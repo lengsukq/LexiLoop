@@ -26,6 +26,7 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
   content: DictionaryContent;
   attempts: ProviderAttempt[];
   hasTransientFailure: boolean;
+  contentSource: "AI_ONLY" | "MIXED" | "DICTIONARY_ONLY";
   requiredProviderFailure: null | {
     transient: boolean;
     errorCode: string;
@@ -65,10 +66,14 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
         errorMessage: aiResult?.attempt.errorMessage ?? "AI 词条初始化 Provider 未执行成功。",
       }
     : null;
+  const aiSuccess = aiResult?.attempt.status === "SUCCESS";
+  const nonAiSuccess = settled.some((item) => !item.attempt.providerId.startsWith("ai:") && item.attempt.status === "SUCCESS");
+  const contentSource = aiSuccess && !nonAiSuccess ? "AI_ONLY" as const : aiSuccess ? "MIXED" as const : "DICTIONARY_ONLY" as const;
   return {
     content: mergeDictionaryContent(...settled.map((item) => item.content)),
     attempts: settled.map((item) => item.attempt),
     hasTransientFailure: settled.some((item) => item.transient),
+    contentSource,
     requiredProviderFailure,
   };
 }

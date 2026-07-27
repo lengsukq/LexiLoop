@@ -37,6 +37,7 @@ interface Detail {
   targetLanguageName: string | null;
   entryType: string;
   initializationStatus: string;
+  contentSource: string;
   masteryLevel: string;
   masteryScore: number;
   isSuspended: boolean;
@@ -303,14 +304,14 @@ export default function WordDetailPage() {
   }
 
   if (!word && !error) {
-    return <div className="grid min-h-[70vh] place-items-center"><Loader2 className="size-8 animate-spin text-indigo-500" /></div>;
+    return <div className="grid min-h-[70vh] place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>;
   }
 
   if (!word) {
     return <div className="py-20 text-center">
-      <AlertCircle className="mx-auto size-12 text-rose-500" />
+      <AlertCircle className="mx-auto size-12 text-[#ff3b30]" />
       <h1 className="mt-4 text-xl font-bold">词条加载失败</h1>
-      <p className="mt-2 text-sm text-slate-500">{error}</p>
+      <p className="mt-2 text-sm text-[#6e6e73] dark:text-[#98989d]">{error}</p>
       <Link href="/words" className={`${buttonClass("outline")} mt-6`}><ArrowLeft className="size-4" />返回单词本</Link>
     </div>;
   }
@@ -344,19 +345,21 @@ export default function WordDetailPage() {
     </div>
 
     <Card className="overflow-hidden">
-      <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-6 text-white sm:p-8">
+      <div className="bg-gradient-to-br from-[#007aff] to-[#5856d6] p-6 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap gap-2">
               <InitializationBadge status={word.initializationStatus} />
               <MasteryBadge level={word.masteryLevel} />
               {word.content.summary.cefrLevel && <Badge tone="purple">CEFR {word.content.summary.cefrLevel}</Badge>}
+              {word.contentSource === "AI_ONLY" && <Badge tone="purple">纯 AI 生成</Badge>}
+              {word.contentSource === "DICTIONARY_ONLY" && <Badge tone="blue">词典</Badge>}
               {word.wrongWordState?.active && <Badge tone="red">活跃错词</Badge>}
             </div>
             <h1 className="mt-5 text-4xl font-bold sm:text-5xl">{word.term}</h1>
             {word.content.summary.translation && <p className="mt-3 text-xl font-medium text-white/95">{word.content.summary.translation}</p>}
-            {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-100">{word.content.summary.shortDefinition}</p>}
-            <p className="mt-3 text-sm text-indigo-100">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {word.entryType === "WORD" ? "单词" : word.entryType === "SENTENCE" ? "句子" : "短语"}</p>
+            {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">{word.content.summary.shortDefinition}</p>}
+            <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {word.entryType === "WORD" ? "单词" : word.entryType === "SENTENCE" ? "句子" : "短语"}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-lg border border-white/25">
                 {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)} className={`px-2 py-0.5 text-xs font-medium transition ${selectedAccent === accent ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{accent === "US" ? "美" : accent === "UK" ? "英" : "通用"}</button>)}
@@ -365,36 +368,36 @@ export default function WordDetailPage() {
               {ttsTip && <p className="w-full text-xs text-amber-300">{ttsTip}</p>}
             </div>
           </div>
-          <div className="rounded-3xl bg-white/15 p-5 text-center backdrop-blur">
+          <div className="rounded-3xl bg-white/15 p-5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-xl">
             <p className="text-4xl font-bold">{word.masteryScore}</p>
-            <p className="text-xs text-indigo-100">熟练度</p>
+            <p className="text-xs text-white/70">熟练度</p>
             <Progress value={word.masteryScore} className="mt-3 w-28 bg-white/20 [&>div]:bg-white" />
           </div>
         </div>
       </div>
     </Card>
 
-    {error && <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">{error}</div>}
+    {error && <div className="rounded-[18px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] shadow-[0_8px_32px_rgba(255,59,48,0.08)] backdrop-blur-xl dark:text-[#ff453a]">{error}</div>}
 
     <div className="grid gap-5 lg:grid-cols-[1.4fr_.6fr]">
       <div className="space-y-5">
         <Card>
           <CardHeader><CardTitle>释义</CardTitle></CardHeader>
           <CardContent>
-            {definitions.length ? <div className="space-y-3">{definitions.map((definition, index) => <div key={`${definition.source}-${definition.senseId ?? index}-${definition.text}`} className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/60">
+            {definitions.length ? <div className="space-y-3">{definitions.map((definition, index) => <div key={`${definition.source}-${definition.senseId ?? index}-${definition.text}`} className="rounded-[16px] border border-white/50 bg-white/40 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
               <div className="flex flex-wrap gap-2">
                 <Badge>{definition.partOfSpeech || "释义"}</Badge>
                 {definition.register && <Badge tone="amber">{definition.register}</Badge>}
                 <Badge tone={definition.source === "user" ? "purple" : definition.source.startsWith("ai:") ? "green" : "blue"}>{definition.source === "user" ? "我的释义" : definition.source.startsWith("ai:") ? "AI" : definition.source}</Badge>
               </div>
               <p className="mt-2 leading-7">{definition.text}</p>
-              {definition.usageNote && <p className="mt-2 text-xs text-slate-500">用法：{definition.usageNote}</p>}
-            </div>)}</div> : <p className="text-sm text-slate-500">尚无释义。可以等待 AI 初始化，或直接填写手动释义继续学习。</p>}
-            <div className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-700">
+              {definition.usageNote && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">用法：{definition.usageNote}</p>}
+            </div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无释义。可以等待 AI 初始化，或直接填写手动释义继续学习。</p>}
+            <div className="mt-5 border-t border-black/[0.06] pt-5 dark:border-white/[0.08]">
               <label className="text-sm font-medium">手动释义</label>
-              <textarea className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 bg-transparent p-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700" value={manualDefinition} onChange={(event) => setManualDefinition(event.target.value)} placeholder="例如：棉花；棉布。保存后即使 AI 服务暂时失败，该词也可以进入学习。" />
+              <textarea className="mt-2 min-h-24 w-full rounded-[14px] border border-black/[0.06] bg-white/60 p-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" value={manualDefinition} onChange={(event) => setManualDefinition(event.target.value)} placeholder="例如：棉花；棉布。保存后即使 AI 服务暂时失败，该词也可以进入学习。" />
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-slate-400">AI 强制刷新时不会覆盖你的手动释义。</p>
+                <p className="text-xs text-[#aeaeb2]">AI 强制刷新时不会覆盖你的手动释义。</p>
                 <Button variant="outline" onClick={() => void saveManualDefinition()} disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存释义</Button>
               </div>
             </div>
@@ -403,31 +406,31 @@ export default function WordDetailPage() {
 
         {word.content.examples.length > 0 && <Card>
           <CardHeader><CardTitle>例句</CardTitle></CardHeader>
-          <CardContent className="space-y-3">{word.content.examples.map((example, index) => <div key={`${example.sentence}-${index}`} className="rounded-xl border-l-4 border-indigo-300 bg-slate-50 p-4 dark:bg-slate-800/60">
-            <div className="flex items-center gap-2"><Badge>{example.difficulty ?? "NORMAL"}</Badge>{example.senseId && <span className="text-xs text-slate-400">词义 {example.senseId}</span>}</div>
+          <CardContent className="space-y-3">{word.content.examples.map((example, index) => <div key={`${example.sentence}-${index}`} className="rounded-[16px] border-l-4 border-[#007aff]/40 bg-white/40 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:bg-white/[0.04]">
+            <div className="flex items-center gap-2"><Badge>{example.difficulty ?? "NORMAL"}</Badge>{example.senseId && <span className="text-xs text-[#aeaeb2]">词义 {example.senseId}</span>}</div>
             <p className="mt-2 italic leading-7">{example.sentence}</p>
-            {example.translation && <p className="mt-1 text-sm text-slate-500">{example.translation}</p>}
+            {example.translation && <p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">{example.translation}</p>}
           </div>)}</CardContent>
         </Card>}
 
         {word.entryType === "SENTENCE" && (word.content.sentenceAnalysis.grammarNotes.length > 0 || word.content.sentenceAnalysis.keyExpressions.length > 0 || word.content.sentenceAnalysis.variations.length > 0) && <Card>
           <CardHeader><CardTitle>句子分析</CardTitle></CardHeader>
           <CardContent className="space-y-5">
-            {word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">语法要点</p><ul className="space-y-2">{word.content.sentenceAnalysis.grammarNotes.map((item) => <li key={item} className="rounded-xl bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">{item}</li>)}</ul></div>}
-            {word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">关键表达</p><div className="space-y-2">{word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><b className="text-sm">{item.expression}</b><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.meaning}</p>{item.note && <p className="mt-1 text-xs text-slate-400">{item.note}</p>}</div>)}</div></div>}
-            {word.content.sentenceAnalysis.variations.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">替换句型</p><div className="space-y-2">{word.content.sentenceAnalysis.variations.map((item) => <div key={item.sentence} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60"><p className="text-sm">{item.sentence}</p>{item.translation && <p className="mt-1 text-xs text-slate-500">{item.translation}</p>}</div>)}</div></div>}
+            {word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">语法要点</p><ul className="space-y-2">{word.content.sentenceAnalysis.grammarNotes.map((item) => <li key={item} className="rounded-[14px] border border-[#007aff]/10 bg-[#007aff]/[0.06] p-3 text-sm text-[#007aff] shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]">{item}</li>)}</ul></div>}
+            {word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">关键表达</p><div className="space-y-2">{word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression} className="rounded-[14px] border border-white/50 bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]"><b className="text-sm">{item.expression}</b><p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">{item.meaning}</p>{item.note && <p className="mt-1 text-xs text-[#aeaeb2]">{item.note}</p>}</div>)}</div></div>}
+            {word.content.sentenceAnalysis.variations.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">替换句型</p><div className="space-y-2">{word.content.sentenceAnalysis.variations.map((item) => <div key={item.sentence} className="rounded-[14px] bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:bg-white/[0.04]"><p className="text-sm">{item.sentence}</p>{item.translation && <p className="mt-1 text-xs text-[#6e6e73] dark:text-[#98989d]">{item.translation}</p>}</div>)}</div></div>}
           </CardContent>
         </Card>}
 
         {hasLearningContent && <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="size-5 text-violet-500" />AI 学习提示</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="size-5 text-[#af52de]" />AI 学习提示</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             {word.content.learning.pronunciationTip && <InfoBlock label="发音提示" text={word.content.learning.pronunciationTip} />}
             {word.content.learning.mnemonic && <InfoBlock label="记忆方法" text={word.content.learning.mnemonic} />}
-            {!word.content.learning.mnemonic && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">记忆方法</p><Button variant="outline" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}AI 生成趣味助记</Button>{mnemonicError && <p className="mt-2 text-xs text-rose-500">{mnemonicError}</p>}</div>}
+            {!word.content.learning.mnemonic && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">记忆方法</p><Button variant="outline" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}AI 生成趣味助记</Button>{mnemonicError && <p className="mt-2 text-xs text-[#ff3b30]">{mnemonicError}</p>}</div>}
             {word.content.learning.mnemonic && <div className="flex justify-end"><Button variant="ghost" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}重新生成</Button></div>}
 
-            {word.content.learning.commonMistakes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">常见错误</p><ul className="space-y-2">{word.content.learning.commonMistakes.map((item) => <li key={item} className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{item}</li>)}</ul></div>}
+            {word.content.learning.commonMistakes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">常见错误</p><ul className="space-y-2">{word.content.learning.commonMistakes.map((item) => <li key={item} className="rounded-[14px] border border-[#ff9500]/10 bg-[#ff9500]/[0.06] p-3 text-sm text-[#c93400] shadow-[0_4px_12px_rgba(255,149,0,0.04)] backdrop-blur-sm dark:text-[#ff9f0a]">{item}</li>)}</ul></div>}
           </CardContent>
         </Card>}
 
@@ -449,7 +452,7 @@ export default function WordDetailPage() {
         <Card>
           <CardHeader><CardTitle>个人备注</CardTitle></CardHeader>
           <CardContent>
-            <textarea className="min-h-32 w-full rounded-xl border border-slate-200 bg-transparent p-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700" value={note} onChange={(event) => setNote(event.target.value)} placeholder="记录记忆方法、易混淆词或使用场景…" />
+            <textarea className="min-h-32 w-full rounded-[14px] border border-black/[0.06] bg-white/60 p-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" value={note} onChange={(event) => setNote(event.target.value)} placeholder="记录记忆方法、易混淆词或使用场景…" />
             <div className="mt-3 flex justify-end"><Button onClick={() => void patch({ userNote: note || null })} disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存备注</Button></div>
           </CardContent>
         </Card>
@@ -463,49 +466,49 @@ export default function WordDetailPage() {
             <Stat label="遗忘次数" value={word.reviewCard?.lapses ?? 0} />
             <Stat label="稳定性" value={word.reviewCard ? word.reviewCard.stability.toFixed(1) : "—"} />
             <Stat label="下次到期" value={formatDate(word.reviewCard?.dueAt, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} />
-            {word.wrongWordState && <div className="rounded-xl bg-rose-50 p-3 text-sm dark:bg-rose-950/30"><p className="font-medium text-rose-700 dark:text-rose-300">错词记录</p><p className="mt-1 text-xs text-rose-600/80">错误 {word.wrongWordState.wrongCount} 次 · 困难 {word.wrongWordState.hardCount} 次 · 连续正确 {word.wrongWordState.consecutiveCorrect}</p></div>}
+            {word.wrongWordState && <div className="rounded-[16px] border border-[#ff3b30]/10 bg-[#ff3b30]/[0.06] p-3 text-sm shadow-[0_4px_16px_rgba(255,59,48,0.05)] backdrop-blur-sm"><p className="font-medium text-[#d70015] dark:text-[#ff453a]">错词记录</p><p className="mt-1 text-xs text-[#ff3b30]/70">错误 {word.wrongWordState.wrongCount} 次 · 困难 {word.wrongWordState.hardCount} 次 · 连续正确 {word.wrongWordState.consecutiveCorrect}</p></div>}
             <Button variant="outline" className="w-full" onClick={() => void patch({ isSuspended: !word.isSuspended })}>{word.isSuspended ? <PlayCircle className="size-4" /> : <PauseCircle className="size-4" />}{word.isSuspended ? "恢复学习" : "暂停学习"}</Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>AI 初始化质量</CardTitle></CardHeader>
-          <CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
+          <CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
             <div className="flex items-center justify-between gap-2"><b className="truncate">{attempt.providerId}</b><Badge tone={attempt.status === "SUCCESS" ? "green" : attempt.status === "FAILED" ? "red" : "amber"}>{attempt.status}</Badge></div>
-            {attempt.metadata?.qualityScore !== undefined && <p className="mt-2 text-xs text-slate-500">质量分：{attempt.metadata.qualityScore} · Token：{attempt.metadata.inputTokens ?? "?"} + {attempt.metadata.outputTokens ?? "?"}</p>}
-            {attempt.errorMessage && <p className="mt-2 text-xs text-rose-500">{attempt.errorMessage}</p>}
-          </div>)}</div> : <p className="text-sm text-slate-500">尚无初始化记录。</p>}</CardContent>
+            {attempt.metadata?.qualityScore !== undefined && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">质量分：{attempt.metadata.qualityScore} · Token：{attempt.metadata.inputTokens ?? "?"} + {attempt.metadata.outputTokens ?? "?"}</p>}
+            {attempt.errorMessage && <p className="mt-2 text-xs text-[#ff3b30]">{attempt.errorMessage}</p>}
+          </div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无初始化记录。</p>}</CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>最近复习</CardTitle></CardHeader>
-          <CardContent>{word.recentReviews.length ? <div className="space-y-3">{word.recentReviews.slice(0, 8).map((review) => <div key={review.id} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2">{review.isCorrect ? <Check className="size-4 text-emerald-500" /> : <AlertCircle className="size-4 text-rose-500" />}<span>{review.rating}</span></span><span className="text-xs text-slate-400">{formatDate(review.reviewedAt, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span></div>)}</div> : <p className="text-sm text-slate-500">尚无复习记录。</p>}</CardContent>
+          <CardContent>{word.recentReviews.length ? <div className="space-y-3">{word.recentReviews.slice(0, 8).map((review) => <div key={review.id} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2">{review.isCorrect ? <Check className="size-4 text-[#34c759]" /> : <AlertCircle className="size-4 text-[#ff3b30]" />}<span>{review.rating}</span></span><span className="text-xs text-[#aeaeb2]">{formatDate(review.reviewedAt, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span></div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无复习记录。</p>}</CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>来源与时间</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm text-slate-500"><p className="flex items-center gap-2"><CalendarClock className="size-4" />导入：{formatDate(word.createdAt)}</p><p>收藏：{formatDate(word.sourceCreatedAt)}</p><p>内容更新：{formatDate(word.updatedAt)}</p></CardContent>
+          <CardContent className="space-y-2 text-sm text-[#6e6e73] dark:text-[#98989d]"><p className="flex items-center gap-2"><CalendarClock className="size-4" />导入：{formatDate(word.createdAt)}</p><p>收藏：{formatDate(word.sourceCreatedAt)}</p><p>内容更新：{formatDate(word.updatedAt)}</p></CardContent>
         </Card>
       </div>
     </div>
 
     {relatedSelection && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" aria-label="关闭关联词提示" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]" onClick={() => setRelatedSelection(null)} />
+      <button type="button" aria-label="关闭关联词提示" className="absolute inset-0 bg-black/30 backdrop-blur-md" onClick={() => setRelatedSelection(null)} />
       <Card className="relative z-10 w-full max-w-md shadow-2xl">
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
-            <div><Badge tone="purple">{relationLabel(relatedSelection.relation)}</Badge><CardTitle className="mt-3 text-2xl">{relatedSelection.item.word}</CardTitle>{relatedSelection.item.translation && <p className="mt-1 text-sm text-slate-500">{relatedSelection.item.translation}</p>}</div>
+            <div><Badge tone="purple">{relationLabel(relatedSelection.relation)}</Badge><CardTitle className="mt-3 text-2xl">{relatedSelection.item.word}</CardTitle>{relatedSelection.item.translation && <p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">{relatedSelection.item.translation}</p>}</div>
             <Button variant="ghost" size="sm" onClick={() => setRelatedSelection(null)}><X className="size-4" /></Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {relatedSelection.item.difference && <div className="rounded-xl bg-indigo-50 p-3 text-sm leading-6 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">{relatedSelection.item.difference}</div>}
-          {relatedBusy && !relatedPreview ? <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500"><Loader2 className="size-5 animate-spin" />正在检查词库状态…</div> : relatedPreview && <div className="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700">
-            <div className="flex items-center justify-between"><span className="text-slate-500">词库状态</span>{relatedPreview.existing ? <InitializationBadge status={relatedPreview.existing.initializationStatus} /> : <Badge>尚未加入</Badge>}</div>
-            <div className="mt-2 flex items-center justify-between"><span className="text-slate-500">语言方向</span><span>{relatedPreview.sourceLanguage} → {relatedPreview.targetLanguage}</span></div>
-            {relatedPreview.partOfSpeech && <div className="mt-2 flex items-center justify-between"><span className="text-slate-500">词性</span><span>{relatedPreview.partOfSpeech}</span></div>}
+          {relatedSelection.item.difference && <div className="rounded-[16px] border border-[#af52de]/10 bg-[#af52de]/[0.06] p-3 text-sm leading-6 text-[#8944ab] shadow-[0_4px_12px_rgba(175,82,222,0.04)] backdrop-blur-sm dark:text-[#bf5af2]">{relatedSelection.item.difference}</div>}
+          {relatedBusy && !relatedPreview ? <div className="flex items-center justify-center gap-2 py-6 text-sm text-[#6e6e73] dark:text-[#98989d]"><Loader2 className="size-5 animate-spin" />正在检查词库状态…</div> : relatedPreview && <div className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
+            <div className="flex items-center justify-between"><span className="text-[#6e6e73] dark:text-[#98989d]">词库状态</span>{relatedPreview.existing ? <InitializationBadge status={relatedPreview.existing.initializationStatus} /> : <Badge>尚未加入</Badge>}</div>
+            <div className="mt-2 flex items-center justify-between"><span className="text-[#6e6e73] dark:text-[#98989d]">语言方向</span><span>{relatedPreview.sourceLanguage} → {relatedPreview.targetLanguage}</span></div>
+            {relatedPreview.partOfSpeech && <div className="mt-2 flex items-center justify-between"><span className="text-[#6e6e73] dark:text-[#98989d]">词性</span><span>{relatedPreview.partOfSpeech}</span></div>}
           </div>}
-          {relatedMessage && <div className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{relatedMessage}</div>}
+          {relatedMessage && <div className="rounded-[16px] border border-[#34c759]/10 bg-[#34c759]/[0.06] p-3 text-sm text-[#248a3d] shadow-[0_4px_12px_rgba(52,199,89,0.04)] backdrop-blur-sm dark:text-[#30d158]">{relatedMessage}</div>}
           <div className="flex justify-end gap-2">
             {relatedPreview?.existing && <Link href={`/words/${relatedPreview.existing.id}`} className={buttonClass("outline")}><ExternalLink className="size-4" />打开词条</Link>}
             {(!relatedPreview?.existing || !["READY", "PARTIAL"].includes(relatedPreview.existing.initializationStatus)) && <Button onClick={() => void addRelated()} disabled={relatedBusy || !relatedPreview}>{relatedBusy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}{relatedPreview?.existing ? "加入初始化" : "加入词库并初始化"}</Button>}
@@ -517,19 +520,19 @@ export default function WordDetailPage() {
 }
 
 function Group({ label, values }: { label: string; values: string[] }) {
-  return <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p><div className="flex flex-wrap gap-2">{values.map((value) => <Badge key={value}>{value}</Badge>)}</div></div>;
+  return <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">{label}</p><div className="flex flex-wrap gap-2">{values.map((value) => <Badge key={value}>{value}</Badge>)}</div></div>;
 }
 
 function RelatedGroup({ label, values, relation, onSelect }: { label: string; values: RelatedWordItem[]; relation: RelationType; onSelect: (item: RelatedWordItem, relation: RelationType) => void }) {
-  return <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p><div className="flex flex-wrap gap-2">{values.map((item) => <button key={`${relation}-${item.word}`} type="button" onClick={() => void onSelect(item, relation)} className="group inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-indigo-100 hover:text-indigo-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-indigo-950 dark:hover:text-indigo-200"><span>{item.word}</span><Plus className="size-3 opacity-45 transition group-hover:opacity-100" /></button>)}</div></div>;
+  return <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">{label}</p><div className="flex flex-wrap gap-2">{values.map((item) => <button key={`${relation}-${item.word}`} type="button" onClick={() => void onSelect(item, relation)} className="group inline-flex items-center gap-1.5 rounded-full border border-white/50 bg-white/50 px-3 py-1 text-xs font-medium text-[#1c1c1e] shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition hover:border-[#007aff]/30 hover:bg-[#007aff]/[0.08] hover:text-[#007aff] hover:shadow-[0_4px_16px_rgba(0,122,255,0.1)] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-[#f5f5f7] dark:hover:text-[#0a84ff]"><span>{item.word}</span><Plus className="size-3 opacity-45 transition group-hover:opacity-100" /></button>)}</div></div>;
 }
 
 function InfoBlock({ label, text }: { label: string; text: string }) {
-  return <div className="rounded-xl bg-violet-50 p-4 dark:bg-violet-950/30"><p className="text-xs font-medium uppercase tracking-wide text-violet-500">{label}</p><p className="mt-2 text-sm leading-6 text-violet-900 dark:text-violet-100">{text}</p></div>;
+  return <div className="rounded-[16px] border border-[#af52de]/10 bg-[#af52de]/[0.06] p-4 shadow-[0_4px_16px_rgba(175,82,222,0.05)] backdrop-blur-sm"><p className="text-xs font-medium uppercase tracking-wide text-[#af52de]">{label}</p><p className="mt-2 text-sm leading-6 text-[#1c1c1e] dark:text-[#f5f5f7]">{text}</p></div>;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
-  return <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-sm last:border-0 dark:border-slate-800"><span className="text-slate-500">{label}</span><b>{value}</b></div>;
+  return <div className="flex items-center justify-between border-b border-black/[0.05] pb-3 text-sm last:border-0 dark:border-white/[0.06]"><span className="text-[#6e6e73] dark:text-[#98989d]">{label}</span><b>{value}</b></div>;
 }
 
 function relationLabel(relation: RelationType): string {

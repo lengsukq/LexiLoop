@@ -162,10 +162,26 @@ export async function processReviewAnswer(input: AnswerInput) {
     if (!["READY", "PARTIAL"].includes(word.initialization_status)) throw new Error("WORD_NOT_READY");
     if (word.is_suspended) throw new Error("WORD_SUSPENDED");
 
-    const spelling = input.questionType !== "EN_TO_ZH";
+    const spelling = input.questionType === "ZH_TO_EN_SPELLING" || input.questionType === "LISTENING_SPELLING";
+    const isChoice = input.questionType === "EN_TO_ZH_CHOICE";
     const normalizedAnswer = normalizeTerm(input.userAnswer ?? "", word.source_language);
-    const isCorrect = spelling ? normalizedAnswer === word.normalized_term : input.rating !== "AGAIN";
-    const effectiveRating: ReviewRating = spelling && !isCorrect ? "AGAIN" : input.rating;
+    let isCorrect: boolean;
+    if (spelling) {
+      isCorrect = normalizedAnswer === word.normalized_term;
+    } else if (isChoice) {
+      const content = sqlite.prepare("SELECT definitions_json FROM word_contents WHERE word_id = ?").get(word.id) as { definitions_json: string } | undefined;
+      if (content) {
+        try {
+          const defs = JSON.parse(content.definitions_json) as Array<{ language: string; text: string }>;
+          const target = defs.filter((d) => d.language === word.target_language);
+          const correctDef = (target.length ? target : defs)[0]?.text ?? "";
+          isCorrect = (input.userAnswer ?? "").trim() === correctDef.trim();
+        } catch { isCorrect = input.rating !== "AGAIN"; }
+      } else { isCorrect = input.rating !== "AGAIN"; }
+    } else {
+      isCorrect = input.rating !== "AGAIN";
+    }
+    const effectiveRating: ReviewRating = (spelling || isChoice) && !isCorrect ? "AGAIN" : input.rating;
     const currentRow = sqlite.prepare("SELECT * FROM review_cards WHERE word_id = ?").get(word.id) as {
       due_at: number; stability: number; difficulty: number; elapsed_days: number; scheduled_days: number;
       reps: number; lapses: number; fsrs_state: number; learning_steps: number; last_review_at: number | null;
@@ -184,7 +200,7 @@ export async function processReviewAnswer(input: AnswerInput) {
       .run(word.id, next.due.getTime(), next.stability, next.difficulty, next.elapsed_days, next.scheduled_days,
         next.reps, next.lapses, next.state, next.learning_steps, now, now, now);
 
-    const expected = input.questionType === "EN_TO_ZH" ? (() => {
+    const expected = (input.questionType === "EN_TO_ZH" || isChoice) ? (() => {
       const content = sqlite.prepare("SELECT definitions_json FROM word_contents WHERE word_id = ?").get(word.id) as { definitions_json: string } | undefined;
       if (!content) return "";
       try {
@@ -193,7 +209,7 @@ export async function processReviewAnswer(input: AnswerInput) {
         return (target.length ? target : values).map((item) => item.text).join("；");
       } catch { return ""; }
     })() : word.term;
-    const prompt = input.questionType === "EN_TO_ZH" ? word.term : expected;
+    const prompt = (input.questionType === "EN_TO_ZH" || isChoice) ? word.term : expected;
     const log = sqlite.prepare(`INSERT INTO review_logs
       (client_answer_id, word_id, study_session_id, study_session_item_id, reviewed_at, rating, question_type,
        presented_prompt, user_answer, expected_answer, is_correct, duration_ms, card_before_json, card_after_json, created_at)
@@ -205,8 +221,9 @@ export async function processReviewAnswer(input: AnswerInput) {
     const wrong = upsertWrongState(word.id, effectiveRating, isCorrect, now);
     const stats = sqlite.prepare(`SELECT count(*) AS total,
       sum(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct,
-      sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again
-      FROM review_logs WHERE word_id = ?`).get(now - 30 * 24 * 60 * 60 * 1000, word.id) as { total: number; correct: number; recent_again: number };
+      sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again,
+      avg(CASE WHEN duration_ms IS NOT NULL AND duration_ms > 0 THEN duration_ms ELSE NULL END) AS avg_duration
+      FROM review_logs WHERE word_id = ?`).get(now - 30 * 24 * 60 * 60 * 1000, word.id) as { total: number; correct: number; recent_again: number; avg_duration: number | null };
     const masteryInput = {
       stability: next.stability,
       scheduledDays: next.scheduled_days,
@@ -216,6 +233,7 @@ export async function processReviewAnswer(input: AnswerInput) {
       consecutiveCorrect: wrong.consecutiveCorrect,
       activeWrongWord: wrong.active,
       recentAgain: stats.recent_again ?? 0,
+      avgDurationMs: stats.avg_duration ?? undefined,
     };
     const masteryScore = calculateMasteryScore(masteryInput);
     const masteryLevel = determineMasteryLevel(masteryInput, masteryScore);

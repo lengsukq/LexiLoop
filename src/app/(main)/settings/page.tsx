@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Database, Download, HardDrive, Loader2, Plus, RefreshCw, Save, Trash2, Upload, Volume2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Database, Download, HardDrive, Loader2, Plus, RefreshCw, Save, Trash2, Upload, Volume2, X, Zap } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import type { AppSettings, LlmPurposeId, LlmProviderConfig } from "@/lib/types";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, PageHeader, Select } from "@/components/ui";
@@ -45,7 +45,7 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className="flex items-center gap-2 text-sm font-medium"><span>{label}</span>
-    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-indigo-600" />
+    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-[#007aff]" />
   </label>;
 }
 
@@ -151,6 +151,8 @@ export default function SettingsPage() {
 
   const [ttsTestState, setTtsTestState] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [ttsTestMessage, setTtsTestMessage] = useState("");
+  const [providerTest, setProviderTest] = useState<Record<number, { state: "idle" | "testing" | "success" | "error"; message: string }>>({});
+  const [providerTestModel, setProviderTestModel] = useState<Record<number, string>>({});
 
   async function testTts() {
     if (!settings) return;
@@ -174,6 +176,25 @@ export default function SettingsPage() {
     } catch {
       setTtsTestState("error");
       setTtsTestMessage("网络请求失败");
+    }
+  }
+
+  async function testProvider(index: number) {
+    if (!settings) return;
+    const provider = settings.llmConfig.providers[index];
+    if (!provider) return;
+    const model = providerTestModel[index] || suggestedModels(provider.apiType, "IMPORT_ENRICHMENT")[0] || "";
+    if (!model) { setProviderTest((t) => ({ ...t, [index]: { state: "error", message: "请输入要测试的模型名称" } })); return; }
+    setProviderTest((t) => ({ ...t, [index]: { state: "testing", message: "" } }));
+    try {
+      const result = await apiFetch<{ model: string; durationMs: number; responsePreview: string }>("/api/settings/test-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiType: provider.apiType, baseUrl: provider.baseUrl, apiKey: provider.apiKey, model }),
+      });
+      setProviderTest((t) => ({ ...t, [index]: { state: "success", message: `${result.model} 响应正常（${result.durationMs}ms）` } }));
+    } catch (reason) {
+      setProviderTest((t) => ({ ...t, [index]: { state: "error", message: reason instanceof Error ? reason.message : "连接失败" } }));
     }
   }
 
@@ -242,21 +263,21 @@ export default function SettingsPage() {
         action={<Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button>}
       />
       {error && (
-        <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-4 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+        <div className="flex items-center gap-2 rounded-[18px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.08] p-4 text-sm text-[#d70015] shadow-[0_8px_32px_rgba(255,59,48,0.08)] backdrop-blur-xl dark:text-[#ff453a]">
           <AlertCircle className="size-4" />{error}
         </div>
       )}
       {message && (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+        <div className="flex items-center gap-2 rounded-[18px] border border-[#34c759]/15 bg-[#34c759]/[0.08] p-4 text-sm text-[#248a3d] shadow-[0_8px_32px_rgba(52,199,89,0.08)] backdrop-blur-xl dark:text-[#30d158]">
           <CheckCircle2 className="size-4" />{message}
         </div>
       )}
-    {!settings && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-indigo-500" /></div>}
+    {!settings && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>}
       {settings && (
         <>
           <Card>
             <CardHeader><CardTitle>每日学习计划</CardTitle></CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
               <NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} />
               <NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} />
               <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
@@ -269,6 +290,7 @@ export default function SettingsPage() {
                   <option value={0.95}>95% - 高强度</option>
                 </Select>
               </label>
+              <NumberField label="初始化并行数" value={settings.backgroundConcurrency} min={1} max={10} onChange={(value) => update("backgroundConcurrency", value)} />
             </CardContent>
           </Card>
 
@@ -301,12 +323,12 @@ export default function SettingsPage() {
           <Card>
             <CardHeader><CardTitle>语音合成 (TTS)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-slate-500">发音功能已内置使用 <strong>Microsoft Edge TTS</strong>，完全免费，无需配置 API Key 或模型。</p>
+              <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">发音功能已内置使用 <strong>Microsoft Edge TTS</strong>，完全免费，无需配置 API Key 或模型。</p>
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <div className="flex items-center gap-2 rounded-[14px] border border-[#34c759]/15 bg-[#34c759]/[0.08] px-4 py-2 text-sm text-[#248a3d] shadow-[0_4px_12px_rgba(52,199,89,0.06)] backdrop-blur-sm dark:text-[#30d158]">
                   <CheckCircle2 className="size-4" />免费 - 无需额外配置
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                <div className="flex items-center gap-2 rounded-[14px] border border-[#007aff]/15 bg-[#007aff]/[0.08] px-4 py-2 text-sm text-[#007aff] shadow-[0_4px_12px_rgba(0,122,255,0.06)] backdrop-blur-sm dark:text-[#0a84ff]">
                   <Volume2 className="size-4" />支持美音 / 英音
                 </div>
               </div>
@@ -315,7 +337,7 @@ export default function SettingsPage() {
                   {ttsTestState === "testing" ? <Loader2 className="size-4 animate-spin" /> : <Volume2 className="size-4" />}试听发音
                 </Button>
                 {ttsTestState !== "idle" && (
-                  <span className={`text-xs ${ttsTestState === "success" ? "text-emerald-600" : "text-rose-600"}`}>{ttsTestMessage}</span>
+                  <span className={`text-xs ${ttsTestState === "success" ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{ttsTestMessage}</span>
                 )}
               </div>
             </CardContent>
@@ -326,7 +348,7 @@ export default function SettingsPage() {
               <CardTitle>大模型配置</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">
                 配置 AI 大模型生成完整词汇学习内容，包括分词义释义、例句、搭配、词形、同根词、近反义词、易混词和记忆提示。Edge TTS 仍独立负责发音。
               </p>
 
@@ -339,14 +361,14 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 {settings.llmConfig.providers.length === 0 && (
-                  <p className="text-xs text-slate-400">暂无配置，请添加一个 Provider。</p>
+                  <p className="text-xs text-[#aeaeb2]">暂无配置，请添加一个 Provider。</p>
                 )}
                 {settings.llmConfig.providers.map((provider, index) => (
-                  <div key={provider.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                  <div key={provider.id} className="rounded-[18px] border border-white/50 bg-white/40 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <label className="space-y-1.5">
-                          <span className="text-xs font-medium text-slate-500">名称</span>
+                          <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">名称</span>
                           <Input
                             value={provider.name}
                             onChange={(e) => updateProviderField(index, "name", e.target.value)}
@@ -354,7 +376,7 @@ export default function SettingsPage() {
                           />
                         </label>
                         <label className="space-y-1.5">
-                          <span className="text-xs font-medium text-slate-500">API 类型</span>
+                          <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">API 类型</span>
                           <Select
                             className="w-full"
                             value={provider.apiType}
@@ -365,7 +387,7 @@ export default function SettingsPage() {
                           </Select>
                         </label>
                         <label className="space-y-1.5">
-                          <span className="text-xs font-medium text-slate-500">接口地址</span>
+                          <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">接口地址</span>
                           <Input
                             value={provider.baseUrl}
                             onChange={(e) => updateProviderField(index, "baseUrl", e.target.value)}
@@ -373,7 +395,7 @@ export default function SettingsPage() {
                           />
                         </label>
                         <label className="space-y-1.5">
-                          <span className="text-xs font-medium text-slate-500">API Key</span>
+                          <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">API Key</span>
                           <Input
                             value={provider.apiKey}
                             onChange={(e) => updateProviderField(index, "apiKey", e.target.value)}
@@ -385,11 +407,33 @@ export default function SettingsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-rose-500 shrink-0"
+                        className="text-[#ff3b30] shrink-0"
                         onClick={() => removeProvider(index)}
                       >
                         <Trash2 className="size-4" />
                       </Button>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
+                      <Input
+                        className="w-56 h-8 text-xs"
+                        placeholder="测试模型，如 gpt-4o-mini"
+                        value={providerTestModel[index] ?? ""}
+                        onChange={(e) => setProviderTestModel((m) => ({ ...m, [index]: e.target.value }))}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void testProvider(index)}
+                        disabled={providerTest[index]?.state === "testing"}
+                      >
+                        {providerTest[index]?.state === "testing" ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}测试连接
+                      </Button>
+                      {providerTest[index]?.state === "success" && (
+                        <span className="text-xs text-[#34c759]">{providerTest[index].message}</span>
+                      )}
+                      {providerTest[index]?.state === "error" && (
+                        <span className="text-xs text-[#ff3b30]">{providerTest[index].message}</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -402,26 +446,26 @@ export default function SettingsPage() {
                   const provider = settings.llmConfig.providers.find((p) => p.id === config.providerId);
                   const models = provider ? suggestedModels(provider.apiType, purpose.id) : [];
                   return (
-                    <div key={purpose.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                    <div key={purpose.id} className="rounded-[18px] border border-white/50 bg-white/40 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">{purpose.label}</p>
-                          <p className="text-xs text-slate-400">{purpose.desc}</p>
+                          <p className="text-xs text-[#aeaeb2]">{purpose.desc}</p>
                         </div>
                         <label className="flex items-center gap-2 text-sm">
-                          <span className="text-slate-500">{config.enabled ? "已启用" : "已禁用"}</span>
+                          <span className="text-[#6e6e73] dark:text-[#98989d]">{config.enabled ? "已启用" : "已禁用"}</span>
                           <input
                             type="checkbox"
                             checked={config.enabled}
                             onChange={(event) => updatePurpose(purpose.id, "enabled", event.target.checked)}
-                            className="size-4 accent-indigo-600"
+                            className="size-4 accent-[#007aff]"
                           />
                         </label>
                       </div>
                       {config.enabled && (
                         <div className="mt-3 flex flex-wrap items-end gap-3">
                           <label className="space-y-1.5 flex-1 min-w-40">
-                            <span className="text-xs font-medium text-slate-500">提供商</span>
+                            <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">提供商</span>
                             <Select
                               className="w-full"
                               value={config.providerId}
@@ -445,7 +489,7 @@ export default function SettingsPage() {
                             </Select>
                           </label>
                           <label className="space-y-1.5 flex-[2] min-w-48">
-                            <span className="text-xs font-medium text-slate-500">模型</span>
+                            <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">模型</span>
                             <Input
                               value={config.model}
                               onChange={(event) => updatePurpose(purpose.id, "model", event.target.value)}
@@ -455,7 +499,7 @@ export default function SettingsPage() {
                           {purpose.id === "IMPORT_ENRICHMENT" && (
                             <>
                               <label className="space-y-1.5 w-20">
-                                <span className="text-xs font-medium text-slate-500">温度</span>
+                                <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">温度</span>
                                 <Input
                                   type="number"
                                   min={0}
@@ -466,23 +510,23 @@ export default function SettingsPage() {
                                 />
                               </label>
                               <label className="space-y-1.5 w-24">
-                                <span className="text-xs font-medium text-slate-500">输出 Token</span>
+                                <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">输出 Token</span>
                                 <Input
                                   type="number"
                                   min={500}
-                                  max={16000}
+                                  max={200000}
                                   step={100}
-                                  value={config.maxOutputTokens ?? 3200}
+                                  value={config.maxOutputTokens ?? 200000}
                                   onChange={(event) => updatePurpose(purpose.id, "maxOutputTokens", Number(event.target.value))}
                                 />
                               </label>
                               <label className="space-y-1.5 w-24">
-                                <span className="text-xs font-medium text-slate-500">超时(秒)</span>
+                                <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">超时(秒)</span>
                                 <Input
                                   type="number"
                                   min={5}
                                   max={300}
-                                  value={(config.timeoutMs ?? 60000) / 1000}
+                                  value={(config.timeoutMs ?? 180000) / 1000}
                                   onChange={(event) => updatePurpose(purpose.id, "timeoutMs", Number(event.target.value) * 1000)}
                                 />
                               </label>
@@ -500,15 +544,15 @@ export default function SettingsPage() {
           <Card>
             <CardHeader><CardTitle>备份与还原</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-slate-500">将学习数据导出为 SQLite 或 JSON 格式进行备份。</p>
+              <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">将学习数据导出为 SQLite 或 JSON 格式进行备份。</p>
               <div className="flex flex-wrap gap-2">
-                <a href="/api/backups/sqlite" download className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><HardDrive className="size-4" />下载 SQLite 备份</a>
-                <a href="/api/backups/json" download className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><Download className="size-4" />下载 JSON 备份</a>
+                <a href="/api/backups/sqlite" download className="inline-flex items-center gap-2 rounded-[14px] border border-white/50 bg-white/50 px-4 py-2 text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-xl transition hover:bg-white/70 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"><HardDrive className="size-4" />下载 SQLite 备份</a>
+                <a href="/api/backups/json" download className="inline-flex items-center gap-2 rounded-[14px] border border-white/50 bg-white/50 px-4 py-2 text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-xl transition hover:bg-white/70 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"><Download className="size-4" />下载 JSON 备份</a>
               </div>
-              <hr className="border-slate-200 dark:border-slate-700" />
-              <p className="text-sm text-slate-500">从备份文件恢复。恢复操作将覆盖全部现有数据。</p>
+              <hr className="border-black/[0.06] dark:border-white/[0.08]" />
+              <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">从备份文件恢复。恢复操作将覆盖全部现有数据。</p>
               <label className="cursor-pointer">
-                <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => restoreInput.current?.click()}>
+                <span className="inline-flex cursor-pointer items-center gap-2 rounded-[14px] border border-white/50 bg-white/50 px-4 py-2 text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-xl transition hover:bg-white/70 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.08]" onClick={() => restoreInput.current?.click()}>
                   <Upload className="size-4" />上传备份文件并恢复
                 </span>
                 <input ref={restoreInput} type="file" accept=".sqlite,.json" className="hidden" onChange={(event) => void restore(event.target.files?.[0])} />
@@ -519,34 +563,34 @@ export default function SettingsPage() {
           <Card>
             <CardHeader><CardTitle>ECDICT 词典</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-slate-500">ECDICT 提供大规模离线英汉词典数据，用词形、词源和真人发音补充 AI 生成内容。</p>
+              <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">ECDICT 提供大规模离线英汉词典数据，用词形、词源和真人发音补充 AI 生成内容。</p>
               {!ecdict ? (
-                <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 className="size-4 animate-spin" />加载中...</div>
+                <div className="flex items-center gap-2 text-sm text-[#aeaeb2]"><Loader2 className="size-4 animate-spin" />加载中...</div>
               ) : ecdict.installed ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <Badge className="text-emerald-600 border-emerald-300" tone="green">{ecdict.enabled ? "已启用" : "已禁用"}</Badge>
-                    <span className="text-xs text-slate-400">{bytes(ecdict.fileSize)}</span>
+                    <Badge className="text-[#34c759] border-[#34c759]/30" tone="green">{ecdict.enabled ? "已启用" : "已禁用"}</Badge>
+                    <span className="text-xs text-[#aeaeb2]">{bytes(ecdict.fileSize)}</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {ecdict.enabled
                       ? <Button variant="outline" size="sm" onClick={() => void ecdictAction("disable")} disabled={busy === "disable"}>停用</Button>
                       : <Button variant="outline" size="sm" onClick={() => void ecdictAction("enable")} disabled={busy === "enable"}>启用</Button>
                     }
-                    <Button variant="outline" size="sm" onClick={() => void ecdictAction("remove")} disabled={busy === "remove"} className="text-rose-500">
+                    <Button variant="outline" size="sm" onClick={() => void ecdictAction("remove")} disabled={busy === "remove"} className="text-[#ff3b30]">
                       {busy === "remove" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}移除
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-400">尚未安装 ECDICT 词典（~700MB）</p>
+                  <p className="text-xs text-[#aeaeb2]">尚未安装 ECDICT 词典（~700MB）</p>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => void ecdictAction("download")} disabled={busy === "download"}>
                       {busy === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}下载并启用
                     </Button>
                     <label className="cursor-pointer">
-                      <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => ecdictInput.current?.click()}>
+                      <span className="inline-flex cursor-pointer items-center gap-2 rounded-[14px] border border-white/50 bg-white/50 px-4 py-2 text-sm font-medium shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-xl transition hover:bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.08]" onClick={() => ecdictInput.current?.click()}>
                         <Upload className="size-4" />上传自定义文件
                       </span>
                       <input ref={ecdictInput} type="file" accept=".sqlite,.mdb" className="hidden" onChange={(event) => void uploadEcdict(event.target.files?.[0])} />

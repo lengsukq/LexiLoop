@@ -1,5 +1,5 @@
 import { sqlite } from "@/db/client";
-import type { EntryType, QuestionType, StudyItemView, StudyMode } from "@/lib/types";
+import type { DictionaryContent, EntryType, QuestionType, StudyItemView, StudyMode } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 import { getSettings } from "@/modules/settings/service";
 
@@ -51,7 +51,7 @@ function dueCandidates(limit: number, now: number): Candidate[] {
     FROM review_cards c JOIN words w ON w.id = c.word_id
     WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
       AND ${candidateAvailabilitySql()}
-    ORDER BY c.due_at ASC LIMIT ?`).all(now, now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as Candidate[];
+    ORDER BY (CAST(? - c.due_at AS REAL) / 86400000.0) * (1.0 + c.difficulty * 0.15) DESC LIMIT ?`).all(now, now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, now, limit) as Candidate[];
 }
 
 function wrongCandidates(limit: number, now: number): Candidate[] {
@@ -89,6 +89,7 @@ function interleave(groups: Array<{ items: Candidate[]; take: number }>): Candid
 function questionFor(mode: StudyMode, taskType: string): QuestionType {
   if (mode === "LISTENING") return "LISTENING_SPELLING";
   if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING";
+  if (taskType === "NEW") return "EN_TO_ZH_CHOICE";
   return "EN_TO_ZH";
 }
 
@@ -135,8 +136,18 @@ function selectCandidates(mode: StudyMode, pools: CandidatePools): Candidate[] {
     case "NEW_WORDS": return pools.fresh.slice(0, pools.limits.fresh);
     case "LISTENING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }]);
     case "SPELLING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }]);
-    case "DAILY": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }]);
+    case "DAILY": return interleave(adaptiveDailyRatios(groups));
   }
+}
+
+function adaptiveDailyRatios(groups: { due: Candidate[]; wrong: Candidate[]; fresh: Candidate[] }) {
+  const total = groups.due.length + groups.wrong.length + groups.fresh.length;
+  if (total === 0) return [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }];
+  const wrongRatio = groups.wrong.length / total;
+  const dueRatio = groups.due.length / total;
+  if (wrongRatio > 0.4) return [{ items: groups.due, take: 3 }, { items: groups.wrong, take: 4 }, { items: groups.fresh, take: 1 }];
+  if (dueRatio > 0.7) return [{ items: groups.due, take: 6 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }];
+  return [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }];
 }
 
 async function loadPools(now: number): Promise<CandidatePools> {
@@ -219,16 +230,31 @@ function expireStaleSessions(now: number): number {
 }
 
 function findResumableSession(mode: StudyMode, now: number): number | null {
-  const modeClause = mode === "DAILY" ? "1 = 1" : "s.session_type = ?";
-  const params: Array<string | number> = mode === "DAILY" ? [now - SESSION_RESUME_TTL_MS] : [mode, now - SESSION_RESUME_TTL_MS];
-  const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
-    WHERE ${modeClause} AND s.completed_at IS NULL AND s.started_at >= ?
-      AND EXISTS (
-        SELECT 1 FROM study_session_items i
-        WHERE i.study_session_id = s.id AND i.status = 'PENDING'
-      )
-    ORDER BY s.started_at DESC LIMIT 1`).get(...params) as { id: number } | undefined;
-  return row?.id ?? null;
+  const ttl = now - SESSION_RESUME_TTL_MS;
+  if (mode === "DAILY") {
+    const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
+      WHERE s.completed_at IS NULL AND s.started_at >= ?
+        AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
+      ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
+    return row?.id ?? null;
+  }
+  const taskTypeMap: Record<string, string> = { DUE_REVIEW: "REVIEW", WRONG_WORDS: "WRONG", NEW_WORDS: "NEW", LISTENING: "LISTENING", SPELLING: "SPELLING" };
+  const taskType = taskTypeMap[mode];
+  // First: exact mode match
+  const exact = sqlite.prepare(`SELECT s.id FROM study_sessions s
+    WHERE s.session_type = ? AND s.completed_at IS NULL AND s.started_at >= ?
+      AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
+    ORDER BY s.started_at DESC LIMIT 1`).get(mode, ttl) as { id: number } | undefined;
+  if (exact) return exact.id;
+  // Fallback: DAILY session with matching task type
+  if (taskType) {
+    const daily = sqlite.prepare(`SELECT s.id FROM study_sessions s
+      WHERE s.completed_at IS NULL AND s.started_at >= ?
+        AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING' AND i.task_type = ?)
+      ORDER BY s.started_at DESC LIMIT 1`).get(ttl, taskType) as { id: number } | undefined;
+    if (daily) return daily.id;
+  }
+  return null;
 }
 
 function activePendingPlan(now: number) {
@@ -291,22 +317,30 @@ export function getStudySession(sessionId: number, resumed = false) {
     FROM study_session_items i JOIN words w ON w.id = i.word_id
     LEFT JOIN word_contents c ON c.word_id = w.id
     WHERE i.study_session_id = ? ORDER BY i.position ASC`).all(sessionId) as Array<Record<string, unknown>>;
-  const items: Array<StudyItemView & { status: string; skipReason: string | null }> = rows.map((row) => ({
-    itemId: Number(row.item_id),
-    position: Number(row.position),
-    taskType: row.task_type as StudyItemView["taskType"],
-    questionType: row.question_type as QuestionType,
-    status: String(row.status),
-    skipReason: row.skip_reason === null ? null : String(row.skip_reason),
-    word: {
-      id: Number(row.word_id),
-      term: String(row.term),
-      sourceLanguage: String(row.source_language),
-      targetLanguage: String(row.target_language),
-      entryType: row.content_type as EntryType,
-      content: row.definitions_json === null ? emptyDictionaryContent() : dictionaryContentFromRow(row),
-    },
-  }));
+  const items: Array<StudyItemView & { status: string; skipReason: string | null }> = rows.map((row) => {
+    const questionType = row.question_type as QuestionType;
+    const content = row.definitions_json === null ? emptyDictionaryContent() : dictionaryContentFromRow(row);
+    const item: StudyItemView & { status: string; skipReason: string | null } = {
+      itemId: Number(row.item_id),
+      position: Number(row.position),
+      taskType: row.task_type as StudyItemView["taskType"],
+      questionType,
+      status: String(row.status),
+      skipReason: row.skip_reason === null ? null : String(row.skip_reason),
+      word: {
+        id: Number(row.word_id),
+        term: String(row.term),
+        sourceLanguage: String(row.source_language),
+        targetLanguage: String(row.target_language),
+        entryType: row.content_type as EntryType,
+        content,
+      },
+    };
+    if (questionType === "EN_TO_ZH_CHOICE") {
+      item.choices = generateChoices(Number(row.word_id), String(row.target_language), content);
+    }
+    return item;
+  });
   const resumeIndex = items.findIndex((item) => item.status === "PENDING");
   return {
     resumed,
@@ -325,6 +359,41 @@ export function getStudySession(sessionId: number, resumed = false) {
     },
     items,
   };
+}
+
+function generateChoices(wordId: number, targetLanguage: string, content: DictionaryContent): string[] {
+  const correctDefs = content.definitions
+    .filter((d) => d.language === targetLanguage)
+    .map((d) => d.text);
+  const correct = correctDefs[0] ?? content.definitions[0]?.text ?? "";
+  if (!correct) return [];
+  const distractorRows = sqlite.prepare(`SELECT c.definitions_json FROM word_contents c
+    JOIN words w ON w.id = c.word_id
+    WHERE c.word_id != ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]'
+    ORDER BY RANDOM() LIMIT 12`).all(wordId) as Array<{ definitions_json: string }>;
+  const distractors: string[] = [];
+  const seen = new Set([correct.toLocaleLowerCase()]);
+  for (const row of distractorRows) {
+    if (distractors.length >= 3) break;
+    try {
+      const defs = JSON.parse(row.definitions_json) as Array<{ language: string; text: string }>;
+      const target = defs.filter((d) => d.language === targetLanguage);
+      const pool = target.length ? target : defs;
+      const text = pool[0]?.text;
+      if (text && !seen.has(text.toLocaleLowerCase())) {
+        seen.add(text.toLocaleLowerCase());
+        distractors.push(text);
+      }
+    } catch { /* skip malformed json */ }
+  }
+  const choices = [correct, ...distractors];
+  // Fisher-Yates shuffle
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [choices[i], choices[j]] = [choices[j]!, choices[i]!];
+  }
+  return choices;
 }
 
 export function skipStudyItem(sessionId: number, itemId: number, reason = "LATER") {

@@ -1,15 +1,18 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-export function buttonClass(variant: "primary" | "secondary" | "outline" | "ghost" | "danger" = "primary", size: "sm" | "md" | "lg" = "md") {
+export function buttonClass(
+  variant: "primary" | "secondary" | "outline" | "ghost" | "danger" = "primary",
+  size: "sm" | "md" | "lg" = "md",
+) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:pointer-events-none disabled:opacity-50",
-    size === "sm" ? "h-9 px-3 text-sm" : size === "lg" ? "h-12 px-6 text-base" : "h-10 px-4 text-sm",
-    variant === "primary" && "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500",
-    variant === "secondary" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-200",
-    variant === "outline" && "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
-    variant === "ghost" && "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
-    variant === "danger" && "bg-rose-600 text-white hover:bg-rose-500",
+    "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007aff]/50 disabled:pointer-events-none disabled:opacity-40 ios-press",
+    size === "sm" ? "h-9 px-3.5 text-[13px]" : size === "lg" ? "h-[54px] px-8 text-[17px]" : "h-11 px-5 text-[15px]",
+    variant === "primary" && "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_16px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_24px_rgba(0,122,255,0.4)]",
+    variant === "secondary" && "bg-[#007aff]/10 text-[#007aff] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] hover:bg-[#007aff]/15 dark:bg-[#0a84ff]/15 dark:text-[#0a84ff]",
+    variant === "outline" && "border border-white/50 bg-white/50 text-[#1c1c1e] shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl hover:bg-white/70 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:border-white/[0.1] dark:bg-white/[0.06] dark:text-[#f5f5f7] dark:hover:bg-white/[0.1]",
+    variant === "ghost" && "text-[#6e6e73] hover:bg-black/[0.04] dark:text-[#98989d] dark:hover:bg-white/[0.08]",
+    variant === "danger" && "bg-gradient-to-b from-[#ff453a] to-[#ff3b30] text-white shadow-[0_4px_16px_rgba(255,59,48,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_24px_rgba(255,59,48,0.4)]",
   );
 }
 
@@ -18,57 +21,110 @@ export function Button({ className, variant = "primary", size = "md", ...props }
 }
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[22px] transition-all duration-300",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
-export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) { return <div className={cn("p-5 pb-3", className)} {...props} />; }
-export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) { return <div className={cn("p-5 pt-2", className)} {...props} />; }
-export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) { return <h2 className={cn("font-semibold text-slate-900 dark:text-white", className)} {...props} />; }
+
+export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("relative z-10 px-5 pt-5 pb-2", className)} {...props} />;
+}
+
+export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("relative z-10 px-5 pb-5 pt-2", className)} {...props} />;
+}
+
+export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 className={cn("text-[17px] font-bold tracking-tight text-[#1c1c1e] dark:text-[#f5f5f7]", className)} {...props} />;
+}
 
 export function Badge({ children, tone = "slate", className }: { children: ReactNode; tone?: "slate" | "green" | "amber" | "red" | "blue" | "purple"; className?: string }) {
-  const tones = {
-    slate: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-    green: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    red: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-    blue: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-    purple: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  const tones: Record<string, string> = {
+    slate: "bg-[#8e8e93]/12 text-[#6e6e73] dark:bg-[#98989d]/15 dark:text-[#98989d]",
+    green: "bg-[#34c759]/12 text-[#248a3d] dark:bg-[#30d158]/15 dark:text-[#30d158]",
+    amber: "bg-[#ff9500]/12 text-[#c93400] dark:bg-[#ff9f0a]/15 dark:text-[#ff9f0a]",
+    red: "bg-[#ff3b30]/12 text-[#d70015] dark:bg-[#ff453a]/15 dark:text-[#ff453a]",
+    blue: "bg-[#007aff]/12 text-[#0040dd] dark:bg-[#0a84ff]/15 dark:text-[#0a84ff]",
+    purple: "bg-[#af52de]/12 text-[#8944ab] dark:bg-[#bf5af2]/15 dark:text-[#bf5af2]",
   };
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", tones[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tones[tone], className)}>{children}</span>;
 }
 
 export function Progress({ value, max = 100, className }: { value: number; max?: number; className?: string }) {
-  const percent = Math.max(0, Math.min(100, max ? value / max * 100 : 0));
-  return <div className={cn("h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800", className)}><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${percent}%` }} /></div>;
+  const percent = Math.max(0, Math.min(100, max ? (value / max) * 100 : 0));
+  return (
+    <div className={cn("h-[7px] overflow-hidden rounded-full bg-black/[0.06] shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] dark:bg-white/[0.08]", className)}>
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-[#007aff] via-[#5ac8fa] to-[#007aff] shadow-[0_1px_4px_rgba(0,122,255,0.3)] transition-all duration-700 ease-out"
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn("h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-indigo-950", props.className)} />;
+  return (
+    <input
+      {...props}
+      className={cn(
+        "h-11 w-full rounded-[14px] border border-white/50 bg-white/50 px-4 text-[15px] shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-2xl outline-none transition-all duration-300 placeholder:text-[#aeaeb2] focus:border-[#007aff]/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.06] dark:placeholder:text-[#636366] dark:focus:shadow-[0_8px_32px_rgba(10,132,255,0.12),0_0_0_4px_rgba(10,132,255,0.1)]",
+        props.className,
+      )}
+    />
+  );
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn("h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950", props.className)} />;
+  return (
+    <select
+      {...props}
+      className={cn(
+        "h-11 rounded-xl border border-white/50 bg-white/50 px-4 text-[15px] shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl outline-none transition-all focus:border-[#007aff]/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08] dark:bg-white/[0.06]",
+        props.className,
+      )}
+    />
+  );
 }
 
 export function EmptyState({ icon, title, description, action }: { icon?: ReactNode; title: string; description: string; action?: ReactNode }) {
-  return <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center dark:border-slate-700 dark:bg-slate-900/60">
-    {icon}<h2 className="mt-3 text-lg font-semibold">{title}</h2><p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>{action && <div className="mt-5">{action}</div>}
-  </div>;
+  return (
+    <div className="liquid-glass-elevated animate-scale-in flex min-h-64 flex-col items-center justify-center rounded-[28px] p-10 text-center">
+      {icon}
+      <h2 className="mt-4 text-xl font-bold tracking-tight text-[#1c1c1e] dark:text-[#f5f5f7]">{title}</h2>
+      <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{description}</p>
+      {action && <div className="mt-6">{action}</div>}
+    </div>
+  );
 }
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
-  return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">{title}</h1>{description && <p className="mt-1 text-sm text-slate-500">{description}</p>}</div>{action}</div>;
+  return (
+    <div className="animate-fade-down flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 className="text-[28px] font-bold tracking-tight text-[#1c1c1e] dark:text-[#f5f5f7]">{title}</h1>
+        {description && <p className="mt-1 text-[15px] text-[#6e6e73] dark:text-[#98989d]">{description}</p>}
+      </div>
+      {action}
+    </div>
+  );
 }
 
 export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/25 backdrop-blur-md" onClick={onClose} />
+      <div className="liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[28px] p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-[#1c1c1e] dark:text-[#f5f5f7]">{title}</h2>
+          <button onClick={onClose} className="ios-press grid size-8 place-items-center rounded-full bg-black/[0.06] text-[#6e6e73] dark:bg-white/[0.08] dark:text-[#98989d]">
+            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
         {children}

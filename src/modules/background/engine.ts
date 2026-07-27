@@ -1,4 +1,5 @@
 import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization/service";
+import { sqlite } from "@/db/client";
 
 type EngineState = {
   started: boolean;
@@ -32,6 +33,15 @@ function state(): EngineState {
   return globalEngine.__lexiloopBackgroundEngine;
 }
 
+function getConcurrencyFromSettings(): number | null {
+  try {
+    const row = sqlite.prepare("SELECT value_json FROM settings WHERE key = 'backgroundConcurrency'").get() as { value_json: string } | undefined;
+    if (!row) return null;
+    const value = Number(JSON.parse(row.value_json));
+    return Number.isInteger(value) && value >= 1 && value <= 10 ? value : null;
+  } catch { return null; }
+}
+
 async function runLoop(engine: EngineState): Promise<void> {
   console.log(`[BackgroundEngine] ${engine.workerId} started, concurrency=${engine.concurrency}`);
   updateHeartbeat(engine.workerId, "STARTING", undefined, {
@@ -41,7 +51,7 @@ async function runLoop(engine: EngineState): Promise<void> {
   });
   while (!engine.stopping) {
     try {
-      const jobs = claimJobs(engine.workerId, engine.concurrency);
+      const jobs = claimJobs(engine.workerId, getConcurrencyFromSettings() ?? engine.concurrency);
       if (jobs.length === 0) {
         updateHeartbeat(engine.workerId, "IDLE", undefined, {
           pid: process.pid,

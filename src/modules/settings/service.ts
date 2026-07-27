@@ -15,6 +15,7 @@ const settingsSchema = z.object({
   dictionaryApiEnabled: z.boolean(),
   myMemoryEnabled: z.boolean(),
   ecdictEnabled: z.boolean(),
+  backgroundConcurrency: z.number().int().min(1).max(10),
   llmConfig: z.object({
     providers: z.array(z.object({
       id: z.string().min(1),
@@ -30,7 +31,7 @@ const settingsSchema = z.object({
         providerId: z.string(),
         model: z.string(),
         temperature: z.number().min(0).max(1).optional(),
-        maxOutputTokens: z.number().int().min(500).max(16000).optional(),
+        maxOutputTokens: z.number().int().min(500).max(200000).optional(),
         timeoutMs: z.number().int().min(5000).max(300000).optional(),
       }),
     ),

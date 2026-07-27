@@ -32,7 +32,7 @@ export type ReviewRating = (typeof REVIEW_RATINGS)[number];
 export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING"] as const;
 export type StudyMode = (typeof STUDY_MODES)[number];
 
-export const QUESTION_TYPES = ["EN_TO_ZH", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
+export const QUESTION_TYPES = ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 
 export const ENTRY_TYPES = ["WORD", "PHRASE", "SENTENCE"] as const;
@@ -170,6 +170,7 @@ export interface ProviderAttempt {
     outputTokens?: number | null;
     qualityScore?: number;
     finishReason?: string | null;
+    rawResponse?: string;
   };
 }
 
@@ -195,6 +196,7 @@ export interface AppSettings {
   dictionaryApiEnabled: boolean;
   myMemoryEnabled: boolean;
   ecdictEnabled: boolean;
+  backgroundConcurrency: number;
   llmConfig: LlmConfig;
 }
 
@@ -272,6 +274,7 @@ export interface StudyItemView {
   position: number;
   taskType: "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING";
   questionType: QuestionType;
+  choices?: string[];
   word: {
     id: number;
     term: string;

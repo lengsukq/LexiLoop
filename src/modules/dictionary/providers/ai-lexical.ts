@@ -18,7 +18,7 @@ const relatedSchema = z.object({
   translation: nullableText(240),
   partOfSpeech: nullableText(50),
   difference: nullableText(500).optional(),
-}).strict();
+}).passthrough();
 
 const outputSchema = z.object({
   term: z.string().trim().min(1).max(300),
@@ -27,7 +27,7 @@ const outputSchema = z.object({
     translation: nullableText(300),
     cefrLevel: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).nullable(),
     frequency: z.enum(["VERY_COMMON", "COMMON", "NORMAL", "RARE"]).nullable(),
-  }).strict(),
+  }).passthrough(),
   senses: z.array(z.object({
     id: z.string().trim().min(1).max(40),
     partOfSpeech: nullableText(50),
@@ -39,39 +39,39 @@ const outputSchema = z.object({
       sentence: z.string().trim().min(1).max(600),
       translation: nullableText(600),
       difficulty: z.enum(["EASY", "NORMAL", "ADVANCED"]),
-    }).strict()).min(1).max(2),
+    }).passthrough()).min(1).max(2),
     synonyms: z.array(relatedSchema).max(8),
     antonyms: z.array(relatedSchema).max(6),
     collocations: z.array(z.object({
       phrase: z.string().trim().min(1).max(200),
       translation: nullableText(300),
       example: nullableText(600),
-    }).strict()).max(8),
-  }).strict()).min(1).max(4),
+    }).passthrough()).max(8),
+  }).passthrough()).min(1).max(4),
   morphology: z.object({
     lemma: nullableText(120),
     forms: z.array(z.object({
       type: z.enum(["LEMMA", "PAST", "PAST_PARTICIPLE", "PRESENT_PARTICIPLE", "THIRD_PERSON", "PLURAL", "COMPARATIVE", "SUPERLATIVE", "OTHER"]),
       value: z.string().trim().min(1).max(120),
-    }).strict()).max(12),
+    }).passthrough()).max(12),
     roots: z.array(z.object({
       root: z.string().trim().min(1).max(100),
       meaning: z.string().trim().min(1).max(300),
       origin: nullableText(200),
-    }).strict()).max(5),
+    }).passthrough()).max(5),
     affixes: z.array(z.object({
       value: z.string().trim().min(1).max(80),
       type: z.enum(["PREFIX", "SUFFIX"]),
       meaning: z.string().trim().min(1).max(300),
-    }).strict()).max(6),
-    wordFamily: z.array(relatedSchema.extend({ relation: z.string().trim().min(1).max(100) }).strict()).max(12),
-  }).strict(),
+    }).passthrough()).max(6),
+    wordFamily: z.array(relatedSchema.extend({ relation: z.string().trim().min(1).max(100) }).passthrough()).max(12),
+  }).passthrough(),
   phrases: z.array(z.object({
     phrase: z.string().trim().min(1).max(240),
     translation: nullableText(300),
     example: nullableText(600),
     kind: z.enum(["COLLOCATION", "PHRASE", "IDIOM"]),
-  }).strict()).max(10),
+  }).passthrough()).max(10),
   confusedWords: z.array(relatedSchema).max(8),
   sentenceAnalysis: z.object({
     grammarNotes: z.array(z.string().trim().min(1).max(800)).max(8),
@@ -79,19 +79,19 @@ const outputSchema = z.object({
       expression: z.string().trim().min(1).max(240),
       meaning: z.string().trim().min(1).max(500),
       note: nullableText(600),
-    }).strict()).max(10),
+    }).passthrough()).max(10),
     variations: z.array(z.object({
       sentence: z.string().trim().min(1).max(800),
       translation: nullableText(800),
-    }).strict()).max(6),
-  }).strict(),
+    }).passthrough()).max(6),
+  }).passthrough(),
   learning: z.object({
     pronunciationTip: nullableText(500),
     mnemonic: nullableText(800),
     commonMistakes: z.array(z.string().trim().min(1).max(500)).max(8),
-  }).strict(),
+  }).passthrough(),
   tags: z.array(z.string().trim().min(1).max(50)).max(12),
-}).strict();
+}).passthrough();
 
 type AiLexicalOutput = z.infer<typeof outputSchema>;
 
@@ -173,6 +173,104 @@ function extractJson(text: string): unknown {
   return JSON.parse(fenced ? fenced[1]! : trimmed);
 }
 
+const ENUM_MAP: Record<string, string> = {
+  common: "COMMON", very_common: "VERY_COMMON", normal: "NORMAL", rare: "RARE",
+  a1: "A1", a2: "A2", b1: "B1", b2: "B2", c1: "C1", c2: "C2",
+  formal: "FORMAL", informal: "INFORMAL", neutral: "NEUTRAL", slang: "SLANG", general: "NEUTRAL",
+  easy: "EASY", intermediate: "NORMAL", advanced: "ADVANCED", "upper-intermediate": "ADVANCED",
+  lemma: "LEMMA", past: "PAST", past_participle: "PAST_PARTICIPLE", present_participle: "PRESENT_PARTICIPLE",
+  third_person: "THIRD_PERSON", plural: "PLURAL", comparative: "COMPARATIVE", superlative: "SUPERLATIVE", other: "OTHER",
+  prefix: "PREFIX", suffix: "SUFFIX",
+  collocation: "COLLOCATION", phrase: "PHRASE", idiom: "IDIOM",
+};
+
+function fixEnum(value: unknown, allowed: string[]): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return value;
+  if (allowed.includes(value)) return value;
+  const mapped = ENUM_MAP[value.trim().toLowerCase().replace(/[\s-]+/g, "_")];
+  return mapped && allowed.includes(mapped) ? mapped : value;
+}
+
+function fixRelatedItem(item: unknown): unknown {
+  if (typeof item === "string") return { word: item, translation: null, partOfSpeech: null, difference: null };
+  if (item && typeof item === "object") {
+    const obj = item as Record<string, unknown>;
+    if (obj.translation === undefined) obj.translation = null;
+    if (obj.partOfSpeech === undefined) obj.partOfSpeech = null;
+    if (obj.difference === undefined) obj.difference = null;
+    if (!obj.relation) obj.relation = "RELATED";
+  }
+  return item;
+}
+
+function fixCollocation(item: unknown): unknown {
+  if (typeof item === "string") return { phrase: item, translation: null, example: null };
+  return item;
+}
+
+function fixKeyExpression(item: unknown): unknown {
+  if (typeof item === "string") {
+    const parts = item.split(/[:：]/);
+    return { expression: parts[0]?.trim() ?? item, meaning: parts.slice(1).join(":").trim() || item, note: null };
+  }
+  return item;
+}
+
+function normalizeAiOutput(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const obj = raw as Record<string, unknown>;
+  if (obj.summary && typeof obj.summary === "object") {
+    const s = obj.summary as Record<string, unknown>;
+    s.cefrLevel = fixEnum(s.cefrLevel, ["A1", "A2", "B1", "B2", "C1", "C2"]);
+    s.frequency = fixEnum(s.frequency, ["VERY_COMMON", "COMMON", "NORMAL", "RARE"]);
+  }
+  if (Array.isArray(obj.senses)) {
+    for (const sense of obj.senses as Array<Record<string, unknown>>) {
+      if (!sense || typeof sense !== "object") continue;
+      sense.register = fixEnum(sense.register, ["FORMAL", "INFORMAL", "NEUTRAL", "SLANG"]);
+      if (Array.isArray(sense.examples)) {
+        for (const ex of sense.examples as Array<Record<string, unknown>>) {
+          if (ex && typeof ex === "object") ex.difficulty = fixEnum(ex.difficulty, ["EASY", "NORMAL", "ADVANCED"]);
+        }
+      }
+      if (Array.isArray(sense.synonyms)) sense.synonyms = sense.synonyms.map(fixRelatedItem);
+      if (Array.isArray(sense.antonyms)) sense.antonyms = sense.antonyms.map(fixRelatedItem);
+      if (Array.isArray(sense.collocations)) sense.collocations = sense.collocations.map(fixCollocation);
+    }
+  }
+  if (obj.morphology && typeof obj.morphology === "object") {
+    const m = obj.morphology as Record<string, unknown>;
+    if (Array.isArray(m.forms)) {
+      for (const f of m.forms as Array<Record<string, unknown>>) {
+        if (f && typeof f === "object") f.type = fixEnum(f.type, ["LEMMA", "PAST", "PAST_PARTICIPLE", "PRESENT_PARTICIPLE", "THIRD_PERSON", "PLURAL", "COMPARATIVE", "SUPERLATIVE", "OTHER"]);
+      }
+    }
+    if (Array.isArray(m.wordFamily)) m.wordFamily = m.wordFamily.map(fixRelatedItem);
+  }
+  if (Array.isArray(obj.phrases)) obj.phrases = (obj.phrases as unknown[]).map(fixCollocation);
+  if (Array.isArray(obj.confusedWords)) obj.confusedWords = (obj.confusedWords as unknown[]).map(fixRelatedItem);
+  if (obj.sentenceAnalysis && typeof obj.sentenceAnalysis === "object") {
+    const sa = obj.sentenceAnalysis as Record<string, unknown>;
+    if (Array.isArray(sa.keyExpressions)) sa.keyExpressions = sa.keyExpressions.map(fixKeyExpression);
+    if (Array.isArray(sa.variations)) sa.variations = sa.variations.map((v: unknown) => typeof v === "string" ? { sentence: v, translation: null } : v);
+    if (!Array.isArray(sa.grammarNotes)) sa.grammarNotes = [];
+    if (!Array.isArray(sa.variations)) sa.variations = [];
+  }
+  if (obj.morphology && typeof obj.morphology === "object") {
+    const m = obj.morphology as Record<string, unknown>;
+    if (Array.isArray(m.affixes)) {
+      m.affixes = (m.affixes as unknown[]).filter((a) => a && typeof a === "object").map((a) => {
+        const aff = a as Record<string, unknown>;
+        if (!aff.meaning) aff.meaning = String(aff.value ?? "");
+        if (typeof aff.type === "string") aff.type = fixEnum(aff.type, ["PREFIX", "SUFFIX"]);
+        return aff;
+      });
+    }
+  }
+  return obj;
+}
+
 function normalized(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
@@ -189,7 +287,21 @@ function promptFor(input: LookupInput): string {
     `SENTENCE 需要在 sentenceAnalysis 中给出语法要点、关键表达和自然替换句型；其 morphology、roots、affixes、wordFamily 可以为空。` +
     `区分词性和主要词义。` +
     `中文翻译应自然；definition 使用源语言解释，translation 使用目标语言。` +
-    `不要生成音频 URL；发音由 Edge TTS 负责。不要输出 Markdown，只输出符合 JSON Schema 的对象。\n\n` +
+    `不要生成音频 URL；发音由 Edge TTS 负责。不要输出 Markdown，只输出一个 JSON 对象。\n\n` +
+    `你的输出必须严格遵循以下结构（字段名、层级、类型不可更改）：\n` +
+    `{"term":"词条","summary":{"shortDefinition":"英文简释","translation":"中文翻译","cefrLevel":"B1","frequency":"COMMON"},` +
+    `"senses":[{"id":"sense_1","partOfSpeech":"noun","definition":"英文释义","translation":"中文释义","register":"NEUTRAL","usageNote":null,` +
+    `"examples":[{"sentence":"例句","translation":"例句翻译","difficulty":"NORMAL"}],` +
+    `"synonyms":[{"word":"同义词","translation":"翻译","partOfSpeech":null,"difference":null}],` +
+    `"antonyms":[],"collocations":[{"phrase":"搭配","translation":"翻译","example":null}]}],` +
+    `"morphology":{"lemma":null,"forms":[{"type":"PLURAL","value":"复数形式"}],"roots":[],"affixes":[],"wordFamily":[]},` +
+    `"phrases":[{"phrase":"短语","translation":"翻译","example":null,"kind":"PHRASE"}],` +
+    `"confusedWords":[],"sentenceAnalysis":{"grammarNotes":[],"keyExpressions":[],"variations":[]},` +
+    `"learning":{"pronunciationTip":null,"mnemonic":"助记","commonMistakes":[]},"tags":["标签"]}\n\n` +
+    `枚举值必须使用：cefrLevel=A1/A2/B1/B2/C1/C2/null, frequency=VERY_COMMON/COMMON/NORMAL/RARE/null, ` +
+    `register=FORMAL/INFORMAL/NEUTRAL/SLANG/null, difficulty=EASY/NORMAL/ADVANCED, ` +
+    `forms.type=LEMMA/PAST/PAST_PARTICIPLE/PRESENT_PARTICIPLE/THIRD_PERSON/PLURAL/COMPARATIVE/SUPERLATIVE/OTHER, ` +
+    `phrases.kind=COLLOCATION/PHRASE/IDIOM。\n\n` +
     `<term_data>${JSON.stringify({
       term: input.term,
       normalizedTerm: input.normalizedTerm,
@@ -204,60 +316,62 @@ function promptFor(input: LookupInput): string {
 
 async function requestOpenAiCompatible(providerId: string, baseUrl: string, apiKey: string, model: string, prompt: string, settings: { temperature: number; maxOutputTokens: number; timeoutMs: number }): Promise<ModelResponse> {
   const endpoint = `${normalizeBaseUrl(baseUrl)}/chat/completions`;
-  const common = {
-    model,
-    messages: [
-      { role: "system", content: "Return only one valid JSON object matching the requested schema." },
-      { role: "user", content: prompt },
-    ],
-    temperature: settings.temperature,
-    max_tokens: settings.maxOutputTokens,
-  };
-  const formats: Array<Record<string, unknown> | null> = [
-    { type: "json_schema", json_schema: { name: "lexiloop_lexical_content", strict: true, schema: JSON_SCHEMA } },
-    { type: "json_object" },
-    null,
+  const schemaInstruction = `\n\nJSON Schema:\n${JSON.stringify(JSON_SCHEMA)}`;
+  const formats: Array<{ format: Record<string, unknown> | null; userPrompt: string }> = [
+    { format: { type: "json_schema", json_schema: { name: "lexiloop_lexical_content", strict: true, schema: JSON_SCHEMA } }, userPrompt: prompt },
+    { format: { type: "json_object" }, userPrompt: `${prompt}${schemaInstruction}` },
+    { format: null, userPrompt: `${prompt}${schemaInstruction}` },
   ];
   let lastError = "模型请求失败";
-  for (const responseFormat of formats) {
+  for (const { responseFormat, userPrompt } of formats.map(({ format, userPrompt }) => ({ responseFormat: format, userPrompt }))) {
     const response = await fetch(endpoint, {
       method: "POST",
       signal: AbortSignal.timeout(settings.timeoutMs),
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ ...common, ...(responseFormat ? { response_format: responseFormat } : {}) }),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: "Return only one valid JSON object matching the requested schema." },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: settings.temperature,
+        ...(responseFormat ? { response_format: responseFormat } : {}),
+      }),
     });
     const body = await response.json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok) {
       const message = body && typeof body.error === "object" && body.error ? String((body.error as Record<string, unknown>).message ?? "") : `HTTP ${response.status}`;
       lastError = message || `HTTP ${response.status}`;
-      const formatUnsupported = response.status === 400
-        && responseFormat
-        && /response[ _-]?format|json[ _-]?schema|structured output/i.test(lastError);
+      const formatUnsupported = response.status === 400 && !!responseFormat;
       if (formatUnsupported) continue;
       const error = new Error(lastError) as Error & { transient?: boolean; code?: string };
       error.transient = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
       error.code = response.status === 429 ? "RATE_LIMITED" : `HTTP_${response.status}`;
       throw error;
     }
-    const choices = Array.isArray(body?.choices) ? body.choices as Array<Record<string, unknown>> : [];
-    const choice = choices[0];
-    const message = choice && typeof choice.message === "object" && choice.message ? choice.message as Record<string, unknown> : null;
-    const content = message?.content;
-    const text = typeof content === "string"
-      ? content
-      : Array.isArray(content)
-        ? content.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "").join("")
-        : content && typeof content === "object" ? JSON.stringify(content) : "";
-    const usage = body?.usage && typeof body.usage === "object" ? body.usage as Record<string, unknown> : {};
-    if (!text) throw new Error(`${providerId} 返回空内容`);
-    return {
-      text,
-      inputTokens: typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : null,
-      outputTokens: typeof usage.completion_tokens === "number" ? usage.completion_tokens : null,
-      finishReason: choice ? String(choice.finish_reason ?? "") || null : null,
-    };
+    return parseOpenAiResponse(providerId, body);
   }
   throw new Error(lastError);
+}
+
+function parseOpenAiResponse(providerId: string, body: Record<string, unknown> | null): ModelResponse {
+  const choices = Array.isArray(body?.choices) ? body.choices as Array<Record<string, unknown>> : [];
+  const choice = choices[0];
+  const message = choice && typeof choice.message === "object" && choice.message ? choice.message as Record<string, unknown> : null;
+  const content = message?.content;
+  const text = typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "").join("")
+      : content && typeof content === "object" ? JSON.stringify(content) : "";
+  const usage = body?.usage && typeof body.usage === "object" ? body.usage as Record<string, unknown> : {};
+  if (!text) throw new Error(`${providerId} 返回空内容`);
+  return {
+    text,
+    inputTokens: typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : null,
+    outputTokens: typeof usage.completion_tokens === "number" ? usage.completion_tokens : null,
+    finishReason: choice ? String(choice.finish_reason ?? "") || null : null,
+  };
 }
 
 async function requestAnthropic(baseUrl: string, apiKey: string, model: string, prompt: string, settings: { temperature: number; maxOutputTokens: number; timeoutMs: number }): Promise<ModelResponse> {
@@ -379,22 +493,24 @@ export class AiLexicalProvider implements DictionaryProvider {
     if (!provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return { content: null, errorCode: "AI_CONFIG_INCOMPLETE", errorMessage: "AI 提供商、API Key、接口地址或模型未配置完整" };
     const options = {
       temperature: purpose.temperature ?? 0.2,
-      maxOutputTokens: purpose.maxOutputTokens ?? 3200,
-      timeoutMs: purpose.timeoutMs ?? 60_000,
+      maxOutputTokens: purpose.maxOutputTokens ?? 200_000,
+      timeoutMs: purpose.timeoutMs ?? 180_000,
     };
+    let rawText = "";
     try {
       const response = provider.apiType === "anthropic"
         ? await requestAnthropic(provider.baseUrl, provider.apiKey, purpose.model, promptFor(input), options)
         : await requestOpenAiCompatible(provider.id, provider.baseUrl, provider.apiKey, purpose.model, promptFor(input), options);
+      rawText = response.text;
       if (["length", "max_tokens"].includes((response.finishReason ?? "").toLocaleLowerCase())) {
-        return { content: null, errorCode: "AI_OUTPUT_TRUNCATED", errorMessage: "AI 输出因 Token 上限被截断，请提高输出 Token 配置。" };
+        return { content: null, errorCode: "AI_OUTPUT_TRUNCATED", errorMessage: "AI 输出因 Token 上限被截断，请提高输出 Token 配置。", metadata: { model: purpose.model, rawResponse: rawText.slice(0, 4000) } };
       }
-      const parsed = outputSchema.parse(extractJson(response.text));
-      if (normalized(parsed.term) !== normalized(input.term)) return { content: null, errorCode: "AI_TERM_MISMATCH", errorMessage: `模型返回了其他词条：${parsed.term}` };
+      const parsed = outputSchema.parse(normalizeAiOutput(extractJson(rawText)));
+      if (normalized(parsed.term) !== normalized(input.term)) return { content: null, errorCode: "AI_TERM_MISMATCH", errorMessage: `模型返回了其他词条：${parsed.term}`, metadata: { model: purpose.model, rawResponse: rawText.slice(0, 4000) } };
       const issues = semanticIssues(parsed, input);
-      if (issues.length > 0) return { content: null, errorCode: "AI_SEMANTIC_INVALID", errorMessage: issues.join("；") };
+      if (issues.length > 0) return { content: null, errorCode: "AI_SEMANTIC_INVALID", errorMessage: issues.join("；"), metadata: { model: purpose.model, rawResponse: rawText.slice(0, 4000) } };
       const score = qualityScore(parsed, input);
-      if (score < 45) return { content: null, errorCode: "AI_QUALITY_LOW", errorMessage: `AI 内容质量评分过低：${score}` };
+      if (score < 45) return { content: null, errorCode: "AI_QUALITY_LOW", errorMessage: `AI 内容质量评分过低：${score}`, metadata: { model: purpose.model, rawResponse: rawText.slice(0, 4000) } };
       const source = `ai:${provider.id}:${purpose.model}`;
       return {
         content: toContent(parsed, input, source),
@@ -416,6 +532,7 @@ export class AiLexicalProvider implements DictionaryProvider {
         errorCode: annotated.code ?? (timeout ? "AI_TIMEOUT" : error instanceof z.ZodError || error instanceof SyntaxError ? "AI_SCHEMA_INVALID" : "AI_REQUEST_FAILED"),
         errorMessage: error instanceof z.ZodError ? `AI 返回结构不符合要求：${error.issues.map((issue) => issue.path.join(".")).slice(0, 5).join("、")}` : error instanceof SyntaxError ? `AI 返回的 JSON 无法解析：${error.message}` : String(error),
         transient: timeout || Boolean(annotated.transient),
+        metadata: rawText ? { model: purpose.model, rawResponse: rawText.slice(0, 4000) } : undefined,
       };
     }
   }

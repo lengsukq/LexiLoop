@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dictionaryApiEnabled: process.env.DICTIONARY_API_ENABLED !== "false",
   myMemoryEnabled: process.env.MYMEMORY_ENABLED !== "false",
   ecdictEnabled: process.env.ECDICT_ENABLED === "true",
+  backgroundConcurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

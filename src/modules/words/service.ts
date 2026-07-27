@@ -93,6 +93,7 @@ export function getWordDetail(wordId: number) {
     sourceLanguage: String(row.source_language), targetLanguage: String(row.target_language),
     sourceLanguageName: row.source_language_name, targetLanguageName: row.target_language_name,
     entryType: String(row.content_type ?? row.entry_type), initializationStatus: String(row.initialization_status),
+    contentSource: String(row.content_source ?? "MIXED"),
     masteryLevel: String(row.mastery_level), masteryScore: Number(row.mastery_score), isSuspended: Boolean(row.is_suspended),
     userNote: row.user_note, sourceCreatedAt: row.source_created_at ? new Date(Number(row.source_created_at)).toISOString() : null,
     createdAt: new Date(Number(row.created_at)).toISOString(), updatedAt: new Date(Number(row.updated_at)).toISOString(),

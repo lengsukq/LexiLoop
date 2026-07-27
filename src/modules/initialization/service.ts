@@ -89,12 +89,12 @@ function saveAttempts(jobId: number, wordId: number, attempts: ProviderAttempt[]
   }
 }
 
-function saveContent(wordId: number, content: DictionaryContent, attempts: ProviderAttempt[], now: number): void {
+function saveContent(wordId: number, content: DictionaryContent, attempts: ProviderAttempt[], contentSource: string, now: number): void {
   sqlite.prepare(`INSERT INTO word_contents
     (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
      synonyms_json, antonyms_json, word_family_json, confused_words_json, roots_json, affixes_json,
-     summary_json, learning_json, sentence_analysis_json, tags_json, provider_metadata_json, content_version, initialized_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+     summary_json, learning_json, sentence_analysis_json, tags_json, provider_metadata_json, content_source, content_version, initialized_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT(word_id) DO UPDATE SET
       definitions_json = excluded.definitions_json,
       pronunciations_json = excluded.pronunciations_json,
@@ -112,6 +112,7 @@ function saveContent(wordId: number, content: DictionaryContent, attempts: Provi
       sentence_analysis_json = excluded.sentence_analysis_json,
       tags_json = excluded.tags_json,
       provider_metadata_json = excluded.provider_metadata_json,
+      content_source = excluded.content_source,
       content_version = word_contents.content_version + 1,
       initialized_at = excluded.initialized_at,
       updated_at = excluded.updated_at`)
@@ -121,7 +122,7 @@ function saveContent(wordId: number, content: DictionaryContent, attempts: Provi
       JSON.stringify(content.phrases), JSON.stringify(content.forms), JSON.stringify(content.synonyms),
       JSON.stringify(content.antonyms), JSON.stringify(content.wordFamily), JSON.stringify(content.confusedWords),
       JSON.stringify(content.roots), JSON.stringify(content.affixes), JSON.stringify(content.summary),
-      JSON.stringify(content.learning), JSON.stringify(content.sentenceAnalysis), JSON.stringify(content.tags), JSON.stringify(attempts), now, now,
+      JSON.stringify(content.learning), JSON.stringify(content.sentenceAnalysis), JSON.stringify(content.tags), JSON.stringify(attempts), contentSource, now, now,
     );
 }
 
@@ -191,7 +192,7 @@ export async function processJob(job: ClaimedJob): Promise<void> {
       failOrRetry(job, result.hasTransientFailure, result.hasTransientFailure ? "PROVIDER_TRANSIENT_FAILURE" : "NO_DEFINITION", "没有获取到可用释义", now);
       return;
     }
-    saveContent(job.wordId, merged, result.attempts, now);
+    saveContent(job.wordId, merged, result.attempts, result.contentSource, now);
     completeJob(job.id, job.wordId, status, now);
   } catch (error) {
     failOrRetry(job, true, "WORKER_EXCEPTION", String(error), Date.now());

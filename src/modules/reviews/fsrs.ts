@@ -1,6 +1,7 @@
 import { createEmptyCard, FSRS, Rating, State, type Card, type Grade, type RecordLogItem } from "ts-fsrs";
 import type { ReviewRating } from "@/lib/types";
 
+/** Creates an FSRS scheduler instance with the given target retention rate (0.7–0.99). */
 export function createFsrs(requestRetention = 0.9) {
   return new FSRS({
     request_retention: requestRetention,
@@ -32,12 +33,14 @@ export function gradeToRating(grade: Grade): ReviewRating {
   return values[grade] ?? "GOOD";
 }
 
+/** Schedules a card after a review, returning the updated card and log entry. */
 export function scheduleCard(card: Card, now: Date, rating: ReviewRating, requestRetention = 0.9) {
   const result = createFsrs(requestRetention).repeat(card, now);
   const item = result[ratingToGrade(rating)] as RecordLogItem;
   return { card: item.card, log: item.log };
 }
 
+/** Previews all four rating outcomes for a card without mutating it. */
 export function previewCard(card: Card, now: Date, requestRetention = 0.9) {
   const result = createFsrs(requestRetention).repeat(card, now);
   return ([Rating.Again, Rating.Hard, Rating.Good, Rating.Easy] as Grade[]).map((grade) => {
@@ -50,6 +53,7 @@ export function previewCard(card: Card, now: Date, requestRetention = 0.9) {
   });
 }
 
+/** Reconstructs a ts-fsrs Card from a database row. */
 export function cardFromRow(row: {
   due_at: number;
   stability: number;

@@ -10,10 +10,9 @@ function settingsWithAiEnabled(): AppSettings {
     myMemoryEnabled: false,
     ecdictEnabled: false,
     llmConfig: {
-      providers: {
-        ...DEFAULT_SETTINGS.llmConfig.providers,
-        openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
-      },
+      providers: [
+        { id: "openai", name: "OpenAI", apiType: "openai", apiKey: "", baseUrl: "https://api.openai.com/v1" },
+      ],
       purposes: {
         ...DEFAULT_SETTINGS.llmConfig.purposes,
         IMPORT_ENRICHMENT: {

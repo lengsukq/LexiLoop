@@ -198,20 +198,20 @@ export interface AppSettings {
   llmConfig: LlmConfig;
 }
 
-export const LLM_PROVIDER_IDS = ["openai", "anthropic", "siliconflow", "custom"] as const;
-export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number];
-
 export const LLM_PURPOSE_IDS = ["TTS", "IMPORT_ENRICHMENT", "STUDY_PLAN", "SUGGESTION"] as const;
 export type LlmPurposeId = (typeof LLM_PURPOSE_IDS)[number];
 
 export interface LlmProviderConfig {
-  apiKey: string;
+  id: string;
+  name: string;
+  apiType: "openai" | "anthropic";
   baseUrl: string;
+  apiKey: string;
 }
 
 export interface LlmPurposeConfig {
   enabled: boolean;
-  providerId: LlmProviderId;
+  providerId: string;
   model: string;
   temperature?: number;
   maxOutputTokens?: number;
@@ -219,7 +219,7 @@ export interface LlmPurposeConfig {
 }
 
 export interface LlmConfig {
-  providers: Record<LlmProviderId, LlmProviderConfig>;
+  providers: LlmProviderConfig[];
   purposes: Record<LlmPurposeId, LlmPurposeConfig>;
 }
 

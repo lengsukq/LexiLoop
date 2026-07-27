@@ -27,29 +27,19 @@ function targetDefinitions(item: Item): string[] {
   const target = item.word.content.definitions.filter((definition) => definition.language === item.word.targetLanguage);
   return (target.length ? target : item.word.content.definitions).map((definition) => definition.text);
 }
-async function tryAiTts(term: string, accent: string) {
+async function playEdgeTts(term: string, accent: string) {
   try {
     const response = await fetch(`/api/tts?word=${encodeURIComponent(term)}&accent=${encodeURIComponent(accent)}`);
     if (response.ok) {
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url); audio.playbackRate = 1; void audio.play();
-      return true;
     }
-  } catch { /* fall through */ }
-  return false;
+  } catch { /* ignore */ }
 }
 async function playWord(item: Item) {
-  const preferred = item.word.content.pronunciations.find((value) => value.accent === "US" && value.audioUrl)
-    ?? item.word.content.pronunciations.find((value) => value.audioUrl);
-  if (preferred?.audioUrl) {
-    const audio = new Audio(preferred.audioUrl); audio.playbackRate = 1;
-    void audio.play().catch(async () => { if (!(await tryAiTts(item.word.term, "US"))) speak(item.word.term); });
-  } else {
-    if (!(await tryAiTts(item.word.term, "US"))) speak(item.word.term);
-  }
+  await playEdgeTts(item.word.term, "US");
 }
-function speak(term: string) { if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(term); utterance.lang = "en-US"; window.speechSynthesis.speak(utterance); } }
 function getHintPattern(term: string): string | null {
   if (term.length <= 2) return null;
   const firstLetter = term[0];
@@ -173,44 +163,30 @@ export function StudyClient() {
 }
 function Pronunciation({ item }: { item: Item }) {
   const [selectedAccent, setSelectedAccent] = useState<"US" | "UK" | "GENERAL">("US");
-  const [selectedSource, setSelectedSource] = useState<"dictionary" | "ai" | "web">("dictionary");
   const [ttsTip, setTtsTip] = useState("");
-  const current = item.word.content.pronunciations.find((p) => p.accent === selectedAccent && p.audioUrl)
-    ?? item.word.content.pronunciations.find((p) => p.accent === selectedAccent);
+  const current = item.word.content.pronunciations.find((p) => p.accent === selectedAccent);
   async function play() {
     setTtsTip("");
-    switch (selectedSource) {
-      case "dictionary": {
-        if (current?.audioUrl) {
-          const audio = new Audio(current.audioUrl); audio.playbackRate = 1;
-          void audio.play().catch(async () => { if (!(await tryAiTts(item.word.term, selectedAccent))) { setTtsTip("Edge TTS 发音失败，请检查网络"); speak(item.word.term); } });
-        } else {
-          if (!(await tryAiTts(item.word.term, selectedAccent))) { setTtsTip("Edge TTS 发音失败，请检查网络"); speak(item.word.term); }
-        }
-        break;
+    try {
+      const response = await fetch(`/api/tts?word=${encodeURIComponent(item.word.term)}&accent=${encodeURIComponent(selectedAccent)}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url); audio.playbackRate = 1; await audio.play();
+      } else {
+        setTtsTip("Edge TTS 发音失败，请检查网络。");
       }
-      case "ai":
-        if (!(await tryAiTts(item.word.term, selectedAccent))) { setTtsTip("Edge TTS 发音失败，请检查网络"); speak(item.word.term); }
-        break;
-      case "web":
-        speak(item.word.term);
-        break;
+    } catch {
+      setTtsTip("Edge TTS 发音失败，请检查网络。");
     }
   }
   const accentLabel: Record<string, string> = { US: "美", UK: "英", GENERAL: "通用" };
-  const sourceLabel: Record<string, string> = { dictionary: "词典", ai: "AI", web: "Web" };
   return <div className="mt-5">
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex overflow-hidden rounded-lg border border-sky-200 dark:border-sky-800">
         {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)}
           className={`px-2 py-0.5 text-xs font-medium transition ${selectedAccent === accent ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-600 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300"}`}>
           {accentLabel[accent] ?? accent}
-        </button>)}
-      </div>
-      <div className="flex overflow-hidden rounded-lg border border-sky-200 dark:border-sky-800">
-        {(["dictionary", "ai", "web"] as const).map((source) => <button key={source} type="button" onClick={() => setSelectedSource(source)}
-          className={`px-2 py-0.5 text-xs font-medium transition ${selectedSource === source ? "bg-sky-500 text-white" : "bg-sky-50 text-sky-600 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300"}`}>
-          {sourceLabel[source]}
         </button>)}
       </div>
       <button type="button" onClick={play} className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-sm text-sky-700 transition hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300">

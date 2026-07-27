@@ -2,7 +2,6 @@ import { db, sqlite } from "@/db/client";
 import { settings } from "@/db/schema";
 import { DEFAULT_SETTINGS } from "@/lib/config";
 import type { AppSettings } from "@/lib/types";
-import { LLM_PROVIDER_IDS } from "@/lib/types";
 import { z } from "zod";
 
 const settingsSchema = z.object({
@@ -17,18 +16,18 @@ const settingsSchema = z.object({
   myMemoryEnabled: z.boolean(),
   ecdictEnabled: z.boolean(),
   llmConfig: z.object({
-    providers: z.record(
-      z.string(),
-      z.object({
-        apiKey: z.string(),
-        baseUrl: z.string(),
-      }),
-    ),
+    providers: z.array(z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      apiType: z.enum(["openai", "anthropic"]),
+      baseUrl: z.string(),
+      apiKey: z.string(),
+    })),
     purposes: z.record(
       z.string(),
       z.object({
         enabled: z.boolean(),
-        providerId: z.enum(LLM_PROVIDER_IDS),
+        providerId: z.string(),
         model: z.string(),
         temperature: z.number().min(0).max(1).optional(),
         maxOutputTokens: z.number().int().min(500).max(16000).optional(),

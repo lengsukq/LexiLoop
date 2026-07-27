@@ -3,7 +3,6 @@ import type {
   AppSettings,
   DictionaryContent,
   LookupInput,
-  LlmProviderId,
   RelatedWordItem,
   WordFormItem,
 } from "@/lib/types";
@@ -203,7 +202,7 @@ function promptFor(input: LookupInput): string {
     })}</term_data>`;
 }
 
-async function requestOpenAiCompatible(providerId: LlmProviderId, baseUrl: string, apiKey: string, model: string, prompt: string, settings: { temperature: number; maxOutputTokens: number; timeoutMs: number }): Promise<ModelResponse> {
+async function requestOpenAiCompatible(providerId: string, baseUrl: string, apiKey: string, model: string, prompt: string, settings: { temperature: number; maxOutputTokens: number; timeoutMs: number }): Promise<ModelResponse> {
   const endpoint = `${normalizeBaseUrl(baseUrl)}/chat/completions`;
   const common = {
     model,
@@ -374,8 +373,9 @@ export class AiLexicalProvider implements DictionaryProvider {
 
   async lookup(input: LookupInput): Promise<ProviderResult> {
     const purpose = this.settings.llmConfig.purposes.IMPORT_ENRICHMENT;
-    const provider = this.settings.llmConfig.providers[purpose.providerId];
     if (!purpose.enabled) return { content: null, errorCode: "AI_DISABLED", errorMessage: "AI 词条初始化未启用" };
+    const provider = this.settings.llmConfig.providers.find((p) => p.id === purpose.providerId);
+    if (!provider) return { content: null, errorCode: "AI_PROVIDER_MISSING", errorMessage: "AI Provider 未找到或已被删除" };
     if (!provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return { content: null, errorCode: "AI_CONFIG_INCOMPLETE", errorMessage: "AI 提供商、API Key、接口地址或模型未配置完整" };
     const options = {
       temperature: purpose.temperature ?? 0.2,
@@ -383,9 +383,9 @@ export class AiLexicalProvider implements DictionaryProvider {
       timeoutMs: purpose.timeoutMs ?? 60_000,
     };
     try {
-      const response = purpose.providerId === "anthropic"
+      const response = provider.apiType === "anthropic"
         ? await requestAnthropic(provider.baseUrl, provider.apiKey, purpose.model, promptFor(input), options)
-        : await requestOpenAiCompatible(purpose.providerId, provider.baseUrl, provider.apiKey, purpose.model, promptFor(input), options);
+        : await requestOpenAiCompatible(provider.id, provider.baseUrl, provider.apiKey, purpose.model, promptFor(input), options);
       if (["length", "max_tokens"].includes((response.finishReason ?? "").toLocaleLowerCase())) {
         return { content: null, errorCode: "AI_OUTPUT_TRUNCATED", errorMessage: "AI 输出因 Token 上限被截断，请提高输出 Token 配置。" };
       }
@@ -395,7 +395,7 @@ export class AiLexicalProvider implements DictionaryProvider {
       if (issues.length > 0) return { content: null, errorCode: "AI_SEMANTIC_INVALID", errorMessage: issues.join("；") };
       const score = qualityScore(parsed, input);
       if (score < 45) return { content: null, errorCode: "AI_QUALITY_LOW", errorMessage: `AI 内容质量评分过低：${score}` };
-      const source = `ai:${purpose.providerId}:${purpose.model}`;
+      const source = `ai:${provider.id}:${purpose.model}`;
       return {
         content: toContent(parsed, input, source),
         metadata: {

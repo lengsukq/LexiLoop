@@ -123,12 +123,13 @@ export default function WordDetailPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [selectedAccent, setSelectedAccent] = useState<"US" | "UK" | "GENERAL">("US");
-  const [selectedSource, setSelectedSource] = useState<"dictionary" | "edge" | "web">("dictionary");
   const [ttsTip, setTtsTip] = useState("");
   const [relatedSelection, setRelatedSelection] = useState<RelatedSelection | null>(null);
   const [relatedPreview, setRelatedPreview] = useState<RelatedPreview | null>(null);
   const [relatedBusy, setRelatedBusy] = useState(false);
   const [relatedMessage, setRelatedMessage] = useState("");
+  const [mnemonicBusy, setMnemonicBusy] = useState(false);
+  const [mnemonicError, setMnemonicError] = useState("");
 
   const applyWord = useCallback((data: Detail) => {
     setWord(data);
@@ -259,54 +260,45 @@ export default function WordDetailPage() {
     }
   }
 
-  function speak(term: string) {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(term);
-    utterance.lang = "en-US";
-    window.speechSynthesis.speak(utterance);
-  }
-
-  async function tryEdgeTts(term: string, accent: string): Promise<boolean> {
+  async function play() {
+    if (!word) return;
+    setTtsTip("");
     try {
-      const response = await fetch(`/api/tts?word=${encodeURIComponent(term)}&accent=${encodeURIComponent(accent)}`);
-      if (!response.ok) return false;
+      const response = await fetch(`/api/tts?word=${encodeURIComponent(word.term)}&accent=${encodeURIComponent(selectedAccent)}`);
+      if (!response.ok) throw new Error("TTS 请求失败");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.playbackRate = 1;
       audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
       await audio.play();
-      return true;
     } catch {
-      return false;
+      setTtsTip("Edge TTS 发音失败，请检查网络。");
     }
   }
 
-  async function play() {
+  async function generateMnemonic() {
     if (!word) return;
-    setTtsTip("");
-    if (selectedSource === "web") {
-      speak(word.term);
-      return;
-    }
-    if (selectedSource === "dictionary") {
-      const dictionaryAudio = word.content.pronunciations.find((item) => item.accent === selectedAccent && item.audioUrl)
-        ?? word.content.pronunciations.find((item) => item.audioUrl);
-      if (dictionaryAudio?.audioUrl) {
-        const audio = new Audio(dictionaryAudio.audioUrl);
-        audio.playbackRate = 1;
-        try {
-          await audio.play();
-          return;
-        } catch {
-          // Fall through to Edge TTS.
-        }
-      }
-    }
-    if (!(await tryEdgeTts(word.term, selectedAccent))) {
-      setTtsTip("Edge TTS 发音失败，已切换浏览器语音。");
-      speak(word.term);
+    setMnemonicBusy(true);
+    setMnemonicError("");
+    setError("");
+    try {
+      const result = await apiFetch<{ mnemonic: string }>(`/api/words/${word.id}/mnemonic`, { method: "POST" });
+      // Update local state so the UI shows the new mnemonic immediately
+      setWord((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          content: {
+            ...current.content,
+            learning: { ...current.content.learning, mnemonic: result.mnemonic },
+          },
+        };
+      });
+    } catch (reason) {
+      setMnemonicError(reason instanceof Error ? reason.message : "生成失败");
+    } finally {
+      setMnemonicBusy(false);
     }
   }
 
@@ -329,7 +321,7 @@ export default function WordDetailPage() {
     word.content.learning.mnemonic
     || word.content.learning.pronunciationTip
     || word.content.learning.commonMistakes.length,
-  );
+  ) || !word.content.learning.mnemonic; // show card when mnemonic is missing so user can generate one
   const hasExtendedContent = Boolean(
     word.content.forms.length
     || word.content.phrases.length
@@ -368,9 +360,6 @@ export default function WordDetailPage() {
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-lg border border-white/25">
                 {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)} className={`px-2 py-0.5 text-xs font-medium transition ${selectedAccent === accent ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{accent === "US" ? "美" : accent === "UK" ? "英" : "通用"}</button>)}
-              </div>
-              <div className="flex overflow-hidden rounded-lg border border-white/25">
-                {(["dictionary", "edge", "web"] as const).map((source) => <button key={source} type="button" onClick={() => setSelectedSource(source)} className={`px-2 py-0.5 text-xs font-medium transition ${selectedSource === source ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{source === "dictionary" ? "词典" : source === "edge" ? "Edge TTS" : "浏览器"}</button>)}
               </div>
               <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void play()}><Volume2 className="size-4" />播放发音</button>
               {ttsTip && <p className="w-full text-xs text-amber-300">{ttsTip}</p>}
@@ -435,6 +424,9 @@ export default function WordDetailPage() {
           <CardContent className="space-y-4">
             {word.content.learning.pronunciationTip && <InfoBlock label="发音提示" text={word.content.learning.pronunciationTip} />}
             {word.content.learning.mnemonic && <InfoBlock label="记忆方法" text={word.content.learning.mnemonic} />}
+            {!word.content.learning.mnemonic && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">记忆方法</p><Button variant="outline" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}AI 生成趣味助记</Button>{mnemonicError && <p className="mt-2 text-xs text-rose-500">{mnemonicError}</p>}</div>}
+            {word.content.learning.mnemonic && <div className="flex justify-end"><Button variant="ghost" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}重新生成</Button></div>}
+
             {word.content.learning.commonMistakes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">常见错误</p><ul className="space-y-2">{word.content.learning.commonMistakes.map((item) => <li key={item} className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{item}</li>)}</ul></div>}
           </CardContent>
         </Card>}

@@ -1,81 +1,569 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, ChevronRight, Database, Download, HardDrive, Loader2, RefreshCw, Save, Trash2, Upload, Volume2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Database, Download, HardDrive, Loader2, Plus, RefreshCw, Save, Trash2, Upload, Volume2, X } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
-import type { AppSettings, LlmProviderId, LlmPurposeId } from "@/lib/types";
-import { LLM_PROVIDER_IDS } from "@/lib/types";
-import { LLM_PROVIDER_META } from "@/modules/llm/service";
+import type { AppSettings, LlmPurposeId, LlmProviderConfig } from "@/lib/types";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, PageHeader, Select } from "@/components/ui";
+
+const PURPOSE_META: Array<{ id: LlmPurposeId; label: string; desc: string }> = [
+  { id: "IMPORT_ENRICHMENT", label: "AI 词条初始化", desc: "为导入词条生成完整、结构化的学习内容" },
+  { id: "STUDY_PLAN", label: "生成学习计划", desc: "根据学习进度生成每日计划" },
+  { id: "SUGGESTION", label: "生成建议", desc: "在学习中提供智能建议" },
+];
+
+const API_TYPE_SUGGESTED_MODELS: Record<string, Partial<Record<LlmPurposeId, string[]>>> = {
+  openai: {
+    TTS: ["tts-1", "tts-1-hd"],
+    IMPORT_ENRICHMENT: ["gpt-4o-mini", "gpt-4o"],
+    STUDY_PLAN: ["gpt-4o-mini", "gpt-4o"],
+    SUGGESTION: ["gpt-4o-mini", "gpt-4o"],
+  },
+  anthropic: {
+    IMPORT_ENRICHMENT: ["claude-3-5-haiku", "claude-3-5-sonnet"],
+    STUDY_PLAN: ["claude-3-5-haiku", "claude-3-5-sonnet"],
+    SUGGESTION: ["claude-3-5-haiku", "claude-3-5-sonnet"],
+  },
+  "opencode-zen": {
+    IMPORT_ENRICHMENT: ["deepseek-v4-flash-free", "mimo-v2.5-free"],
+    STUDY_PLAN: ["deepseek-v4-flash-free", "mimo-v2.5-free"],
+    SUGGESTION: ["mimo-v2.5-free", "deepseek-v4-flash-free"],
+  },
+};
+
+function suggestedModels(apiType: string, purposeId: LlmPurposeId): string[] {
+  return API_TYPE_SUGGESTED_MODELS[apiType]?.[purposeId] ?? [];
+}
 
 interface EcdictStatus { installed: boolean; enabled: boolean; fileSize: number; path: string; downloadUrl: string; }
 function bytes(value: number) { if (!value) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024))); return `${(value / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`; }
+
+function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return <label className="space-y-2"><span className="text-sm font-medium">{label}</span>
+    <Input type="number" min={min} max={max} value={value} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value) || 0)))} />
+  </label>;
+}
+
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return <label className="flex items-center gap-2 text-sm font-medium"><span>{label}</span>
+    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-indigo-600" />
+  </label>;
+}
+
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<AppSettings | null>(null); const [ecdict, setEcdict] = useState<EcdictStatus | null>(null); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState("");
-  const ecdictInput = useRef<HTMLInputElement>(null); const restoreInput = useRef<HTMLInputElement>(null);
-  const load = useCallback(async () => { try { const [values, status] = await Promise.all([apiFetch<AppSettings>("/api/settings"), apiFetch<EcdictStatus>("/api/settings/ecdict")]); setSettings(values); setEcdict(status); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "加载失败"); } }, []);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
-  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) { setSettings((current) => current ? { ...current, [key]: value } : current); }
-  async function save() { if (!settings) return; setBusy("save"); setMessage(""); try { setSettings(await apiFetch<AppSettings>("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) })); setMessage("学习设置已保存。新会话和内置后台引擎会使用最新配置。"); } catch (reason) { setError(reason instanceof Error ? reason.message : "保存失败"); } finally { setBusy(""); } }
-  async function ecdictAction(action: "download" | "enable" | "disable" | "remove") { setBusy(action); setError(""); setMessage(""); try { setEcdict(await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: action === "remove" ? "DELETE" : "POST", headers: action === "remove" ? undefined : { "Content-Type": "application/json" }, body: action === "remove" ? undefined : JSON.stringify({ action }) })); setMessage(action === "download" ? "ECDICT 已下载并启用。" : action === "remove" ? "ECDICT 已移除。" : "ECDICT 状态已更新。"); } catch (reason) { setError(reason instanceof Error ? reason.message : "操作失败"); } finally { setBusy(""); } }
-  async function uploadEcdict(file?: File) { if (!file) return; setBusy("upload-ecdict"); try { const form = new FormData(); form.append("file", file); setEcdict(await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: "PUT", body: form })); setMessage("ECDICT 文件校验通过并已启用。"); } catch (reason) { setError(reason instanceof Error ? reason.message : "上传失败"); } finally { setBusy(""); if (ecdictInput.current) ecdictInput.current.value = ""; } }
-  async function restore(file?: File) { if (!file || !window.confirm("恢复会替换当前全部 LexiLoop 数据。已确认有可用备份吗？")) return; setBusy("restore"); try { const form = new FormData(); form.append("file", file); const result = await apiFetch<{ message: string }>("/api/backups/restore", { method: "POST", body: form }); setMessage(result.message); } catch (reason) { setError(reason instanceof Error ? reason.message : "恢复失败"); } finally { setBusy(""); if (restoreInput.current) restoreInput.current.value = ""; } }
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [ecdict, setEcdict] = useState<EcdictStatus | null>(null);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState("");
+  const ecdictInput = useRef<HTMLInputElement>(null);
+  const restoreInput = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [values, status] = await Promise.all([
+        apiFetch<AppSettings>("/api/settings"),
+        apiFetch<EcdictStatus>("/api/settings/ecdict"),
+      ]);
+      setSettings(values);
+      setEcdict(status);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "加载失败");
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setSettings((current) => current ? { ...current, [key]: value } : current);
+  }
+
+  async function save() {
+    if (!settings) return;
+    setBusy("save");
+    setMessage("");
+    try {
+      setSettings(await apiFetch<AppSettings>("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      }));
+      setMessage("学习设置已保存。新会话和内置后台引擎会使用最新配置。");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存失败");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function ecdictAction(action: "download" | "enable" | "disable" | "remove") {
+    setBusy(action);
+    setError("");
+    setMessage("");
+    try {
+      setEcdict(await apiFetch<EcdictStatus>("/api/settings/ecdict", {
+        method: action === "remove" ? "DELETE" : "POST",
+        headers: action === "remove" ? undefined : { "Content-Type": "application/json" },
+        body: action === "remove" ? undefined : JSON.stringify({ action }),
+      }));
+      setMessage(action === "download" ? "ECDICT 已下载并启用。" : action === "remove" ? "ECDICT 已移除。" : "ECDICT 状态已更新。");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "操作失败");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function uploadEcdict(file?: File) {
+    if (!file) return;
+    setBusy("upload-ecdict");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      setEcdict(await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: "PUT", body: form }));
+      setMessage("ECDICT 文件校验通过并已启用。");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "上传失败");
+    } finally {
+      setBusy("");
+      if (ecdictInput.current) ecdictInput.current.value = "";
+    }
+  }
+
+  async function restore(file?: File) {
+    if (!file || !window.confirm("恢复会替换当前全部 LexiLoop 数据。已确认有可用备份吗？")) return;
+    setBusy("restore");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const result = await apiFetch<{ message: string }>("/api/backups/restore", { method: "POST", body: form });
+      setMessage(result.message);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "恢复失败");
+    } finally {
+      setBusy("");
+      if (restoreInput.current) restoreInput.current.value = "";
+    }
+  }
+
   const [ttsTestState, setTtsTestState] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [ttsTestMessage, setTtsTestMessage] = useState("");
+
   async function testTts() {
     if (!settings) return;
-    setTtsTestState("testing"); setTtsTestMessage("");
+    setTtsTestState("testing");
+    setTtsTestMessage("");
     try {
       const response = await fetch("/api/tts?word=LexiLoop&accent=US");
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        const audio = new Audio(url); audio.playbackRate = 1; await audio.play();
-        setTtsTestState("success"); setTtsTestMessage("播放正常");
+        const audio = new Audio(url);
+        audio.playbackRate = 1;
+        await audio.play();
+        setTtsTestState("success");
+        setTtsTestMessage("播放正常");
       } else {
         const body = await response.json().catch(() => ({ error: "未知错误" }));
-        setTtsTestState("error"); setTtsTestMessage(body.error || "测试失败");
+        setTtsTestState("error");
+        setTtsTestMessage(body.error || "测试失败");
       }
-    } catch { setTtsTestState("error"); setTtsTestMessage("网络请求失败"); }
+    } catch {
+      setTtsTestState("error");
+      setTtsTestMessage("网络请求失败");
+    }
   }
-  function updatePurpose(purposeId: LlmPurposeId, field: keyof AppSettings["llmConfig"]["purposes"][LlmPurposeId], value: unknown) {
-    setSettings((current) => current ? {
-      ...current, llmConfig: {
-        ...current.llmConfig, purposes: {
+
+  function updatePurpose(purposeId: LlmPurposeId, field: string, value: unknown) {
+    setSettings((current) => {
+      if (!current) return null;
+      return {
+        ...current,
+        llmConfig: {
+          ...current.llmConfig,
+          purposes: {
           ...current.llmConfig.purposes,
           [purposeId]: { ...current.llmConfig.purposes[purposeId], [field]: value },
         },
       },
-    } : null);
-  }
-  function updateProvider(providerId: LlmProviderId, field: keyof AppSettings["llmConfig"]["providers"][LlmProviderId], value: string) {
-    setSettings((current) => current ? {
-      ...current, llmConfig: {
-        ...current.llmConfig, providers: {
-          ...current.llmConfig.providers,
-          [providerId]: { ...current.llmConfig.providers[providerId], [field]: value },
-        },
-      },
-    } : null);
+      };
+    });
   }
 
-  return <div className="space-y-6"><PageHeader title="设置与数据" description="调整每日学习计划、词典来源，并管理完整备份。" action={<Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button>} />
-    {error && <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-4 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"><AlertCircle className="size-4" />{error}</div>}{message && <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"><CheckCircle2 className="size-4" />{message}</div>}
+  function addProvider() {
+    setSettings((current) => {
+      if (!current) return null;
+      const id = `provider-${Date.now()}`;
+      const newProvider: LlmProviderConfig = { id, name: "", apiType: "openai", baseUrl: "", apiKey: "" };
+      return {
+        ...current,
+        llmConfig: {
+          ...current.llmConfig,
+          providers: [...current.llmConfig.providers, newProvider],
+        },
+      };
+    });
+  }
+
+  function updateProviderField(index: number, field: keyof LlmProviderConfig, value: string) {
+    setSettings((current) => {
+      if (!current) return null;
+      const providers = current.llmConfig.providers.map((p, i) =>
+        i === index ? { ...p, [field]: value } : p
+      );
+      return { ...current, llmConfig: { ...current.llmConfig, providers } };
+    });
+  }
+
+  function removeProvider(index: number) {
+    setSettings((current) => {
+      if (!current) return null;
+      const removed = current.llmConfig.providers[index];
+      if (!removed) return current;
+      const providers = current.llmConfig.providers.filter((_, i) => i !== index);
+      const purposes = { ...current.llmConfig.purposes };
+      for (const key of Object.keys(purposes) as LlmPurposeId[]) {
+        if (purposes[key].providerId === removed.id) {
+          purposes[key] = { ...purposes[key], enabled: false, providerId: "" };
+        }
+      }
+      return { ...current, llmConfig: { ...current.llmConfig, providers, purposes } };
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="设置与数据"
+        description="调整每日学习计划、词典来源，并管理完整备份。"
+        action={<Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button>}
+      />
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-4 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+          <AlertCircle className="size-4" />{error}
+        </div>
+      )}
+      {message && (
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <CheckCircle2 className="size-4" />{message}
+        </div>
+      )}
     {!settings && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-indigo-500" /></div>}
-    {settings && <><Card><CardHeader><CardTitle>每日学习计划</CardTitle></CardHeader><CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"><NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} /><NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} /><NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} /><label className="space-y-2"><span className="text-sm font-medium">目标记忆率</span><Select className="w-full" value={settings.targetRetentionRate} onChange={(event) => update("targetRetentionRate", Number(event.target.value))}><option value={0.85}>85% · 更轻松</option><option value={0.9}>90% · 推荐</option><option value={0.93}>93% · 更密集</option><option value={0.95}>95% · 高强度</option></Select></label></CardContent></Card>
-      <Card><CardHeader><CardTitle>发音与词典来源</CardTitle></CardHeader><CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"><label className="space-y-2"><span className="text-sm font-medium">默认口音</span><Select className="w-full" value={settings.defaultAccent} onChange={(event) => update("defaultAccent", event.target.value as AppSettings["defaultAccent"])}><option value="US">美音</option><option value="UK">英音</option><option value="GENERAL">通用</option></Select></label><label className="space-y-2"><span className="text-sm font-medium">播放速度</span><Select className="w-full" value={settings.playbackSpeed} onChange={(event) => update("playbackSpeed", Number(event.target.value))}><option value={0.75}>0.75x</option><option value={1}>1.0x</option><option value={1.25}>1.25x</option><option value={1.5}>1.5x</option></Select></label><Toggle label="自动播放发音" checked={settings.autoPlayPronunciation} onChange={(value) => update("autoPlayPronunciation", value)} /><Toggle label="DictionaryAPI.dev" checked={settings.dictionaryApiEnabled} onChange={(value) => update("dictionaryApiEnabled", value)} /><Toggle label="MyMemory 翻译" checked={settings.myMemoryEnabled} onChange={(value) => update("myMemoryEnabled", value)} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>语音合成 (TTS)</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-slate-500">发音功能已内置使用 <strong>Microsoft Edge TTS</strong>，完全免费，无需配置 API Key 或模型。</p>
-        <div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"><CheckCircle2 className="size-4" />免费 · 无需额外配置</div><div className="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"><Volume2 className="size-4" />支持美音 / 英音</div></div>
-        <div className="flex items-center gap-3"><Button variant="outline" size="sm" onClick={() => void testTts()} disabled={ttsTestState === "testing"}>{ttsTestState === "testing" ? <Loader2 className="size-4 animate-spin" /> : <Volume2 className="size-4" />}试听发音</Button>{ttsTestState !== "idle" && <span className={`text-xs ${ttsTestState === "success" ? "text-emerald-600" : "text-rose-600"}`}>{ttsTestMessage}</span>}</div></CardContent></Card>
-      <Card><CardHeader><CardTitle>大模型配置</CardTitle></CardHeader><CardContent className="space-y-5"><p className="text-sm text-slate-500">配置 AI 大模型生成完整词汇学习内容，包括分词义释义、例句、搭配、词形、同根词、近反义词、易混词和记忆提示。Edge TTS 仍独立负责发音。</p>
-        <div className="space-y-4">{[{ id: "IMPORT_ENRICHMENT" as LlmPurposeId, label: "AI 词条初始化", desc: "为导入词条生成完整、结构化的学习内容" }, { id: "STUDY_PLAN" as LlmPurposeId, label: "生成学习计划", desc: "根据学习进度生成每日计划" }, { id: "SUGGESTION" as LlmPurposeId, label: "生成建议", desc: "在学习中提供智能建议" }].map((purpose) => { const config = settings.llmConfig.purposes[purpose.id]; const meta = LLM_PROVIDER_META[config.providerId]; const suggestedModels = meta?.suggestedModels[purpose.id] ?? []; return <div key={purpose.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-medium">{purpose.label}</p><p className="text-xs text-slate-400">{purpose.desc}</p></div><label className="flex items-center gap-2 text-sm"><span className="text-slate-500">{config.enabled ? "已启用" : "已禁用"}</span><input type="checkbox" checked={config.enabled} onChange={(event) => updatePurpose(purpose.id, "enabled", event.target.checked)} className="size-4 accent-indigo-600" /></label></div>{config.enabled && <div className="mt-3 flex flex-wrap items-end gap-3"><label className="space-y-1.5 flex-1 min-w-40"><span className="text-xs font-medium text-slate-500">提供商</span><Select className="w-full" value={config.providerId} onChange={(event) => { const newProvider = event.target.value as LlmProviderId; const newMeta = LLM_PROVIDER_META[newProvider]; const newSuggested = newMeta?.suggestedModels[purpose.id] ?? []; updatePurpose(purpose.id, "providerId", newProvider); if (newSuggested.length) updatePurpose(purpose.id, "model", newSuggested[0]); }}>{LLM_PROVIDER_IDS.map((id) => <option key={id} value={id}>{LLM_PROVIDER_META[id].name}</option>)}</Select></label><label className="space-y-1.5 flex-[2] min-w-48"><span className="text-xs font-medium text-slate-500">模型</span><Input value={config.model} onChange={(event) => updatePurpose(purpose.id, "model", event.target.value)} placeholder={suggestedModels.length ? `推荐: ${suggestedModels.join("、")}` : "输入模型名称"} /></label>{purpose.id === "IMPORT_ENRICHMENT" && <><label className="space-y-1.5 w-24"><span className="text-xs font-medium text-slate-500">温度</span><Input type="number" min={0} max={1} step={0.1} value={config.temperature ?? 0.2} onChange={(event) => updatePurpose(purpose.id, "temperature", Number(event.target.value))} /></label><label className="space-y-1.5 w-32"><span className="text-xs font-medium text-slate-500">输出 Token</span><Input type="number" min={500} max={16000} step={100} value={config.maxOutputTokens ?? 3200} onChange={(event) => updatePurpose(purpose.id, "maxOutputTokens", Number(event.target.value))} /></label><label className="space-y-1.5 w-32"><span className="text-xs font-medium text-slate-500">超时（秒）</span><Input type="number" min={5} max={300} value={Math.round((config.timeoutMs ?? 60000) / 1000)} onChange={(event) => updatePurpose(purpose.id, "timeoutMs", Number(event.target.value) * 1000)} /></label></>}</div>}</div>; })}</div>
-        <details className="group rounded-xl border border-slate-200 dark:border-slate-700"><summary className="flex cursor-pointer items-center gap-2 p-4 text-sm font-medium text-slate-700 dark:text-slate-300"><ChevronRight className="size-4 transition group-open:rotate-90" />提供商凭证</summary><div className="space-y-4 px-4 pb-4">{LLM_PROVIDER_IDS.map((id) => { const provider = settings.llmConfig.providers[id]; const meta = LLM_PROVIDER_META[id]; return <div key={id} className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/40"><p className="mb-3 text-sm font-medium">{meta.name}</p><div className="flex flex-wrap gap-3"><label className="space-y-1.5 flex-1 min-w-60"><span className="text-xs font-medium text-slate-500">API Key</span><Input type="password" value={provider.apiKey} onChange={(event) => updateProvider(id, "apiKey", event.target.value)} placeholder="sk-..." /></label><label className="space-y-1.5 flex-[2] min-w-60"><span className="text-xs font-medium text-slate-500">接口地址</span><Input value={provider.baseUrl} onChange={(event) => updateProvider(id, "baseUrl", event.target.value)} placeholder={id === "custom" ? "https://your-endpoint.com/v1" : undefined} /></label></div></div>; })}</div></details>
-      </CardContent></Card>
-      <div className="flex justify-end"><Button size="lg" onClick={() => void save()} disabled={busy === "save"}>{busy === "save" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存学习设置</Button></div>
-    </>}
-    <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>离线词典 ECDICT</CardTitle><p className="mt-1 text-sm text-slate-500">用于可缓存的中文释义、音标、标签和词形变化，不使用禁止缓存的有道词典结果。</p></div>{ecdict && <Badge tone={ecdict.installed && ecdict.enabled ? "green" : ecdict.installed ? "amber" : "slate"}>{ecdict.installed ? ecdict.enabled ? "已安装并启用" : "已安装未启用" : "未安装"}</Badge>}</div></CardHeader><CardContent>{ecdict ? <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><Info label="文件大小" value={bytes(ecdict.fileSize)} /><Info label="服务状态" value={ecdict.enabled ? "启用" : "禁用"} /><Info label="存储路径" value={ecdict.path} /></div><div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">完整 ECDICT 约数百 MB。自动下载可能持续较久，FNOS 环境也可以直接上传现有 SQLite 文件。</div><div className="flex flex-wrap gap-2">{!ecdict.installed && <Button onClick={() => void ecdictAction("download")} disabled={Boolean(busy)}>{busy === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}自动下载并安装</Button>}<Button variant="outline" onClick={() => ecdictInput.current?.click()} disabled={Boolean(busy)}>{busy === "upload-ecdict" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}上传 SQLite</Button><input ref={ecdictInput} hidden type="file" accept=".db,.sqlite,.sqlite3" onChange={(event) => void uploadEcdict(event.target.files?.[0])} />{ecdict.installed && <Button variant="outline" onClick={() => void ecdictAction(ecdict.enabled ? "disable" : "enable")} disabled={Boolean(busy)}>{ecdict.enabled ? "禁用" : "启用"}</Button>}{ecdict.installed && <Button variant="danger" onClick={() => void ecdictAction("remove")} disabled={Boolean(busy)}><Trash2 className="size-4" />移除</Button>}</div></div> : <Loader2 className="size-6 animate-spin text-indigo-500" />}</CardContent></Card>
-    <Card><CardHeader><CardTitle>备份与恢复</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-3"><a href="/api/backups/sqlite" className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:hover:bg-indigo-950/20"><span className="grid size-11 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950"><Database className="size-5" /></span><span><b className="block text-sm">导出 SQLite</b><small className="text-slate-400">完整可恢复备份</small></span></a><a href="/api/backups/json" className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:hover:bg-indigo-950/20"><span className="grid size-11 place-items-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950"><Download className="size-5" /></span><span><b className="block text-sm">导出 JSON</b><small className="text-slate-400">便于检查与迁移</small></span></a><button type="button" onClick={() => restoreInput.current?.click()} className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-rose-300 hover:bg-rose-50 dark:border-slate-700 dark:hover:bg-rose-950/20"><span className="grid size-11 place-items-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-950">{busy === "restore" ? <Loader2 className="size-5 animate-spin" /> : <HardDrive className="size-5" />}</span><span><b className="block text-sm">恢复 SQLite</b><small className="text-slate-400">校验后重启应用生效</small></span></button><input ref={restoreInput} hidden type="file" accept=".sqlite,.db,.sqlite3" onChange={(event) => void restore(event.target.files?.[0])} /></div><p className="text-xs text-slate-400">恢复文件会先执行 SQLite 完整性和表结构校验，并暂存为 restore-pending.sqlite；重启 app 容器后自动替换。</p></CardContent></Card>
-  </div>;
+      {settings && (
+        <>
+          <Card>
+            <CardHeader><CardTitle>每日学习计划</CardTitle></CardHeader>
+            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} />
+              <NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} />
+              <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
+              <label className="space-y-2">
+                <span className="text-sm font-medium">目标记忆率</span>
+                <Select className="w-full" value={settings.targetRetentionRate} onChange={(event) => update("targetRetentionRate", Number(event.target.value))}>
+                  <option value={0.85}>85% - 更轻松</option>
+                  <option value={0.9}>90% - 推荐</option>
+                  <option value={0.93}>93% - 更密集</option>
+                  <option value={0.95}>95% - 高强度</option>
+                </Select>
+              </label>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>发音与词典来源</CardTitle></CardHeader>
+            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="space-y-2">
+                <span className="text-sm font-medium">默认口音</span>
+                <Select className="w-full" value={settings.defaultAccent} onChange={(event) => update("defaultAccent", event.target.value as AppSettings["defaultAccent"])}>
+                  <option value="US">美音</option>
+                  <option value="UK">英音</option>
+                  <option value="GENERAL">通用</option>
+                </Select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">播放速度</span>
+                <Select className="w-full" value={settings.playbackSpeed} onChange={(event) => update("playbackSpeed", Number(event.target.value))}>
+                  <option value={0.75}>0.75x</option>
+                  <option value={1}>1.0x</option>
+                  <option value={1.25}>1.25x</option>
+                  <option value={1.5}>1.5x</option>
+                </Select>
+              </label>
+              <Toggle label="自动播放发音" checked={settings.autoPlayPronunciation} onChange={(value) => update("autoPlayPronunciation", value)} />
+              <Toggle label="DictionaryAPI.dev" checked={settings.dictionaryApiEnabled} onChange={(value) => update("dictionaryApiEnabled", value)} />
+              <Toggle label="MyMemory 翻译" checked={settings.myMemoryEnabled} onChange={(value) => update("myMemoryEnabled", value)} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>语音合成 (TTS)</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-500">发音功能已内置使用 <strong>Microsoft Edge TTS</strong>，完全免费，无需配置 API Key 或模型。</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <CheckCircle2 className="size-4" />免费 - 无需额外配置
+                </div>
+                <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                  <Volume2 className="size-4" />支持美音 / 英音
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" onClick={() => void testTts()} disabled={ttsTestState === "testing"}>
+                  {ttsTestState === "testing" ? <Loader2 className="size-4 animate-spin" /> : <Volume2 className="size-4" />}试听发音
+                </Button>
+                {ttsTestState !== "idle" && (
+                  <span className={`text-xs ${ttsTestState === "success" ? "text-emerald-600" : "text-rose-600"}`}>{ttsTestMessage}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>大模型配置</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <p className="text-sm text-slate-500">
+                配置 AI 大模型生成完整词汇学习内容，包括分词义释义、例句、搭配、词形、同根词、近反义词、易混词和记忆提示。Edge TTS 仍独立负责发音。
+              </p>
+
+              {/* Provider management section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Provider 管理</h3>
+                  <Button variant="outline" size="sm" onClick={addProvider}>
+                    <Plus className="size-4" />添加 Provider
+                  </Button>
+                </div>
+                {settings.llmConfig.providers.length === 0 && (
+                  <p className="text-xs text-slate-400">暂无配置，请添加一个 Provider。</p>
+                )}
+                {settings.llmConfig.providers.map((provider, index) => (
+                  <div key={provider.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <label className="space-y-1.5">
+                          <span className="text-xs font-medium text-slate-500">名称</span>
+                          <Input
+                            value={provider.name}
+                            onChange={(e) => updateProviderField(index, "name", e.target.value)}
+                            placeholder="例如: 我的 OpenAI"
+                          />
+                        </label>
+                        <label className="space-y-1.5">
+                          <span className="text-xs font-medium text-slate-500">API 类型</span>
+                          <Select
+                            className="w-full"
+                            value={provider.apiType}
+                            onChange={(e) => updateProviderField(index, "apiType", e.target.value)}
+                          >
+                            <option value="openai">OpenAI 兼容</option>
+                            <option value="anthropic">Anthropic</option>
+                          </Select>
+                        </label>
+                        <label className="space-y-1.5">
+                          <span className="text-xs font-medium text-slate-500">接口地址</span>
+                          <Input
+                            value={provider.baseUrl}
+                            onChange={(e) => updateProviderField(index, "baseUrl", e.target.value)}
+                            placeholder={provider.apiType === "openai" ? "https://api.openai.com/v1" : "https://api.anthropic.com/v1"}
+                          />
+                        </label>
+                        <label className="space-y-1.5">
+                          <span className="text-xs font-medium text-slate-500">API Key</span>
+                          <Input
+                            value={provider.apiKey}
+                            onChange={(e) => updateProviderField(index, "apiKey", e.target.value)}
+                            placeholder="sk-..."
+                            type="password"
+                          />
+                        </label>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-rose-500 shrink-0"
+                        onClick={() => removeProvider(index)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Purpose binding section */}
+              <div className="space-y-4">
+                {PURPOSE_META.map((purpose) => {
+                  const config = settings.llmConfig.purposes[purpose.id];
+                  const provider = settings.llmConfig.providers.find((p) => p.id === config.providerId);
+                  const models = provider ? suggestedModels(provider.apiType, purpose.id) : [];
+                  return (
+                    <div key={purpose.id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{purpose.label}</p>
+                          <p className="text-xs text-slate-400">{purpose.desc}</p>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm">
+                          <span className="text-slate-500">{config.enabled ? "已启用" : "已禁用"}</span>
+                          <input
+                            type="checkbox"
+                            checked={config.enabled}
+                            onChange={(event) => updatePurpose(purpose.id, "enabled", event.target.checked)}
+                            className="size-4 accent-indigo-600"
+                          />
+                        </label>
+                      </div>
+                      {config.enabled && (
+                        <div className="mt-3 flex flex-wrap items-end gap-3">
+                          <label className="space-y-1.5 flex-1 min-w-40">
+                            <span className="text-xs font-medium text-slate-500">提供商</span>
+                            <Select
+                              className="w-full"
+                              value={config.providerId}
+                              onChange={(event) => {
+                                const selectedProvider = settings.llmConfig.providers.find((p) => p.id === event.target.value);
+                                updatePurpose(purpose.id, "providerId", event.target.value);
+                                if (selectedProvider) {
+                                  const newModels = suggestedModels(selectedProvider.apiType, purpose.id);
+                                  if (newModels.length > 0) {
+                                    updatePurpose(purpose.id, "model", newModels[0]);
+                                  }
+                                }
+                              }}
+                            >
+                              {settings.llmConfig.providers.length === 0 && (
+                                <option value="">-- 请先添加 Provider --</option>
+                              )}
+                              {settings.llmConfig.providers.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name || p.id}</option>
+                              ))}
+                            </Select>
+                          </label>
+                          <label className="space-y-1.5 flex-[2] min-w-48">
+                            <span className="text-xs font-medium text-slate-500">模型</span>
+                            <Input
+                              value={config.model}
+                              onChange={(event) => updatePurpose(purpose.id, "model", event.target.value)}
+                              placeholder={models.length > 0 ? `推荐: ${models.join("、")}` : "输入模型名称"}
+                            />
+                          </label>
+                          {purpose.id === "IMPORT_ENRICHMENT" && (
+                            <>
+                              <label className="space-y-1.5 w-20">
+                                <span className="text-xs font-medium text-slate-500">温度</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={1}
+                                  step={0.1}
+                                  value={config.temperature ?? 0.2}
+                                  onChange={(event) => updatePurpose(purpose.id, "temperature", Number(event.target.value))}
+                                />
+                              </label>
+                              <label className="space-y-1.5 w-24">
+                                <span className="text-xs font-medium text-slate-500">输出 Token</span>
+                                <Input
+                                  type="number"
+                                  min={500}
+                                  max={16000}
+                                  step={100}
+                                  value={config.maxOutputTokens ?? 3200}
+                                  onChange={(event) => updatePurpose(purpose.id, "maxOutputTokens", Number(event.target.value))}
+                                />
+                              </label>
+                              <label className="space-y-1.5 w-24">
+                                <span className="text-xs font-medium text-slate-500">超时(秒)</span>
+                                <Input
+                                  type="number"
+                                  min={5}
+                                  max={300}
+                                  value={(config.timeoutMs ?? 60000) / 1000}
+                                  onChange={(event) => updatePurpose(purpose.id, "timeoutMs", Number(event.target.value) * 1000)}
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>备份与还原</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-500">将学习数据导出为 SQLite 或 JSON 格式进行备份。</p>
+              <div className="flex flex-wrap gap-2">
+                <a href="/api/backups/sqlite" download className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><HardDrive className="size-4" />下载 SQLite 备份</a>
+                <a href="/api/backups/json" download className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><Download className="size-4" />下载 JSON 备份</a>
+              </div>
+              <hr className="border-slate-200 dark:border-slate-700" />
+              <p className="text-sm text-slate-500">从备份文件恢复。恢复操作将覆盖全部现有数据。</p>
+              <label className="cursor-pointer">
+                <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => restoreInput.current?.click()}>
+                  <Upload className="size-4" />上传备份文件并恢复
+                </span>
+                <input ref={restoreInput} type="file" accept=".sqlite,.json" className="hidden" onChange={(event) => void restore(event.target.files?.[0])} />
+              </label>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>ECDICT 词典</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-500">ECDICT 提供大规模离线英汉词典数据，用词形、词源和真人发音补充 AI 生成内容。</p>
+              {!ecdict ? (
+                <div className="flex items-center gap-2 text-sm text-slate-400"><Loader2 className="size-4 animate-spin" />加载中...</div>
+              ) : ecdict.installed ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Badge className="text-emerald-600 border-emerald-300" tone="green">{ecdict.enabled ? "已启用" : "已禁用"}</Badge>
+                    <span className="text-xs text-slate-400">{bytes(ecdict.fileSize)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {ecdict.enabled
+                      ? <Button variant="outline" size="sm" onClick={() => void ecdictAction("disable")} disabled={busy === "disable"}>停用</Button>
+                      : <Button variant="outline" size="sm" onClick={() => void ecdictAction("enable")} disabled={busy === "enable"}>启用</Button>
+                    }
+                    <Button variant="outline" size="sm" onClick={() => void ecdictAction("remove")} disabled={busy === "remove"} className="text-rose-500">
+                      {busy === "remove" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}移除
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400">尚未安装 ECDICT 词典（~700MB）</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => void ecdictAction("download")} disabled={busy === "download"}>
+                      {busy === "download" ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}下载并启用
+                    </Button>
+                    <label className="cursor-pointer">
+                      <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" onClick={() => ecdictInput.current?.click()}>
+                        <Upload className="size-4" />上传自定义文件
+                      </span>
+                      <input ref={ecdictInput} type="file" accept=".sqlite,.mdb" className="hidden" onChange={(event) => void uploadEcdict(event.target.files?.[0])} />
+                    </label>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end gap-3">
+            <Button onClick={() => void save()} disabled={busy === "save"}>
+              {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存设置
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
-function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) { return <label className="space-y-2"><span className="text-sm font-medium">{label}</span><Input type="number" min={min} max={max} value={value} onChange={(event) => onChange(Math.max(min, Math.min(max, Number(event.target.value))))} /></label>; }
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4 accent-indigo-600" /></label>; }
-function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60"><p className="text-xs text-slate-400">{label}</p><p className="mt-1 break-all text-sm font-medium">{value}</p></div>; }

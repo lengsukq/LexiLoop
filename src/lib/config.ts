@@ -1,17 +1,20 @@
 import type { AppSettings, LlmConfig } from "@/lib/types";
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
-  providers: {
-    openai: { apiKey: "", baseUrl: "https://api.openai.com/v1" },
-    anthropic: { apiKey: "", baseUrl: "https://api.anthropic.com/v1" },
-    siliconflow: { apiKey: "", baseUrl: "https://api.siliconflow.cn/v1" },
-    custom: { apiKey: "", baseUrl: "" },
-  },
+  providers: [
+    {
+      id: "opencode-zen",
+      name: "OpenCode Zen",
+      apiType: "openai",
+      baseUrl: "https://opencode.ai/zen/v1",
+      apiKey: "public",
+    },
+  ],
   purposes: {
-    TTS: { enabled: false, providerId: "siliconflow", model: "TeleAI/TeleSpeechASR" },
-    IMPORT_ENRICHMENT: { enabled: false, providerId: "openai", model: "gpt-4o-mini", temperature: 0.2, maxOutputTokens: 3200, timeoutMs: 60000 },
-    STUDY_PLAN: { enabled: false, providerId: "openai", model: "gpt-4o-mini" },
-    SUGGESTION: { enabled: false, providerId: "openai", model: "gpt-4o-mini" },
+    TTS: { enabled: false, providerId: "", model: "" },
+    IMPORT_ENRICHMENT: { enabled: true, providerId: "opencode-zen", model: "deepseek-v4-flash-free" },
+    STUDY_PLAN: { enabled: true, providerId: "opencode-zen", model: "deepseek-v4-flash-free" },
+    SUGGESTION: { enabled: false, providerId: "opencode-zen", model: "mimo-v2.5-free" },
   },
 };
 

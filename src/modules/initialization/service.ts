@@ -4,7 +4,7 @@ import type { DictionaryContent, InitializationMode, InitializationStatus, Provi
 import { getSettings } from "@/modules/settings/service";
 import { contentStatus, dictionaryContentFromRow, mergeDictionaryContent } from "@/modules/dictionary/content";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, like, sql, count, type SQL } from "drizzle-orm";
 
 export interface ClaimedJob {
   id: number;
@@ -304,7 +304,20 @@ export async function getInitializationSummary() {
   return result;
 }
 
-export async function listInitializationJobs(limit = 100, status?: InitializationStatus) {
+export async function getWordsSummary() {
+  const counts = await db.select({ status: words.initializationStatus, count: sql<number>`count(*)` }).from(words).groupBy(words.initializationStatus);
+  const result: Record<InitializationStatus, number> = { PENDING: 0, QUEUED: 0, RUNNING: 0, READY: 0, PARTIAL: 0, FAILED: 0, DISABLED: 0 };
+  for (const row of counts) result[row.status] = Number(row.count);
+  return result;
+}
+
+export async function listInitializationJobs(options: { page?: number; pageSize?: number; status?: InitializationStatus; search?: string } = {}) {
+  const { page = 1, pageSize = 50, status: statusFilter, search } = options;
+  const conditions: SQL[] = [];
+  if (statusFilter) conditions.push(eq(initializationJobs.status, statusFilter));
+  if (search) conditions.push(like(words.term, `%${search}%`));
+  const where = conditions.length > 0 ? and(...conditions) : sql`1=1`;
+
   const base = db.select({
     id: initializationJobs.id, wordId: initializationJobs.wordId, term: words.term,
     status: initializationJobs.status, mode: initializationJobs.mode, priority: initializationJobs.priority,
@@ -312,8 +325,98 @@ export async function listInitializationJobs(limit = 100, status?: Initializatio
     lastError: initializationJobs.lastError, lastErrorCode: initializationJobs.lastErrorCode,
     createdAt: initializationJobs.createdAt, updatedAt: initializationJobs.updatedAt, completedAt: initializationJobs.completedAt,
   }).from(initializationJobs).innerJoin(words, eq(initializationJobs.wordId, words.id));
-  const query = status ? base.where(eq(initializationJobs.status, status)) : base;
-  return query.orderBy(sql`${initializationJobs.createdAt} DESC`).limit(limit);
+
+  const countResult = await db.select({ total: count() }).from(initializationJobs)
+    .innerJoin(words, eq(initializationJobs.wordId, words.id))
+    .where(where);
+  const total = Number(countResult[0]?.total ?? 0);
+
+  const jobs = await base.where(where).orderBy(sql`${initializationJobs.createdAt} DESC`).limit(pageSize).offset((page - 1) * pageSize);
+  return { jobs, total };
+}
+
+export async function getJobDetails(jobId: number) {
+  const rows = sqlite.prepare(`
+    SELECT j.*, w.term, w.normalized_term, w.source_language, w.target_language
+    FROM initialization_jobs j
+    JOIN words w ON w.id = j.word_id
+    WHERE j.id = ?
+  `).get(jobId) as Record<string, unknown> | undefined;
+  if (!rows) return null;
+
+  const attempts = sqlite.prepare(`
+    SELECT * FROM provider_attempts WHERE initialization_job_id = ? ORDER BY created_at ASC
+  `).all(jobId) as Array<Record<string, unknown>>;
+
+  const wordContent = sqlite.prepare(`
+    SELECT * FROM word_contents WHERE word_id = ?
+  `).get(rows.word_id as number) as Record<string, unknown> | undefined;
+
+  const contentFieldKeys = [
+    "definitions", "pronunciations", "examples", "phrases", "forms",
+    "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes",
+    "tags",
+  ] as const;
+
+  const contentFields = wordContent
+    ? Object.fromEntries(contentFieldKeys.map((key) => {
+        const col = `${key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}_json` as string;
+        const arr: unknown[] = JSON.parse((wordContent[col] as string) || "[]");
+        return [key, arr.length > 0];
+      }))
+    : Object.fromEntries(contentFieldKeys.map((key) => [key, false]));
+
+  // Check summary sub-fields
+  const summaryJson = wordContent?.summary_json as string | undefined;
+  const summary = summaryJson ? JSON.parse(summaryJson) : null;
+  contentFields.summary = summary && (summary.shortDefinition || summary.translation);
+  contentFields.learning = summary && (summary.pronunciationTip || (summary.mnemonic));
+  // Re-check learning from learning_json
+  const learningJson = wordContent?.learning_json as string | undefined;
+  const learning = learningJson ? JSON.parse(learningJson) : null;
+  contentFields.learning = learning && (learning.pronunciationTip || learning.mnemonic || learning.commonMistakes?.length > 0);
+  // sentenceAnalysis
+  const saJson = wordContent?.sentence_analysis_json as string | undefined;
+  const sa = saJson ? JSON.parse(saJson) : null;
+  contentFields.sentenceAnalysis = sa && (sa.grammarNotes?.length > 0 || sa.keyExpressions?.length > 0);
+
+  const formatAttempt = (a: Record<string, unknown>) => ({
+    id: a.id as number,
+    providerId: a.provider_id as string,
+    status: a.status as string,
+    durationMs: a.duration_ms as number,
+    fieldsReturned: JSON.parse((a.fields_returned_json as string) || "[]") as string[],
+    errorCode: a.error_code as string | null,
+    errorMessage: a.error_message as string | null,
+    metadata: a.metadata_json ? JSON.parse(a.metadata_json as string) : null,
+    createdAt: a.created_at as number,
+  });
+
+  return {
+    job: {
+      id: rows.id as number,
+      wordId: rows.word_id as number,
+      term: rows.term as string,
+      normalizedTerm: rows.normalized_term as string,
+      sourceLanguage: rows.source_language as string,
+      targetLanguage: rows.target_language as string,
+      status: rows.status as string,
+      mode: rows.mode as string,
+      priority: rows.priority as number,
+      attemptCount: rows.attempt_count as number,
+      maxAttempts: rows.max_attempts as number,
+      lastError: rows.last_error as string | null,
+      lastErrorCode: rows.last_error_code as string | null,
+      availableAt: rows.available_at as number | null,
+      lockedAt: rows.locked_at as number | null,
+      lockedBy: rows.locked_by as string | null,
+      createdAt: rows.created_at as number,
+      updatedAt: rows.updated_at as number,
+      completedAt: rows.completed_at as number | null,
+    },
+    attempts: attempts.map(formatAttempt),
+    contentFields,
+  };
 }
 
 export async function getWorkerHeartbeats() {

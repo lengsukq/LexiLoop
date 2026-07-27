@@ -1,0 +1,77 @@
+import { createEmptyCard, FSRS, Rating, State, type Card, type Grade, type RecordLogItem } from "ts-fsrs";
+import type { ReviewRating } from "@/lib/types";
+
+export function createFsrs(requestRetention = 0.9) {
+  return new FSRS({
+    request_retention: requestRetention,
+    maximum_interval: 3650,
+    enable_fuzz: true,
+  });
+}
+
+export function emptyCard(now = new Date()): Card {
+  return createEmptyCard(now);
+}
+
+export function ratingToGrade(rating: ReviewRating): Grade {
+  return {
+    AGAIN: Rating.Again,
+    HARD: Rating.Hard,
+    GOOD: Rating.Good,
+    EASY: Rating.Easy,
+  }[rating] as Grade;
+}
+
+export function gradeToRating(grade: Grade): ReviewRating {
+  const values: Record<number, ReviewRating> = {
+    [Rating.Again]: "AGAIN",
+    [Rating.Hard]: "HARD",
+    [Rating.Good]: "GOOD",
+    [Rating.Easy]: "EASY",
+  };
+  return values[grade] ?? "GOOD";
+}
+
+export function scheduleCard(card: Card, now: Date, rating: ReviewRating, requestRetention = 0.9) {
+  const result = createFsrs(requestRetention).repeat(card, now);
+  const item = result[ratingToGrade(rating)] as RecordLogItem;
+  return { card: item.card, log: item.log };
+}
+
+export function previewCard(card: Card, now: Date, requestRetention = 0.9) {
+  const result = createFsrs(requestRetention).repeat(card, now);
+  return ([Rating.Again, Rating.Hard, Rating.Good, Rating.Easy] as Grade[]).map((grade) => {
+    const item = result[grade] as RecordLogItem;
+    return {
+      rating: gradeToRating(grade),
+      nextDueAt: item.card.due,
+      scheduledDays: item.card.scheduled_days,
+    };
+  });
+}
+
+export function cardFromRow(row: {
+  due_at: number;
+  stability: number;
+  difficulty: number;
+  elapsed_days: number;
+  scheduled_days: number;
+  reps: number;
+  lapses: number;
+  fsrs_state: number;
+  last_review_at: number | null;
+  learning_steps: number;
+}): Card {
+  return {
+    due: new Date(row.due_at),
+    stability: row.stability,
+    difficulty: row.difficulty,
+    elapsed_days: row.elapsed_days,
+    scheduled_days: row.scheduled_days,
+    reps: row.reps,
+    lapses: row.lapses,
+    state: row.fsrs_state as State,
+    last_review: row.last_review_at ? new Date(row.last_review_at) : undefined,
+    learning_steps: row.learning_steps,
+  };
+}

@@ -132,14 +132,14 @@ export function normalizeDictionaryContent(content: Partial<DictionaryContent> |
       grammarNotes: Array.isArray(sentenceAnalysis.grammarNotes) ? sentenceAnalysis.grammarNotes.map(cleanText).filter(Boolean) : [],
       keyExpressions: Array.isArray(sentenceAnalysis.keyExpressions) ? sentenceAnalysis.keyExpressions.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
-        const record = item as Record<string, unknown>;
+        const record = item as unknown as Record<string, unknown>;
         const expression = cleanText(record.expression);
         const meaning = cleanText(record.meaning);
         return expression && meaning ? [{ expression, meaning, note: cleanText(record.note) || null }] : [];
       }) : [],
       variations: Array.isArray(sentenceAnalysis.variations) ? sentenceAnalysis.variations.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
-        const record = item as Record<string, unknown>;
+        const record = item as unknown as Record<string, unknown>;
         const sentence = cleanText(record.sentence);
         return sentence ? [{ sentence, translation: cleanText(record.translation) || null }] : [];
       }) : [],

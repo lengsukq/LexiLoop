@@ -336,39 +336,39 @@ export default function WordDetailPage() {
   );
 
   return <div className="space-y-6">
-    <div className="flex items-center justify-between">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <Link href="/words" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />返回单词本</Link>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void initialize()}><RefreshCw className="size-4" />AI 重新初始化</Button>
         <Button variant="danger" size="sm" onClick={() => void remove()}><Trash2 className="size-4" />删除</Button>
       </div>
     </div>
 
     <Card className="overflow-hidden">
-      <div className="bg-gradient-to-br from-[#007aff] to-[#5856d6] p-6 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
+      <div className="bg-gradient-to-br from-[#007aff] to-[#5856d6] p-5 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap gap-2">
-              <InitializationBadge status={word.initializationStatus} />
-              <MasteryBadge level={word.masteryLevel} />
-              {word.content.summary.cefrLevel && <Badge tone="purple">CEFR {word.content.summary.cefrLevel}</Badge>}
-              {word.contentSource === "AI_ONLY" && <Badge tone="purple">纯 AI 生成</Badge>}
-              {word.contentSource === "DICTIONARY_ONLY" && <Badge tone="blue">词典</Badge>}
-              {word.wrongWordState?.active && <Badge tone="red">活跃错词</Badge>}
+              <InitializationBadge status={word.initializationStatus} onGradient />
+              <MasteryBadge level={word.masteryLevel} onGradient />
+              {word.content.summary.cefrLevel && <Badge tone="glass">CEFR {word.content.summary.cefrLevel}</Badge>}
+              {word.contentSource === "AI_ONLY" && <Badge tone="glass">纯 AI 生成</Badge>}
+              {word.contentSource === "DICTIONARY_ONLY" && <Badge tone="glass">词典</Badge>}
+              {word.wrongWordState?.active && <Badge tone="glass">活跃错词</Badge>}
             </div>
-            <h1 className="mt-5 text-4xl font-bold sm:text-5xl">{word.term}</h1>
-            {word.content.summary.translation && <p className="mt-3 text-xl font-medium text-white/95">{word.content.summary.translation}</p>}
+            <h1 className="mt-4 break-words text-3xl font-bold sm:mt-5 sm:text-4xl lg:text-5xl">{word.term}</h1>
+            {word.content.summary.translation && <p className="mt-2 text-lg font-medium text-white/95 sm:mt-3 sm:text-xl">{word.content.summary.translation}</p>}
             {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">{word.content.summary.shortDefinition}</p>}
             <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {word.entryType === "WORD" ? "单词" : word.entryType === "SENTENCE" ? "句子" : "短语"}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-lg border border-white/25">
-                {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)} className={`px-2 py-0.5 text-xs font-medium transition ${selectedAccent === accent ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{accent === "US" ? "美" : accent === "UK" ? "英" : "通用"}</button>)}
+                {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)} className={`px-2.5 py-1 text-xs font-medium transition ${selectedAccent === accent ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{accent === "US" ? "美" : accent === "UK" ? "英" : "通用"}</button>)}
               </div>
               <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void play()}><Volume2 className="size-4" />播放发音</button>
               {ttsTip && <p className="w-full text-xs text-amber-300">{ttsTip}</p>}
             </div>
           </div>
-          <div className="rounded-3xl bg-white/15 p-5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-xl">
+          <div className="shrink-0 self-start rounded-3xl bg-white/15 p-5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:self-auto">
             <p className="text-4xl font-bold">{word.masteryScore}</p>
             <p className="text-xs text-white/70">熟练度</p>
             <Progress value={word.masteryScore} className="mt-3 w-28 bg-white/20 [&>div]:bg-white" />
@@ -396,7 +396,7 @@ export default function WordDetailPage() {
             <div className="mt-5 border-t border-black/[0.06] pt-5 dark:border-white/[0.08]">
               <label className="text-sm font-medium">手动释义</label>
               <textarea className="mt-2 min-h-24 w-full rounded-[14px] border border-black/[0.06] bg-white/60 p-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" value={manualDefinition} onChange={(event) => setManualDefinition(event.target.value)} placeholder="例如：棉花；棉布。保存后即使 AI 服务暂时失败，该词也可以进入学习。" />
-              <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[#aeaeb2]">AI 强制刷新时不会覆盖你的手动释义。</p>
                 <Button variant="outline" onClick={() => void saveManualDefinition()} disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存释义</Button>
               </div>

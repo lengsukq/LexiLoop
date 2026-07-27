@@ -20,6 +20,34 @@ export type TtsResult =
   | { ok: true; audio: ArrayBuffer }
   | { ok: false; error: string };
 
+// Simple LRU cache for TTS audio results
+const TTS_CACHE_MAX = 200;
+const ttsCache = new Map<string, ArrayBuffer>();
+
+function ttsCacheKey(word: string, accent: string): string {
+  return `${accent}:${word.toLowerCase()}`;
+}
+
+function ttsCacheGet(key: string): ArrayBuffer | undefined {
+  const value = ttsCache.get(key);
+  if (value !== undefined) {
+    // Move to end (most recently used)
+    ttsCache.delete(key);
+    ttsCache.set(key, value);
+  }
+  return value;
+}
+
+function ttsCacheSet(key: string, value: ArrayBuffer): void {
+  if (ttsCache.has(key)) ttsCache.delete(key);
+  else if (ttsCache.size >= TTS_CACHE_MAX) {
+    // Evict oldest (first entry)
+    const oldest = ttsCache.keys().next().value;
+    if (oldest !== undefined) ttsCache.delete(oldest);
+  }
+  ttsCache.set(key, value);
+}
+
 function generateId(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
@@ -159,6 +187,10 @@ function synthesize(text: string, voice: string): Promise<Buffer> {
 export async function generateTtsAudio(options: TtsOptions): Promise<TtsResult> {
   const accent = (options.accent ?? "US") as keyof typeof VOICE_MAP;
   const voice = VOICE_MAP[accent] || "en-US-JennyNeural";
+  const cacheKey = ttsCacheKey(options.word, accent);
+
+  const cached = ttsCacheGet(cacheKey);
+  if (cached) return { ok: true, audio: cached };
 
   try {
     const buffer = await synthesize(options.word, voice);
@@ -171,6 +203,7 @@ export async function generateTtsAudio(options: TtsOptions): Promise<TtsResult> 
       buffer.byteOffset,
       buffer.byteOffset + buffer.byteLength,
     ) as ArrayBuffer;
+    ttsCacheSet(cacheKey, arrayBuffer);
     return { ok: true, audio: arrayBuffer };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Edge TTS 请求失败";

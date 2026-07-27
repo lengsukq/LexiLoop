@@ -277,7 +277,7 @@ export default function SettingsPage() {
         <>
           <Card>
             <CardHeader><CardTitle>每日学习计划</CardTitle></CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+            <CardContent className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} />
               <NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} />
               <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
@@ -296,7 +296,7 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader><CardTitle>发音与词典来源</CardTitle></CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <CardContent className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               <label className="space-y-2">
                 <span className="text-sm font-medium">默认口音</span>
                 <Select className="w-full" value={settings.defaultAccent} onChange={(event) => update("defaultAccent", event.target.value as AppSettings["defaultAccent"])}>

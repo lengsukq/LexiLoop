@@ -68,10 +68,13 @@ export function getStatistics(days = 30) {
     item.skipped += session.skipped_count ?? 0;
     item.minutes += (session.duration_ms ?? 0) / 60_000;
   }
-  const activeDates = new Set([
-    ...logs.map((item) => dateKey(item.reviewed_at)),
-    ...sessions.filter((item) => item.completed_count > 0).map((item) => dateKey(item.started_at)),
-  ]);
+  // Compute streak from SQL-level distinct active dates (not bounded by display range)
+  const streakSince = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const activeDateRows = sqlite.prepare(
+    `SELECT DISTINCT reviewed_at AS ts FROM review_logs WHERE reviewed_at >= ?
+     UNION SELECT DISTINCT started_at AS ts FROM study_sessions WHERE started_at >= ? AND completed_count > 0`,
+  ).all(streakSince, streakSince) as Array<{ ts: number }>;
+  const activeDates = new Set(activeDateRows.map((row) => dateKey(row.ts)));
   let streak = 0;
   for (let offset = 0; offset < 3650; offset += 1) {
     const key = dateKey(Date.now() - offset * 24 * 60 * 60 * 1000);

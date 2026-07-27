@@ -182,7 +182,6 @@ function countAvailableCandidates(now: number) {
 
 export async function getDailyStudyPlan() {
   const now = Date.now();
-  expireStaleSessions(now);
   const active = activePendingPlan(now);
   const pools = await loadPools(now);
   const selected = selectCandidates("DAILY", pools);

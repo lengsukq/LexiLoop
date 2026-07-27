@@ -121,6 +121,27 @@ export function getWordDetail(wordId: number) {
   };
 }
 
+function cancelPendingStudyItemsForSuspend(wordId: number, now: number): void {
+  const sessions = sqlite.prepare(`SELECT study_session_id AS session_id, count(*) AS count
+    FROM study_session_items
+    WHERE word_id = ? AND status = 'PENDING'
+    GROUP BY study_session_id`).all(wordId) as Array<{ session_id: number; count: number }>;
+  if (sessions.length === 0) return;
+  sqlite.prepare(`UPDATE study_session_items SET status = 'SKIPPED', answered_at = ?, skip_reason = 'WORD_SUSPENDED'
+    WHERE word_id = ? AND status = 'PENDING'`).run(now, wordId);
+  for (const session of sessions) {
+    sqlite.prepare(`UPDATE study_sessions SET completed_count = completed_count + ?, skipped_count = skipped_count + ? WHERE id = ?`)
+      .run(session.count, session.count, session.session_id);
+    const pending = sqlite.prepare(`SELECT count(*) AS count FROM study_session_items
+      WHERE study_session_id = ? AND status = 'PENDING'`).get(session.session_id) as { count: number };
+    if (pending.count === 0) {
+      const started = sqlite.prepare("SELECT started_at FROM study_sessions WHERE id = ?").get(session.session_id) as { started_at: number };
+      sqlite.prepare("UPDATE study_sessions SET completed_at = ?, duration_ms = ? WHERE id = ?")
+        .run(now, now - started.started_at, session.session_id);
+    }
+  }
+}
+
 const updateSchema = z.object({ userNote: z.string().max(5000).nullable().optional(), isSuspended: z.boolean().optional() }).strict();
 export function updateWord(wordId: number, input: unknown) {
   const values = updateSchema.parse(input);
@@ -133,6 +154,9 @@ export function updateWord(wordId: number, input: unknown) {
   if (updates.length) {
     updates.push("updated_at = ?"); params.push(Date.now(), wordId);
     sqlite.prepare(`UPDATE words SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+  }
+  if (values.isSuspended === true) {
+    cancelPendingStudyItemsForSuspend(wordId, Date.now());
   }
   return getWordDetail(wordId);
 }
@@ -295,13 +319,25 @@ export function addRelatedWord(parentWordId: number, input: unknown) {
   }).immediate();
 }
 
-export function deleteWord(wordId: number): boolean {
+export function deleteWord(wordId: number, force = false): boolean {
   const word = sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId);
   if (!word) return false;
-  const history = sqlite.prepare(`SELECT
+  if (!force) {
+    const history = sqlite.prepare(`SELECT
       EXISTS(SELECT 1 FROM review_logs WHERE word_id = ?) AS has_reviews,
       EXISTS(SELECT 1 FROM study_session_items WHERE word_id = ?) AS has_session_items`)
-    .get(wordId, wordId) as { has_reviews: number; has_session_items: number };
-  if (history.has_reviews || history.has_session_items) throw new Error("WORD_HAS_LEARNING_HISTORY");
-  return sqlite.prepare("DELETE FROM words WHERE id = ?").run(wordId).changes === 1;
+      .get(wordId, wordId) as { has_reviews: number; has_session_items: number };
+    if (history.has_reviews || history.has_session_items) throw new Error("WORD_HAS_LEARNING_HISTORY");
+  }
+  return sqlite.transaction(() => {
+    if (force) {
+      sqlite.prepare("DELETE FROM review_logs WHERE word_id = ?").run(wordId);
+      sqlite.prepare("DELETE FROM review_cards WHERE word_id = ?").run(wordId);
+      sqlite.prepare("DELETE FROM wrong_word_states WHERE word_id = ?").run(wordId);
+      sqlite.prepare("DELETE FROM study_session_items WHERE word_id = ?").run(wordId);
+      sqlite.prepare("DELETE FROM initialization_jobs WHERE word_id = ?").run(wordId);
+      sqlite.prepare("DELETE FROM provider_attempts WHERE word_id = ?").run(wordId);
+    }
+    return sqlite.prepare("DELETE FROM words WHERE id = ?").run(wordId).changes === 1;
+  }).immediate();
 }

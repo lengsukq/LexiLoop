@@ -1,4 +1,5 @@
 import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization/service";
+import { runMaintenance } from "@/modules/background/maintenance";
 import { sqlite } from "@/db/client";
 
 type EngineState = {
@@ -8,7 +9,10 @@ type EngineState = {
   concurrency: number;
   pollIntervalMs: number;
   loopPromise: Promise<void> | null;
+  lastMaintenanceAt: number;
 };
+
+const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 const globalEngine = globalThis as typeof globalThis & { __lexiloopBackgroundEngine?: EngineState };
 
@@ -28,6 +32,7 @@ function state(): EngineState {
       concurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
       pollIntervalMs: Math.max(250, Number(process.env.BACKGROUND_POLL_INTERVAL_MS ?? process.env.WORKER_POLL_INTERVAL_MS ?? 1_000)),
       loopPromise: null,
+      lastMaintenanceAt: 0,
     };
   }
   return globalEngine.__lexiloopBackgroundEngine;
@@ -42,6 +47,19 @@ function getConcurrencyFromSettings(): number | null {
   } catch { return null; }
 }
 
+function maybeRunMaintenance(engine: EngineState): void {
+  const now = Date.now();
+  if (now - engine.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) return;
+  engine.lastMaintenanceAt = now;
+  try {
+    const result = runMaintenance();
+    const touched = result.expiredPreviews + result.decayedWrongWords + result.retriedJobs + result.expiredSessions + result.expiredBatches + result.purgedPreviews;
+    if (touched > 0) console.log(`[BackgroundEngine] maintenance:`, result);
+  } catch (error) {
+    console.error("[BackgroundEngine] maintenance error", error);
+  }
+}
+
 async function runLoop(engine: EngineState): Promise<void> {
   console.log(`[BackgroundEngine] ${engine.workerId} started, concurrency=${engine.concurrency}`);
   updateHeartbeat(engine.workerId, "STARTING", undefined, {
@@ -49,8 +67,10 @@ async function runLoop(engine: EngineState): Promise<void> {
     concurrency: engine.concurrency,
     mode: "embedded",
   });
+  maybeRunMaintenance(engine);
   while (!engine.stopping) {
     try {
+      maybeRunMaintenance(engine);
       const jobs = claimJobs(engine.workerId, getConcurrencyFromSettings() ?? engine.concurrency);
       if (jobs.length === 0) {
         updateHeartbeat(engine.workerId, "IDLE", undefined, {

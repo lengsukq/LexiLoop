@@ -40,11 +40,21 @@ const settingsSchema = z.object({
 
 export const partialSettingsSchema = settingsSchema.partial().strict();
 
+const SETTINGS_CACHE_TTL_MS = 30_000;
+let settingsCache: { value: AppSettings; expiresAt: number } | null = null;
+
+export function invalidateSettingsCache(): void {
+  settingsCache = null;
+}
+
 export async function getSettings(): Promise<AppSettings> {
+  if (settingsCache && Date.now() < settingsCache.expiresAt) return settingsCache.value;
   const rows = await db.select().from(settings);
   const values: Record<string, unknown> = {};
   for (const row of rows) values[row.key] = row.valueJson;
-  return settingsSchema.parse({ ...DEFAULT_SETTINGS, ...values }) as AppSettings;
+  const result = settingsSchema.parse({ ...DEFAULT_SETTINGS, ...values }) as AppSettings;
+  settingsCache = { value: result, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
+  return result;
 }
 
 export async function updateSettings(input: unknown): Promise<AppSettings> {
@@ -56,5 +66,6 @@ export async function updateSettings(input: unknown): Promise<AppSettings> {
   sqlite.transaction(() => {
     for (const [key, value] of Object.entries(values)) upsert.run(key, JSON.stringify(value), now);
   })();
+  invalidateSettingsCache();
   return getSettings();
 }

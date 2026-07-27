@@ -94,7 +94,7 @@ export default function HomePage() {
         <div className="absolute right-1/4 top-0 size-32 rounded-full bg-white/[0.04] blur-xl" />
         <div className="relative flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Badge className="bg-white/[0.18] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md">今日学习</Badge>
+            <Badge tone="glass">今日学习</Badge>
             <h1 className="mt-5 text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
               保持词汇循环，不让记忆掉队
             </h1>

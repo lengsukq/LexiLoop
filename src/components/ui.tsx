@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function buttonClass(
@@ -44,7 +45,7 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
   return <h2 className={cn("text-[17px] font-bold tracking-tight text-[#1c1c1e] dark:text-[#f5f5f7]", className)} {...props} />;
 }
 
-export function Badge({ children, tone = "slate", className }: { children: ReactNode; tone?: "slate" | "green" | "amber" | "red" | "blue" | "purple"; className?: string }) {
+export function Badge({ children, tone = "slate", className }: { children: ReactNode; tone?: "slate" | "green" | "amber" | "red" | "blue" | "purple" | "glass"; className?: string }) {
   const tones: Record<string, string> = {
     slate: "bg-[#8e8e93]/12 text-[#6e6e73] dark:bg-[#98989d]/15 dark:text-[#98989d]",
     green: "bg-[#34c759]/12 text-[#248a3d] dark:bg-[#30d158]/15 dark:text-[#30d158]",
@@ -52,6 +53,7 @@ export function Badge({ children, tone = "slate", className }: { children: React
     red: "bg-[#ff3b30]/12 text-[#d70015] dark:bg-[#ff453a]/15 dark:text-[#ff453a]",
     blue: "bg-[#007aff]/12 text-[#0040dd] dark:bg-[#0a84ff]/15 dark:text-[#0a84ff]",
     purple: "bg-[#af52de]/12 text-[#8944ab] dark:bg-[#bf5af2]/15 dark:text-[#bf5af2]",
+    glass: "border border-white/25 bg-white/[0.18] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md",
   };
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tones[tone], className)}>{children}</span>;
 }
@@ -129,6 +131,59 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+function paginationRange(page: number, totalPages: number): (number | "...")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  const start = Math.max(2, page - 1);
+  const end = Math.min(totalPages - 1, page + 1);
+  if (start > 2) pages.push("...");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < totalPages - 1) pages.push("...");
+  pages.push(totalPages);
+  return pages;
+}
+
+export function Pagination({ page, totalPages, total, onChange, className }: {
+  page: number; totalPages: number; total?: number; onChange: (page: number) => void; className?: string;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className={cn("flex flex-col items-center gap-3 sm:flex-row sm:justify-between", className)}>
+      {total !== undefined && <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">共 {total} 条</p>}
+      <nav className="flex items-center gap-1.5">
+        <button
+          className="ios-press grid size-9 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          aria-label="上一页"
+        ><ChevronLeft className="size-4" /></button>
+        {paginationRange(page, totalPages).map((item, index) =>
+          item === "..." ? (
+            <span key={`ellipsis-${index}`} className="px-1 text-sm text-[#aeaeb2]">…</span>
+          ) : (
+            <button
+              key={item}
+              className={cn(
+                "ios-press size-9 rounded-[12px] text-sm font-medium transition-all duration-200",
+                item === page
+                  ? "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_14px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)]"
+                  : "border border-white/50 bg-white/50 text-[#6e6e73] shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm hover:bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-[#98989d] dark:hover:bg-white/[0.1]",
+              )}
+              onClick={() => onChange(item)}
+            >{item}</button>
+          ),
+        )}
+        <button
+          className="ios-press grid size-9 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          disabled={page >= totalPages}
+          onClick={() => onChange(page + 1)}
+          aria-label="下一页"
+        ><ChevronRight className="size-4" /></button>
+      </nav>
     </div>
   );
 }

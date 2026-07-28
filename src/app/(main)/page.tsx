@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, BookOpen, Brain, CheckCircle2, Clock3, Headphones, Loader2, PenLine, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowRight, AudioLines, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Headphones, Loader2, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 import { DailyAiSuggestion } from "./daily-ai-suggestion";
@@ -191,6 +191,20 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="animate-fade-up stagger-5">
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <div><CardTitle>趣味训练</CardTitle><p className="mt-1 text-xs text-[#8e8e93]">独立游戏模式，不占用今日复习队列</p></div>
+          <Link href="/games" className="inline-flex items-center gap-1 text-sm font-semibold text-[#007aff] dark:text-[#0a84ff]">全部游戏<ArrowRight className="size-4" /></Link>
+        </CardHeader>
+        <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5 sm:gap-3">
+          <PracticeLink href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-[#af52de] to-[#5856d6]" />
+          <PracticeLink href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-[#007aff]" />
+          <PracticeLink href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-[#ff9500] to-[#ff6961]" />
+          <PracticeLink href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-[#007aff]" />
+          <PracticeLink href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-[#34c759] to-[#007aff]" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -85,7 +85,7 @@ export const studySessionItems = sqliteTable("study_session_items", {
   position: integer("position").notNull(),
   wordId: integer("word_id").notNull().references(() => words.id, { onDelete: "cascade" }),
   taskType: text("task_type", { enum: ["NEW", "REVIEW", "WRONG", "LISTENING", "SPELLING"] }).notNull(),
-  questionType: text("question_type", { enum: ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] }).notNull(),
+  questionType: text("question_type", { enum: ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] }).notNull(),
   status: text("status", { enum: ["PENDING", "ANSWERED", "SKIPPED"] }).notNull().default("PENDING"),
   answeredAt: integer("answered_at", { mode: "timestamp_ms" }),
   skipReason: text("skip_reason"),
@@ -93,6 +93,19 @@ export const studySessionItems = sqliteTable("study_session_items", {
 }, (table) => [
   uniqueIndex("study_session_items_position_unique").on(table.studySessionId, table.position),
   index("study_session_items_session_idx").on(table.studySessionId, table.status),
+]);
+
+export const gameHighScores = sqliteTable("game_high_scores", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  gameMode: text("game_mode").notNull(),
+  score: integer("score").notNull(),
+  maxCombo: integer("max_combo").notNull().default(0),
+  accuracy: integer("accuracy").notNull().default(0),
+  elapsedMs: integer("elapsed_ms").notNull().default(0),
+  playedAt: integer("played_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  index("game_high_scores_mode_score_idx").on(table.gameMode, table.score),
 ]);
 
 export const reviewCards = sqliteTable("review_cards", {

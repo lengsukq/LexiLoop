@@ -30,6 +30,25 @@ export function requestedFieldStatus(content: DictionaryContent, fields: readonl
   return present > 0 ? "PARTIAL" : "FAILED";
 }
 
+export function requestedFieldStatusForLanguages(
+  content: DictionaryContent,
+  fields: readonly InitializationField[],
+  sourceLanguage: string,
+  targetLanguage: string,
+): "READY" | "PARTIAL" | "FAILED" {
+  const status = requestedFieldStatus(content, fields);
+  const definitionsRequired = !fields.length || fields.includes("definitions");
+  if (!definitionsRequired || sourceLanguage === targetLanguage) return status;
+
+  const hasTargetDefinition = content.definitions.some((definition) =>
+    definition.language === targetLanguage && definition.text.trim().length > 0,
+  );
+  if (hasTargetDefinition) return status;
+  return content.definitions.some((definition) => definition.text.trim().length > 0)
+    ? "PARTIAL"
+    : status;
+}
+
 export function fieldsReturned(content: DictionaryContent, requestedFields: readonly InitializationField[]): InitializationField[] {
   const candidates = requestedFields.length ? requestedFields : INITIALIZATION_FIELDS;
   return candidates.filter((field) => hasInitializationField(content, field));

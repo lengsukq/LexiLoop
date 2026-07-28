@@ -12,12 +12,13 @@ import { EcdictProvider } from "./providers/ecdict";
 import { MyMemoryProvider } from "./providers/mymemory";
 import { AiLexicalProvider } from "./providers/ai-lexical";
 import { MerriamWebsterProvider } from "./providers/merriam-webster";
+import { TencentTranslateProvider } from "./providers/tencent-translate";
 import { mergeDictionaryContent } from "./content";
 import {
   fieldsReturned,
   normalizeRequestedFields,
   projectDictionaryContent,
-  requestedFieldStatus,
+  requestedFieldStatusForLanguages,
 } from "./selection";
 
 export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, InitializationField[]> = {
@@ -26,6 +27,7 @@ export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, Initializat
   ecdict: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "forms", "tags"],
   ai: ["definitions", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"],
   mymemory: ["definitions"],
+  "tencent-translate": ["definitions"],
 };
 
 function providerKey(provider: DictionaryProvider): InitializationProviderId {
@@ -38,14 +40,28 @@ function createProvider(id: InitializationProviderId, settings: AppSettings): Di
   if (id === "ecdict") return settings.ecdictEnabled ? new EcdictProvider() : null;
   if (id === "ai") return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled ? new AiLexicalProvider(settings) : null;
   if (id === "mymemory") return settings.myMemoryEnabled ? new MyMemoryProvider() : null;
+  if (id === "tencent-translate") {
+    if (!settings.tencentTranslateEnabled || !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim()) return null;
+    return new TencentTranslateProvider({ secretId: settings.tencentTranslateSecretId.trim(), secretKey: settings.tencentTranslateSecretKey.trim(), projectId: settings.tencentTranslateProjectId });
+  }
   return null;
 }
 
 function providersFor(settings: AppSettings, selected?: InitializationProviderId[]): DictionaryProvider[] {
-  const defaultOrder: InitializationProviderId[] = settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled
-    ? ["merriam-webster", "ai", "dictionaryapi.dev", "ecdict"]
-    : ["merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory"];
-  const order = selected?.length ? [...new Set(selected)] : defaultOrder;
+  let order: InitializationProviderId[];
+  if (selected?.length) {
+    order = [...new Set(selected)];
+  } else if (settings.translationProviderOrder?.length) {
+    // Use user-configured order, appending AI if enabled but not listed
+    order = [...settings.translationProviderOrder];
+    if (settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled && !order.includes("ai")) {
+      order.splice(1, 0, "ai");
+    }
+  } else {
+    order = settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled
+      ? ["merriam-webster", "ai", "dictionaryapi.dev", "ecdict"]
+      : ["merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory"];
+  }
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }
 
@@ -53,6 +69,19 @@ function supportsRequestedFields(provider: DictionaryProvider, requestedFields: 
   if (!requestedFields.length) return true;
   const capabilities = PROVIDER_CAPABILITIES[providerKey(provider)];
   return requestedFields.some((field) => capabilities.includes(field));
+}
+
+function requestedContentReady(
+  content: DictionaryContent,
+  requestedFields: InitializationField[],
+  input: LookupInput,
+): boolean {
+  return requestedFieldStatusForLanguages(
+    content,
+    requestedFields,
+    input.sourceLanguage,
+    input.targetLanguage,
+  ) === "READY";
 }
 
 type SettledProvider = {
@@ -106,10 +135,7 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
       const result = await runProvider(provider, input, requestedFields);
       settled.push(result);
       if (result.content) accumulated = mergeDictionaryContent(accumulated, result.content);
-      const satisfied = requestedFields.length
-        ? requestedFieldStatus(accumulated, requestedFields) === "READY"
-        : accumulated.definitions.length > 0;
-      if (satisfied) break;
+      if (requestedContentReady(accumulated, requestedFields, input)) break;
     }
   } else {
     settled = await Promise.all(providers.map((provider) => runProvider(provider, input, requestedFields)));

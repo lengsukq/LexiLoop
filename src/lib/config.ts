@@ -1,4 +1,4 @@
-import type { AppSettings, LlmConfig } from "@/lib/types";
+import type { AppSettings, InitializationProviderId, LlmConfig } from "@/lib/types";
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
   providers: [
@@ -36,6 +36,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   merriamWebsterThesaurusKey: "",
   backgroundConcurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
   aiRetryCount: 1,
+  tencentTranslateEnabled: false,
+  tencentTranslateSecretId: "",
+  tencentTranslateSecretKey: "",
+  tencentTranslateProjectId: 0,
+  translationProviderOrder: ["merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory"] as InitializationProviderId[],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

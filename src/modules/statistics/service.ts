@@ -20,6 +20,8 @@ export async function getDashboard() {
     FROM study_sessions s
     JOIN study_session_items i ON i.study_session_id = s.id AND i.status = 'PENDING'
     WHERE s.completed_at IS NULL AND s.started_at >= ?
+      AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
     GROUP BY s.id
     ORDER BY s.started_at DESC
     LIMIT 1`).get(resumeCutoff) as {

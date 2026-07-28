@@ -20,6 +20,11 @@ const settingsSchema = z.object({
   merriamWebsterThesaurusKey: z.string(),
   backgroundConcurrency: z.number().int().min(1).max(10),
   aiRetryCount: z.number().int().min(0).max(5),
+  tencentTranslateEnabled: z.boolean(),
+  tencentTranslateSecretId: z.string(),
+  tencentTranslateSecretKey: z.string(),
+  tencentTranslateProjectId: z.number().int().min(0).max(999999),
+  translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ecdict", "ai", "mymemory", "tencent-translate"])).max(10),
   llmConfig: z.object({
     providers: z.array(z.object({
       id: z.string().min(1),

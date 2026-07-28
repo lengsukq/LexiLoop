@@ -277,6 +277,55 @@ button, input, select, textarea { font: inherit; }
   0% { transform: translateX(-100%) rotate(12deg); }
   100% { transform: translateX(200%) rotate(12deg); }
 }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+}
+@keyframes mole-pop {
+  0% { transform: translateY(115%); opacity: 0; }
+  70% { transform: translateY(-6%); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes mole-squish {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  45% { transform: translateY(26%) scaleY(0.35) scaleX(1.35); opacity: 1; }
+  100% { transform: translateY(115%); opacity: 0; }
+}
+@keyframes mole-hide {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(115%); opacity: 0; }
+}
+@keyframes block-scroll-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-33.333%); }
+}
+@keyframes block-scroll-right {
+  from { transform: translateX(-33.333%); }
+  to { transform: translateX(0); }
+}
+@keyframes block-drop {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(48px) rotate(9deg); opacity: 0; }
+}
+@keyframes tower-bounce {
+  0% { transform: scale(0.3) translateY(-18px); opacity: 0; }
+  60% { transform: scale(1.12) translateY(2px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes tetris-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(430px); }
+}
+@keyframes tetris-smash {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes tetris-stack-in {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
 .animate-fade-up {
   animation: ios-fade-up 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;

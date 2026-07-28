@@ -6,6 +6,7 @@ import { getTodayRecommendedItems } from "@/modules/suggestions/service";
 
 const SKIP_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
+const appTimezone = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
 
 interface Candidate {
   id: number;
@@ -43,6 +44,8 @@ function candidateAvailabilitySql(): string {
     WHERE active_item.word_id = w.id
       AND active_item.status = 'PENDING'
       AND active_session.completed_at IS NULL
+      AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%'
       AND active_session.started_at >= ?
   )`;
 }
@@ -73,18 +76,42 @@ function newCandidates(limit: number, now: number): Candidate[] {
 
 type RecommendedCandidate = Candidate & { recommendedQuestionType: QuestionType };
 
+function startOfToday(now: number): number {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: appTimezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "01";
+  return new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00.000`).getTime();
+}
+
 async function aiRecommendedCandidates(now: number): Promise<RecommendedCandidate[]> {
   const recommendations = await getTodayRecommendedItems();
   if (!recommendations.length) return [];
   const ids = recommendations.map((item) => item.wordId);
   const placeholders = ids.map(() => "?").join(",");
+  // AI必做题不受其他活跃会话的 PENDING 排斥，但排除近12小时跳过过的词
+  // 以及今日 AI 会话中已处理过的词（保证“生成新一轮”不会重复出题）
   const rows = sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type
     FROM words w
     WHERE w.id IN (${placeholders})
       AND w.is_suspended = 0
       AND w.initialization_status IN ('READY','PARTIAL')
-      AND ${candidateAvailabilitySql()}`)
-    .all(...ids, now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS) as Candidate[];
+      AND NOT EXISTS (
+        SELECT 1 FROM study_session_items skipped
+        WHERE skipped.word_id = w.id
+          AND skipped.status = 'SKIPPED'
+          AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET')
+          AND skipped.answered_at IS NOT NULL
+          AND skipped.answered_at >= ?
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM study_session_items done
+        JOIN study_sessions ds ON ds.id = done.study_session_id
+        WHERE done.word_id = w.id
+          AND ds.source_type = 'AI_RECOMMENDED'
+          AND ds.started_at >= ?
+          AND done.status IN ('ANSWERED', 'SKIPPED')
+          AND COALESCE(done.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET')
+      )`)
+    .all(...ids, now - SKIP_COOLDOWN_MS, startOfToday(now)) as Candidate[];
   const byId = new Map(rows.map((row) => [row.id, row]));
   return recommendations.flatMap((recommendation) => {
     const candidate = byId.get(recommendation.wordId);
@@ -263,6 +290,8 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
   if (mode === "DAILY") {
     const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
       WHERE s.completed_at IS NULL AND s.started_at >= ?
+        AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
         AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
       ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
     return row?.id ?? null;
@@ -272,6 +301,8 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
   // First: exact mode match
   const exact = sqlite.prepare(`SELECT s.id FROM study_sessions s
     WHERE s.session_type = ? AND s.completed_at IS NULL AND s.started_at >= ?
+      AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
       AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
     ORDER BY s.started_at DESC LIMIT 1`).get(mode, ttl) as { id: number } | undefined;
   if (exact) return exact.id;
@@ -279,6 +310,8 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
   if (taskType) {
     const daily = sqlite.prepare(`SELECT s.id FROM study_sessions s
       WHERE s.completed_at IS NULL AND s.started_at >= ?
+        AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
         AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING' AND i.task_type = ?)
       ORDER BY s.started_at DESC LIMIT 1`).get(ttl, taskType) as { id: number } | undefined;
     if (daily) return daily.id;
@@ -300,6 +333,8 @@ function activePendingPlan(now: number) {
     LEFT JOIN review_cards c ON c.word_id = w.id
     LEFT JOIN wrong_word_states x ON x.word_id = w.id
     WHERE i.status = 'PENDING' AND s.completed_at IS NULL AND s.started_at >= ?
+      AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
     GROUP BY category`).all(now, now - SESSION_RESUME_TTL_MS) as Array<{ category: "REVIEW" | "WRONG" | "NEW"; count: number }>;
   const result = { REVIEW: 0, WRONG: 0, NEW: 0 };
   for (const row of rows) result[row.category] = Number(row.count);
@@ -316,6 +351,9 @@ export async function startStudySession(mode: StudyMode, resume = true) {
 
   const pools = await loadPools(now);
   const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
+  if (mode === "AI_RECOMMENDED" && recommended!.length === 0) {
+    throw new Error("AI_RECOMMENDED_ALL_DONE");
+  }
   const selected: Candidate[] = recommended ?? selectCandidates(mode, pools);
   const dueSet = new Set(pools.due.map((item) => item.id));
   const wrongSet = new Set(pools.wrong.map((item) => item.id));

@@ -42,6 +42,7 @@ export const INITIALIZATION_PROVIDER_IDS = [
   "ecdict",
   "ai",
   "mymemory",
+  "tencent-translate",
 ] as const;
 export type InitializationProviderId = (typeof INITIALIZATION_PROVIDER_IDS)[number];
 
@@ -73,11 +74,28 @@ export type ReviewRating = (typeof REVIEW_RATINGS)[number];
 export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING", "AI_RECOMMENDED"] as const;
 export type StudyMode = (typeof STUDY_MODES)[number];
 
-export const QUESTION_TYPES = ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
+export const QUESTION_TYPES = ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 
 export const ENTRY_TYPES = ["WORD", "PHRASE", "SENTENCE"] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
+
+export interface TopScoreEntry {
+  score: number;
+  maxCombo: number;
+  accuracy: number;
+  elapsedMs: number;
+  playedAt: number;
+  isCurrent: boolean;
+}
+
+export interface LeaderboardSummary {
+  rank: number;
+  inTop10: boolean;
+  isNewBest: boolean;
+  best: number;
+  top: TopScoreEntry[];
+}
 
 export type UsageRegister = "FORMAL" | "INFORMAL" | "NEUTRAL" | "SLANG";
 export type ContentDifficulty = "EASY" | "NORMAL" | "ADVANCED";
@@ -244,6 +262,11 @@ export interface AppSettings {
   merriamWebsterThesaurusKey: string;
   backgroundConcurrency: number;
   aiRetryCount: number;
+  tencentTranslateEnabled: boolean;
+  tencentTranslateSecretId: string;
+  tencentTranslateSecretKey: string;
+  tencentTranslateProjectId: number;
+  translationProviderOrder: InitializationProviderId[];
   llmConfig: LlmConfig;
 }
 

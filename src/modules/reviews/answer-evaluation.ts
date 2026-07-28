@@ -1,0 +1,63 @@
+import type { ReviewRating } from "@/lib/types";
+import { normalizeTerm } from "@/modules/imports/normalizer";
+import type { AnswerInput, ReviewWordRow } from "./types";
+
+interface DefinitionValue {
+  language: string;
+  text: string;
+}
+
+export interface AnswerEvaluation {
+  isCorrect: boolean;
+  effectiveRating: ReviewRating;
+  expectedAnswer: string;
+  presentedPrompt: string;
+}
+
+function parseDefinitions(raw: string | null): DefinitionValue[] {
+  if (!raw) return [];
+  try {
+    return (JSON.parse(raw) as DefinitionValue[]).filter((item) => typeof item.text === "string");
+  } catch {
+    return [];
+  }
+}
+
+function targetDefinitions(word: ReviewWordRow): DefinitionValue[] {
+  const definitions = parseDefinitions(word.definitions_json);
+  const target = definitions.filter((definition) => definition.language === word.target_language);
+  return target.length ? target : definitions;
+}
+
+function expectedAnswer(input: AnswerInput, word: ReviewWordRow, definitions: DefinitionValue[]): string {
+  const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
+  return definitionQuestion ? definitions.map((definition) => definition.text).join("；") : word.term;
+}
+
+function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definitions: DefinitionValue[]): boolean {
+  const spelling = input.questionType === "ZH_TO_EN_SPELLING" || input.questionType === "LISTENING_SPELLING";
+  if (spelling) return normalizeTerm(input.userAnswer ?? "", word.source_language) === word.normalized_term;
+  if (input.questionType === "EN_TO_ZH_CHOICE") {
+    const correctDefinition = definitions[0]?.text;
+    return correctDefinition ? (input.userAnswer ?? "").trim() === correctDefinition.trim() : input.rating !== "AGAIN";
+  }
+  return input.rating !== "AGAIN";
+}
+
+export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): AnswerEvaluation {
+  const definitions = targetDefinitions(word);
+  const isCorrect = isAnswerCorrect(input, word, definitions);
+  const objectivelyScored = input.questionType === "ZH_TO_EN_SPELLING"
+    || input.questionType === "LISTENING_SPELLING"
+    || input.questionType === "EN_TO_ZH_CHOICE";
+  const effectiveRating: ReviewRating = objectivelyScored && !isCorrect ? "AGAIN" : input.rating;
+  const expected = expectedAnswer(input, word, definitions);
+  const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
+
+  return {
+    isCorrect,
+    effectiveRating,
+    expectedAnswer: expected,
+    presentedPrompt: definitionQuestion ? word.term : expected,
+  };
+}

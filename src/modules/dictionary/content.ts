@@ -179,6 +179,60 @@ function mergeRelated(target: RelatedWordItem[], incoming: RelatedWordItem[]): v
   }
 }
 
+/**
+ * Character-level Jaccard similarity between two strings.
+ * Strips punctuation/whitespace for a cleaner comparison.
+ */
+function textSimilarity(a: string, b: string): number {
+  const clean = (s: string) => s.replace(/[\s\p{P}]/gu, "");
+  const sa = new Set(clean(a));
+  const sb = new Set(clean(b));
+  if (sa.size === 0 && sb.size === 0) return 1;
+  if (sa.size === 0 || sb.size === 0) return 0;
+  let intersection = 0;
+  for (const ch of sa) if (sb.has(ch)) intersection++;
+  return intersection / (sa.size + sb.size - intersection);
+}
+
+const SIMILARITY_THRESHOLD = 0.72;
+
+/**
+ * Remove near-duplicate definitions within the same language + partOfSpeech group.
+ * Keeps the longer (more detailed) entry when two are too similar.
+ * User-edited definitions are always preserved.
+ */
+function deduplicateSimilarDefinitions(definitions: DictionaryContent["definitions"]): DictionaryContent["definitions"] {
+  const groups = new Map<string, DictionaryContent["definitions"]>();
+  for (const item of definitions) {
+    const groupKey = `${item.language}|${item.partOfSpeech ?? ""}`;
+    const group = groups.get(groupKey);
+    if (group) group.push(item);
+    else groups.set(groupKey, [item]);
+  }
+  const result: DictionaryContent["definitions"] = [];
+  for (const group of groups.values()) {
+    const kept: DictionaryContent["definitions"] = [];
+    for (const item of group) {
+      // Always keep user-edited definitions
+      if (item.isUserEdited) { kept.push(item); continue; }
+      const duplicate = kept.find(
+        (existing) => !existing.isUserEdited && textSimilarity(existing.text, item.text) >= SIMILARITY_THRESHOLD,
+      );
+      if (duplicate) {
+        // Replace with the longer/more detailed one
+        if (item.text.length > duplicate.text.length) {
+          const idx = kept.indexOf(duplicate);
+          kept[idx] = item;
+        }
+      } else {
+        kept.push(item);
+      }
+    }
+    result.push(...kept);
+  }
+  return result;
+}
+
 export function mergeDictionaryContent(...contents: Array<Partial<DictionaryContent> | null | undefined>): DictionaryContent {
   const result = emptyDictionaryContent();
   const definitionKeys = new Set<string>();
@@ -243,6 +297,7 @@ export function mergeDictionaryContent(...contents: Array<Partial<DictionaryCont
     for (const value of content.tags) tags.add(value);
   }
   result.tags = [...tags];
+  result.definitions = deduplicateSimilarDefinitions(result.definitions);
   return result;
 }
 

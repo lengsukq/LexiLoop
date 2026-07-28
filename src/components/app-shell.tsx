@@ -26,7 +26,7 @@ function isActive(href: string, pathname: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const isStudyScreen = pathname.startsWith("/study");
+  const isStudyScreen = pathname.startsWith("/study") || pathname.startsWith("/match") || pathname.startsWith("/games") || pathname.startsWith("/phonetics");
 
   const primaryNav = navigation.filter((item) => mobilePrimary.includes(item.href));
   const secondaryNav = navigation.filter((item) => !mobilePrimary.includes(item.href));

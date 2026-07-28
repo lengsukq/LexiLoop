@@ -67,6 +67,7 @@ export const wordContents = sqliteTable("word_contents", {
 export const studySessions = sqliteTable("study_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sessionType: text("session_type", { enum: ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING"] }).notNull(),
+  sourceType: text("source_type"),
   startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
   completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   plannedCount: integer("planned_count").notNull().default(0),
@@ -145,6 +146,24 @@ export const wrongWordStates = sqliteTable("wrong_word_states", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+
+export const dailyAiSuggestions = sqliteTable("daily_ai_suggestions", {
+  dateKey: text("date_key").primaryKey(),
+  sourceDateKey: text("source_date_key").notNull(),
+  qualityScore: integer("quality_score"),
+  metricsJson: text("metrics_json", { mode: "json" }).$type<Record<string, unknown>>().notNull().default({}),
+  contentJson: text("content_json", { mode: "json" }).$type<Record<string, unknown>>().notNull().default({}),
+  recommendedItemsJson: text("recommended_items_json", { mode: "json" }).$type<Array<Record<string, unknown>>>().notNull().default([]),
+  generator: text("generator", { enum: ["AI", "RULE_BASED"] }).notNull().default("RULE_BASED"),
+  providerId: text("provider_id"),
+  model: text("model"),
+  generationWarning: text("generation_warning"),
+  generatedAt: integer("generated_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [
+  index("daily_ai_suggestions_generated_idx").on(table.generatedAt),
+]);
+
 export const manualPreviews = sqliteTable("manual_previews", {
   token: text("token").primaryKey(),
   inputText: text("input_text").notNull(),
@@ -214,6 +233,8 @@ export const initializationJobs = sqliteTable("initialization_jobs", {
   taskType: text("task_type", { enum: ["INITIALIZE", "MNEMONIC", "EXAMPLE_TRANSLATIONS"] }).notNull().default("INITIALIZE"),
   mode: text("mode", { enum: ["SKIP_INITIALIZED", "FILL_MISSING_FIELDS", "FORCE_OVERWRITE"] }).notNull(),
   requestedFieldsJson: text("requested_fields_json", { mode: "json" }).$type<string[]>(),
+  requestedProvidersJson: text("requested_providers_json", { mode: "json" }).$type<string[]>(),
+  providerStrategy: text("provider_strategy", { enum: ["PARALLEL_MERGE", "PRIORITY_FALLBACK"] }).notNull().default("PARALLEL_MERGE"),
   status: text("status", { enum: ["PENDING", "QUEUED", "RUNNING", "READY", "PARTIAL", "FAILED", "DISABLED"] }).notNull().default("QUEUED"),
   priority: integer("priority").notNull().default(0),
   attemptCount: integer("attempt_count").notNull().default(0),

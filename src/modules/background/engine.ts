@@ -1,5 +1,6 @@
 import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization/service";
 import { runMaintenance } from "@/modules/background/maintenance";
+import { getTodaySuggestion, suggestionDateKey } from "@/modules/suggestions/service";
 import { sqlite } from "@/db/client";
 
 type EngineState = {
@@ -10,9 +11,16 @@ type EngineState = {
   pollIntervalMs: number;
   loopPromise: Promise<void> | null;
   lastMaintenanceAt: number;
+  lastSuggestionCheckAt: number;
+  lastSuggestionDateKey: string | null;
+  suggestionPromise: Promise<void> | null;
 };
 
 const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const SUGGESTION_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
+const SUGGESTION_GENERATION_HOUR = 0;
+const SUGGESTION_GENERATION_MINUTE = 5;
+const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
 
 const globalEngine = globalThis as typeof globalThis & { __lexiloopBackgroundEngine?: EngineState };
 
@@ -33,6 +41,9 @@ function state(): EngineState {
       pollIntervalMs: Math.max(250, Number(process.env.BACKGROUND_POLL_INTERVAL_MS ?? process.env.WORKER_POLL_INTERVAL_MS ?? 1_000)),
       loopPromise: null,
       lastMaintenanceAt: 0,
+      lastSuggestionCheckAt: 0,
+      lastSuggestionDateKey: null,
+      suggestionPromise: null,
     };
   }
   return globalEngine.__lexiloopBackgroundEngine;
@@ -60,6 +71,50 @@ function maybeRunMaintenance(engine: EngineState): void {
   }
 }
 
+function localClock(timestamp: number): { hour: number; minute: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(timestamp));
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return { hour: Number(value.hour ?? 0), minute: Number(value.minute ?? 0) };
+}
+
+function maybeGenerateDailySuggestion(engine: EngineState): void {
+  const now = Date.now();
+  if (now - engine.lastSuggestionCheckAt < SUGGESTION_CHECK_INTERVAL_MS) return;
+  engine.lastSuggestionCheckAt = now;
+
+  let clock: { hour: number; minute: number };
+  let dateKey: string;
+  try {
+    clock = localClock(now);
+    dateKey = suggestionDateKey(now);
+  } catch (error) {
+    console.error(`[BackgroundEngine] invalid APP_TIMEZONE=${APP_TIMEZONE}`, error);
+    return;
+  }
+  const afterScheduledTime = clock.hour > SUGGESTION_GENERATION_HOUR
+    || (clock.hour === SUGGESTION_GENERATION_HOUR && clock.minute >= SUGGESTION_GENERATION_MINUTE);
+  if (!afterScheduledTime) return;
+
+  if (engine.lastSuggestionDateKey === dateKey || engine.suggestionPromise) return;
+
+  engine.suggestionPromise = getTodaySuggestion({ now })
+    .then((suggestion) => {
+      engine.lastSuggestionDateKey = dateKey;
+      console.log(`[BackgroundEngine] daily suggestion ready: ${suggestion.dateKey}, generator=${suggestion.generator}`);
+    })
+    .catch((error) => {
+      console.error("[BackgroundEngine] daily suggestion error", error);
+    })
+    .finally(() => {
+      engine.suggestionPromise = null;
+    });
+}
+
 async function runLoop(engine: EngineState): Promise<void> {
   console.log(`[BackgroundEngine] ${engine.workerId} started, concurrency=${engine.concurrency}`);
   updateHeartbeat(engine.workerId, "STARTING", undefined, {
@@ -68,9 +123,11 @@ async function runLoop(engine: EngineState): Promise<void> {
     mode: "embedded",
   });
   maybeRunMaintenance(engine);
+  maybeGenerateDailySuggestion(engine);
   while (!engine.stopping) {
     try {
       maybeRunMaintenance(engine);
+      maybeGenerateDailySuggestion(engine);
       const jobs = claimJobs(engine.workerId, getConcurrencyFromSettings() ?? engine.concurrency);
       if (jobs.length === 0) {
         updateHeartbeat(engine.workerId, "IDLE", undefined, {

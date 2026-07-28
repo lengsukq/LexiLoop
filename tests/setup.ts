@@ -15,7 +15,7 @@ beforeEach(async () => {
   const { sqlite } = await import("@/db/client");
   sqlite.exec("PRAGMA foreign_keys = OFF");
   for (const table of [
-    "provider_attempts", "initialization_jobs", "import_rows", "import_batches", "import_previews",
+    "provider_attempts", "initialization_jobs", "daily_ai_suggestions", "import_rows", "import_batches", "import_previews",
     "review_logs", "study_session_items", "study_sessions", "wrong_word_states", "review_cards",
     "word_contents", "words", "worker_heartbeats", "settings",
   ]) sqlite.exec(`DELETE FROM ${table}`);

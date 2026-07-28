@@ -2,6 +2,7 @@ import { sqlite } from "@/db/client";
 import type { DictionaryContent, EntryType, QuestionType, StudyItemView, StudyMode } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 import { getSettings } from "@/modules/settings/service";
+import { getTodayRecommendedItems } from "@/modules/suggestions/service";
 
 const SKIP_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +71,27 @@ function newCandidates(limit: number, now: number): Candidate[] {
     ORDER BY COALESCE(w.source_created_at, w.created_at) ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as Candidate[];
 }
 
+type RecommendedCandidate = Candidate & { recommendedQuestionType: QuestionType };
+
+async function aiRecommendedCandidates(now: number): Promise<RecommendedCandidate[]> {
+  const recommendations = await getTodayRecommendedItems();
+  if (!recommendations.length) return [];
+  const ids = recommendations.map((item) => item.wordId);
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type
+    FROM words w
+    WHERE w.id IN (${placeholders})
+      AND w.is_suspended = 0
+      AND w.initialization_status IN ('READY','PARTIAL')
+      AND ${candidateAvailabilitySql()}`)
+    .all(...ids, now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS) as Candidate[];
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return recommendations.flatMap((recommendation) => {
+    const candidate = byId.get(recommendation.wordId);
+    return candidate ? [{ ...candidate, recommendedQuestionType: recommendation.questionType }] : [];
+  });
+}
+
 function interleave(groups: Array<{ items: Candidate[]; take: number }>): Candidate[] {
   const indexes = groups.map(() => 0);
   const output: Candidate[] = [];
@@ -136,6 +158,7 @@ function selectCandidates(mode: StudyMode, pools: CandidatePools): Candidate[] {
     case "NEW_WORDS": return pools.fresh.slice(0, pools.limits.fresh);
     case "LISTENING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }]);
     case "SPELLING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }]);
+    case "AI_RECOMMENDED": return [];
     case "DAILY": return interleave(adaptiveDailyRatios(groups));
   }
 }
@@ -230,6 +253,13 @@ function expireStaleSessions(now: number): number {
 
 function findResumableSession(mode: StudyMode, now: number): number | null {
   const ttl = now - SESSION_RESUME_TTL_MS;
+  if (mode === "AI_RECOMMENDED") {
+    const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
+      WHERE s.source_type = 'AI_RECOMMENDED' AND s.completed_at IS NULL AND s.started_at >= ?
+        AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
+      ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
+    return row?.id ?? null;
+  }
   if (mode === "DAILY") {
     const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
       WHERE s.completed_at IS NULL AND s.started_at >= ?
@@ -285,20 +315,27 @@ export async function startStudySession(mode: StudyMode, resume = true) {
   }
 
   const pools = await loadPools(now);
-  const selected = selectCandidates(mode, pools);
+  const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
+  const selected: Candidate[] = recommended ?? selectCandidates(mode, pools);
   const dueSet = new Set(pools.due.map((item) => item.id));
   const wrongSet = new Set(pools.wrong.map((item) => item.id));
+  const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode;
+  const sourceType = mode === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : null;
   const sessionId = sqlite.transaction(() => {
     const session = sqlite.prepare(`INSERT INTO study_sessions
-      (session_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at)
-      VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?)`).run(mode, now, selected.length === 0 ? now : null, selected.length, now);
+      (session_type, source_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at)
+      VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?)`).run(persistedMode, sourceType, now, selected.length === 0 ? now : null, selected.length, now);
     const id = Number(session.lastInsertRowid);
     const insert = sqlite.prepare(`INSERT INTO study_session_items
       (study_session_id, position, word_id, task_type, question_type, status, created_at)
       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`);
     selected.forEach((candidate, index) => {
-      const taskType = taskFor(mode, candidate, { due: dueSet, wrong: wrongSet });
-      insert.run(id, index, candidate.id, taskType, questionFor(mode, taskType), now);
+      const taskMode = mode === "AI_RECOMMENDED" ? "DAILY" : mode;
+      const taskType = taskFor(taskMode, candidate, { due: dueSet, wrong: wrongSet });
+      const recommendedQuestion = mode === "AI_RECOMMENDED"
+        ? (candidate as RecommendedCandidate).recommendedQuestionType
+        : null;
+      insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType), now);
     });
     return id;
   }).immediate();
@@ -346,7 +383,7 @@ export function getStudySession(sessionId: number, resumed = false) {
     resumeIndex: resumeIndex === -1 ? items.length : resumeIndex,
     session: {
       id: Number(session.id),
-      sessionType: String(session.session_type),
+      sessionType: session.source_type === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : String(session.session_type),
       startedAt: new Date(Number(session.started_at)).toISOString(),
       completedAt: session.completed_at ? new Date(Number(session.completed_at)).toISOString() : null,
       plannedCount: Number(session.planned_count),

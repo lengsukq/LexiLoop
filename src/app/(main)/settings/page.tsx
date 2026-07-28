@@ -11,7 +11,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, PageHea
 const PURPOSE_META: Array<{ id: LlmPurposeId; label: string; desc: string }> = [
   { id: "IMPORT_ENRICHMENT", label: "AI 词条初始化", desc: "为导入词条生成完整、结构化的学习内容" },
   { id: "STUDY_PLAN", label: "生成学习计划", desc: "根据学习进度生成每日计划" },
-  { id: "SUGGESTION", label: "生成建议", desc: "在学习中提供智能建议" },
+  { id: "SUGGESTION", label: "每日学习建议", desc: "回顾昨日质量并生成今日必做题" },
 ];
 
 const SETTINGS_TABS = [
@@ -622,7 +622,7 @@ export default function SettingsPage() {
                     const models = provider ? configuredModels(provider) : [];
                     const retryProvider = settings.llmConfig.providers.find((p) => p.id === config.retryProviderId) ?? provider;
                     const retryModels = retryProvider ? configuredModels(retryProvider) : [];
-                    const reserved = purpose.id === "STUDY_PLAN" || purpose.id === "SUGGESTION";
+                    const reserved = purpose.id === "STUDY_PLAN";
                     return (
                       <div key={purpose.id} className="rounded-[18px] border border-white/50 bg-white/40 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
                         <div className="flex items-center justify-between gap-3">

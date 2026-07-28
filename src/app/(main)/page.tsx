@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, BookOpen, Brain, CheckCircle2, Clock3, Headphones, Loader2, PenLine, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
+import { DailyAiSuggestion } from "./daily-ai-suggestion";
 
 interface Dashboard {
   totalWords: number;
@@ -134,6 +135,8 @@ export default function HomePage() {
         </Link>
       )}
 
+      <DailyAiSuggestion />
+
       {/* Stats Grid */}
       <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {[
@@ -225,5 +228,5 @@ function PracticeLink({ href, icon, title, subtitle, gradient }: {
 }
 
 function sessionLabel(sessionType: string): string {
-  return ({ DAILY: "今日学习", NEW_WORDS: "新词学习", DUE_REVIEW: "到期复习", WRONG_WORDS: "错词强化", LISTENING: "听力拼写", SPELLING: "中文拼写" } as Record<string, string>)[sessionType] ?? "学习会话";
+  return ({ DAILY: "今日学习", NEW_WORDS: "新词学习", DUE_REVIEW: "到期复习", WRONG_WORDS: "错词强化", LISTENING: "听力拼写", SPELLING: "中文拼写", AI_RECOMMENDED: "AI 今日必做题" } as Record<string, string>)[sessionType] ?? "学习会话";
 }

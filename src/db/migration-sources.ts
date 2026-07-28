@@ -31,5 +31,13 @@ export const MIGRATIONS = [
   {
     "name": "0007_generic_ai_tasks.sql",
     "sql": "-- Reuse the existing durable queue for every user-triggered AI operation.\nALTER TABLE initialization_jobs ADD COLUMN task_type TEXT NOT NULL DEFAULT 'INITIALIZE'\n  CHECK(task_type IN ('INITIALIZE', 'MNEMONIC', 'EXAMPLE_TRANSLATIONS'));\n\nDROP INDEX IF EXISTS initialization_jobs_active_word_unique;\nCREATE INDEX IF NOT EXISTS initialization_jobs_task_type_idx ON initialization_jobs(task_type, status, available_at, priority);\nCREATE UNIQUE INDEX IF NOT EXISTS initialization_jobs_active_word_task_unique\n  ON initialization_jobs(word_id, task_type) WHERE status IN ('QUEUED', 'RUNNING');\n"
+  },
+  {
+    "name": "0008_initialization_selection.sql",
+    "sql": "-- Store field-level and provider-level initialization choices on durable jobs.\nALTER TABLE initialization_jobs ADD COLUMN requested_providers_json TEXT;\nALTER TABLE initialization_jobs ADD COLUMN provider_strategy TEXT NOT NULL DEFAULT 'PARALLEL_MERGE'\n  CHECK(provider_strategy IN ('PARALLEL_MERGE', 'PRIORITY_FALLBACK'));\n"
+  },
+  {
+    "name": "0009_daily_ai_suggestions.sql",
+    "sql": "-- Daily AI study review and recommended practice source.\nALTER TABLE study_sessions ADD COLUMN source_type TEXT;\nCREATE INDEX IF NOT EXISTS study_sessions_source_idx ON study_sessions(source_type, completed_at, started_at);\n\nCREATE TABLE IF NOT EXISTS daily_ai_suggestions (\n  date_key TEXT PRIMARY KEY,\n  source_date_key TEXT NOT NULL,\n  quality_score INTEGER,\n  metrics_json TEXT NOT NULL DEFAULT '{}',\n  content_json TEXT NOT NULL DEFAULT '{}',\n  recommended_items_json TEXT NOT NULL DEFAULT '[]',\n  generator TEXT NOT NULL DEFAULT 'RULE_BASED' CHECK(generator IN ('AI','RULE_BASED')),\n  provider_id TEXT,\n  model TEXT,\n  generation_warning TEXT,\n  generated_at INTEGER NOT NULL,\n  updated_at INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS daily_ai_suggestions_generated_idx ON daily_ai_suggestions(generated_at);\n"
   }
 ] as const;

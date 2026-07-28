@@ -16,6 +16,44 @@ export const INITIALIZATION_MODES = [
 ] as const;
 export type InitializationMode = (typeof INITIALIZATION_MODES)[number];
 
+export const INITIALIZATION_FIELDS = [
+  "definitions",
+  "pronunciations.phonetic",
+  "pronunciations.audio",
+  "examples",
+  "phrases",
+  "forms",
+  "synonyms",
+  "antonyms",
+  "wordFamily",
+  "confusedWords",
+  "roots",
+  "affixes",
+  "tags",
+  "summary",
+  "learning",
+  "sentenceAnalysis",
+] as const;
+export type InitializationField = (typeof INITIALIZATION_FIELDS)[number];
+
+export const INITIALIZATION_PROVIDER_IDS = [
+  "merriam-webster",
+  "dictionaryapi.dev",
+  "ecdict",
+  "ai",
+  "mymemory",
+] as const;
+export type InitializationProviderId = (typeof INITIALIZATION_PROVIDER_IDS)[number];
+
+export const PROVIDER_STRATEGIES = ["PARALLEL_MERGE", "PRIORITY_FALLBACK"] as const;
+export type ProviderStrategy = (typeof PROVIDER_STRATEGIES)[number];
+
+export interface InitializationTaskOptions {
+  requestedFields?: InitializationField[];
+  requestedProviders?: InitializationProviderId[];
+  providerStrategy?: ProviderStrategy;
+}
+
 export const AI_TASK_TYPES = ["INITIALIZE", "MNEMONIC", "EXAMPLE_TRANSLATIONS"] as const;
 export type AiTaskType = (typeof AI_TASK_TYPES)[number];
 
@@ -32,7 +70,7 @@ export type MasteryLevel = (typeof MASTERY_LEVELS)[number];
 export const REVIEW_RATINGS = ["AGAIN", "HARD", "GOOD", "EASY"] as const;
 export type ReviewRating = (typeof REVIEW_RATINGS)[number];
 
-export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING"] as const;
+export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING", "AI_RECOMMENDED"] as const;
 export type StudyMode = (typeof STUDY_MODES)[number];
 
 export const QUESTION_TYPES = ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
@@ -184,7 +222,9 @@ export interface LookupInput {
   sourceLanguage: string;
   targetLanguage: string;
   initializationMode?: InitializationMode;
-  requestedFields?: string[];
+  requestedFields?: InitializationField[];
+  requestedProviders?: InitializationProviderId[];
+  providerStrategy?: ProviderStrategy;
   existingContent?: DictionaryContent;
 }
 

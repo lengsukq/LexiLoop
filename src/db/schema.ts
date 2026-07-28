@@ -211,6 +211,7 @@ export const importRows = sqliteTable("import_rows", {
 export const initializationJobs = sqliteTable("initialization_jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   wordId: integer("word_id").notNull().references(() => words.id, { onDelete: "cascade" }),
+  taskType: text("task_type", { enum: ["INITIALIZE", "MNEMONIC", "EXAMPLE_TRANSLATIONS"] }).notNull().default("INITIALIZE"),
   mode: text("mode", { enum: ["SKIP_INITIALIZED", "FILL_MISSING_FIELDS", "FORCE_OVERWRITE"] }).notNull(),
   requestedFieldsJson: text("requested_fields_json", { mode: "json" }).$type<string[]>(),
   status: text("status", { enum: ["PENDING", "QUEUED", "RUNNING", "READY", "PARTIAL", "FAILED", "DISABLED"] }).notNull().default("QUEUED"),

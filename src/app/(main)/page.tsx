@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, BookOpen, Brain, CheckCircle2, Headphones, Loader2, PenLine, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowRight, BookOpen, Brain, CheckCircle2, Clock3, Headphones, Loader2, PenLine, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
-import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Progress, buttonClass } from "@/components/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 
 interface Dashboard {
   totalWords: number;
@@ -15,6 +15,7 @@ interface Dashboard {
   todayProcessed: number;
   todayGoalTotal: number;
   todayAccuracy: number | null;
+  resumeSession: null | { id: number; sessionType: string; startedAt: string; remainingCount: number; plannedCount: number };
   plan: {
     dueReviewCount: number; plannedDueReviewCount: number;
     wrongWordCount: number; plannedWrongWordCount: number;
@@ -86,16 +87,16 @@ export default function HomePage() {
   const planProgress = data.todayGoalTotal ? (completedToday / data.todayGoalTotal) * 100 : 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Hero Card */}
-      <section className="animate-fade-up relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0a84ff] via-[#5856d6] to-[#af52de] p-8 text-white shadow-[0_16px_56px_rgba(0,122,255,0.3),0_4px_16px_rgba(0,0,0,0.1),inset_0_2px_0_rgba(255,255,255,0.2)] sm:p-10">
+      <section className="animate-fade-up relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#0a84ff] via-[#5856d6] to-[#af52de] p-5 text-white shadow-[0_16px_56px_rgba(0,122,255,0.3),0_4px_16px_rgba(0,0,0,0.1),inset_0_2px_0_rgba(255,255,255,0.2)] sm:rounded-[28px] sm:p-10">
         <div className="absolute -right-20 -top-20 size-56 rounded-full bg-white/[0.08] blur-3xl" />
         <div className="absolute -bottom-16 -left-16 size-44 rounded-full bg-white/[0.06] blur-2xl" />
         <div className="absolute right-1/4 top-0 size-32 rounded-full bg-white/[0.04] blur-xl" />
-        <div className="relative flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-7">
           <div>
             <Badge tone="glass">今日学习</Badge>
-            <h1 className="mt-5 text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
+            <h1 className="mt-3 text-[25px] font-bold leading-tight tracking-tight sm:mt-5 sm:text-[32px]">
               保持词汇循环，不让记忆掉队
             </h1>
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/70">
@@ -104,14 +105,14 @@ export default function HomePage() {
           </div>
           <Link
             href="/study?mode=DAILY"
-            className="ios-press inline-flex h-[54px] shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-white/95 px-8 text-[17px] font-bold text-[#007aff] shadow-[0_6px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-sm"
+            className="ios-press inline-flex h-12 w-full shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-white/95 px-6 text-[16px] font-bold text-[#007aff] shadow-[0_6px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-sm sm:h-[54px] sm:w-auto sm:px-8 sm:text-[17px]"
           >
             <Sparkles className="size-5" />
             开始学习
             <ArrowRight className="size-5" />
           </Link>
         </div>
-        <div className="relative mt-8">
+        <div className="relative mt-6 sm:mt-8">
           <div className="mb-2.5 flex justify-between text-xs font-medium text-white/60">
             <span>今日完成度</span>
             <span>{completedToday}/{data.todayGoalTotal}</span>
@@ -125,8 +126,16 @@ export default function HomePage() {
         </div>
       </section>
 
+      {data.resumeSession && (
+        <Link href={`/study?mode=${encodeURIComponent(data.resumeSession.sessionType)}`} className="ios-press glass-inner flex items-center gap-3 rounded-[18px] p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,122,255,0.12)] sm:rounded-[20px] sm:p-5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-[#007aff]/12 text-[#007aff] dark:text-[#0a84ff]"><Clock3 className="size-5" /></span>
+          <span className="min-w-0 flex-1"><b className="block text-[15px]">继续上次学习</b><small className="mt-0.5 block text-[13px] text-[#6e6e73] dark:text-[#98989d]">{sessionLabel(data.resumeSession.sessionType)} · 还剩 {data.resumeSession.remainingCount} 题</small></span>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#007aff] dark:text-[#0a84ff]">继续<ArrowRight className="size-4" /></span>
+        </Link>
+      )}
+
       {/* Stats Grid */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {[
           { label: "总词数", value: data.totalWords, detail: `${data.initializedWords} 个可学习`, icon: BookOpen, gradient: "from-[#007aff] to-[#5ac8fa]" },
           { label: "已掌握", value: data.masteredWords, detail: `${Math.round((data.masteredWords / Math.max(1, data.totalWords)) * 100)}% 掌握率`, icon: CheckCircle2, gradient: "from-[#34c759] to-[#30d158]" },
@@ -134,14 +143,14 @@ export default function HomePage() {
           { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-[#ff3b30] to-[#ff6961]" : "from-[#8e8e93] to-[#aeaeb2]" },
         ].map((item, index) => (
           <Card key={item.label} className={`ios-lift animate-fade-up stagger-${index + 1}`}>
-            <CardContent className="flex items-center gap-4 pt-5">
-              <div className={`grid size-12 place-items-center rounded-[14px] bg-gradient-to-br ${item.gradient} text-white shadow-lg`}>
-                <item.icon className="size-6" />
+            <CardContent className="flex items-center gap-3 pt-4 sm:gap-4 sm:pt-5">
+              <div className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${item.gradient} text-white shadow-lg sm:size-12 sm:rounded-[14px]`}>
+                <item.icon className="size-5 sm:size-6" />
               </div>
               <div>
-                <p className="text-[13px] font-medium text-[#8e8e93] dark:text-[#636366]">{item.label}</p>
-                <p className="text-[26px] font-bold tracking-tight">{item.value}</p>
-                <p className="text-xs text-[#aeaeb2] dark:text-[#48484a]">{item.detail}</p>
+                <p className="text-[12px] font-medium text-[#8e8e93] dark:text-[#636366] sm:text-[13px]">{item.label}</p>
+                <p className="text-[22px] font-bold tracking-tight sm:text-[26px]">{item.value}</p>
+                <p className="hidden text-xs text-[#aeaeb2] dark:text-[#48484a] sm:block">{item.detail}</p>
               </div>
             </CardContent>
           </Card>
@@ -149,10 +158,10 @@ export default function HomePage() {
       </section>
 
       {/* Queue + Practice */}
-      <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-4 sm:gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="animate-fade-up stagger-3">
           <CardHeader><CardTitle>今日队列</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
+          <CardContent className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
             <QueueCard icon={<RotateCcw className="size-5" />} label="到期复习" count={data.plan.dueReviewCount} planned={data.plan.plannedDueReviewCount} href="/study?mode=DUE_REVIEW" gradient="from-[#007aff] to-[#5ac8fa]" />
             <QueueCard icon={<AlertCircle className="size-5" />} label="错词强化" count={data.plan.wrongWordCount} planned={data.plan.plannedWrongWordCount} href="/study?mode=WRONG_WORDS" gradient="from-[#ff3b30] to-[#ff6961]" />
             <QueueCard icon={<Sparkles className="size-5" />} label="新词学习" count={data.plan.newWordCount} planned={data.plan.plannedNewWordCount} href="/study?mode=NEW_WORDS" gradient="from-[#af52de] to-[#bf5af2]" />
@@ -161,7 +170,7 @@ export default function HomePage() {
 
         <Card className="animate-fade-up stagger-4">
           <CardHeader><CardTitle>专项练习</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2.5 sm:space-y-3">
             <PracticeLink
               href="/study?mode=LISTENING"
               icon={<Headphones className="size-5" />}
@@ -187,14 +196,13 @@ function QueueCard({ icon, label, count, planned, href, gradient }: {
   icon: React.ReactNode; label: string; count: number; planned: number; href: string; gradient: string;
 }) {
   return (
-    <Link href={href} className="ios-press group glass-inner rounded-[20px] p-5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]">
-      <div className="flex items-center justify-between">
+    <Link href={href} className="ios-press group glass-inner flex items-center gap-3 rounded-[16px] p-3.5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] sm:block sm:rounded-[20px] sm:p-5">
+      <div className="flex shrink-0 items-center justify-between sm:justify-between">
         <span className={`grid size-10 place-items-center rounded-[14px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)]`}>{icon}</span>
-        <ArrowRight className="size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 dark:text-[#38383a]" />
+        <ArrowRight className="hidden size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 sm:block dark:text-[#38383a]" />
       </div>
-      <p className="mt-5 text-[30px] font-bold tracking-tight">{planned}</p>
-      <p className="text-[13px] font-semibold text-[#6e6e73] dark:text-[#98989d]">{label}</p>
-      <p className="mt-1 text-xs text-[#aeaeb2] dark:text-[#48484a]">共 {count} 个待处理</p>
+      <div className="min-w-0 flex-1 sm:mt-5"><p className="text-[23px] font-bold leading-none tracking-tight sm:text-[30px]">{planned}</p><p className="mt-1 text-[13px] font-semibold text-[#6e6e73] dark:text-[#98989d]">{label}</p><p className="mt-0.5 text-xs text-[#aeaeb2] dark:text-[#48484a]">共 {count} 个待处理</p></div>
+      <ArrowRight className="size-4 shrink-0 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 sm:hidden dark:text-[#38383a]" />
     </Link>
   );
 }
@@ -203,9 +211,9 @@ function PracticeLink({ href, icon, title, subtitle, gradient }: {
   href: string; icon: React.ReactNode; title: string; subtitle: string; gradient: string;
 }) {
   return (
-    <Link href={href} className="ios-press group glass-inner flex items-center justify-between rounded-[20px] p-5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]">
+    <Link href={href} className="ios-press group glass-inner flex items-center justify-between rounded-[16px] p-3.5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-5">
       <span className="flex items-center gap-3.5">
-        <span className={`grid size-11 place-items-center rounded-[14px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)]`}>{icon}</span>
+        <span className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)] sm:size-11 sm:rounded-[14px]`}>{icon}</span>
         <span>
           <b className="block text-[15px] font-semibold">{title}</b>
           <small className="text-[13px] text-[#8e8e93] dark:text-[#636366]">{subtitle}</small>
@@ -214,4 +222,8 @@ function PracticeLink({ href, icon, title, subtitle, gradient }: {
       <ArrowRight className="size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 dark:text-[#38383a]" />
     </Link>
   );
+}
+
+function sessionLabel(sessionType: string): string {
+  return ({ DAILY: "今日学习", NEW_WORDS: "新词学习", DUE_REVIEW: "到期复习", WRONG_WORDS: "错词强化", LISTENING: "听力拼写", SPELLING: "中文拼写" } as Record<string, string>)[sessionType] ?? "学习会话";
 }

@@ -16,6 +16,9 @@ export const INITIALIZATION_MODES = [
 ] as const;
 export type InitializationMode = (typeof INITIALIZATION_MODES)[number];
 
+export const AI_TASK_TYPES = ["INITIALIZE", "MNEMONIC", "EXAMPLE_TRANSLATIONS"] as const;
+export type AiTaskType = (typeof AI_TASK_TYPES)[number];
+
 export const IMPORT_MODES = [
   "SKIP_EXISTING",
   "FILL_MISSING",
@@ -196,7 +199,11 @@ export interface AppSettings {
   dictionaryApiEnabled: boolean;
   myMemoryEnabled: boolean;
   ecdictEnabled: boolean;
+  merriamWebsterEnabled: boolean;
+  merriamWebsterDictionaryKey: string;
+  merriamWebsterThesaurusKey: string;
   backgroundConcurrency: number;
+  aiRetryCount: number;
   llmConfig: LlmConfig;
 }
 
@@ -209,12 +216,19 @@ export interface LlmProviderConfig {
   apiType: "openai" | "anthropic";
   baseUrl: string;
   apiKey: string;
+  /** Saved model names exposed by this provider, for reuse across AI features. */
+  models?: string[];
+  /** Default model for connection checks and new feature bindings. */
+  defaultModel?: string;
 }
 
 export interface LlmPurposeConfig {
   enabled: boolean;
   providerId: string;
   model: string;
+  /** Provider/model used from the second attempt onward when the AI task is retried. */
+  retryProviderId?: string;
+  retryModel?: string;
   temperature?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;

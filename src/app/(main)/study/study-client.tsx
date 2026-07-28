@@ -7,6 +7,13 @@ import { apiFetch } from "@/lib/client-api";
 import type { DictionaryContent, QuestionType, ReviewRating, StudyMode } from "@/lib/types";
 import { Badge, Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
 
+function clientId(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 interface Item {
   itemId: number; position: number; taskType: string; questionType: QuestionType; status: string; skipReason: string | null;
   choices?: string[];
@@ -93,7 +100,7 @@ export function StudyClient() {
   useEffect(() => {
     if (current) {
       itemStartedAt.current = Date.now();
-      answerIdRef.current = crypto.randomUUID();
+      answerIdRef.current = clientId();
     }
   }, [current]);
   const complete = Boolean(data && (data.session.completedAt || data.resumeIndex >= data.items.length));
@@ -117,7 +124,7 @@ export function StudyClient() {
     setSubmitting(true); setError("");
     try {
       const result = await apiFetch<AnswerResult>("/api/study/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        clientAnswerId: answerIdRef.current || crypto.randomUUID(), wordId: current.word.id, studySessionId: sessionId,
+        clientAnswerId: answerIdRef.current || clientId(), wordId: current.word.id, studySessionId: sessionId,
         studySessionItemId: current.itemId, rating, questionType: current.questionType,
         userAnswer: current.questionType === "EN_TO_ZH_CHOICE" ? (selectedChoice ?? undefined) : (userAnswer || undefined),
         durationMs: Math.max(0, Date.now() - itemStartedAt.current),
@@ -162,7 +169,7 @@ export function StudyClient() {
         {lastResult && <div className={`mt-4 flex items-center gap-2 text-[15px] font-semibold ${lastResult.isCorrect ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.isCorrect ? "已记录" : "已加入错词强化"}</div>}
         {error && <div className="mt-4 rounded-[14px] bg-[#ff3b30]/[0.08] p-3 text-[14px] text-[#d70015] dark:text-[#ff453a]">{error}</div>}
       </div>
-      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[13px] text-[#aeaeb2]">点击上方选项作答</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="grid grid-cols-[auto_auto_1fr] gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className="border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06]"><XCircle className="size-5" />忘记</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-5" />检查答案</Button></div> : <div className="grid grid-cols-[auto_1fr] gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-[#ff3b30]/25 text-[#d70015] shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-[#ff453a]", HARD: "glass-inner border-[#ff9500]/25 text-[#c93400] shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-[#ff9f0a]", GOOD: "glass-inner border-[#007aff]/25 text-[#0040dd] shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-[#34c759]/25 text-[#248a3d] shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-[#30d158]" } as const; return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press rounded-[16px] border-[1.5px] p-3.5 text-center transition-all duration-200 disabled:opacity-40 ${styles[rating]}`}><b className="block text-[15px]">{labels[rating]}</b><span className="mt-1 block text-[11px] opacity-60">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div>}
+      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[13px] text-[#aeaeb2]">点击上方选项作答</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className="w-full sm:w-auto"><Clock3 className="size-5" />稍后再学</Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className="w-full border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06] sm:w-auto"><XCircle className="size-5" />忘记</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-5" />检查答案</Button></div> : <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-[#ff3b30]/25 text-[#d70015] shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-[#ff453a]", HARD: "glass-inner border-[#ff9500]/25 text-[#c93400] shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-[#ff9f0a]", GOOD: "glass-inner border-[#007aff]/25 text-[#0040dd] shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-[#34c759]/25 text-[#248a3d] shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-[#30d158]" } as const; return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press rounded-[16px] border-[1.5px] p-3.5 text-center transition-all duration-200 disabled:opacity-40 ${styles[rating]}`}><b className="block text-[15px]">{labels[rating]}</b><span className="mt-1 block text-[11px] opacity-60">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div>}
     </CardContent></Card>
   </div>;
 }

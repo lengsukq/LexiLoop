@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   CalendarClock,
   Check,
+  ChevronDown,
   ExternalLink,
   Loader2,
   PauseCircle,
@@ -21,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch, formatDate } from "@/lib/client-api";
+import { waitForAiTask } from "@/lib/ai-task-client";
 import type { DictionaryContent, RelatedWordItem } from "@/lib/types";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress, buttonClass } from "@/components/ui";
 import { InitializationBadge, MasteryBadge } from "@/components/status-badges";
@@ -131,6 +133,8 @@ export default function WordDetailPage() {
   const [relatedMessage, setRelatedMessage] = useState("");
   const [mnemonicBusy, setMnemonicBusy] = useState(false);
   const [mnemonicError, setMnemonicError] = useState("");
+  const [translationBusy, setTranslationBusy] = useState(false);
+  const [translationMessage, setTranslationMessage] = useState("");
 
   const applyWord = useCallback((data: Detail) => {
     setWord(data);
@@ -188,10 +192,14 @@ export default function WordDetailPage() {
     }
   }
 
-  async function initialize() {
+  async function initialize(mode: "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE" = "FILL_MISSING_FIELDS") {
     if (!word) return;
     try {
-      await apiFetch(`/api/words/${word.id}/initialize`, { method: "POST" });
+      await apiFetch(`/api/words/${word.id}/initialize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
       await load();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建任务失败");
@@ -261,11 +269,11 @@ export default function WordDetailPage() {
     }
   }
 
-  async function play() {
-    if (!word) return;
+  async function playText(text = word?.term) {
+    if (!text) return;
     setTtsTip("");
     try {
-      const response = await fetch(`/api/tts?word=${encodeURIComponent(word.term)}&accent=${encodeURIComponent(selectedAccent)}`);
+      const response = await fetch(`/api/tts?word=${encodeURIComponent(text)}&accent=${encodeURIComponent(selectedAccent)}`);
       if (!response.ok) throw new Error("TTS 请求失败");
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -284,22 +292,47 @@ export default function WordDetailPage() {
     setMnemonicError("");
     setError("");
     try {
-      const result = await apiFetch<{ mnemonic: string }>(`/api/words/${word.id}/mnemonic`, { method: "POST" });
-      // Update local state so the UI shows the new mnemonic immediately
-      setWord((current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          content: {
-            ...current.content,
-            learning: { ...current.content.learning, mnemonic: result.mnemonic },
-          },
-        };
-      });
+      const task = await apiFetch<{ jobId: number }>(`/api/words/${word.id}/mnemonic`, { method: "POST" });
+      await waitForAiTask(task.jobId);
+      await load();
     } catch (reason) {
       setMnemonicError(reason instanceof Error ? reason.message : "生成失败");
     } finally {
       setMnemonicBusy(false);
+    }
+  }
+
+  async function translateExamples() {
+    if (!word) return;
+    setTranslationBusy(true);
+    setTranslationMessage("");
+    setError("");
+    try {
+      const task = await apiFetch<{ jobId: number }>(`/api/words/${word.id}/example-translations`, { method: "POST" });
+      await waitForAiTask(task.jobId);
+      setTranslationMessage("已补全缺失的中文翻译。");
+      await load();
+    } catch (reason) {
+      setTranslationMessage(reason instanceof Error ? reason.message : "补全例句翻译失败");
+    } finally {
+      setTranslationBusy(false);
+    }
+  }
+
+  async function translateSummary() {
+    if (!word) return;
+    setTranslationBusy(true);
+    setTranslationMessage("");
+    setError("");
+    try {
+      const task = await apiFetch<{ jobId: number }>(`/api/words/${word.id}/summary-translation`, { method: "POST" });
+      await waitForAiTask(task.jobId);
+      setTranslationMessage("已补全词条中文释义。");
+      await load();
+    } catch (reason) {
+      setTranslationMessage(reason instanceof Error ? reason.message : "补全中文释义失败");
+    } finally {
+      setTranslationBusy(false);
     }
   }
 
@@ -334,12 +367,15 @@ export default function WordDetailPage() {
     || word.content.affixes.length
     || word.content.tags.length,
   );
+  const missingExampleTranslations = word.content.examples.filter((example) => !example.translation?.trim()).length;
+  const missingSummaryTranslation = Boolean(word.content.summary.shortDefinition?.trim()) && !word.content.summary.translation?.trim();
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Link href="/words" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />返回单词本</Link>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => void initialize()}><RefreshCw className="size-4" />AI 重新初始化</Button>
+        <Button variant="outline" size="sm" onClick={() => void initialize()}><Sparkles className="size-4" />补全缺失内容</Button>
+        <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？")) void initialize("FORCE_OVERWRITE"); }}><RefreshCw className="size-4" />重新生成</Button>
         <Button variant="danger" size="sm" onClick={() => void remove()}><Trash2 className="size-4" />删除</Button>
       </div>
     </div>
@@ -358,13 +394,20 @@ export default function WordDetailPage() {
             </div>
             <h1 className="mt-4 break-words text-3xl font-bold sm:mt-5 sm:text-4xl lg:text-5xl">{word.term}</h1>
             {word.content.summary.translation && <p className="mt-2 text-lg font-medium text-white/95 sm:mt-3 sm:text-xl">{word.content.summary.translation}</p>}
-            {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">{word.content.summary.shortDefinition}</p>}
+            {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80 break-words">{word.content.summary.shortDefinition}</p>}
+            {missingSummaryTranslation && <div className="mt-3 flex max-w-2xl flex-wrap items-center gap-2 rounded-xl border border-white/15 bg-black/10 px-3 py-2 text-xs text-white/80 backdrop-blur-sm">
+              <span>暂无中文释义</span>
+              <button type="button" onClick={() => void translateSummary()} disabled={translationBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1 font-medium text-white transition hover:bg-white/25 disabled:cursor-wait disabled:opacity-70">
+                {translationBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}AI 翻译释义
+              </button>
+            </div>}
+            {translationMessage && missingSummaryTranslation && <p className={`mt-2 max-w-2xl text-xs ${translationMessage.startsWith("已") ? "text-emerald-100" : "text-amber-200"}`}>{translationMessage}</p>}
             <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {word.entryType === "WORD" ? "单词" : word.entryType === "SENTENCE" ? "句子" : "短语"}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <div className="flex overflow-hidden rounded-lg border border-white/25">
                 {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)} className={`px-2.5 py-1 text-xs font-medium transition ${selectedAccent === accent ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{accent === "US" ? "美" : accent === "UK" ? "英" : "通用"}</button>)}
               </div>
-              <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void play()}><Volume2 className="size-4" />播放发音</button>
+              <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void playText()}><Volume2 className="size-4" />播放发音</button>
               {ttsTip && <p className="w-full text-xs text-amber-300">{ttsTip}</p>}
             </div>
           </div>
@@ -379,8 +422,8 @@ export default function WordDetailPage() {
 
     {error && <div className="rounded-[18px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] shadow-[0_8px_32px_rgba(255,59,48,0.08)] backdrop-blur-xl dark:text-[#ff453a]">{error}</div>}
 
-    <div className="grid gap-5 lg:grid-cols-[1.4fr_.6fr]">
-      <div className="space-y-5">
+    <div className="grid gap-5 lg:grid-cols-[1.4fr_.6fr] min-w-0">
+      <div className="space-y-5 min-w-0">
         <Card>
           <CardHeader><CardTitle>释义</CardTitle></CardHeader>
           <CardContent>
@@ -390,8 +433,7 @@ export default function WordDetailPage() {
                 {definition.register && <Badge tone="amber">{definition.register}</Badge>}
                 <Badge tone={definition.source === "user" ? "purple" : definition.source.startsWith("ai:") ? "green" : "blue"}>{definition.source === "user" ? "我的释义" : definition.source.startsWith("ai:") ? "AI" : definition.source}</Badge>
               </div>
-              <p className="mt-2 leading-7">{definition.text}</p>
-              {definition.usageNote && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">用法：{definition.usageNote}</p>}
+              <p className="mt-2 leading-7 break-words">{definition.text}</p>              {definition.usageNote && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">用法：{definition.usageNote}</p>}
             </div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无释义。可以等待 AI 初始化，或直接填写手动释义继续学习。</p>}
             <div className="mt-5 border-t border-black/[0.06] pt-5 dark:border-white/[0.08]">
               <label className="text-sm font-medium">手动释义</label>
@@ -405,20 +447,21 @@ export default function WordDetailPage() {
         </Card>
 
         {word.content.examples.length > 0 && <Card>
-          <CardHeader><CardTitle>例句</CardTitle></CardHeader>
+          <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>例句</CardTitle>{missingExampleTranslations > 0 && <p className="mt-1 text-xs text-[#aeaeb2]">有 {missingExampleTranslations} 条例句还没有中文翻译</p>}</div>{missingExampleTranslations > 0 && <Button variant="outline" size="sm" onClick={() => void translateExamples()} disabled={translationBusy}>{translationBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}AI 补全翻译</Button>}</div></CardHeader>
+          {translationMessage && <div className={`mx-4 mb-1 rounded-[12px] px-3 py-2 text-xs sm:mx-5 ${translationMessage.startsWith("已") || translationMessage.startsWith("没有") ? "bg-[#34c759]/[0.08] text-[#248a3d] dark:text-[#30d158]" : "bg-[#ff3b30]/[0.07] text-[#d70015] dark:text-[#ff453a]"}`}>{translationMessage}</div>}
           <CardContent className="space-y-3">{word.content.examples.map((example, index) => <div key={`${example.sentence}-${index}`} className="rounded-[16px] border-l-4 border-[#007aff]/40 bg-white/40 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:bg-white/[0.04]">
-            <div className="flex items-center gap-2"><Badge>{example.difficulty ?? "NORMAL"}</Badge>{example.senseId && <span className="text-xs text-[#aeaeb2]">词义 {example.senseId}</span>}</div>
-            <p className="mt-2 italic leading-7">{example.sentence}</p>
-            {example.translation && <p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">{example.translation}</p>}
+            <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Badge>{example.difficulty ?? "NORMAL"}</Badge>{example.senseId && <span className="text-xs text-[#aeaeb2]">词义 {example.senseId}</span>}</div><button type="button" aria-label="朗读例句" title="朗读例句" onClick={() => void playText(example.sentence)} className="ios-press grid size-8 shrink-0 place-items-center rounded-full bg-[#007aff]/10 text-[#007aff] transition hover:bg-[#007aff]/15 dark:text-[#0a84ff]"><Volume2 className="size-4" /></button></div>
+            <p className="mt-2 italic leading-7 break-words">{example.sentence}</p>
+            {example.translation ? <p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d] break-words">{example.translation}</p> : <p className="mt-2 text-xs text-[#aeaeb2]">暂未翻译</p>}
           </div>)}</CardContent>
         </Card>}
 
         {word.entryType === "SENTENCE" && (word.content.sentenceAnalysis.grammarNotes.length > 0 || word.content.sentenceAnalysis.keyExpressions.length > 0 || word.content.sentenceAnalysis.variations.length > 0) && <Card>
           <CardHeader><CardTitle>句子分析</CardTitle></CardHeader>
           <CardContent className="space-y-5">
-            {word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">语法要点</p><ul className="space-y-2">{word.content.sentenceAnalysis.grammarNotes.map((item) => <li key={item} className="rounded-[14px] border border-[#007aff]/10 bg-[#007aff]/[0.06] p-3 text-sm text-[#007aff] shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]">{item}</li>)}</ul></div>}
-            {word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">关键表达</p><div className="space-y-2">{word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression} className="rounded-[14px] border border-white/50 bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]"><b className="text-sm">{item.expression}</b><p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">{item.meaning}</p>{item.note && <p className="mt-1 text-xs text-[#aeaeb2]">{item.note}</p>}</div>)}</div></div>}
-            {word.content.sentenceAnalysis.variations.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">替换句型</p><div className="space-y-2">{word.content.sentenceAnalysis.variations.map((item) => <div key={item.sentence} className="rounded-[14px] bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:bg-white/[0.04]"><p className="text-sm">{item.sentence}</p>{item.translation && <p className="mt-1 text-xs text-[#6e6e73] dark:text-[#98989d]">{item.translation}</p>}</div>)}</div></div>}
+            {word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">语法要点</p><ul className="space-y-2">{word.content.sentenceAnalysis.grammarNotes.map((item) => <li key={item} className="rounded-[14px] border border-[#007aff]/10 bg-[#007aff]/[0.06] p-3 text-sm break-words text-[#007aff] shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]">{item}</li>)}</ul></div>}
+            {word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">关键表达</p><div className="space-y-2">{word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression} className="rounded-[14px] border border-white/50 bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]"><b className="text-sm break-words">{item.expression}</b><p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d] break-words">{item.meaning}</p>{item.note && <p className="mt-1 text-xs text-[#aeaeb2] break-words">{item.note}</p>}</div>)}</div></div>}
+            {word.content.sentenceAnalysis.variations.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">替换句型</p><div className="space-y-2">{word.content.sentenceAnalysis.variations.map((item) => <div key={item.sentence} className="rounded-[14px] bg-white/40 p-3 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:bg-white/[0.04]"><p className="text-sm break-words">{item.sentence}</p>{item.translation && <p className="mt-1 text-xs text-[#6e6e73] dark:text-[#98989d] break-words">{item.translation}</p>}</div>)}</div></div>}
           </CardContent>
         </Card>}
 
@@ -430,7 +473,7 @@ export default function WordDetailPage() {
             {!word.content.learning.mnemonic && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">记忆方法</p><Button variant="outline" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}AI 生成趣味助记</Button>{mnemonicError && <p className="mt-2 text-xs text-[#ff3b30]">{mnemonicError}</p>}</div>}
             {word.content.learning.mnemonic && <div className="flex justify-end"><Button variant="ghost" size="sm" onClick={() => void generateMnemonic()} disabled={mnemonicBusy}>{mnemonicBusy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}重新生成</Button></div>}
 
-            {word.content.learning.commonMistakes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">常见错误</p><ul className="space-y-2">{word.content.learning.commonMistakes.map((item) => <li key={item} className="rounded-[14px] border border-[#ff9500]/10 bg-[#ff9500]/[0.06] p-3 text-sm text-[#c93400] shadow-[0_4px_12px_rgba(255,149,0,0.04)] backdrop-blur-sm dark:text-[#ff9f0a]">{item}</li>)}</ul></div>}
+            {word.content.learning.commonMistakes.length > 0 && <div><p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">常见错误</p><ul className="space-y-2">{word.content.learning.commonMistakes.map((item) => <li key={item} className="rounded-[14px] border border-[#ff9500]/10 bg-[#ff9500]/[0.06] p-3 text-sm break-words text-[#c93400] shadow-[0_4px_12px_rgba(255,149,0,0.04)] backdrop-blur-sm dark:text-[#ff9f0a]">{item}</li>)}</ul></div>}
           </CardContent>
         </Card>}
 
@@ -449,18 +492,10 @@ export default function WordDetailPage() {
           </CardContent>
         </Card>}
 
-        <Card>
-          <CardHeader><CardTitle>个人备注</CardTitle></CardHeader>
-          <CardContent>
-            <textarea className="min-h-32 w-full rounded-[14px] border border-black/[0.06] bg-white/60 p-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" value={note} onChange={(event) => setNote(event.target.value)} placeholder="记录记忆方法、易混淆词或使用场景…" />
-            <div className="mt-3 flex justify-end"><Button onClick={() => void patch({ userNote: note || null })} disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存备注</Button></div>
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="space-y-5">
+      <div className="space-y-5 min-w-0">
         <Card>
-          <CardHeader><CardTitle>学习状态</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <Stat label="累计复习" value={word.reviewCard?.reps ?? 0} />
             <Stat label="遗忘次数" value={word.reviewCard?.lapses ?? 0} />
@@ -472,12 +507,22 @@ export default function WordDetailPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>AI 初始化质量</CardTitle></CardHeader>
-          <CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
+          <CardHeader><CardTitle>个人备注</CardTitle></CardHeader>
+          <CardContent>
+            <textarea className="min-h-36 w-full rounded-[14px] border border-black/[0.06] bg-white/60 p-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" value={note} onChange={(event) => setNote(event.target.value)} placeholder="记录记忆方法、易混淆词或使用场景…" />
+            <div className="mt-3 flex justify-end"><Button onClick={() => void patch({ userNote: note || null })} disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存备注</Button></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <details className="group">
+            <summary className="relative z-10 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-[15px] font-bold tracking-tight [&::-webkit-details-marker]:hidden sm:px-5 sm:py-5"><span>AI 初始化质量</span><ChevronDown className="size-4 text-[#8e8e93] transition-transform group-open:rotate-180" /></summary>
+            <CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
             <div className="flex items-center justify-between gap-2"><b className="truncate">{attempt.providerId}</b><Badge tone={attempt.status === "SUCCESS" ? "green" : attempt.status === "FAILED" ? "red" : "amber"}>{attempt.status}</Badge></div>
             {attempt.metadata?.qualityScore !== undefined && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">质量分：{attempt.metadata.qualityScore} · Token：{attempt.metadata.inputTokens ?? "?"} + {attempt.metadata.outputTokens ?? "?"}</p>}
             {attempt.errorMessage && <p className="mt-2 text-xs text-[#ff3b30]">{attempt.errorMessage}</p>}
-          </div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无初始化记录。</p>}</CardContent>
+            </div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无初始化记录。</p>}</CardContent>
+          </details>
         </Card>
 
         <Card>
@@ -528,7 +573,7 @@ function RelatedGroup({ label, values, relation, onSelect }: { label: string; va
 }
 
 function InfoBlock({ label, text }: { label: string; text: string }) {
-  return <div className="rounded-[16px] border border-[#af52de]/10 bg-[#af52de]/[0.06] p-4 shadow-[0_4px_16px_rgba(175,82,222,0.05)] backdrop-blur-sm"><p className="text-xs font-medium uppercase tracking-wide text-[#af52de]">{label}</p><p className="mt-2 text-sm leading-6 text-[#1c1c1e] dark:text-[#f5f5f7]">{text}</p></div>;
+  return <div className="rounded-[16px] border border-[#af52de]/10 bg-[#af52de]/[0.06] p-4 shadow-[0_4px_16px_rgba(175,82,222,0.05)] backdrop-blur-sm"><p className="text-xs font-medium uppercase tracking-wide text-[#af52de]">{label}</p><p className="mt-2 text-sm leading-6 break-words text-[#1c1c1e] dark:text-[#f5f5f7]">{text}</p></div>;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {

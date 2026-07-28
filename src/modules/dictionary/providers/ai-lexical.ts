@@ -9,7 +9,7 @@ import type {
 import type { DictionaryProvider, ProviderResult } from "../provider";
 import { emptyDictionaryContent } from "../content";
 
-export const AI_LEXICAL_PROMPT_VERSION = "lexical-v2";
+export const AI_LEXICAL_PROMPT_VERSION = "lexical-v3";
 export const AI_LEXICAL_SCHEMA_VERSION = 2;
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable();
@@ -275,6 +275,10 @@ function normalized(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+function isChineseMnemonic(value: string | null): boolean {
+  return (value?.match(/[\u3400-\u9fff]/g)?.length ?? 0) >= 8;
+}
+
 function promptFor(input: LookupInput): string {
   const existing = input.existingContent;
   const existingSummary = existing ? {
@@ -287,6 +291,7 @@ function promptFor(input: LookupInput): string {
     `SENTENCE 需要在 sentenceAnalysis 中给出语法要点、关键表达和自然替换句型；其 morphology、roots、affixes、wordFamily 可以为空。` +
     `区分词性和主要词义。` +
     `中文翻译应自然；definition 使用源语言解释，translation 使用目标语言。` +
+    `learning.mnemonic 必须写给英文基础较弱的中文母语者：使用简体中文叙述，至少包含 8 个汉字；目标英文词或必要的词根可以出现，但不得输出英文完整句子或英文解释。没有自然的中文联想时返回 null，不要硬编英文助记。` +
     `不要生成音频 URL；发音由 Edge TTS 负责。不要输出 Markdown，只输出一个 JSON 对象。\n\n` +
     `你的输出必须严格遵循以下结构（字段名、层级、类型不可更改）：\n` +
     `{"term":"词条","summary":{"shortDefinition":"英文简释","translation":"中文翻译","cefrLevel":"B1","frequency":"COMMON"},` +
@@ -425,7 +430,10 @@ function toContent(output: AiLexicalOutput, input: LookupInput, source: string):
     .map((item) => ({ word: item.word, translation: item.translation, partOfSpeech: item.partOfSpeech, difference: item.difference ?? null, relation: item.relation, source }));
   content.phrases.push(...output.phrases.map((item) => ({ ...item, source })));
   content.confusedWords = related(output.confusedWords, "CONFUSED_WITH", source).filter((item) => normalized(item.word) !== self);
-  content.learning = output.learning;
+  content.learning = {
+    ...output.learning,
+    mnemonic: isChineseMnemonic(output.learning.mnemonic) ? output.learning.mnemonic : null,
+  };
   content.sentenceAnalysis = output.sentenceAnalysis;
   content.tags = output.tags;
   return content;

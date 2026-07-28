@@ -27,5 +27,9 @@ export const MIGRATIONS = [
   {
     "name": "0006_performance_indexes.sql",
     "sql": "-- Performance indexes for maintenance tasks and common queries\nCREATE INDEX IF NOT EXISTS study_session_items_word_status_idx ON study_session_items(word_id, status);\nCREATE INDEX IF NOT EXISTS study_session_items_status_answered_idx ON study_session_items(status, answered_at);\nCREATE INDEX IF NOT EXISTS wrong_word_states_decay_idx ON wrong_word_states(active, last_wrong_at);\nCREATE INDEX IF NOT EXISTS initialization_jobs_retry_idx ON initialization_jobs(status, attempt_count, completed_at);\nCREATE INDEX IF NOT EXISTS study_sessions_completed_idx ON study_sessions(completed_at, started_at);\n"
+  },
+  {
+    "name": "0007_generic_ai_tasks.sql",
+    "sql": "-- Reuse the existing durable queue for every user-triggered AI operation.\nALTER TABLE initialization_jobs ADD COLUMN task_type TEXT NOT NULL DEFAULT 'INITIALIZE'\n  CHECK(task_type IN ('INITIALIZE', 'MNEMONIC', 'EXAMPLE_TRANSLATIONS'));\n\nDROP INDEX IF EXISTS initialization_jobs_active_word_unique;\nCREATE INDEX IF NOT EXISTS initialization_jobs_task_type_idx ON initialization_jobs(task_type, status, available_at, priority);\nCREATE UNIQUE INDEX IF NOT EXISTS initialization_jobs_active_word_task_unique\n  ON initialization_jobs(word_id, task_type) WHERE status IN ('QUEUED', 'RUNNING');\n"
   }
 ] as const;

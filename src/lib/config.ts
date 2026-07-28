@@ -8,13 +8,15 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = {
       apiType: "openai",
       baseUrl: "https://opencode.ai/zen/v1",
       apiKey: "public",
+      models: [],
+      defaultModel: "",
     },
   ],
   purposes: {
     TTS: { enabled: false, providerId: "", model: "" },
-    IMPORT_ENRICHMENT: { enabled: true, providerId: "opencode-zen", model: "deepseek-v4-flash-free" },
-    STUDY_PLAN: { enabled: true, providerId: "opencode-zen", model: "deepseek-v4-flash-free" },
-    SUGGESTION: { enabled: false, providerId: "opencode-zen", model: "mimo-v2.5-free" },
+    IMPORT_ENRICHMENT: { enabled: false, providerId: "", model: "" },
+    STUDY_PLAN: { enabled: false, providerId: "", model: "" },
+    SUGGESTION: { enabled: false, providerId: "", model: "" },
   },
 };
 
@@ -29,7 +31,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dictionaryApiEnabled: process.env.DICTIONARY_API_ENABLED !== "false",
   myMemoryEnabled: process.env.MYMEMORY_ENABLED !== "false",
   ecdictEnabled: process.env.ECDICT_ENABLED === "true",
+  merriamWebsterEnabled: false,
+  merriamWebsterDictionaryKey: "",
+  merriamWebsterThesaurusKey: "",
   backgroundConcurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
+  aiRetryCount: 1,
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

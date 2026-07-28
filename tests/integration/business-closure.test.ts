@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sqlite } from "@/db/client";
 import { createImportPreview, commitImport, ImportRollbackError, rollbackImportBatch } from "@/modules/imports/service";
-import { processJob, queueBulkInitialization } from "@/modules/initialization/service";
+import { processJob, queueAiTask, queueBulkInitialization, queueSelectedInitialization, queueWordInitialization } from "@/modules/initialization/service";
 import { processReviewAnswer } from "@/modules/reviews/service";
 import { getDailyStudyPlan, skipStudyItem, startStudySession } from "@/modules/study/service";
+import { updateSettings } from "@/modules/settings/service";
+import { DEFAULT_SETTINGS } from "@/lib/config";
 
 function insertReadyWord(term: string, definition = "测试释义"): number {
   const now = Date.now();
@@ -109,7 +111,7 @@ describe("initialization continuity", () => {
     const jobId = Number(sqlite.prepare(`INSERT INTO initialization_jobs
       (word_id, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
       VALUES (?, 'FORCE_OVERWRITE', 'RUNNING', 100, 5, 5, ?, ?, ?)`).run(wordId, now, now, now).lastInsertRowid);
-    await processJob({ id: jobId, wordId, mode: "FORCE_OVERWRITE", attemptCount: 5, maxAttempts: 5 });
+    await processJob({ id: jobId, wordId, taskType: "INITIALIZE", mode: "FORCE_OVERWRITE", attemptCount: 5, maxAttempts: 5 });
     expect((sqlite.prepare("SELECT status FROM initialization_jobs WHERE id = ?").get(jobId) as { status: string }).status).toBe("FAILED");
     expect((sqlite.prepare("SELECT initialization_status FROM words WHERE id = ?").get(wordId) as { initialization_status: string }).initialization_status).toBe("PARTIAL");
   });
@@ -180,6 +182,68 @@ describe("bulk AI initialization", () => {
     expect(active).toEqual([
       { word_id: aiDoneId, mode: "FORCE_OVERWRITE" },
       { word_id: pendingId, mode: "FORCE_OVERWRITE" },
+    ]);
+  });
+
+  it("queues selected words for missing-field completion even after an earlier AI success", () => {
+    const aiDoneId = insertReadyWord("alpha");
+    const otherId = insertReadyWord("beta");
+    const now = Date.now();
+    sqlite.prepare(`INSERT INTO provider_attempts
+      (word_id, provider_id, status, duration_ms, fields_returned_json, metadata_json, created_at)
+      VALUES (?, 'ai:openai:test-model', 'SUCCESS', 100, '["definitions"]', '{}', ?)`)
+      .run(aiDoneId, now);
+
+    const selected = queueSelectedInitialization([aiDoneId, otherId, otherId, 999999]);
+    expect(selected).toMatchObject({ requestedWords: 3, selectedWords: 2, skippedWords: 1, createdJobs: 2, updatedJobs: 0, mode: "FILL_MISSING_FIELDS" });
+    expect((sqlite.prepare("SELECT mode FROM initialization_jobs WHERE word_id = ?").get(aiDoneId) as { mode: string }).mode).toBe("FILL_MISSING_FIELDS");
+
+    const singleJobId = queueWordInitialization(aiDoneId);
+    expect((sqlite.prepare("SELECT mode FROM initialization_jobs WHERE id = ?").get(singleJobId) as { mode: string }).mode).toBe("FILL_MISSING_FIELDS");
+  });
+});
+
+describe("example translation completion", () => {
+  it("fills only missing example translations and preserves existing text", async () => {
+    const wordId = insertReadyWord("dry", "干燥的");
+    sqlite.prepare("UPDATE word_contents SET examples_json = ? WHERE word_id = ?").run(JSON.stringify([
+      { sentence: "This well is as dry as that cow.", translation: null, source: "dictionaryapi.dev", isUserAdded: false },
+      { sentence: "Dry alcohol is 200 proof.", translation: "无水酒精的浓度为 200 proof。", source: "dictionaryapi.dev", isUserAdded: false },
+    ]), wordId);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ translations: [{ index: 0, translation: "这口井和那头牛一样干。" }] }) } }],
+    }), { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+    try {
+      await updateSettings({
+        llmConfig: {
+          ...DEFAULT_SETTINGS.llmConfig,
+          providers: [{ id: "test", name: "Test", apiType: "openai", baseUrl: "https://example.test/v1", apiKey: "test", models: ["test-model"], defaultModel: "test-model" }],
+          purposes: { ...DEFAULT_SETTINGS.llmConfig.purposes, IMPORT_ENRICHMENT: { enabled: true, providerId: "test", model: "test-model" } },
+        },
+      });
+      const { translateMissingExamples } = await import("@/modules/translations/service");
+      await expect(translateMissingExamples(wordId)).resolves.toEqual({ translated: 1, remaining: 0 });
+      const examples = JSON.parse((sqlite.prepare("SELECT examples_json FROM word_contents WHERE word_id = ?").get(wordId) as { examples_json: string }).examples_json) as Array<{ translation: string }>;
+      expect(examples.map((example) => example.translation)).toEqual(["这口井和那头牛一样干。", "无水酒精的浓度为 200 proof。"]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("unified AI task queue", () => {
+  it("keeps independent AI operations for one word in the same retryable task table", () => {
+    const wordId = insertReadyWord("stunning", "惊艳的");
+    const initializeId = queueAiTask(wordId, "INITIALIZE");
+    const mnemonicId = queueAiTask(wordId, "MNEMONIC");
+    const translationId = queueAiTask(wordId, "EXAMPLE_TRANSLATIONS");
+    expect(new Set([initializeId, mnemonicId, translationId]).size).toBe(3);
+    const tasks = sqlite.prepare("SELECT task_type, max_attempts FROM initialization_jobs WHERE word_id = ? ORDER BY task_type").all(wordId) as Array<{ task_type: string; max_attempts: number }>;
+    expect(tasks).toEqual([
+      { task_type: "EXAMPLE_TRANSLATIONS", max_attempts: 2 },
+      { task_type: "INITIALIZE", max_attempts: 2 },
+      { task_type: "MNEMONIC", max_attempts: 2 },
     ]);
   });
 });

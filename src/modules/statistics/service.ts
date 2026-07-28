@@ -14,6 +14,17 @@ function lastDateKeys(days: number): string[] {
 
 export async function getDashboard() {
   const plan = await getDailyStudyPlan();
+  const resumeCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const resumable = sqlite.prepare(`SELECT s.id, s.session_type, s.started_at, s.planned_count,
+      count(i.id) AS remaining_count
+    FROM study_sessions s
+    JOIN study_session_items i ON i.study_session_id = s.id AND i.status = 'PENDING'
+    WHERE s.completed_at IS NULL AND s.started_at >= ?
+    GROUP BY s.id
+    ORDER BY s.started_at DESC
+    LIMIT 1`).get(resumeCutoff) as {
+      id: number; session_type: string; started_at: number; planned_count: number; remaining_count: number;
+    } | undefined;
   const totals = sqlite.prepare(`SELECT count(*) AS total,
     sum(CASE WHEN mastery_level = 'MASTERED' THEN 1 ELSE 0 END) AS mastered,
     sum(CASE WHEN initialization_status IN ('READY','PARTIAL') THEN 1 ELSE 0 END) AS initialized,
@@ -37,6 +48,13 @@ export async function getDashboard() {
     todayProcessed,
     todayGoalTotal: todayProcessed + plan.plannedTotal,
     todayAccuracy: todayLogs.length ? Math.round(todayLogs.filter((item) => item.is_correct).length / todayLogs.length * 100) : null,
+    resumeSession: resumable ? {
+      id: resumable.id,
+      sessionType: resumable.session_type,
+      startedAt: new Date(resumable.started_at).toISOString(),
+      remainingCount: resumable.remaining_count,
+      plannedCount: resumable.planned_count,
+    } : null,
     plan,
   };
 }

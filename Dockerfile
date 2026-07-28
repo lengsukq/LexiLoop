@@ -23,8 +23,9 @@ RUN apt-get update \
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=deps /app/node_modules/ws ./node_modules/ws
 COPY docker/entrypoint-app.sh /usr/local/bin/entrypoint-app
-RUN chmod +x /usr/local/bin/entrypoint-app \
+RUN chmod 755 /usr/local/bin/entrypoint-app \
   && mkdir -p /app/data/backups /app/data/reference \
   && chown -R node:node /app
 USER node

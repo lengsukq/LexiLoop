@@ -25,7 +25,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[22px] transition-all duration-300",
+        "liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[20px] transition-all duration-300 sm:rounded-[22px]",
         className,
       )}
       {...props}
@@ -34,11 +34,11 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative z-10 px-5 pt-5 pb-2", className)} {...props} />;
+  return <div className={cn("relative z-10 px-4 pb-2 pt-4 sm:px-5 sm:pt-5", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative z-10 px-5 pb-5 pt-2", className)} {...props} />;
+  return <div className={cn("relative z-10 px-4 pb-4 pt-2 sm:px-5 sm:pb-5", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
@@ -96,7 +96,7 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 
 export function EmptyState({ icon, title, description, action }: { icon?: ReactNode; title: string; description: string; action?: ReactNode }) {
   return (
-    <div className="liquid-glass-elevated animate-scale-in flex min-h-64 flex-col items-center justify-center rounded-[28px] p-10 text-center">
+    <div className="liquid-glass-elevated animate-scale-in flex min-h-56 flex-col items-center justify-center rounded-[22px] p-6 text-center sm:min-h-64 sm:rounded-[28px] sm:p-10">
       {icon}
       <h2 className="mt-4 text-xl font-bold tracking-tight text-[#1c1c1e] dark:text-[#f5f5f7]">{title}</h2>
       <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{description}</p>

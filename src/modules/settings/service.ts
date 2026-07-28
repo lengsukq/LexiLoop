@@ -15,7 +15,11 @@ const settingsSchema = z.object({
   dictionaryApiEnabled: z.boolean(),
   myMemoryEnabled: z.boolean(),
   ecdictEnabled: z.boolean(),
+  merriamWebsterEnabled: z.boolean(),
+  merriamWebsterDictionaryKey: z.string(),
+  merriamWebsterThesaurusKey: z.string(),
   backgroundConcurrency: z.number().int().min(1).max(10),
+  aiRetryCount: z.number().int().min(0).max(5),
   llmConfig: z.object({
     providers: z.array(z.object({
       id: z.string().min(1),
@@ -23,6 +27,8 @@ const settingsSchema = z.object({
       apiType: z.enum(["openai", "anthropic"]),
       baseUrl: z.string(),
       apiKey: z.string(),
+      models: z.array(z.string().trim().min(1).max(200)).max(1000).default([]),
+      defaultModel: z.string().trim().max(200).default(""),
     })),
     purposes: z.record(
       z.string(),
@@ -30,6 +36,8 @@ const settingsSchema = z.object({
         enabled: z.boolean(),
         providerId: z.string(),
         model: z.string(),
+        retryProviderId: z.string().trim().max(200).optional(),
+        retryModel: z.string().trim().max(200).optional(),
         temperature: z.number().min(0).max(1).optional(),
         maxOutputTokens: z.number().int().min(500).max(200000).optional(),
         timeoutMs: z.number().int().min(5000).max(300000).optional(),
@@ -45,6 +53,24 @@ let settingsCache: { value: AppSettings; expiresAt: number } | null = null;
 
 export function invalidateSettingsCache(): void {
   settingsCache = null;
+}
+
+/** A retry can deliberately switch both provider and model without altering the saved primary binding. */
+export function settingsForAiAttempt(settings: AppSettings, attemptCount: number): AppSettings {
+  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const retryModel = purpose.retryModel?.trim();
+  if (attemptCount <= 1 || !retryModel) return settings;
+  const retryProviderId = purpose.retryProviderId?.trim() || purpose.providerId;
+  return {
+    ...settings,
+    llmConfig: {
+      ...settings.llmConfig,
+      purposes: {
+        ...settings.llmConfig.purposes,
+        IMPORT_ENRICHMENT: { ...purpose, providerId: retryProviderId, model: retryModel },
+      },
+    },
+  };
 }
 
 export async function getSettings(): Promise<AppSettings> {

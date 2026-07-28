@@ -42,7 +42,7 @@ export function autoRetryFailedJobs(): number {
       AND (completed_at IS NULL OR completed_at < ?)`).run(now, now, now - FAILED_RETRY_COOLDOWN_MS);
   if (result.changes > 0) {
     const queuedWords = sqlite.prepare(
-      "SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED'",
+      "SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED' AND task_type = 'INITIALIZE'",
     ).all() as Array<{ word_id: number }>;
     for (const job of queuedWords) {
       sqlite.prepare("UPDATE words SET initialization_status = 'QUEUED', updated_at = ? WHERE id = ? AND initialization_status = 'FAILED'")

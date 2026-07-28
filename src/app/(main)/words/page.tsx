@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Clock3, Loader2, Plus, Search, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Clock3, Loader2, Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { apiFetch, formatDate } from "@/lib/client-api";
-import { Badge, Button, Card, CardContent, EmptyState, Input, PageHeader, Pagination, Select, buttonClass } from "@/components/ui";
+import { Badge, Button, Card, CardContent, Dialog, EmptyState, Input, PageHeader, Pagination, Select, buttonClass } from "@/components/ui";
 import { InitializationBadge, MasteryBadge } from "@/components/status-badges";
 
 interface WordItem { id: number; term: string; sourceLanguage: string; targetLanguage: string; entryType: string; initializationStatus: string; masteryLevel: string; masteryScore: number; isSuspended: boolean; createdAt: string; dueAt: string | null; reps: number; wrongWordActive: boolean; definition: string | null; hasPronunciation: boolean; }
@@ -19,6 +19,7 @@ export default function WordsPage() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ResponseData | null>(null);
   const [error, setError] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => { const timer = window.setTimeout(() => { setQuery(queryInput.trim()); setPage(1); }, 350); return () => window.clearTimeout(timer); }, [queryInput]);
   const load = useCallback(async () => {
@@ -30,8 +31,18 @@ export default function WordsPage() {
   }, [mastery, page, query, sort, special, status]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
-  return <div className="space-y-6"><PageHeader title="单词本" description="浏览词典内容、学习状态、错词和到期计划。" action={<div className="flex gap-2"><Link href="/create" className={buttonClass("primary")}><Plus className="size-4" />手动添加</Link><Link href="/import" className={buttonClass("outline")}><Upload className="size-4" />导入 CSV</Link></div>} />
-    <Card><CardContent className="pt-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_repeat(4,auto)]"><div className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#aeaeb2]" /><Input className="pl-9" placeholder="搜索词条或备注…" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} /></div><Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">全部初始化状态</option><option value="READY">已就绪</option><option value="PARTIAL">部分完成</option><option value="QUEUED">排队中</option><option value="RUNNING">初始化中</option><option value="FAILED">失败</option></Select><Select value={mastery} onChange={(event) => { setMastery(event.target.value); setPage(1); }}><option value="">全部掌握状态</option><option value="NEW">新词</option><option value="LEARNING">学习中</option><option value="FAMILIAR">熟悉</option><option value="PROFICIENT">熟练</option><option value="MASTERED">已掌握</option></Select><Select value={special} onChange={(event) => { setSpecial(event.target.value); setPage(1); }}><option value="">全部词条</option><option value="wrong">仅错词</option><option value="due">仅到期</option><option value="suspended">仅暂停</option></Select><Select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="createdAt">按导入时间</option><option value="sourceCreatedAt">按收藏时间</option><option value="term">按字母</option><option value="masteryScore">按熟练度</option><option value="dueAt">按到期时间</option></Select></div></CardContent></Card>
+  const activeFilterCount = [status, mastery, special].filter(Boolean).length;
+  const filters = <>
+    <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="">全部初始化状态</option><option value="READY">已就绪</option><option value="PARTIAL">部分完成</option><option value="QUEUED">排队中</option><option value="RUNNING">初始化中</option><option value="FAILED">失败</option></Select>
+    <Select value={mastery} onChange={(event) => { setMastery(event.target.value); setPage(1); }}><option value="">全部掌握状态</option><option value="NEW">新词</option><option value="LEARNING">学习中</option><option value="FAMILIAR">熟悉</option><option value="PROFICIENT">熟练</option><option value="MASTERED">已掌握</option></Select>
+    <Select value={special} onChange={(event) => { setSpecial(event.target.value); setPage(1); }}><option value="">全部词条</option><option value="wrong">仅错词</option><option value="due">仅到期</option><option value="suspended">仅暂停</option></Select>
+    <Select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="createdAt">按导入时间</option><option value="sourceCreatedAt">按收藏时间</option><option value="term">按字母</option><option value="masteryScore">按熟练度</option><option value="dueAt">按到期时间</option></Select>
+  </>;
+  function clearFilters() { setStatus(""); setMastery(""); setSpecial(""); setSort("createdAt"); setPage(1); }
+
+  return <div className="space-y-4 sm:space-y-6"><PageHeader title="单词本" description="浏览词典内容、学习状态、错词和到期计划。" action={<div className="flex gap-2"><Link href="/create" className={buttonClass("primary")}><Plus className="size-4" />手动添加</Link><Link href="/import" className={`${buttonClass("outline")} hidden sm:inline-flex`}><Upload className="size-4" />导入 CSV</Link></div>} />
+    <Card><CardContent className="pt-4 sm:pt-5"><div className="flex gap-2 sm:hidden"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#aeaeb2]" /><Input className="pl-9" placeholder="搜索词条或备注…" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} /></div><Button variant="outline" onClick={() => setFiltersOpen(true)} aria-label="打开筛选"><SlidersHorizontal className="size-4" />{activeFilterCount ? activeFilterCount : "筛选"}</Button></div><div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-[1fr_repeat(4,auto)]"><div className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#aeaeb2]" /><Input className="pl-9" placeholder="搜索词条或备注…" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} /></div>{filters}</div></CardContent></Card>
+    <Dialog open={filtersOpen} onClose={() => setFiltersOpen(false)} title="筛选单词本"><div className="grid gap-3">{filters}<div className="mt-2 flex justify-between gap-2"><Button variant="ghost" onClick={clearFilters}>清除筛选</Button><Button onClick={() => setFiltersOpen(false)}>完成</Button></div></div></Dialog>
     {error && <div className="glass-inner rounded-[14px] border-[#ff3b30]/15 p-4 text-sm text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.08)] dark:text-[#ff453a]">{error}</div>}
     {!data && !error && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>}
     {data && data.items.length === 0 && <EmptyState icon={<BookOpen className="size-10 text-[#aeaeb2]" />} title="没有匹配的词条" description={query || status || mastery || special ? "调整筛选条件后再试。" : "先导入 EasyDict CSV，初始化完成后即可开始学习。"} action={!query && !status && !mastery && !special ? <Link href="/import" className={buttonClass("primary")}>导入 CSV</Link> : undefined} />}

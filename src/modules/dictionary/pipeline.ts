@@ -4,11 +4,13 @@ import { DictionaryApiProvider } from "./providers/dictionary-api";
 import { EcdictProvider } from "./providers/ecdict";
 import { MyMemoryProvider } from "./providers/mymemory";
 import { AiLexicalProvider } from "./providers/ai-lexical";
+import { MerriamWebsterProvider } from "./providers/merriam-webster";
 import { mergeDictionaryContent } from "./content";
 
 function providersFor(settings: AppSettings): DictionaryProvider[] {
   const providers: DictionaryProvider[] = [];
   const aiProvider = new AiLexicalProvider(settings);
+  if (settings.merriamWebsterEnabled) providers.push(new MerriamWebsterProvider(settings));
   if (settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled) {
     providers.push(aiProvider);
     // AI 负责核心学习内容；传统词典只补充音标、真人音频或离线词形。

@@ -1,17 +1,27 @@
 import { db, sqlite } from "@/db/client";
 import { initializationJobs, words, workerHeartbeats } from "@/db/schema";
-import type { DictionaryContent, InitializationMode, InitializationStatus, ProviderAttempt } from "@/lib/types";
-import { getSettings } from "@/modules/settings/service";
+import type { AiTaskType, DictionaryContent, InitializationMode, InitializationStatus, ProviderAttempt } from "@/lib/types";
+import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { contentStatus, dictionaryContentFromRow, mergeDictionaryContent } from "@/modules/dictionary/content";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
+import { runSupplementalTask } from "@/modules/ai-tasks/supplemental";
 import { eq, and, like, sql, count, type SQL } from "drizzle-orm";
 
 export interface ClaimedJob {
   id: number;
   wordId: number;
+  taskType: AiTaskType;
   mode: InitializationMode;
   attemptCount: number;
   maxAttempts: number;
+}
+
+function maxAttemptsFromSettings(): number {
+  try {
+    const row = sqlite.prepare("SELECT value_json FROM settings WHERE key = 'aiRetryCount'").get() as { value_json: string } | undefined;
+    const retryCount = row ? Number(JSON.parse(row.value_json)) : 1;
+    return Math.max(1, Math.min(6, (Number.isInteger(retryCount) ? retryCount : 1) + 1));
+  } catch { return 2; }
 }
 
 function retryDelayMs(attemptCount: number): number {
@@ -45,7 +55,7 @@ export function recoverStaleJobs(staleAfterMs = 10 * 60_000): number {
         last_error = COALESCE(last_error, 'Worker lock expired'), last_error_code = 'STALE_LOCK', updated_at = ?
     WHERE status = 'RUNNING' AND locked_at IS NOT NULL AND locked_at < ?`)
     .run(now, now, now - staleAfterMs);
-  const queuedWords = sqlite.prepare("SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED'").all() as Array<{ word_id: number }>;
+  const queuedWords = sqlite.prepare("SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED' AND task_type = 'INITIALIZE'").all() as Array<{ word_id: number }>;
   for (const job of queuedWords) setWordOperationalStatus(job.word_id, "QUEUED", now);
   return result.changes;
 }
@@ -54,12 +64,12 @@ export function claimJobs(workerId: string, limit: number): ClaimedJob[] {
   const now = Date.now();
   recoverStaleJobs();
   return sqlite.transaction(() => {
-    const candidates = sqlite.prepare(`SELECT id, word_id, mode, attempt_count, max_attempts
+    const candidates = sqlite.prepare(`SELECT id, word_id, task_type, mode, attempt_count, max_attempts
       FROM initialization_jobs
       WHERE status = 'QUEUED' AND attempt_count < max_attempts
         AND (available_at IS NULL OR available_at <= ?)
       ORDER BY priority DESC, created_at ASC LIMIT ?`).all(now, limit) as Array<{
-        id: number; word_id: number; mode: InitializationMode; attempt_count: number; max_attempts: number;
+        id: number; word_id: number; task_type: AiTaskType; mode: InitializationMode; attempt_count: number; max_attempts: number;
       }>;
     const claimed: ClaimedJob[] = [];
     const claim = sqlite.prepare(`UPDATE initialization_jobs SET status = 'RUNNING', locked_at = ?, locked_by = ?,
@@ -67,10 +77,11 @@ export function claimJobs(workerId: string, limit: number): ClaimedJob[] {
     for (const candidate of candidates) {
       const result = claim.run(now, workerId, now, candidate.id);
       if (result.changes !== 1) continue;
-      setWordOperationalStatus(candidate.word_id, "RUNNING", now);
+      if (candidate.task_type === "INITIALIZE") setWordOperationalStatus(candidate.word_id, "RUNNING", now);
       claimed.push({
         id: candidate.id,
         wordId: candidate.word_id,
+        taskType: candidate.task_type,
         mode: candidate.mode,
         attemptCount: candidate.attempt_count + 1,
         maxAttempts: candidate.max_attempts,
@@ -126,11 +137,11 @@ function saveContent(wordId: number, content: DictionaryContent, attempts: Provi
     );
 }
 
-function completeJob(jobId: number, wordId: number, status: InitializationStatus, now: number): void {
+function completeJob(job: ClaimedJob, status: InitializationStatus, now: number): void {
   sqlite.prepare(`UPDATE initialization_jobs SET status = ?, locked_at = NULL, locked_by = NULL,
     completed_at = ?, updated_at = ?, last_error = NULL, last_error_code = NULL WHERE id = ?`)
-    .run(status, now, now, jobId);
-  sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?").run(status, now, wordId);
+    .run(status, now, now, job.id);
+  if (job.taskType === "INITIALIZE") sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?").run(status, now, job.wordId);
 }
 
 function failOrRetry(job: ClaimedJob, transient: boolean, errorCode: string, errorMessage: string, now: number): void {
@@ -138,16 +149,27 @@ function failOrRetry(job: ClaimedJob, transient: boolean, errorCode: string, err
     sqlite.prepare(`UPDATE initialization_jobs SET status = 'QUEUED', locked_at = NULL, locked_by = NULL,
       available_at = ?, last_error = ?, last_error_code = ?, updated_at = ? WHERE id = ?`)
       .run(now + retryDelayMs(job.attemptCount), errorMessage, errorCode, now, job.id);
-    setWordOperationalStatus(job.wordId, "QUEUED", now);
+    if (job.taskType === "INITIALIZE") setWordOperationalStatus(job.wordId, "QUEUED", now);
     return;
   }
   sqlite.prepare(`UPDATE initialization_jobs SET status = 'FAILED', locked_at = NULL, locked_by = NULL,
     completed_at = ?, last_error = ?, last_error_code = ?, updated_at = ? WHERE id = ?`)
     .run(now, errorMessage, errorCode, now, job.id);
-  setWordOperationalStatus(job.wordId, "FAILED", now);
+  if (job.taskType === "INITIALIZE") setWordOperationalStatus(job.wordId, "FAILED", now);
 }
 
 export async function processJob(job: ClaimedJob): Promise<void> {
+  if (job.taskType !== "INITIALIZE") {
+    try {
+      await runSupplementalTask(job.taskType, job.wordId, job.attemptCount);
+      completeJob(job, "READY", Date.now());
+    } catch (error) {
+      const text = String(error);
+      const transient = !["WORD_NOT_FOUND", "AI_DISABLED", "AI_CONFIG_INCOMPLETE", "AI_MNEMONIC_LANGUAGE_INVALID"].some((code) => text.includes(code));
+      failOrRetry(job, transient, "AI_TASK_FAILED", text, Date.now());
+    }
+    return;
+  }
   const word = sqlite.prepare("SELECT * FROM words WHERE id = ?").get(job.wordId) as Record<string, unknown> | undefined;
   if (!word) {
     failOrRetry(job, false, "WORD_NOT_FOUND", "词条不存在", Date.now());
@@ -157,12 +179,12 @@ export async function processJob(job: ClaimedJob): Promise<void> {
   const existing = dictionaryContentFromRow(contentRow);
 
   if (job.mode === "SKIP_INITIALIZED" && existing.definitions.length > 0) {
-    completeJob(job.id, job.wordId, contentStatus(existing), Date.now());
+    completeJob(job, contentStatus(existing), Date.now());
     return;
   }
 
   try {
-    const settings = await getSettings();
+    const settings = settingsForAiAttempt(await getSettings(), job.attemptCount);
     const result = await lookupDictionary({
       term: String(word.term),
       normalizedTerm: String(word.normalized_term),
@@ -193,7 +215,7 @@ export async function processJob(job: ClaimedJob): Promise<void> {
       return;
     }
     saveContent(job.wordId, merged, result.attempts, result.contentSource, now);
-    completeJob(job.id, job.wordId, status, now);
+    completeJob(job, status, now);
   } catch (error) {
     failOrRetry(job, true, "WORKER_EXCEPTION", String(error), Date.now());
   }
@@ -208,22 +230,91 @@ export function updateHeartbeat(workerId: string, status: "STARTING" | "IDLE" | 
     .run(workerId, status, currentJobId ?? null, JSON.stringify(metadata ?? {}), now, now);
 }
 
-export function queueWordInitialization(wordId: number, mode: InitializationMode = "FORCE_OVERWRITE", priority = 100): number {
+export function queueWordInitialization(wordId: number, mode: InitializationMode = "FILL_MISSING_FIELDS", priority = 100): number {
+  return queueAiTask(wordId, "INITIALIZE", mode, priority);
+}
+
+export function queueAiTask(
+  wordId: number,
+  taskType: AiTaskType,
+  mode: InitializationMode = "FILL_MISSING_FIELDS",
+  priority = 100,
+): number {
   const word = sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId);
   if (!word) throw new Error("WORD_NOT_FOUND");
   const now = Date.now();
-  const active = sqlite.prepare("SELECT id, mode FROM initialization_jobs WHERE word_id = ? AND status IN ('QUEUED','RUNNING') LIMIT 1").get(wordId) as { id: number; mode: InitializationMode } | undefined;
+  const maxAttempts = maxAttemptsFromSettings();
+  const active = sqlite.prepare("SELECT id, mode FROM initialization_jobs WHERE word_id = ? AND task_type = ? AND status IN ('QUEUED','RUNNING') LIMIT 1").get(wordId, taskType) as { id: number; mode: InitializationMode } | undefined;
   if (active) {
-    sqlite.prepare("UPDATE initialization_jobs SET mode = ?, priority = MAX(priority, ?), available_at = ?, updated_at = ? WHERE id = ?")
-      .run(strongerInitializationMode(active.mode, mode), priority, now, now, active.id);
+    sqlite.prepare("UPDATE initialization_jobs SET mode = ?, priority = MAX(priority, ?), max_attempts = MAX(max_attempts, ?), available_at = ?, updated_at = ? WHERE id = ?")
+      .run(strongerInitializationMode(active.mode, mode), priority, maxAttempts, now, now, active.id);
     return active.id;
   }
   const result = sqlite.prepare(`INSERT INTO initialization_jobs
-    (word_id, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
-    VALUES (?, ?, 'QUEUED', ?, 0, 5, ?, ?, ?)`)
-    .run(wordId, mode, priority, now, now, now);
-  setWordOperationalStatus(wordId, "QUEUED", now);
+    (word_id, task_type, mode, requested_fields_json, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'QUEUED', ?, 0, ?, ?, ?, ?)`)
+    .run(wordId, taskType, mode, taskType === "MNEMONIC" ? '["learning.mnemonic"]' : taskType === "EXAMPLE_TRANSLATIONS" ? '["examples.translation"]' : null, priority, maxAttempts, now, now, now);
+  if (taskType === "INITIALIZE") setWordOperationalStatus(wordId, "QUEUED", now);
   return Number(result.lastInsertRowid);
+}
+
+export interface QueueInitializationResult {
+  requestedWords: number;
+  selectedWords: number;
+  skippedWords: number;
+  createdJobs: number;
+  updatedJobs: number;
+  mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE">;
+}
+
+/**
+ * Queue a deliberate selection from the wordbook or task list.  A selection is
+ * intentionally not filtered by previous AI attempts: a word may have AI
+ * content already, while still missing an example, mnemonic, or morphology.
+ */
+export function queueSelectedInitialization(
+  wordIds: number[],
+  mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE"> = "FILL_MISSING_FIELDS",
+): QueueInitializationResult {
+  const requestedIds = [...new Set(wordIds.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!requestedIds.length) return { requestedWords: 0, selectedWords: 0, skippedWords: 0, createdJobs: 0, updatedJobs: 0, mode };
+
+  const placeholders = requestedIds.map(() => "?").join(", ");
+  const existingIds = new Set((sqlite.prepare(`SELECT id FROM words WHERE id IN (${placeholders})`).all(...requestedIds) as Array<{ id: number }>)
+    .map((row) => row.id));
+  const now = Date.now();
+  let createdJobs = 0;
+  let updatedJobs = 0;
+
+  sqlite.transaction(() => {
+    const findActive = sqlite.prepare(`SELECT id, mode FROM initialization_jobs
+      WHERE word_id = ? AND task_type = 'INITIALIZE' AND status IN ('QUEUED','RUNNING') LIMIT 1`);
+    const updateActive = sqlite.prepare(`UPDATE initialization_jobs
+      SET mode = ?, priority = MAX(priority, 90), available_at = ?, updated_at = ? WHERE id = ?`);
+    const insertJob = sqlite.prepare(`INSERT INTO initialization_jobs
+      (word_id, task_type, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
+      VALUES (?, 'INITIALIZE', ?, 'QUEUED', 90, 0, ?, ?, ?, ?)`);
+    for (const wordId of existingIds) {
+      const active = findActive.get(wordId) as { id: number; mode: InitializationMode } | undefined;
+      if (active) {
+        updateActive.run(strongerInitializationMode(active.mode, mode), now, now, active.id);
+        updatedJobs += 1;
+      } else {
+        insertJob.run(wordId, mode, maxAttemptsFromSettings(), now, now, now);
+        createdJobs += 1;
+      }
+      setWordOperationalStatus(wordId, "QUEUED", now);
+    }
+  }).immediate();
+
+  return {
+    requestedWords: requestedIds.length,
+    selectedWords: existingIds.size,
+    skippedWords: requestedIds.length - existingIds.size,
+    createdJobs,
+    updatedJobs,
+    mode,
+  };
 }
 
 
@@ -240,7 +331,6 @@ export function queueBulkInitialization(
   mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE"> = "FILL_MISSING_FIELDS",
   onlyWithoutAi = true,
 ) {
-  const now = Date.now();
   const total = (sqlite.prepare("SELECT count(*) AS count FROM words").get() as { count: number }).count;
   const aiFilter = onlyWithoutAi
     ? `WHERE NOT EXISTS (
@@ -249,34 +339,13 @@ export function queueBulkInitialization(
       )`
     : "";
   const candidates = sqlite.prepare(`SELECT w.id FROM words w ${aiFilter} ORDER BY w.id ASC`).all() as Array<{ id: number }>;
-  let createdJobs = 0;
-  let updatedJobs = 0;
-  sqlite.transaction(() => {
-    const findActive = sqlite.prepare(`SELECT id, mode FROM initialization_jobs
-      WHERE word_id = ? AND status IN ('QUEUED','RUNNING') LIMIT 1`);
-    const updateActive = sqlite.prepare(`UPDATE initialization_jobs
-      SET mode = ?, priority = MAX(priority, 70), available_at = ?, updated_at = ? WHERE id = ?`);
-    const insertJob = sqlite.prepare(`INSERT INTO initialization_jobs
-      (word_id, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
-      VALUES (?, ?, 'QUEUED', 70, 0, 5, ?, ?, ?)`);
-    for (const candidate of candidates) {
-      const active = findActive.get(candidate.id) as { id: number; mode: InitializationMode } | undefined;
-      if (active) {
-        updateActive.run(strongerInitializationMode(active.mode, mode), now, now, active.id);
-        updatedJobs += 1;
-      } else {
-        insertJob.run(candidate.id, mode, now, now, now);
-        createdJobs += 1;
-      }
-      setWordOperationalStatus(candidate.id, "QUEUED", now);
-    }
-  }).immediate();
+  const queued = queueSelectedInitialization(candidates.map((candidate) => candidate.id), mode);
   return {
     totalWords: total,
-    selectedWords: candidates.length,
+    selectedWords: queued.selectedWords,
     skippedAiInitialized: onlyWithoutAi ? total - candidates.length : 0,
-    createdJobs,
-    updatedJobs,
+    createdJobs: queued.createdJobs,
+    updatedJobs: queued.updatedJobs,
     mode,
   };
 }
@@ -289,10 +358,10 @@ export function retryFailedJobs(jobIds: number[]): number {
   let changed = 0;
   sqlite.transaction(() => {
     for (const id of jobIds) {
-      const job = sqlite.prepare("SELECT word_id FROM initialization_jobs WHERE id = ?").get(id) as { word_id: number } | undefined;
+      const job = sqlite.prepare("SELECT word_id, task_type FROM initialization_jobs WHERE id = ?").get(id) as { word_id: number; task_type: AiTaskType } | undefined;
       const result = statement.run(now, now, id);
       changed += result.changes;
-      if (result.changes && job) setWordOperationalStatus(job.word_id, "QUEUED", now);
+      if (result.changes && job?.task_type === "INITIALIZE") setWordOperationalStatus(job.word_id, "QUEUED", now);
     }
   })();
   return changed;
@@ -320,7 +389,7 @@ export async function listInitializationJobs(options: { page?: number; pageSize?
   const where = conditions.length > 0 ? and(...conditions) : sql`1=1`;
 
   const base = db.select({
-    id: initializationJobs.id, wordId: initializationJobs.wordId, term: words.term,
+    id: initializationJobs.id, wordId: initializationJobs.wordId, term: words.term, taskType: initializationJobs.taskType,
     status: initializationJobs.status, mode: initializationJobs.mode, priority: initializationJobs.priority,
     attemptCount: initializationJobs.attemptCount, maxAttempts: initializationJobs.maxAttempts,
     lastError: initializationJobs.lastError, lastErrorCode: initializationJobs.lastErrorCode,
@@ -397,6 +466,7 @@ export async function getJobDetails(jobId: number) {
     job: {
       id: rows.id as number,
       wordId: rows.word_id as number,
+      taskType: rows.task_type as AiTaskType,
       term: rows.term as string,
       normalizedTerm: rows.normalized_term as string,
       sourceLanguage: rows.source_language as string,

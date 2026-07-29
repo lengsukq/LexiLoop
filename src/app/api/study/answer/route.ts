@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { fail, internalError, ok } from "@/lib/api";
 import { QUESTION_TYPES, REVIEW_RATINGS } from "@/lib/types";
+import { MAX_ACTIVE_ANSWER_DURATION_MS } from "@/modules/reviews/duration";
 import { processReviewAnswer } from "@/modules/reviews/service";
 import { z } from "zod";
 const schema = z.object({
@@ -11,7 +12,7 @@ const schema = z.object({
   rating: z.enum(REVIEW_RATINGS),
   questionType: z.enum(QUESTION_TYPES),
   userAnswer: z.string().max(1000).optional(),
-  durationMs: z.number().int().min(0).max(60 * 60 * 1000).optional(),
+  durationMs: z.number().int().min(0).max(MAX_ACTIVE_ANSWER_DURATION_MS).optional(),
 });
 export async function POST(request: NextRequest) {
   try { return ok(await processReviewAnswer(schema.parse(await request.json()))); }

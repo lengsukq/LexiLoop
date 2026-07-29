@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
 import { fail, internalError, ok } from "@/lib/api";
-import { isAdminAuthorized } from "@/lib/security";
 import { stageSqliteRestore } from "@/modules/backups/service";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
-  if (!isAdminAuthorized(request)) return fail("UNAUTHORIZED", "管理令牌无效。", 401);
   try {
     const form = await request.formData(); const file = form.get("file");
     if (!(file instanceof File)) return fail("FILE_REQUIRED", "请选择 LexiLoop SQLite 备份。");

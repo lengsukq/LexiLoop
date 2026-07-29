@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { fail, internalError, ok } from "@/lib/api";
 import { completeGameSession, GAME_MODES } from "@/modules/games/service";
+import { MAX_ACTIVE_ANSWER_DURATION_MS } from "@/modules/reviews/duration";
 import { z } from "zod";
 
 const schema = z.object({
@@ -10,7 +11,7 @@ const schema = z.object({
     wordId: z.number().int().positive(),
     solved: z.boolean(),
     hadMistake: z.boolean(),
-    durationMs: z.number().int().min(0).max(60 * 60 * 1000).optional(),
+    durationMs: z.number().int().min(0).max(MAX_ACTIVE_ANSWER_DURATION_MS).optional(),
   })).max(20),
   elapsedMs: z.number().int().min(0).max(60 * 60 * 1000),
   mistakeCount: z.number().int().min(0).max(1000),

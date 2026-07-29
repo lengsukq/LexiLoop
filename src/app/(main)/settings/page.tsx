@@ -52,6 +52,7 @@ export default function SettingsPage() {
               tencentTestState={data.tencentTestState}
               tencentTestMessage={data.tencentTestMessage}
               onTestTencentTranslate={data.testTencentTranslate}
+              ecdict={data.ecdict}
             />
           )}
           {activeTab === "ai" && (

@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, GripVertical, Loader2, PlugZap, Volume2 } from "lucide-react";
 import type { AppSettings, InitializationProviderId } from "@/lib/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from "@/components/ui";
-import { NumberField, Toggle, type SettingsUpdater, type TestState } from "../settings-shared";
+import { Toggle, type EcdictStatus, type SettingsUpdater, type TestState } from "../settings-shared";
+import { StudyPlanSettings } from "./study-plan-settings";
 
 const PROVIDER_LABELS: Record<InitializationProviderId, string> = {
   "merriam-webster": "Merriam-Webster",
@@ -23,6 +24,7 @@ export function StudySettingsTab({
   tencentTestState,
   tencentTestMessage,
   onTestTencentTranslate,
+  ecdict,
 }: {
   settings: AppSettings;
   update: SettingsUpdater;
@@ -32,6 +34,7 @@ export function StudySettingsTab({
   tencentTestState: TestState;
   tencentTestMessage: string;
   onTestTencentTranslate: () => Promise<void>;
+  ecdict: EcdictStatus | null;
 }) {
   const [mwKeysExpanded, setMwKeysExpanded] = useState(false);
   const [tencentKeysExpanded, setTencentKeysExpanded] = useState(false);
@@ -46,7 +49,7 @@ export function StudySettingsTab({
       case "mymemory": return settings.myMemoryEnabled;
       case "merriam-webster": return settings.merriamWebsterEnabled;
       case "youdao": return settings.youdaoEnabled;
-      case "ecdict": return settings.ecdictEnabled;
+      case "ecdict": return Boolean(settings.ecdictEnabled && ecdict?.installed);
       case "tencent-translate": return settings.tencentTranslateEnabled;
       case "ai": return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
       default: return true;
@@ -87,30 +90,7 @@ export function StudySettingsTab({
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader><CardTitle>每日学习计划</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} />
-            <NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} />
-            <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
-            <label className="space-y-1.5">
-              <span className="text-sm font-medium leading-none">目标记忆率</span>
-              <Select className="w-full" value={settings.targetRetentionRate} onChange={(event) => update("targetRetentionRate", Number(event.target.value))}>
-                <option value={0.85}>85% - 更轻松</option>
-                <option value={0.9}>90% - 推荐</option>
-                <option value={0.93}>93% - 更密集</option>
-                <option value={0.95}>95% - 高强度</option>
-              </Select>
-            </label>
-            <NumberField label="初始化并行数" value={settings.backgroundConcurrency} min={1} max={10} onChange={(value) => update("backgroundConcurrency", value)} />
-            <div className="space-y-1.5">
-              <NumberField label="AI 失败重试次数" value={settings.aiRetryCount} min={0} max={5} onChange={(value) => update("aiRetryCount", value)} />
-              <p className="text-xs leading-tight text-[#aeaeb2]">默认 1 次：每个 AI 任务最多尝试 2 次。</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <StudyPlanSettings settings={settings} update={update} />
 
       <Card>
         <CardHeader><CardTitle>语音与词典</CardTitle></CardHeader>
@@ -121,7 +101,7 @@ export function StudySettingsTab({
               <label className="min-w-36 space-y-1.5">
                 <span className="text-xs font-medium">默认口音</span>
                 <Select className="w-full" value={settings.defaultAccent} onChange={(event) => update("defaultAccent", event.target.value as AppSettings["defaultAccent"])}>
-                  <option value="US">美音</option><option value="UK">英音</option><option value="GENERAL">通用</option>
+                  <option value="US">美音</option><option value="UK">英音</option>
                 </Select>
               </label>
               <label className="min-w-28 space-y-1.5">

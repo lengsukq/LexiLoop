@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, AudioLines, Blocks, Brain, CheckCircle2, Clock3, Flame, Gamepad2, Hammer, Headphones,
   Layers, Loader2, Puzzle, RotateCcw, Trophy, Volume2, XCircle, Zap,
@@ -113,7 +113,7 @@ function formatTime(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export default function GamesPage() {
+function GamesPageContent() {
   const searchParams = useSearchParams();
   const initialMode = validMode(searchParams.get("mode")) ? searchParams.get("mode") as GameMode : null;
   const [mode, setMode] = useState<GameMode | null>(initialMode);
@@ -571,6 +571,10 @@ export default function GamesPage() {
     {error && <div className="flex items-center justify-between gap-3 rounded-[14px] bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] dark:text-[#ff453a]"><span>{error}</span><button type="button" className="font-semibold" onClick={() => void finishGame()}>重试保存</button></div>}
     {phase === "saving" && <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 backdrop-blur-sm"><div className="liquid-glass-elevated rounded-[22px] px-7 py-6 text-center"><Loader2 className="mx-auto size-8 animate-spin text-[#007aff]" /><p className="mt-3 text-sm font-semibold">正在结算并更新错词…</p></div></div>}
   </div>;
+}
+
+export default function GamesPage() {
+  return <Suspense fallback={null}><GamesPageContent /></Suspense>;
 }
 
 function ChoiceGrid({ choices, wrongChoice, onChoose, definitions }: { choices: string[]; wrongChoice: string | null; onChoose: (choice: string) => void; definitions?: Record<string, string> }) {

@@ -41,10 +41,10 @@ export class EcdictProvider implements DictionaryProvider {
         text, source: this.id, isUserEdited: false,
       }));
       const pronunciations = [];
-      if (row.phonetic) pronunciations.push({ accent: "GENERAL" as const, phonetic: row.phonetic, audioUrl: null, source: this.id, isSynthetic: false });
+      if (row.phonetic) pronunciations.push({ accent: "US" as const, phonetic: row.phonetic, audioUrl: null, source: this.id, isSynthetic: false });
       for (const audioUrl of (row.audio ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
         const marker = audioUrl.toLowerCase();
-        pronunciations.push({ accent: marker.includes("us") ? "US" as const : marker.includes("uk") ? "UK" as const : "GENERAL" as const, phonetic: row.phonetic, audioUrl, source: this.id, isSynthetic: false });
+        pronunciations.push({ accent: marker.includes("uk") ? "UK" as const : "US" as const, phonetic: row.phonetic, audioUrl, source: this.id, isSynthetic: false });
       }
       const forms = (row.exchange ?? "").split("/").map((value) => {
         const [code, ...rest] = value.split(":");

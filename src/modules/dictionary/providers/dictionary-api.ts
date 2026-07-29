@@ -32,7 +32,7 @@ export class DictionaryApiProvider implements DictionaryProvider {
           if (!phonetic.text && !phonetic.audio) continue;
           const marker = `${phonetic.audio ?? ""} ${phonetic.sourceUrl ?? ""}`.toLowerCase();
           content.pronunciations?.push({
-            accent: marker.includes("uk") ? "UK" : marker.includes("us") ? "US" : "GENERAL",
+            accent: marker.includes("uk") ? "UK" : "US",
             phonetic: phonetic.text ?? entry.phonetic ?? null,
             audioUrl: phonetic.audio || null,
             source: this.id,

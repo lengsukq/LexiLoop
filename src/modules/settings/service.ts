@@ -10,7 +10,9 @@ const settingsSchema = z.object({
   dailyDueReviewLimit: z.number().int().min(1).max(500),
   targetRetentionRate: z.number().min(0.7).max(0.99),
   defaultAccent: z.preprocess((value) => value === "GENERAL" ? "US" : value, z.enum(["US", "UK"])),
-  playbackSpeed: z.number().min(0.5).max(2),
+  wordSpeed: z.number().min(0.5).max(2).default(1),
+  phraseSpeed: z.number().min(0.5).max(2).default(1),
+  sentenceSpeed: z.number().min(0.5).max(2).default(1),
   autoPlayPronunciation: z.boolean(),
   dictionaryApiEnabled: z.boolean(),
   myMemoryEnabled: z.boolean(),
@@ -84,6 +86,15 @@ export async function getSettings(): Promise<AppSettings> {
   const rows = await db.select().from(settings);
   const values: Record<string, unknown> = {};
   for (const row of rows) values[row.key] = row.valueJson;
+  // Migrate legacy single playbackSpeed into per-category speeds when the new
+  // fields have never been saved individually.
+  const legacySpeed = typeof values.playbackSpeed === "number" ? values.playbackSpeed : null;
+  if (legacySpeed !== null) {
+    delete values.playbackSpeed;
+    for (const key of ["wordSpeed", "phraseSpeed", "sentenceSpeed"]) {
+      if (values[key] === undefined) values[key] = legacySpeed;
+    }
+  }
   const result = settingsSchema.parse({ ...DEFAULT_SETTINGS, ...values }) as AppSettings;
   settingsCache = { value: result, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
   return result;

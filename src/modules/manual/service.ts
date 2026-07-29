@@ -33,9 +33,6 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
   const contentType = values.contentType ?? detectEntryType(values.text);
   const normalizedTerm = normalizeTerm(values.text, source.code);
   const settings = await getSettings();
-  if (!settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled) {
-    throw new ManualPreviewError("AI_PREVIEW_DISABLED", "请先在设置中启用并配置 AI 词条初始化。");
-  }
   const existing = sqlite.prepare(`SELECT id FROM words
     WHERE normalized_term = ? AND source_language = ? AND target_language = ? LIMIT 1`)
     .get(normalizedTerm, source.code, target.code) as { id: number } | undefined;
@@ -56,7 +53,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
   }
   const content = normalizeDictionaryContent(result.content);
   if (contentStatus(content, contentType) === "FAILED") {
-    throw new ManualPreviewError("AI_PREVIEW_EMPTY", "AI 没有生成可用释义，请调整输入或重新生成。");
+    throw new ManualPreviewError("DICTIONARY_PREVIEW_EMPTY", "词典没有返回可用释义，请调整输入或稍后重试。");
   }
   const attempts = result.attempts.map((attempt) => ({
     ...attempt,

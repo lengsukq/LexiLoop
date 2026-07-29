@@ -2,7 +2,7 @@ import type { InitializationProviderId } from "./core";
 
 export interface AppSettings {
   dailyNewWords: number; dailyWrongWordLimit: number; dailyDueReviewLimit: number; targetRetentionRate: number;
-  defaultAccent: "US" | "UK"; playbackSpeed: number; autoPlayPronunciation: boolean;
+  defaultAccent: "US" | "UK"; wordSpeed: number; phraseSpeed: number; sentenceSpeed: number; autoPlayPronunciation: boolean;
   dictionaryApiEnabled: boolean; myMemoryEnabled: boolean; ecdictEnabled: boolean; merriamWebsterEnabled: boolean;
   merriamWebsterDictionaryKey: string; merriamWebsterThesaurusKey: string; backgroundConcurrency: number; aiRetryCount: number;
   tencentTranslateEnabled: boolean; tencentTranslateSecretId: string; tencentTranslateSecretKey: string; tencentTranslateProjectId: number;

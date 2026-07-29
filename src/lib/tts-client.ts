@@ -13,6 +13,68 @@ const pendingAudio = new Map<string, Promise<Blob | null>>();
 let activeAudio: HTMLAudioElement | null = null;
 let activeObjectUrl: string | null = null;
 
+export interface TtsPreloadItem {
+  text: string;
+  accent?: string;
+}
+
+export type TtsCategory = "word" | "phrase" | "sentence";
+
+export interface TtsSpeedConfig {
+  word: number;
+  phrase: number;
+  sentence: number;
+}
+
+let speedConfig: TtsSpeedConfig | null = null;
+let speedFetchPromise: Promise<void> | null = null;
+
+/** Manually set per-category playback speeds (e.g. after saving settings). */
+export function configureTtsSpeeds(speeds: TtsSpeedConfig): void {
+  speedConfig = { ...speeds };
+}
+
+/** Invalidate cached speeds so the next playback re-fetches from the server. */
+export function invalidateTtsSpeeds(): void {
+  speedConfig = null;
+  speedFetchPromise = null;
+}
+
+async function ensureSpeedConfig(): Promise<void> {
+  if (speedConfig) return;
+  if (!speedFetchPromise) {
+    speedFetchPromise = (async () => {
+      try {
+        const response = await fetch("/api/settings", { headers: { accept: "application/json" }, cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json().catch(() => null) as { success?: boolean; data?: { wordSpeed?: number; phraseSpeed?: number; sentenceSpeed?: number } } | null;
+        const data = payload?.success ? payload.data : null;
+        speedConfig = {
+          word: typeof data?.wordSpeed === "number" ? data.wordSpeed : 1,
+          phrase: typeof data?.phraseSpeed === "number" ? data.phraseSpeed : 1,
+          sentence: typeof data?.sentenceSpeed === "number" ? data.sentenceSpeed : 1,
+        };
+      } catch {
+        // Network failures fall back to normal speed.
+      }
+    })();
+  }
+  await speedFetchPromise;
+}
+
+async function resolveSpeed(category: TtsCategory): Promise<number> {
+  await ensureSpeedConfig();
+  const rate = speedConfig?.[category];
+  return typeof rate === "number" && rate > 0 ? rate : 1;
+}
+
+/** Map a word entry type to its TTS playback category. */
+export function entryTypeToTtsCategory(entryType: string): TtsCategory {
+  if (entryType === "SENTENCE") return "sentence";
+  if (entryType === "PHRASE") return "phrase";
+  return "word";
+}
+
 function normalizeAccent(accent: string): string {
   const normalized = accent.trim().toUpperCase();
   return normalized === "UK" ? normalized : "US";
@@ -103,6 +165,37 @@ async function loadTtsAudio(term: string, accent: string): Promise<Blob | null> 
   return request;
 }
 
+export async function preloadTts(text: string, accent = "US"): Promise<boolean> {
+  if (!text.trim()) return false;
+  try {
+    return Boolean(await loadTtsAudio(text, accent));
+  } catch {
+    return false;
+  }
+}
+
+export async function preloadTtsBatch(items: readonly TtsPreloadItem[], maxConcurrent = 2): Promise<void> {
+  const uniqueItems = new Map<string, TtsPreloadItem>();
+  for (const item of items) {
+    if (!item.text.trim()) continue;
+    const normalizedAccent = normalizeAccent(item.accent ?? "US");
+    uniqueItems.set(audioCacheKey(item.text, normalizedAccent), { text: item.text, accent: normalizedAccent });
+  }
+
+  const queue = [...uniqueItems.values()];
+  if (queue.length === 0) return;
+  const workerCount = Math.min(Math.max(1, Math.floor(maxConcurrent) || 1), queue.length);
+  let cursor = 0;
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < queue.length) {
+      const item = queue[cursor];
+      cursor += 1;
+      if (item) await preloadTts(item.text, item.accent);
+    }
+  }));
+}
+
 function stopActiveAudio(): void {
   if (activeAudio) {
     activeAudio.pause();
@@ -115,8 +208,8 @@ function stopActiveAudio(): void {
   }
 }
 
-export async function playCachedTts(term: string, accent = "US"): Promise<boolean> {
-  const blob = await loadTtsAudio(term, accent);
+export async function playCachedTts(term: string, accent = "US", category: TtsCategory = "word"): Promise<boolean> {
+  const [blob, playbackRate] = await Promise.all([loadTtsAudio(term, accent), resolveSpeed(category)]);
   if (!blob) return false;
 
   stopActiveAudio();
@@ -124,7 +217,7 @@ export async function playCachedTts(term: string, accent = "US"): Promise<boolea
   const audio = new Audio(objectUrl);
   activeAudio = audio;
   activeObjectUrl = objectUrl;
-  audio.playbackRate = 1;
+  audio.playbackRate = playbackRate;
 
   const release = () => {
     if (activeAudio === audio) stopActiveAudio();
@@ -139,4 +232,12 @@ export async function playCachedTts(term: string, accent = "US"): Promise<boolea
     release();
     return false;
   }
+}
+
+/**
+ * Generic playback helper: resolves the TTS category from the entry type
+ * (WORD / PHRASE / SENTENCE) and plays with the configured per-category speed.
+ */
+export async function playEntryTts(term: string, entryType: string, accent = "US"): Promise<boolean> {
+  return playCachedTts(term, accent, entryTypeToTtsCategory(entryType));
 }

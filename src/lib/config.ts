@@ -26,7 +26,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dailyDueReviewLimit: 30,
   targetRetentionRate: 0.9,
   defaultAccent: "US",
-  playbackSpeed: 1,
+  wordSpeed: 1,
+  phraseSpeed: 1,
+  sentenceSpeed: 1,
   autoPlayPronunciation: true,
   dictionaryApiEnabled: process.env.DICTIONARY_API_ENABLED !== "false",
   myMemoryEnabled: process.env.MYMEMORY_ENABLED !== "false",
@@ -41,7 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tencentTranslateSecretKey: "",
   tencentTranslateProjectId: 0,
   youdaoEnabled: process.env.YOUDO_API_ENABLED !== "false",
-  translationProviderOrder: ["merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory", "youdao"] as InitializationProviderId[],
+  translationProviderOrder: ["youdao", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory"] as InitializationProviderId[],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

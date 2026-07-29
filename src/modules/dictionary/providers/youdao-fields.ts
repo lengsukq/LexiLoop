@@ -5,44 +5,152 @@ const FORM_PATTERNS = [
   [/^复数\s+(.+)$/, "PLURAL"], [/^第三人称单数\s+(.+)$/, "THIRD_PERSON"], [/^现在分词\s+(.+)$/, "PRESENT_PARTICIPLE"],
   [/^过去式\s+(.+)$/, "PAST"], [/^过去分词\s+(.+)$/, "PAST_PARTICIPLE"], [/^比较级\s+(.+)$/, "COMPARATIVE"], [/^最高级\s+(.+)$/, "SUPERLATIVE"],
 ] as const;
+const FORM_LABELS = new Map<string, DictionaryContent["forms"][number]["type"]>([
+  ["复数", "PLURAL"], ["第三人称单数", "THIRD_PERSON"], ["现在分词", "PRESENT_PARTICIPLE"],
+  ["过去式", "PAST"], ["过去分词", "PAST_PARTICIPLE"], ["比较级", "COMPARATIVE"], ["最高级", "SUPERLATIVE"],
+]);
+const SECTION_HEADINGS = new Set([
+  "网络释义", "英英释义", "专业释义", "同近义词", "同根词", "词源", "短语", "词典短语",
+  "双语例句", "原声例句", "权威例句", "百科", "有道翻译",
+]);
+
+const dictionarySource = "youdao";
+const translationSource = "youdao:translation";
+const exampleSource = "youdao:example";
+const audioExampleSource = "youdao:audio-example";
+const authorityExampleSource = "youdao:authority-example";
+const phraseSource = "youdao:phrase";
+const networkPhraseSource = "youdao:network";
+
+function isChineseLine(line: string): boolean {
+  return /[\u3400-\u9fff]/.test(line) && !/[a-zA-Z]{3,}/.test(line.replace(/《[^》]+》/g, ""));
+}
+
+function isSectionHeading(line: string): boolean {
+  return SECTION_HEADINGS.has(line.trim()) || /^(更多|查看|以上为机器翻译)/.test(line.trim());
+}
+
+function cleanExampleLine(line: string): string {
+  return line
+    .replace(/^\d+[.、]?\s*/, "")
+    .replace(/^\[?点击发音\]?\s*/, "")
+    .replace(/\s*点击发音.*$/, "")
+    .trim();
+}
+
+function matchesTerm(sentence: string, term: string): boolean {
+  const normalizedTerm = term.trim().toLocaleLowerCase();
+  if (!normalizedTerm) return false;
+  if (normalizedTerm.includes(" ")) return sentence.toLocaleLowerCase().includes(normalizedTerm);
+  const escaped = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-z])${escaped}(?:$|[^a-z])`, "i").test(sentence);
+}
 
 export function parsePhonetics(lines: string[]): DictionaryContent["pronunciations"] {
   const text = lines.join(" "); const result: DictionaryContent["pronunciations"] = [];
   const uk = text.match(/英\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/英\s*\/\s*([^/]+?)\s*\//);
   const us = text.match(/美\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/美\s*\/\s*([^/]+?)\s*\//);
-  if (uk?.[1]) result.push({ accent: "UK", phonetic: uk[1].trim(), audioUrl: null, source: "youdao", isSynthetic: false });
-  if (us?.[1]) result.push({ accent: "US", phonetic: us[1].trim(), audioUrl: null, source: "youdao", isSynthetic: false });
+  if (uk?.[1]) result.push({ accent: "UK", phonetic: uk[1].trim(), audioUrl: null, source: dictionarySource, isSynthetic: false });
+  if (us?.[1]) result.push({ accent: "US", phonetic: us[1].trim(), audioUrl: null, source: dictionarySource, isSynthetic: false });
   return result;
 }
-export function parseDefinitions(lines: string[]): DictionaryContent["definitions"] {
-  return lines.flatMap((line) => { const match = line.match(POS); if (!match?.[2]?.trim()) return []; return [{ language: "zh-CHS", partOfSpeech: match[1]!, text: match[2]!.trim(), source: "youdao", isUserEdited: false }]; });
+
+export function parseDefinitions(lines: string[], language = "zh-CN"): DictionaryContent["definitions"] {
+  let active = false;
+  return lines.flatMap((line) => {
+    const trimmed = line.trim();
+    if (trimmed === "简明" || trimmed === "词典释义") active = true;
+    if (isSectionHeading(trimmed) && trimmed !== "词典释义" && trimmed !== "简明") active = false;
+    const match = trimmed.match(POS);
+    if (!match?.[2]?.trim() || (!active && !POS.test(trimmed))) return [];
+    return [{ language, partOfSpeech: match[1]!, text: match[2]!.trim(), source: dictionarySource, isUserEdited: false }];
+  });
 }
+
 export function parseWordForms(lines: string[]): DictionaryContent["forms"] {
-  return lines.flatMap((line) => { for (const [pattern, type] of FORM_PATTERNS) { const match = line.match(pattern); if (match?.[1]) return [{ type, value: match[1].trim(), source: "youdao" }]; } return []; }) as DictionaryContent["forms"];
+  const result: DictionaryContent["forms"] = [];
+  let pending: DictionaryContent["forms"][number]["type"] | null = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    for (const [pattern, type] of FORM_PATTERNS) {
+      const match = line.match(pattern);
+      if (match?.[1]) {
+        result.push({ type, value: match[1].trim(), source: dictionarySource });
+        pending = null;
+        continue;
+      }
+    }
+    const label = FORM_LABELS.get(line);
+    if (label) {
+      pending = label;
+      continue;
+    }
+    if (pending && line && !isSectionHeading(line) && !/^\d+$/.test(line) && !/^[\u3400-\u9fff]/.test(line)) {
+      result.push({ type: pending, value: line, source: dictionarySource });
+      pending = null;
+    }
+  }
+  return result;
 }
+
 export function parseExamples(lines: string[], term: string): DictionaryContent["examples"] {
-  const result: DictionaryContent["examples"] = []; const lower = term.toLowerCase(); let active = false; let pending = false;
-  for (const line of lines) {
-    if (line.includes("双语例句") || line.includes("原声例句") || line.includes("权威例句")) { active = true; continue; }
-    if (active && (line.includes("查看更多") || line.includes("词典短语") || line.includes("同近义词"))) break;
-    if (!active) continue;
-    if (line.includes("点击发音") || /^[\u4e00-\u9fff\s，。；：、！？]+$/.test(line)) { if (pending && result.length && !result.at(-1)!.translation) result.at(-1)!.translation = line.replace(/点击发音.*$/, "").trim(); pending = false; continue; }
-    const clean = line.replace(/^\d+\s*/, "").trim(); if (!clean.toLowerCase().includes(lower)) continue;
-    const sentence = clean.replace(/\[?点击发音\]?.*$/, "").replace(/\s+[\u4e00-\u9fff].*$/, "").trim();
-    if (sentence.length > 5) { result.push({ sentence, translation: null, source: "youdao", isUserAdded: false }); pending = true; }
+  const result: DictionaryContent["examples"] = [];
+  let source: string | null = null;
+  let pending: DictionaryContent["examples"][number] | null = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === "双语例句") { source = exampleSource; continue; }
+    if (line === "原声例句") { source = audioExampleSource; continue; }
+    if (line === "权威例句") { source = authorityExampleSource; continue; }
+    if (source && (line.includes("查看更多") || line === "词典短语" || line === "同近义词" || line === "百科")) source = null;
+    if (!source) continue;
+    const clean = cleanExampleLine(line);
+    if (!clean || /^《[^》]+》$/.test(clean) || /^\d+$/.test(clean)) continue;
+    if (pending && isChineseLine(clean)) {
+      pending.translation = clean;
+      pending = null;
+      continue;
+    }
+    if (!matchesTerm(clean, term) || isChineseLine(clean) || clean.length < 5) continue;
+    const sentence = clean.replace(/\s+[\u3400-\u9fff].*$/, "").trim();
+    if (sentence.length < 5) continue;
+    pending = { sentence, translation: null, source, isUserAdded: false };
+    result.push(pending);
   }
   return result;
 }
+
 export function parsePhrases(lines: string[]): DictionaryContent["phrases"] {
-  const result: DictionaryContent["phrases"] = []; let active = false;
-  for (const line of lines) {
-    if (line.includes("短语") || line.includes("词典短语") || line.includes("网络释义")) { active = true; continue; }
-    if (active && (line.includes("双语例句") || line.includes("同近义词") || line.includes("英英释义") || line.includes("查看更多"))) break;
-    if (!active) continue;
-    const clean = line.replace(/^-\s*/, "").replace(/^\d+\s*/, "").trim(); if (!clean || clean.length < 3) continue;
-    const match = clean.match(/^(.+?)([\u4e00-\u9fff].+)$/);
-    if (match) { const phrase = match[1]!.trim(); const translation = match[2]!.trim().replace(/^[；;，,、\s]+/, ""); if (phrase.length > 1 && phrase.length < 80 && translation) result.push({ phrase, translation, source: "youdao" }); }
-    else if (/^[a-zA-Z]/.test(clean) && clean.length < 60 && clean.split(/\s+/).length >= 2) result.push({ phrase: clean, translation: null, source: "youdao" });
+  const result: DictionaryContent["phrases"] = [];
+  let source: string | null = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!.trim();
+    if (line === "网络释义") { source = networkPhraseSource; continue; }
+    if (line === "短语" || line === "词典短语") { source = phraseSource; continue; }
+    if (source && (line === "双语例句" || line === "原声例句" || line === "权威例句" || line === "同近义词" || line === "百科")) source = null;
+    if (!source || !line || /^\d+$/.test(line) || isSectionHeading(line)) continue;
+    const next = lines[index + 1]?.trim() ?? "";
+    const inline = line.match(/^(.+?)([\u3400-\u9fff].+)$/);
+    const phrase = (inline?.[1] ?? line).replace(/^[-•]\s*/, "").trim();
+    const translation = (inline?.[2] ?? (/^[\u3400-\u9fff]/.test(next) ? next : "")).replace(/^[；;，,、\s]+/, "").trim();
+    if (!/^[a-zA-Z]/.test(phrase) || phrase.length < 2 || phrase.length > 100) continue;
+    if (!translation && phrase.split(/\s+/).length < 2) continue;
+    result.push({ phrase, translation: translation || null, source });
+    if (!inline?.[2] && translation) index += 1;
   }
   return result;
+}
+
+export function parseTranslation(lines: string[], term: string, language = "zh-CN"): { translation: string; source: string } | null {
+  const marker = lines.findIndex((line) => line === "有道翻译" || line.includes("有道翻译"));
+  if (marker < 0) return null;
+  const normalizedTerm = term.trim().toLocaleLowerCase();
+  for (const candidate of lines.slice(marker + 1, marker + 8)) {
+    const value = candidate.replace(/^[：:、\s]+/, "").trim();
+    if (!value || value.toLocaleLowerCase() === normalizedTerm || isSectionHeading(value)) continue;
+    if (value.startsWith("以上为机器翻译") || value === "长、整句建议使用人工翻译") continue;
+    if (language.toLowerCase().startsWith("zh") && /[\u3400-\u9fff]/.test(value)) return { translation: value, source: translationSource };
+    if (!language.toLowerCase().startsWith("zh") && !/[\u3400-\u9fff]/.test(value)) return { translation: value, source: translationSource };
+  }
+  return null;
 }

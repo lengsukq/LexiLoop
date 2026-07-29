@@ -80,7 +80,7 @@ export function contentStatus(content: DictionaryContent, entryType: EntryType =
     const hasMeaning = content.definitions.some((item) => item.text.trim()) || Boolean(content.summary.translation?.trim()) || Boolean(content.summary.shortDefinition?.trim());
     if (!hasMeaning) return "FAILED";
     const hasAnalysis = Boolean(content.sentenceAnalysis.grammarPattern || content.sentenceAnalysis.grammarExplanation) || content.sentenceAnalysis.grammarNotes.length > 0 || content.sentenceAnalysis.keyExpressions.length > 0 || content.sentenceAnalysis.similarExamples.length > 0 || content.sentenceAnalysis.variations.length > 0;
-    return hasAnalysis ? "READY" : "PARTIAL";
+    return hasAnalysis || Boolean(content.summary.translation?.trim()) ? "READY" : "PARTIAL";
   }
   if (content.definitions.length === 0) return "FAILED";
   return content.examples.length > 0 ? "READY" : "PARTIAL";

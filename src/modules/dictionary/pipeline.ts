@@ -14,7 +14,7 @@ import { AiLexicalProvider } from "./providers/ai-lexical";
 import { YoudaoProvider } from "./providers/youdao";
 import { MerriamWebsterProvider } from "./providers/merriam-webster";
 import { TencentTranslateProvider } from "./providers/tencent-translate";
-import { mergeDictionaryContent } from "./content";
+import { contentStatus, mergeDictionaryContent } from "./content";
 import {
   fieldsReturned,
   normalizeRequestedFields,
@@ -26,7 +26,7 @@ export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, Initializat
   "merriam-webster": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   "dictionaryapi.dev": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   ecdict: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "forms", "tags"],
-  youdao: ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms"],
+  youdao: ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary"],
   ai: ["definitions", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"],
   mymemory: ["definitions"],
   "tencent-translate": ["definitions"],
@@ -55,15 +55,11 @@ function providersFor(settings: AppSettings, selected?: InitializationProviderId
   if (selected?.length) {
     order = [...new Set(selected)];
   } else if (settings.translationProviderOrder?.length) {
-    // Use user-configured order, appending AI if enabled but not listed
+    // Use the saved order. AI is intentionally not appended: default initialization
+    // must be dictionary-backed, while AI runs as an explicit supplemental task.
     order = [...settings.translationProviderOrder];
-    if (settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled && !order.includes("ai")) {
-      order.splice(1, 0, "ai");
-    }
   } else {
-    order = settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled
-      ? ["merriam-webster", "ai", "dictionaryapi.dev", "ecdict", "youdao"]
-      : ["merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory", "youdao"];
+    order = ["youdao", "merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory"];
   }
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }
@@ -144,17 +140,26 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
     settled = await Promise.all(providers.map((provider) => runProvider(provider, input, requestedFields)));
   }
 
-  const content = mergeDictionaryContent(...settled.map((item) => item.content));
+  let content = mergeDictionaryContent(...settled.map((item) => item.content));
+
+  // 释义降级：主数据来源都没有返回释义时，依次尝试腾讯翻译和 AI
+  const needsDefinitionFallback =
+    contentStatus(content, input.entryType) === "FAILED" &&
+    (!requestedFields.length || requestedFields.includes("definitions"));
+  if (needsDefinitionFallback) {
+    const attempted = new Set(settled.map((item) => item.attempt.providerId.startsWith("ai:") ? "ai" : item.attempt.providerId));
+    for (const fallbackId of ["tencent-translate", "ai"] as InitializationProviderId[]) {
+      if (attempted.has(fallbackId)) continue;
+      const provider = createProvider(fallbackId, settings);
+      if (!provider || !provider.supports(input)) continue;
+      const result = await runProvider(provider, input, requestedFields);
+      settled.push(result);
+      if (result.content) content = mergeDictionaryContent(content, result.content);
+      if (contentStatus(content, input.entryType) !== "FAILED") break;
+    }
+  }
+
   const aiResult = settled.find((item) => item.attempt.providerId.startsWith("ai:"));
-  const implicitFullAiJob = !input.requestedFields?.length && !input.requestedProviders?.length
-    && settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
-  const requiredProviderFailure = implicitFullAiJob && aiResult?.attempt.status !== "SUCCESS"
-    ? {
-        transient: aiResult?.transient ?? false,
-        errorCode: aiResult?.attempt.errorCode ?? "AI_PROVIDER_MISSING",
-        errorMessage: aiResult?.attempt.errorMessage ?? "AI 词条初始化 Provider 未执行成功。",
-      }
-    : null;
   const aiSuccess = aiResult?.attempt.status === "SUCCESS";
   const nonAiSuccess = settled.some((item) => !item.attempt.providerId.startsWith("ai:") && item.attempt.status === "SUCCESS");
   const contentSource = aiSuccess && !nonAiSuccess ? "AI_ONLY" as const : aiSuccess ? "MIXED" as const : "DICTIONARY_ONLY" as const;
@@ -163,6 +168,6 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
     attempts: settled.map((item) => item.attempt),
     hasTransientFailure: settled.some((item) => item.transient),
     contentSource,
-    requiredProviderFailure,
+    requiredProviderFailure: null,
   };
 }

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     return ok(await createManualPreview(await request.json()));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "输入内容或语言参数无效。", 400, error.issues);
-    if (error instanceof ManualPreviewError) return fail(error.code, error.message, error.code === "AI_PREVIEW_DISABLED" ? 409 : 422, error.details);
+    if (error instanceof ManualPreviewError) return fail(error.code, error.message, 422, error.details);
     return internalError(error, "生成 AI 预览失败。");
   }
 }

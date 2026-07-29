@@ -138,33 +138,29 @@ function completeJob(job: ClaimedJob, status: InitializationStatus, now: number,
   if (job.taskType === "INITIALIZE") sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?").run(wordStatus, now, job.wordId);
 }
 
-/** 初始化成功后自动补全目标语言释义和例句翻译；低优先级执行，不阻塞主流程。 */
-function queueTranslationsIfMissing(
+/** 初始化成功后排队非事实内容；低优先级执行，不阻塞词典内容落库。 */
+function queueSupplementalTasks(
   wordId: number,
   content: DictionaryContent,
   settings: AppSettings,
+  entryType: EntryType,
   sourceLanguage: string,
   targetLanguage: string,
 ): void {
-  const sourceDefinitionCount = content.definitions.filter((item) =>
-    item.language === sourceLanguage && item.text.trim(),
-  ).length;
-  const targetDefinitionCount = content.definitions.filter((item) =>
-    item.language === targetLanguage && item.text.trim(),
-  ).length;
-  const missingDefinitions = sourceLanguage !== targetLanguage
-    && sourceDefinitionCount > targetDefinitionCount;
-  const missingSummary = Boolean(content.summary.shortDefinition?.trim())
-    && !content.summary.translation?.trim();
-  const missingExamples = content.examples.some((example) =>
-    example.sentence.trim() && !example.translation?.trim(),
-  );
-  if (!missingDefinitions && !missingSummary && !missingExamples) return;
-
   const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!purpose.enabled || !provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return;
-  queueAiTask(wordId, "EXAMPLE_TRANSLATIONS", "FILL_MISSING_FIELDS", 20);
+
+  if (entryType === "SENTENCE") {
+    const hasTargetTranslation = content.definitions.some((item) => item.language === targetLanguage && item.text.trim())
+      || Boolean(content.summary.translation?.trim());
+    if (!hasTargetTranslation) queueAiTask(wordId, "EXAMPLE_TRANSLATIONS", "FILL_MISSING_FIELDS", 20);
+    return;
+  }
+
+  if (sourceLanguage.startsWith("en") && !content.learning.mnemonic?.trim()) {
+    queueAiTask(wordId, "MNEMONIC", "FILL_MISSING_FIELDS", 20);
+  }
 }
 
 function failOrRetry(job: ClaimedJob, transient: boolean, errorCode: string, errorMessage: string, now: number): void {
@@ -240,17 +236,6 @@ export async function processJob(job: ClaimedJob): Promise<void> {
     }, settings);
     const now = Date.now();
     saveAttempts(job.id, job.wordId, result.attempts, now);
-    if (result.requiredProviderFailure) {
-      failOrRetry(
-        job,
-        result.requiredProviderFailure.transient,
-        result.requiredProviderFailure.errorCode,
-        result.requiredProviderFailure.errorMessage,
-        now,
-      );
-      return;
-    }
-
     const incomingStatus = requestedFields.length
       ? requestedFieldStatusForLanguages(result.content, requestedFields, sourceLanguage, targetLanguage)
       : contentStatus(result.content, entryType);
@@ -275,10 +260,11 @@ export async function processJob(job: ClaimedJob): Promise<void> {
     if (wordStatus === "FAILED" && taskStatus !== "FAILED") wordStatus = "PARTIAL";
     saveContent(job.wordId, merged, result.attempts, result.contentSource, now);
     completeJob(job, taskStatus, now, wordStatus);
-    queueTranslationsIfMissing(
+    if (!requestedFields.length) queueSupplementalTasks(
       job.wordId,
       merged,
       settings,
+      entryType,
       sourceLanguage,
       targetLanguage,
     );

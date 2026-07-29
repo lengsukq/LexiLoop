@@ -9,9 +9,8 @@ import type {
   PracticeTaskType,
 } from "@/modules/practice/types";
 import { processReviewAnswer } from "@/modules/reviews/service";
+import { boundedActiveDurationMs, closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
 import type { QuestionType } from "@/lib/types";
-
-const MAX_REVIEW_DURATION_MS = 60 * 60 * 1000;
 
 interface CompletionRow {
   item_id: number;
@@ -24,30 +23,21 @@ interface CompletionRow {
 }
 
 export function closeOpenPracticeSessions(sourceTypePattern: string, now = Date.now()): void {
-  const sessions = sqlite.prepare(`SELECT id, started_at FROM study_sessions
-    WHERE source_type LIKE ? AND completed_at IS NULL`).all(sourceTypePattern) as Array<{
-      id: number;
-      started_at: number;
-    }>;
+  const sessions = sqlite.prepare(`SELECT id FROM study_sessions
+    WHERE source_type LIKE ? AND completed_at IS NULL`).all(sourceTypePattern) as Array<{ id: number }>;
   if (!sessions.length) return;
 
   sqlite.transaction(() => {
     const skipPendingItems = sqlite.prepare(`UPDATE study_session_items
       SET status = 'SKIPPED', answered_at = ?, skip_reason = 'SESSION_EXPIRED'
       WHERE study_session_id = ? AND status = 'PENDING'`);
-    const closeSession = sqlite.prepare(`UPDATE study_sessions
-      SET completed_at = ?, duration_ms = ?, completed_count = completed_count + ?,
-        skipped_count = skipped_count + ? WHERE id = ?`);
+    const updateCounts = sqlite.prepare(`UPDATE study_sessions
+      SET completed_count = completed_count + ?, skipped_count = skipped_count + ? WHERE id = ?`);
 
     for (const session of sessions) {
       const skipped = skipPendingItems.run(now, session.id);
-      closeSession.run(
-        now,
-        Math.max(0, now - session.started_at),
-        skipped.changes,
-        skipped.changes,
-        session.id,
-      );
+      updateCounts.run(skipped.changes, skipped.changes, session.id);
+      closeStudySessionWithActiveDuration(session.id, now);
     }
   }).immediate();
 }
@@ -113,10 +103,6 @@ function loadCompletionRows(sessionId: number, sourceType: string): CompletionRo
     WHERE i.study_session_id = ? ORDER BY i.position ASC`).all(sessionId) as CompletionRow[];
 }
 
-function boundedDuration(durationMs: number): number {
-  return Math.max(0, Math.min(MAX_REVIEW_DURATION_MS, Math.round(durationMs)));
-}
-
 function correctAnswer(row: CompletionRow): string {
   if (row.question_type !== "EN_TO_ZH_CHOICE") return row.term;
   return extractPreferredDefinition(row.definitions_json, row.target_language) ?? "";
@@ -127,7 +113,7 @@ export async function completePracticeSession(
 ): Promise<PracticeCompletionSummary> {
   const rows = loadCompletionRows(input.sessionId, input.sourceType);
   const submitted = new Map(input.answers.map((answer) => [`${answer.itemId}:${answer.wordId}`, answer]));
-  const averageDuration = boundedDuration(input.elapsedMs / Math.max(1, rows.length));
+  const averageDuration = boundedActiveDurationMs(input.elapsedMs / Math.max(1, rows.length)) ?? 0;
   let firstTryCorrect = 0;
   let recovered = 0;
   let missed = 0;
@@ -149,7 +135,7 @@ export async function completePracticeSession(
       rating: solved && !hadMistake ? "GOOD" : "AGAIN",
       questionType: row.question_type,
       userAnswer: solved && !hadMistake ? correctAnswer(row) : input.failureAnswer,
-      durationMs: boundedDuration(answer?.durationMs ?? averageDuration),
+      durationMs: boundedActiveDurationMs(answer?.durationMs ?? averageDuration) ?? 0,
     });
   }
 

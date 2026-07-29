@@ -7,10 +7,8 @@ import type {
   InitializationTaskOptions,
   ProviderStrategy,
 } from "@/lib/types";
-import { dictionaryContentFromRow } from "@/modules/dictionary/content";
 import {
   normalizeRequestedFields,
-  requestedFieldStatusForLanguages,
 } from "@/modules/dictionary/selection";
 import {
   maxAttemptsFromSettings,
@@ -18,6 +16,18 @@ import {
   setWordOperationalStatus,
   uniqueOrdered,
 } from "./shared";
+
+export { previewConfiguredInitialization, queueConfiguredInitialization } from "./configured";
+export { queueBulkInitialization, retryFailedJobs } from "./bulk";
+
+function strongerInitializationMode(current: InitializationMode, requested: InitializationMode): InitializationMode {
+  const weight: Record<InitializationMode, number> = {
+    SKIP_INITIALIZED: 1,
+    FILL_MISSING_FIELDS: 2,
+    FORCE_OVERWRITE: 3,
+  };
+  return weight[requested] > weight[current] ? requested : current;
+}
 export function queueWordInitialization(
   wordId: number,
   mode: InitializationMode = "FILL_MISSING_FIELDS",
@@ -123,111 +133,4 @@ export function queueSelectedInitialization(
     updatedJobs,
     mode,
   };
-}
-
-export interface ConfiguredInitializationInput extends InitializationTaskOptions {
-  wordIds?: number[];
-  mode?: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE">;
-  onlyMissing?: boolean;
-}
-
-function configuredCandidates(input: ConfiguredInitializationInput) {
-  const requestedFields = normalizeRequestedFields(input.requestedFields);
-  const requestedIds = input.wordIds?.length
-    ? [...new Set(input.wordIds.filter((id) => Number.isInteger(id) && id > 0))]
-    : null;
-  const where = requestedIds ? `WHERE w.id IN (${requestedIds.map(() => "?").join(",")})` : "";
-  const rows = sqlite.prepare(`SELECT w.id AS selected_word_id, w.term,
-      w.source_language, w.target_language, wc.*
-    FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id ${where} ORDER BY w.id ASC`)
-    .all(...(requestedIds ?? [])) as Array<Record<string, unknown>>;
-  const onlyMissing = input.onlyMissing ?? input.mode !== "FORCE_OVERWRITE";
-  const candidates = rows.filter((row) => {
-    if (!onlyMissing || !requestedFields.length) return true;
-    return requestedFieldStatusForLanguages(
-      dictionaryContentFromRow(row),
-      requestedFields,
-      String(row.source_language),
-      String(row.target_language),
-    ) !== "READY";
-  });
-  return { requestedFields, requestedIds, rows, candidates };
-}
-
-export function previewConfiguredInitialization(input: ConfiguredInitializationInput) {
-  const { requestedFields, requestedIds, rows, candidates } = configuredCandidates(input);
-  return {
-    scope: requestedIds ? "SELECTED" as const : "ALL" as const,
-    requestedWords: requestedIds?.length ?? rows.length,
-    existingWords: rows.length,
-    selectedWords: candidates.length,
-    skippedExisting: rows.length - candidates.length,
-    requestedFields,
-    requestedProviders: uniqueOrdered(input.requestedProviders),
-    providerStrategy: input.providerStrategy ?? "PARALLEL_MERGE",
-    mode: input.mode ?? "FILL_MISSING_FIELDS",
-    sample: candidates.slice(0, 8).map((row) => ({ id: Number(row.selected_word_id), term: String(row.term) })),
-  };
-}
-
-export function queueConfiguredInitialization(input: ConfiguredInitializationInput) {
-  const preview = previewConfiguredInitialization(input);
-  const { candidates } = configuredCandidates(input);
-  const queued = queueSelectedInitialization(
-    candidates.map((row) => Number(row.selected_word_id)),
-    input.mode ?? "FILL_MISSING_FIELDS",
-    input,
-  );
-  return { ...preview, createdJobs: queued.createdJobs, updatedJobs: queued.updatedJobs };
-}
-
-
-function strongerInitializationMode(current: InitializationMode, requested: InitializationMode): InitializationMode {
-  const weight: Record<InitializationMode, number> = {
-    SKIP_INITIALIZED: 1,
-    FILL_MISSING_FIELDS: 2,
-    FORCE_OVERWRITE: 3,
-  };
-  return weight[requested] > weight[current] ? requested : current;
-}
-
-export function queueBulkInitialization(
-  mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE"> = "FILL_MISSING_FIELDS",
-  onlyWithoutAi = true,
-  options: InitializationTaskOptions = {},
-) {
-  const total = (sqlite.prepare("SELECT count(*) AS count FROM words").get() as { count: number }).count;
-  const aiFilter = onlyWithoutAi
-    ? `WHERE NOT EXISTS (
-        SELECT 1 FROM provider_attempts pa
-        WHERE pa.word_id = w.id AND pa.provider_id LIKE 'ai:%' AND pa.status = 'SUCCESS'
-      )`
-    : "";
-  const candidates = sqlite.prepare(`SELECT w.id FROM words w ${aiFilter} ORDER BY w.id ASC`).all() as Array<{ id: number }>;
-  const queued = queueSelectedInitialization(candidates.map((candidate) => candidate.id), mode, options);
-  return {
-    totalWords: total,
-    selectedWords: queued.selectedWords,
-    skippedAiInitialized: onlyWithoutAi ? total - candidates.length : 0,
-    createdJobs: queued.createdJobs,
-    updatedJobs: queued.updatedJobs,
-    mode,
-  };
-}
-
-export function retryFailedJobs(jobIds: number[]): number {
-  const now = Date.now();
-  const statement = sqlite.prepare(`UPDATE initialization_jobs SET status = 'QUEUED', attempt_count = 0,
-    available_at = ?, locked_at = NULL, locked_by = NULL, last_error = NULL, last_error_code = NULL,
-    completed_at = NULL, updated_at = ? WHERE id = ? AND status = 'FAILED'`);
-  let changed = 0;
-  sqlite.transaction(() => {
-    for (const id of jobIds) {
-      const job = sqlite.prepare("SELECT word_id, task_type FROM initialization_jobs WHERE id = ?").get(id) as { word_id: number; task_type: AiTaskType } | undefined;
-      const result = statement.run(now, now, id);
-      changed += result.changes;
-      if (result.changes && job?.task_type === "INITIALIZE") setWordOperationalStatus(job.word_id, "QUEUED", now);
-    }
-  })();
-  return changed;
 }

@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { boundedActiveDurationMs } from "@/modules/reviews/duration";
 import { DAY_MS, suggestionDateKey } from "./date";
 import type { DailySuggestionMetrics, ReviewRow } from "./types";
 
@@ -42,11 +43,10 @@ export function collectSuggestionMetrics(now: number, sourceDateKey: string): {
     .filter((session) => suggestionDateKey(session.started_at) === sourceDateKey && session.completed_count > 0);
 
   const correctCount = reviews.filter((review) => Boolean(review.is_correct)).length;
-  const timedReviews = reviews.filter((review) => review.duration_ms !== null && review.duration_ms >= 0);
-  const sessionDuration = sessions.reduce((sum, session) => sum + (session.duration_ms ?? 0), 0);
-  const standaloneDuration = reviews
-    .filter((review) => review.study_session_id === null)
-    .reduce((sum, review) => sum + (review.duration_ms ?? 0), 0);
+  const timedReviews = reviews
+    .map((review) => boundedActiveDurationMs(review.duration_ms))
+    .filter((duration): duration is number => duration !== null);
+  const activeDuration = timedReviews.reduce((sum, duration) => sum + duration, 0);
 
   return {
     reviews,
@@ -59,9 +59,9 @@ export function collectSuggestionMetrics(now: number, sourceDateKey: string): {
       skippedCount: skips.length,
       sessionCount: sessions.length,
       averageDurationMs: timedReviews.length
-        ? Math.round(timedReviews.reduce((sum, review) => sum + (review.duration_ms ?? 0), 0) / timedReviews.length)
+        ? Math.round(activeDuration / timedReviews.length)
         : null,
-      studyMinutes: Math.round((sessionDuration + standaloneDuration) / 60_000),
+      studyMinutes: Math.round(activeDuration / 60_000),
       completionRate: reviews.length + skips.length
         ? Math.round(reviews.length / (reviews.length + skips.length) * 100)
         : null,

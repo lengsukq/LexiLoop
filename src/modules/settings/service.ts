@@ -9,7 +9,7 @@ const settingsSchema = z.object({
   dailyWrongWordLimit: z.number().int().min(0).max(100),
   dailyDueReviewLimit: z.number().int().min(1).max(500),
   targetRetentionRate: z.number().min(0.7).max(0.99),
-  defaultAccent: z.enum(["US", "UK", "GENERAL"]),
+  defaultAccent: z.preprocess((value) => value === "GENERAL" ? "US" : value, z.enum(["US", "UK"])),
   playbackSpeed: z.number().min(0.5).max(2),
   autoPlayPronunciation: z.boolean(),
   dictionaryApiEnabled: z.boolean(),

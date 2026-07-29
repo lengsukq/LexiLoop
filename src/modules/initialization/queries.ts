@@ -1,93 +1,9 @@
 import { db, sqlite } from "@/db/client";
 import { initializationJobs, words, workerHeartbeats } from "@/db/schema";
-import type {
-  AiTaskType,
-  InitializationField,
-  InitializationProviderId,
-  InitializationStatus,
-  ProviderStrategy,
-} from "@/lib/types";
-import { PROVIDER_CAPABILITIES } from "@/modules/dictionary/pipeline";
-import { getEcdictStatus } from "@/modules/ecdict/service";
-import { getSettings } from "@/modules/settings/service";
-import { and, count, eq, like, sql, type SQL } from "drizzle-orm";
-import { parseStringArray } from "./shared";
-export async function getInitializationOptions() {
-  const [settings, ecdict] = await Promise.all([getSettings(), getEcdictStatus()]);
-  const aiPurpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
-  const aiProvider = settings.llmConfig.providers.find((provider) => provider.id === aiPurpose.providerId);
-  const mwDictionaryReady = Boolean(settings.merriamWebsterDictionaryKey.trim());
-  const mwThesaurusReady = Boolean(settings.merriamWebsterThesaurusKey.trim());
-  const providers: Array<{
-    id: InitializationProviderId;
-    label: string;
-    available: boolean;
-    enabled: boolean;
-    reason: string | null;
-    capabilities: InitializationField[];
-  }> = [
-    {
-      id: "merriam-webster",
-      label: "Merriam-Webster",
-      enabled: settings.merriamWebsterEnabled,
-      available: settings.merriamWebsterEnabled && (mwDictionaryReady || mwThesaurusReady),
-      reason: !settings.merriamWebsterEnabled ? "请先在设置中启用" : !mwDictionaryReady && !mwThesaurusReady ? "尚未配置 API Key" : null,
-      capabilities: [
-        ...(mwDictionaryReady ? PROVIDER_CAPABILITIES["merriam-webster"].filter((field) => !["synonyms", "antonyms"].includes(field)) : []),
-        ...(mwThesaurusReady ? (["synonyms", "antonyms"] as InitializationField[]) : []),
-      ],
-    },
-    {
-      id: "dictionaryapi.dev",
-      label: "DictionaryAPI.dev",
-      enabled: settings.dictionaryApiEnabled,
-      available: settings.dictionaryApiEnabled,
-      reason: settings.dictionaryApiEnabled ? null : "请先在设置中启用",
-      capabilities: PROVIDER_CAPABILITIES["dictionaryapi.dev"],
-    },
-    {
-      id: "ecdict",
-      label: "ECDICT",
-      enabled: settings.ecdictEnabled,
-      available: ecdict.installed && settings.ecdictEnabled,
-      reason: !ecdict.installed ? "尚未安装离线词典" : !settings.ecdictEnabled ? "词典当前已停用" : null,
-      capabilities: PROVIDER_CAPABILITIES.ecdict,
-    },
-    {
-      id: "ai",
-      label: "AI 词条初始化",
-      enabled: aiPurpose.enabled,
-      available: Boolean(aiPurpose.enabled && aiProvider?.apiKey.trim() && aiProvider.baseUrl.trim() && aiPurpose.model.trim()),
-      reason: !aiPurpose.enabled ? "AI 词条初始化未启用" : !aiProvider ? "AI Provider 不存在" : !aiProvider.apiKey.trim() || !aiProvider.baseUrl.trim() || !aiPurpose.model.trim() ? "AI 配置不完整" : null,
-      capabilities: PROVIDER_CAPABILITIES.ai,
-    },
-    {
-      id: "mymemory",
-      label: "MyMemory 翻译",
-      enabled: settings.myMemoryEnabled,
-      available: settings.myMemoryEnabled,
-      reason: settings.myMemoryEnabled ? null : "请先在设置中启用",
-      capabilities: PROVIDER_CAPABILITIES.mymemory,
-    },
-    {
-      id: "tencent-translate",
-      label: "腾讯翻译",
-      enabled: settings.tencentTranslateEnabled,
-      available: settings.tencentTranslateEnabled && Boolean(settings.tencentTranslateSecretId.trim()) && Boolean(settings.tencentTranslateSecretKey.trim()),
-      reason: !settings.tencentTranslateEnabled ? "请先在设置中启用" : !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim() ? "尚未配置 API 密钥" : null,
-      capabilities: PROVIDER_CAPABILITIES["tencent-translate"],
-    },
-    {
-      id: "youdao",
-      label: "有道词典",
-      enabled: settings.youdaoEnabled,
-      available: settings.youdaoEnabled,
-      reason: settings.youdaoEnabled ? null : "请先在设置中启用",
-      capabilities: PROVIDER_CAPABILITIES.youdao,
-    },
-  ];
-  return { providers };
-}
+import type { InitializationStatus } from "@/lib/types";
+import { sql } from "drizzle-orm";
+export { getJobDetails } from "./job-details";
+export { getInitializationOptions } from "./options";
 
 export async function getInitializationSummary() {
   const counts = await db.select({ status: initializationJobs.status, count: sql<number>`count(*)` }).from(initializationJobs).groupBy(initializationJobs.status);
@@ -103,125 +19,132 @@ export async function getWordsSummary() {
   return result;
 }
 
-export async function listInitializationJobs(options: { page?: number; pageSize?: number; status?: InitializationStatus; search?: string } = {}) {
-  const { page = 1, pageSize = 50, status: statusFilter, search } = options;
-  const conditions: SQL[] = [];
-  if (statusFilter) conditions.push(eq(initializationJobs.status, statusFilter));
-  if (search) conditions.push(like(words.term, `%${search}%`));
-  const where = conditions.length > 0 ? and(...conditions) : sql`1=1`;
+const AGGREGATE_STATUS_SQL = `
+  CASE
+    WHEN SUM(CASE WHEN j.status = 'RUNNING' THEN 1 ELSE 0 END) > 0 THEN 'RUNNING'
+    WHEN SUM(CASE WHEN j.status IN ('QUEUED', 'PENDING') THEN 1 ELSE 0 END) > 0 THEN 'QUEUED'
+    WHEN SUM(CASE WHEN j.status = 'FAILED' THEN 1 ELSE 0 END) > 0 THEN 'FAILED'
+    WHEN SUM(CASE WHEN j.status = 'PARTIAL' THEN 1 ELSE 0 END) > 0 THEN 'PARTIAL'
+    ELSE 'READY'
+  END
+`;
 
-  const base = db.select({
-    id: initializationJobs.id, wordId: initializationJobs.wordId, term: words.term, taskType: initializationJobs.taskType,
-    status: initializationJobs.status, mode: initializationJobs.mode, priority: initializationJobs.priority,
-    requestedFields: initializationJobs.requestedFieldsJson, requestedProviders: initializationJobs.requestedProvidersJson,
-    providerStrategy: initializationJobs.providerStrategy,
-    attemptCount: initializationJobs.attemptCount, maxAttempts: initializationJobs.maxAttempts,
-    lastError: initializationJobs.lastError, lastErrorCode: initializationJobs.lastErrorCode,
-    createdAt: initializationJobs.createdAt, updatedAt: initializationJobs.updatedAt, completedAt: initializationJobs.completedAt,
-  }).from(initializationJobs).innerJoin(words, eq(initializationJobs.wordId, words.id));
-
-  const countResult = await db.select({ total: count() }).from(initializationJobs)
-    .innerJoin(words, eq(initializationJobs.wordId, words.id))
-    .where(where);
-  const total = Number(countResult[0]?.total ?? 0);
-
-  const jobs = await base.where(where).orderBy(sql`${initializationJobs.createdAt} DESC`).limit(pageSize).offset((page - 1) * pageSize);
-  return { jobs, total };
+export interface InitializationWordRecord {
+  wordId: number;
+  term: string;
+  normalizedTerm: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  status: string;
+  taskCount: number;
+  completedTaskCount: number;
+  failedTaskCount: number;
+  activeTaskCount: number;
+  updatedAt: number;
+  errorSummary: string | null;
+  tasks: Array<{
+    id: number;
+    taskType: string;
+    status: string;
+    mode: string;
+    attemptCount: number;
+    maxAttempts: number;
+    lastError: string | null;
+    lastErrorCode: string | null;
+    createdAt: number;
+    updatedAt: number;
+    completedAt: number | null;
+  }>;
 }
 
-export async function getJobDetails(jobId: number) {
+export async function listInitializationJobs(options: { page?: number; pageSize?: number; status?: InitializationStatus; search?: string } = {}) {
+  const { page = 1, pageSize = 50, status: statusFilter, search } = options;
+  const where: string[] = ["1 = 1"];
+  const params: Array<string | number> = [];
+  if (search) {
+    where.push("(w.term LIKE ? ESCAPE '\\' OR w.normalized_term LIKE ? ESCAPE '\\')");
+    const escaped = search.replace(/[\\%_]/g, "\\$&");
+    params.push(`%${escaped}%`, `%${escaped}%`);
+  }
+  const having = statusFilter ? `HAVING ${AGGREGATE_STATUS_SQL} = ?` : "";
+  const havingParams = statusFilter ? [statusFilter] : [];
+  const from = `FROM initialization_jobs j INNER JOIN words w ON w.id = j.word_id WHERE ${where.join(" AND ")} GROUP BY w.id`;
+
+  const totalRow = sqlite.prepare(`
+    SELECT COUNT(*) AS total FROM (
+      SELECT w.id ${from} ${having}
+    ) grouped
+  `).get(...params, ...havingParams) as { total: number };
+  const total = Number(totalRow.total ?? 0);
+
   const rows = sqlite.prepare(`
-    SELECT j.*, w.term, w.normalized_term, w.source_language, w.target_language
-    FROM initialization_jobs j
-    JOIN words w ON w.id = j.word_id
-    WHERE j.id = ?
-  `).get(jobId) as Record<string, unknown> | undefined;
-  if (!rows) return null;
+    SELECT
+      w.id AS word_id,
+      w.term,
+      w.normalized_term,
+      w.source_language,
+      w.target_language,
+      ${AGGREGATE_STATUS_SQL} AS aggregate_status,
+      COUNT(j.id) AS task_count,
+      SUM(CASE WHEN j.status IN ('READY', 'PARTIAL', 'DISABLED') THEN 1 ELSE 0 END) AS completed_task_count,
+      SUM(CASE WHEN j.status = 'FAILED' THEN 1 ELSE 0 END) AS failed_task_count,
+      SUM(CASE WHEN j.status IN ('QUEUED', 'PENDING', 'RUNNING') THEN 1 ELSE 0 END) AS active_task_count,
+      MAX(j.updated_at) AS updated_at
+    ${from}
+    ${having}
+    ORDER BY MAX(j.updated_at) DESC, w.id DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, ...havingParams, pageSize, (page - 1) * pageSize) as Array<Record<string, unknown>>;
 
-  const attempts = sqlite.prepare(`
-    SELECT * FROM provider_attempts WHERE initialization_job_id = ? ORDER BY created_at ASC
-  `).all(jobId) as Array<Record<string, unknown>>;
+  const wordIds = rows.map((row) => Number(row.word_id));
+  const taskRows = wordIds.length
+    ? sqlite.prepare(`SELECT id, word_id, task_type, status, mode, attempt_count, max_attempts,
+        last_error, last_error_code, created_at, updated_at, completed_at
+        FROM initialization_jobs
+        WHERE word_id IN (${wordIds.map(() => "?").join(",")})
+        ORDER BY word_id ASC, updated_at DESC, id DESC`).all(...wordIds) as Array<Record<string, unknown>>
+    : [];
+  const tasksByWord = new Map<number, InitializationWordRecord["tasks"]>();
+  for (const task of taskRows) {
+    const wordId = Number(task.word_id);
+    const tasks = tasksByWord.get(wordId) ?? [];
+    tasks.push({
+      id: Number(task.id),
+      taskType: String(task.task_type),
+      status: String(task.status),
+      mode: String(task.mode),
+      attemptCount: Number(task.attempt_count ?? 0),
+      maxAttempts: Number(task.max_attempts ?? 0),
+      lastError: task.last_error === null || task.last_error === undefined ? null : String(task.last_error),
+      lastErrorCode: task.last_error_code === null || task.last_error_code === undefined ? null : String(task.last_error_code),
+      createdAt: Number(task.created_at),
+      updatedAt: Number(task.updated_at),
+      completedAt: task.completed_at === null || task.completed_at === undefined ? null : Number(task.completed_at),
+    });
+    tasksByWord.set(wordId, tasks);
+  }
 
-  const wordContent = sqlite.prepare(`
-    SELECT * FROM word_contents WHERE word_id = ?
-  `).get(rows.word_id as number) as Record<string, unknown> | undefined;
-
-  const contentFieldKeys = [
-    "definitions", "pronunciations", "examples", "phrases", "forms",
-    "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes",
-    "tags",
-  ] as const;
-
-  const contentFields = wordContent
-    ? Object.fromEntries(contentFieldKeys.map((key) => {
-        const col = `${key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}_json` as string;
-        const arr: unknown[] = JSON.parse((wordContent[col] as string) || "[]");
-        return [key, arr.length > 0];
-      }))
-    : Object.fromEntries(contentFieldKeys.map((key) => [key, false]));
-
-  // Check summary sub-fields
-  const summaryJson = wordContent?.summary_json as string | undefined;
-  const summary = summaryJson ? JSON.parse(summaryJson) : null;
-  contentFields.summary = summary && (summary.shortDefinition || summary.translation);
-  contentFields.learning = summary && (summary.pronunciationTip || (summary.mnemonic));
-  // Re-check learning from learning_json
-  const learningJson = wordContent?.learning_json as string | undefined;
-  const learning = learningJson ? JSON.parse(learningJson) : null;
-  contentFields.learning = learning && (learning.pronunciationTip || learning.mnemonic || learning.commonMistakes?.length > 0);
-  // sentenceAnalysis
-  const saJson = wordContent?.sentence_analysis_json as string | undefined;
-  const sa = saJson ? JSON.parse(saJson) : null;
-  contentFields.sentenceAnalysis = sa && Boolean(
-    sa.grammarPattern
-    || sa.grammarExplanation
-    || sa.grammarNotes?.length > 0
-    || sa.keyExpressions?.length > 0
-    || sa.similarExamples?.length > 0
-    || sa.variations?.length > 0
-  );
-
-  const formatAttempt = (a: Record<string, unknown>) => ({
-    id: a.id as number,
-    providerId: a.provider_id as string,
-    status: a.status as string,
-    durationMs: a.duration_ms as number,
-    fieldsReturned: JSON.parse((a.fields_returned_json as string) || "[]") as string[],
-    errorCode: a.error_code as string | null,
-    errorMessage: a.error_message as string | null,
-    metadata: a.metadata_json ? JSON.parse(a.metadata_json as string) : null,
-    createdAt: a.created_at as number,
+  const items: InitializationWordRecord[] = rows.map((row) => {
+    const wordId = Number(row.word_id);
+    const tasks = tasksByWord.get(wordId) ?? [];
+    const errorSummary = tasks.find((task) => task.status === "FAILED" && task.lastError)?.lastError ?? null;
+    return {
+      wordId,
+      term: String(row.term),
+      normalizedTerm: String(row.normalized_term),
+      sourceLanguage: String(row.source_language),
+      targetLanguage: String(row.target_language),
+      status: String(row.aggregate_status),
+      taskCount: Number(row.task_count ?? 0),
+      completedTaskCount: Number(row.completed_task_count ?? 0),
+      failedTaskCount: Number(row.failed_task_count ?? 0),
+      activeTaskCount: Number(row.active_task_count ?? 0),
+      updatedAt: Number(row.updated_at),
+      errorSummary,
+      tasks,
+    };
   });
-
-  return {
-    job: {
-      id: rows.id as number,
-      wordId: rows.word_id as number,
-      taskType: rows.task_type as AiTaskType,
-      term: rows.term as string,
-      normalizedTerm: rows.normalized_term as string,
-      sourceLanguage: rows.source_language as string,
-      targetLanguage: rows.target_language as string,
-      status: rows.status as string,
-      mode: rows.mode as string,
-      requestedFields: parseStringArray<InitializationField>(rows.requested_fields_json),
-      requestedProviders: parseStringArray<InitializationProviderId>(rows.requested_providers_json),
-      providerStrategy: (rows.provider_strategy as ProviderStrategy | null) ?? "PARALLEL_MERGE",
-      priority: rows.priority as number,
-      attemptCount: rows.attempt_count as number,
-      maxAttempts: rows.max_attempts as number,
-      lastError: rows.last_error as string | null,
-      lastErrorCode: rows.last_error_code as string | null,
-      availableAt: rows.available_at as number | null,
-      lockedAt: rows.locked_at as number | null,
-      lockedBy: rows.locked_by as string | null,
-      createdAt: rows.created_at as number,
-      updatedAt: rows.updated_at as number,
-      completedAt: rows.completed_at as number | null,
-    },
-    attempts: attempts.map(formatAttempt),
-    contentFields,
-  };
+  return { items, total };
 }
 
 export async function getWorkerHeartbeats() {

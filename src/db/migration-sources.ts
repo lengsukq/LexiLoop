@@ -47,5 +47,9 @@ export const MIGRATIONS = [
   {
     "name": "0011_game_high_scores.sql",
     "sql": "-- Persist every finished game run so each game can show a personal top-10 board.\nCREATE TABLE IF NOT EXISTS game_high_scores (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  game_mode TEXT NOT NULL,\n  score INTEGER NOT NULL,\n  max_combo INTEGER NOT NULL DEFAULT 0,\n  accuracy INTEGER NOT NULL DEFAULT 0,\n  elapsed_ms INTEGER NOT NULL DEFAULT 0,\n  played_at INTEGER NOT NULL,\n  created_at INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS game_high_scores_mode_score_idx ON game_high_scores(game_mode, score DESC, played_at ASC);\n"
+  },
+  {
+    "name": "0012_active_study_duration.sql",
+    "sql": "-- Rebuild historical session duration from effective per-answer time.\n-- Each answer is capped at 10 minutes to discard legacy idle/wall-clock outliers.\nUPDATE study_sessions\nSET duration_ms = COALESCE((\n  SELECT SUM(\n    CASE\n      WHEN review_logs.duration_ms IS NULL OR review_logs.duration_ms <= 0 THEN 0\n      WHEN review_logs.duration_ms > 600000 THEN 600000\n      ELSE review_logs.duration_ms\n    END\n  )\n  FROM review_logs\n  WHERE review_logs.study_session_id = study_sessions.id\n), 0)\nWHERE completed_count > 0;\n"
   }
 ] as const;

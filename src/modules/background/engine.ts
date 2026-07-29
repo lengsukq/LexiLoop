@@ -2,7 +2,6 @@ import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization
 import { runMaintenance } from "@/modules/background/maintenance";
 import { getTodaySuggestion, suggestionDateKey } from "@/modules/suggestions/service";
 import { sqlite } from "@/db/client";
-
 type EngineState = {
   started: boolean;
   stopping: boolean;
@@ -15,22 +14,18 @@ type EngineState = {
   lastSuggestionDateKey: string | null;
   suggestionPromise: Promise<void> | null;
 };
-
 const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const SUGGESTION_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 const SUGGESTION_GENERATION_HOUR = 0;
 const SUGGESTION_GENERATION_MINUTE = 5;
 const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
-
 const globalEngine = globalThis as typeof globalThis & { __lexiloopBackgroundEngine?: EngineState };
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(resolve, ms);
     timer.unref?.();
   });
 }
-
 function state(): EngineState {
   if (!globalEngine.__lexiloopBackgroundEngine) {
     globalEngine.__lexiloopBackgroundEngine = {
@@ -48,7 +43,6 @@ function state(): EngineState {
   }
   return globalEngine.__lexiloopBackgroundEngine;
 }
-
 function getConcurrencyFromSettings(): number | null {
   try {
     const row = sqlite.prepare("SELECT value_json FROM settings WHERE key = 'backgroundConcurrency'").get() as { value_json: string } | undefined;
@@ -57,7 +51,6 @@ function getConcurrencyFromSettings(): number | null {
     return Number.isInteger(value) && value >= 1 && value <= 10 ? value : null;
   } catch { return null; }
 }
-
 function maybeRunMaintenance(engine: EngineState): void {
   const now = Date.now();
   if (now - engine.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) return;
@@ -70,7 +63,6 @@ function maybeRunMaintenance(engine: EngineState): void {
     console.error("[BackgroundEngine] maintenance error", error);
   }
 }
-
 function localClock(timestamp: number): { hour: number; minute: number } {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: APP_TIMEZONE,
@@ -81,12 +73,10 @@ function localClock(timestamp: number): { hour: number; minute: number } {
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return { hour: Number(value.hour ?? 0), minute: Number(value.minute ?? 0) };
 }
-
 function maybeGenerateDailySuggestion(engine: EngineState): void {
   const now = Date.now();
   if (now - engine.lastSuggestionCheckAt < SUGGESTION_CHECK_INTERVAL_MS) return;
   engine.lastSuggestionCheckAt = now;
-
   let clock: { hour: number; minute: number };
   let dateKey: string;
   try {
@@ -99,9 +89,7 @@ function maybeGenerateDailySuggestion(engine: EngineState): void {
   const afterScheduledTime = clock.hour > SUGGESTION_GENERATION_HOUR
     || (clock.hour === SUGGESTION_GENERATION_HOUR && clock.minute >= SUGGESTION_GENERATION_MINUTE);
   if (!afterScheduledTime) return;
-
   if (engine.lastSuggestionDateKey === dateKey || engine.suggestionPromise) return;
-
   engine.suggestionPromise = getTodaySuggestion({ now })
     .then((suggestion) => {
       engine.lastSuggestionDateKey = dateKey;
@@ -114,7 +102,6 @@ function maybeGenerateDailySuggestion(engine: EngineState): void {
       engine.suggestionPromise = null;
     });
 }
-
 async function runLoop(engine: EngineState): Promise<void> {
   console.log(`[BackgroundEngine] ${engine.workerId} started, concurrency=${engine.concurrency}`);
   updateHeartbeat(engine.workerId, "STARTING", undefined, {
@@ -166,7 +153,6 @@ async function runLoop(engine: EngineState): Promise<void> {
   engine.started = false;
   engine.loopPromise = null;
 }
-
 export function startBackgroundEngine(): void {
   if (process.env.BACKGROUND_ENGINE_ENABLED === "false") {
     console.log("[BackgroundEngine] disabled by BACKGROUND_ENGINE_ENABLED=false");
@@ -183,12 +169,10 @@ export function startBackgroundEngine(): void {
     engine.loopPromise = null;
   });
 }
-
 export function stopBackgroundEngine(): void {
   const engine = state();
   engine.stopping = true;
 }
-
 export function getBackgroundEngineState() {
   const engine = state();
   return {

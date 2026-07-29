@@ -8,6 +8,7 @@ import type {
   ReviewStatistics,
   ReviewWordRow,
 } from "./types";
+import { boundedActiveDurationMs, closeStudySessionWithActiveDuration } from "./duration";
 
 const MASTERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -147,7 +148,7 @@ export function insertReviewLog(input: {
       input.answer.userAnswer ?? null,
       input.expectedAnswer,
       input.isCorrect ? 1 : 0,
-      input.answer.durationMs ?? null,
+      boundedActiveDurationMs(input.answer.durationMs),
       JSON.stringify(input.before),
       JSON.stringify(input.after),
       input.reviewedAt,
@@ -177,9 +178,5 @@ export function finalizeStudySession(sessionId: number, isCorrect: boolean, now:
     .get(sessionId) as { count: number };
   if (pending.count > 0) return;
 
-  const session = sqlite.prepare("SELECT started_at FROM study_sessions WHERE id = ?").get(sessionId) as {
-    started_at: number;
-  };
-  sqlite.prepare("UPDATE study_sessions SET completed_at = ?, duration_ms = ? WHERE id = ?")
-    .run(now, now - session.started_at, sessionId);
+  closeStudySessionWithActiveDuration(sessionId, now);
 }

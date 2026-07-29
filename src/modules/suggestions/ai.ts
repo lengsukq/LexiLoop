@@ -2,7 +2,7 @@ import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { getSettings } from "@/modules/settings/service";
 import { z } from "zod";
 import { RECOMMENDATION_LIMIT } from "./content";
-import { extractJson } from "./json";
+import { extractJson } from "@/lib/json";
 import type {
   AiSuggestionOutput,
   DailySuggestionMetrics,

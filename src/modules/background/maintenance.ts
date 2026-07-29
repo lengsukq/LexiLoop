@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
 
 /**
  * Periodic maintenance tasks executed by the Background Engine.
@@ -85,17 +86,18 @@ export function expireStaleSessions(): number {
   const now = Date.now();
   const staleBefore = now - 24 * 60 * 60 * 1000;
   return sqlite.transaction(() => {
-    const stale = sqlite.prepare(`SELECT id, started_at FROM study_sessions
-      WHERE completed_at IS NULL AND started_at < ?`).all(staleBefore) as Array<{ id: number; started_at: number }>;
+    const stale = sqlite.prepare(`SELECT id FROM study_sessions
+      WHERE completed_at IS NULL AND started_at < ?`).all(staleBefore) as Array<{ id: number }>;
     let expiredItems = 0;
     for (const session of stale) {
       const result = sqlite.prepare(`UPDATE study_session_items
         SET status = 'SKIPPED', answered_at = ?, skip_reason = 'SESSION_EXPIRED'
         WHERE study_session_id = ? AND status = 'PENDING'`).run(now, session.id);
       expiredItems += result.changes;
-      sqlite.prepare(`UPDATE study_sessions SET completed_at = ?, duration_ms = ?,
-        completed_count = completed_count + ?, skipped_count = skipped_count + ?
-        WHERE id = ?`).run(now, now - session.started_at, result.changes, result.changes, session.id);
+      sqlite.prepare(`UPDATE study_sessions SET completed_count = completed_count + ?,
+        skipped_count = skipped_count + ? WHERE id = ?`)
+        .run(result.changes, result.changes, session.id);
+      closeStudySessionWithActiveDuration(session.id, now);
     }
     return expiredItems;
   }).immediate();

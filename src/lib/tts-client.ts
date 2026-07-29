@@ -15,7 +15,7 @@ let activeObjectUrl: string | null = null;
 
 function normalizeAccent(accent: string): string {
   const normalized = accent.trim().toUpperCase();
-  return normalized === "UK" || normalized === "GENERAL" ? normalized : "US";
+  return normalized === "UK" ? normalized : "US";
 }
 
 function audioCacheKey(term: string, accent: string): string {

@@ -1,5 +1,5 @@
 import { sqlite } from "@/db/client";
-import { parseJson } from "./json";
+import { parseJson } from "@/lib/json";
 import type {
   DailyAiSuggestion,
   DailySuggestionMetrics,

@@ -1,5 +1,6 @@
 import { sqlite } from "@/db/client";
 import { getDailyStudyPlan } from "@/modules/study/service";
+import { boundedActiveDurationMs } from "@/modules/reviews/duration";
 
 const timezone = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
 function dateKey(timestamp: number): string {
@@ -81,14 +82,13 @@ export function getStatistics(days = 30) {
     item.reviews += 1;
     item.correct += log.is_correct ? 1 : 0;
     item.again += log.rating === "AGAIN" ? 1 : 0;
-    if (log.study_session_id === null) item.minutes += (log.duration_ms ?? 0) / 60_000;
+    item.minutes += (boundedActiveDurationMs(log.duration_ms) ?? 0) / 60_000;
   }
   for (const session of sessions) {
     const item = daily.get(dateKey(session.started_at));
     if (!item || session.completed_count === 0) continue;
     item.sessions += 1;
     item.skipped += session.skipped_count ?? 0;
-    item.minutes += (session.duration_ms ?? 0) / 60_000;
   }
   // Compute streak from SQL-level distinct active dates (not bounded by display range)
   const streakSince = Date.now() - 365 * 24 * 60 * 60 * 1000;

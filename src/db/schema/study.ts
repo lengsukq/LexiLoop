@@ -1,0 +1,25 @@
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { words } from "./core";
+
+export const studySessions = sqliteTable("study_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }), sessionType: text("session_type", { enum: ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING"] }).notNull(), sourceType: text("source_type"),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(), completedAt: integer("completed_at", { mode: "timestamp_ms" }), plannedCount: integer("planned_count").notNull().default(0), completedCount: integer("completed_count").notNull().default(0),
+  correctCount: integer("correct_count").notNull().default(0), wrongCount: integer("wrong_count").notNull().default(0), skippedCount: integer("skipped_count").notNull().default(0), durationMs: integer("duration_ms"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+export const studySessionItems = sqliteTable("study_session_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }), studySessionId: integer("study_session_id").notNull().references(() => studySessions.id, { onDelete: "cascade" }), position: integer("position").notNull(),
+  wordId: integer("word_id").notNull().references(() => words.id, { onDelete: "cascade" }), taskType: text("task_type", { enum: ["NEW", "REVIEW", "WRONG", "LISTENING", "SPELLING"] }).notNull(),
+  questionType: text("question_type", { enum: ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] }).notNull(), status: text("status", { enum: ["PENDING", "ANSWERED", "SKIPPED"] }).notNull().default("PENDING"),
+  answeredAt: integer("answered_at", { mode: "timestamp_ms" }), skipReason: text("skip_reason"), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("study_session_items_position_unique").on(table.studySessionId, table.position), index("study_session_items_session_idx").on(table.studySessionId, table.status)]);
+
+export const gameHighScores = sqliteTable("game_high_scores", {
+  id: integer("id").primaryKey({ autoIncrement: true }), gameMode: text("game_mode").notNull(), score: integer("score").notNull(), maxCombo: integer("max_combo").notNull().default(0), accuracy: integer("accuracy").notNull().default(0), elapsedMs: integer("elapsed_ms").notNull().default(0), playedAt: integer("played_at", { mode: "timestamp_ms" }).notNull(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [index("game_high_scores_mode_score_idx").on(table.gameMode, table.score)]);
+export const reviewCards = sqliteTable("review_cards", {
+  wordId: integer("word_id").primaryKey().references(() => words.id, { onDelete: "cascade" }), dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(), stability: real("stability").notNull(), difficulty: real("difficulty").notNull(), elapsedDays: integer("elapsed_days").notNull(), scheduledDays: integer("scheduled_days").notNull(), reps: integer("reps").notNull(), lapses: integer("lapses").notNull(), fsrsState: integer("fsrs_state").notNull(), learningSteps: integer("learning_steps").notNull().default(0), lastReviewAt: integer("last_review_at", { mode: "timestamp_ms" }), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(), updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+export const reviewLogs = sqliteTable("review_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }), clientAnswerId: text("client_answer_id").notNull(), wordId: integer("word_id").notNull().references(() => words.id, { onDelete: "cascade" }), studySessionId: integer("study_session_id").references(() => studySessions.id, { onDelete: "set null" }), studySessionItemId: integer("study_session_item_id").references(() => studySessionItems.id, { onDelete: "set null" }),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }).notNull(), rating: text("rating", { enum: ["AGAIN", "HARD", "GOOD", "EASY"] }).notNull(), questionType: text("question_type").notNull(), presentedPrompt: text("presented_prompt"), userAnswer: text("user_answer"), expectedAnswer: text("expected_answer"), isCorrect: integer("is_correct", { mode: "boolean" }).notNull(), durationMs: integer("duration_ms"), cardBeforeJson: text("card_before_json", { mode: "json" }).$type<Record<string, unknown>>(), cardAfterJson: text("card_after_json", { mode: "json" }).$type<Record<string, unknown>>(), createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+}, (table) => [uniqueIndex("review_logs_client_answer_unique").on(table.clientAnswerId), index("review_logs_word_idx").on(table.wordId, table.reviewedAt), index("review_logs_session_idx").on(table.studySessionId)]);

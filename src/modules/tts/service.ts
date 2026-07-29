@@ -4,11 +4,11 @@ import {
   TRUSTED_CLIENT_TOKEN,
   CHROMIUM_FULL_VERSION,
 } from "node-edge-tts/dist/drm.js";
+import { ttsCacheGet, ttsCacheKey, ttsCacheSet } from "./cache";
 
 const VOICE_MAP: Record<string, string> = {
   US: "en-US-JennyNeural",
   UK: "en-GB-SoniaNeural",
-  GENERAL: "en-US-JennyNeural",
 };
 
 interface TtsOptions {
@@ -19,34 +19,6 @@ interface TtsOptions {
 export type TtsResult =
   | { ok: true; audio: ArrayBuffer }
   | { ok: false; error: string };
-
-// Simple LRU cache for TTS audio results
-const TTS_CACHE_MAX = 200;
-const ttsCache = new Map<string, ArrayBuffer>();
-
-function ttsCacheKey(word: string, accent: string): string {
-  return `${accent}:${word.toLowerCase()}`;
-}
-
-function ttsCacheGet(key: string): ArrayBuffer | undefined {
-  const value = ttsCache.get(key);
-  if (value !== undefined) {
-    // Move to end (most recently used)
-    ttsCache.delete(key);
-    ttsCache.set(key, value);
-  }
-  return value;
-}
-
-function ttsCacheSet(key: string, value: ArrayBuffer): void {
-  if (ttsCache.has(key)) ttsCache.delete(key);
-  else if (ttsCache.size >= TTS_CACHE_MAX) {
-    // Evict oldest (first entry)
-    const oldest = ttsCache.keys().next().value;
-    if (oldest !== undefined) ttsCache.delete(oldest);
-  }
-  ttsCache.set(key, value);
-}
 
 function generateId(): string {
   return crypto.randomUUID().replace(/-/g, "");

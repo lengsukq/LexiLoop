@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
+import { configureTtsSpeeds } from "@/lib/tts-client";
 import type { AppSettings } from "@/lib/types";
 import type { EcdictStatus, TestState } from "./settings-shared";
 
@@ -57,6 +58,7 @@ export function useSettingsData() {
         body: JSON.stringify(settings),
       });
       setSettings(saved);
+      configureTtsSpeeds({ word: saved.wordSpeed, phrase: saved.phraseSpeed, sentence: saved.sentenceSpeed });
       setMessage("学习设置已保存。新会话和内置后台引擎会使用最新配置。");
     } catch (reason) {
       setError(errorMessage(reason, "保存失败"));

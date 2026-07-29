@@ -7,9 +7,10 @@ import {
   Sparkles, Trophy, XCircle, Zap,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
-import { playCachedTts } from "@/lib/tts-client";
+import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type { LeaderboardSummary } from "@/lib/types";
+import { GameSummary, type SummaryItem } from "@/components/game-summary";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress, buttonClass } from "@/components/ui";
 
@@ -80,6 +81,7 @@ export default function MatchPage() {
   const [remainingMs, setRemainingMs] = useState(0);
   const [result, setResult] = useState<MatchResult | null>(null);
   const [error, setError] = useState("");
+  const [summaryItems, setSummaryItems] = useState<SummaryItem[]>([]);
 
   const sessionRef = useRef<MatchSession | null>(null);
   const matchedRef = useRef<Set<number>>(new Set());
@@ -101,6 +103,15 @@ export default function MatchPage() {
     setError("");
 
     const elapsedMs = captureActiveDuration();
+    setSummaryItems(current.pairs.map((item) => {
+      const matched = matchedRef.current.has(item.itemId);
+      const hadMistake = mistakeItemsRef.current.has(item.itemId);
+      return {
+        term: item.term,
+        definition: item.definition,
+        status: matched ? (hadMistake ? "recovered" : "correct") : "missed",
+      } satisfies SummaryItem;
+    }));
     try {
       const saved = await apiFetch<MatchResult>(`/api/match/sessions/${current.sessionId}/complete`, {
         method: "POST",
@@ -141,6 +152,11 @@ export default function MatchPage() {
     return () => window.clearInterval(timer);
   }, [finishGame, phase, session]);
 
+  useEffect(() => {
+    if (phase !== "playing" || !session) return;
+    void preloadTtsBatch(session.pairs.map((item) => ({ text: item.term, accent: "US" })));
+  }, [phase, session]);
+
   async function startGame() {
     const preset = PRESETS.find((item) => item.id === presetId) ?? PRESETS[1];
     setPhase("loading");
@@ -170,6 +186,7 @@ export default function MatchPage() {
       setSelected(null);
       setCombo(0);
       setMistakeCount(0);
+      setSummaryItems([]);
       setRemainingMs(created.durationSeconds * 1000);
       setPhase("playing");
     } catch (reason) {
@@ -282,6 +299,7 @@ export default function MatchPage() {
             <div className="mb-2 flex items-center justify-between text-sm"><span className="text-[#6e6e73] dark:text-[#98989d]">首次配对正确率</span><b>{result.accuracy}%</b></div>
             <Progress value={result.accuracy} />
           </div>
+          <GameSummary items={summaryItems} />
           <LeaderboardPanel leaderboard={result.leaderboard} />
           {(result.recovered > 0 || result.missed > 0) && <div className="flex items-start gap-3 rounded-[16px] bg-[#ff9500]/[0.08] p-4"><Flame className="mt-0.5 size-5 shrink-0 text-[#ff9500]" /><p className="text-sm leading-relaxed text-[#8a3b00] dark:text-[#ff9f0a]">错配或超时词条已按“忘记”记录，后续会优先出现在错词强化和下一轮配对中。</p></div>}
           <div className="grid gap-2 sm:grid-cols-2">

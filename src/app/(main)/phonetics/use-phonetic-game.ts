@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
-import { playCachedTts } from "@/lib/tts-client";
+import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
+import type { SummaryItem } from "@/components/game-summary";
 import type {
   PhoneticAccent,
   PhoneticAnswerState,
@@ -33,6 +34,7 @@ export function usePhoneticGame() {
   const [audioError, setAudioError] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<PhoneticGameResult | null>(null);
+  const [summaryItems, setSummaryItems] = useState<SummaryItem[]>([]);
 
   const sessionRef = useRef<PhoneticGameSession | null>(null);
   const answersRef = useRef<Map<number, PhoneticAnswerState>>(new Map());
@@ -48,6 +50,10 @@ export function usePhoneticGame() {
 
   const current = session?.items[index] ?? null;
   const { reset: resetItemTimer, capture: captureItemDuration } = useActiveStopwatch(Boolean(phase === "playing" && current && !correctFeedback));
+  useEffect(() => {
+    if (phase !== "playing" || !session) return;
+    void preloadTtsBatch(session.items.slice(index, index + 5).map((item) => ({ text: item.term, accent: session.accent })));
+  }, [index, phase, session]);
 
   const playCurrent = useCallback(async () => {
     const item = sessionRef.current?.items[index];
@@ -72,6 +78,17 @@ export function usePhoneticGame() {
       durationMs: 0,
     });
     const elapsedMs = answers.reduce((sum, answer) => sum + answer.durationMs, 0);
+    setSummaryItems(activeSession.items.map((item) => {
+      const answer = answersRef.current.get(item.itemId);
+      const solved = answer?.solved ?? false;
+      const hadMistake = answer?.hadMistake ?? true;
+      return {
+        term: item.term,
+        definition: item.definition,
+        phonetic: item.phonetic,
+        status: solved ? (hadMistake ? "recovered" : "correct") : "missed",
+      } satisfies SummaryItem;
+    }));
 
     try {
       const saved = await apiFetch<PhoneticGameResult>(`/api/phonetics/sessions/${activeSession.sessionId}/complete`, {
@@ -182,6 +199,7 @@ export function usePhoneticGame() {
       setWrongChoice(null);
       setCorrectFeedback(false);
       setAudioError("");
+      setSummaryItems([]);
       setPhase("playing");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建音标训练失败");
@@ -234,6 +252,7 @@ export function usePhoneticGame() {
     audioError,
     error,
     result,
+    summaryItems,
     start,
     finish,
     choose,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { waitForAiTask } from "@/lib/ai-task-client";
 import { apiFetch } from "@/lib/client-api";
+import { playEntryTts } from "@/lib/tts-client";
 import type { RelatedWordItem } from "@/lib/types";
 import type {
   RelatedPreview,
@@ -172,20 +173,10 @@ export function useWordDetail(wordId: string) {
   }
 
   async function playText(text = word?.term) {
-    if (!text) return;
+    if (!text || !word) return;
     setTtsTip("");
-    try {
-      const response = await fetch(
-        `/api/tts?word=${encodeURIComponent(text)}&accent=${encodeURIComponent(selectedAccent)}`,
-      );
-      if (!response.ok) throw new Error("TTS 请求失败");
-      const url = URL.createObjectURL(await response.blob());
-      const audio = new Audio(url);
-      audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
-      await audio.play();
-    } catch {
-      setTtsTip("Edge TTS 发音失败，请检查网络。");
-    }
+    const played = await playEntryTts(text, text === word.term ? word.entryType : "SENTENCE", selectedAccent);
+    if (!played) setTtsTip("Edge TTS 发音失败，请检查网络。");
   }
 
   async function runAiTask(

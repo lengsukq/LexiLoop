@@ -340,7 +340,7 @@ export default function InitializePage() {
         </div>}
         {words.length ? <>
           <div className="overflow-auto rounded-[18px] border border-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-white/[0.08]">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[840px] text-left text-sm">
               <thead className="bg-black/[0.03] text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]">
                 <tr>
                   <th className="w-10 p-3"><input type="checkbox" aria-label="选择当前页全部词条" checked={words.length > 0 && words.every((word) => selectedWordIds.has(word.wordId))} onChange={(event) => {
@@ -351,11 +351,9 @@ export default function InitializePage() {
                       return next;
                     });
                   }} /></th>
-                  <th className="p-3">词条</th>
-                  <th className="p-3">总体状态</th>
-                  <th className="p-3">子任务进度</th>
-                  <th className="p-3">更新时间</th>
-                  <th className="p-3">错误</th>
+                  <th className="min-w-[160px] p-3">词条</th>
+                  <th className="whitespace-nowrap p-3">状态</th>
+                  <th className="min-w-[180px] p-3">错误</th>
                   <th className="w-24 p-3">操作</th>
                 </tr>
               </thead>
@@ -379,14 +377,16 @@ export default function InitializePage() {
                             <span className="inline-flex items-center gap-1">{word.term}<ExternalLink className="size-3" /></span>
                           </Link>
                         </div>
+                        <div className="mt-1 pl-9 text-xs font-normal text-[#8e8e93]">
+                          <span className="font-medium">{word.completedTaskCount}/{word.taskCount}</span>
+                          <span className="ml-1">已完成</span>
+                          {word.activeTaskCount > 0 && <span className="ml-2 text-[#007aff]">· {word.activeTaskCount} 个处理中</span>}
+                        </div>
                       </td>
-                      <td className="p-3"><InitializationBadge status={word.status} /></td>
-                      <td className="p-3">
-                        <span className="font-medium">{word.completedTaskCount}/{word.taskCount}</span>
-                        <span className="ml-1 text-xs text-[#8e8e93]">已完成</span>
-                        {word.activeTaskCount > 0 && <span className="ml-2 text-xs text-[#007aff]">· {word.activeTaskCount} 个处理中</span>}
+                      <td className="whitespace-nowrap p-3">
+                        <div><InitializationBadge status={word.status} /></div>
+                        <div className="mt-1 text-xs text-[#6e6e73] dark:text-[#98989d]">{formatTs(word.updatedAt)}</div>
                       </td>
-                      <td className="p-3 text-xs text-[#6e6e73] dark:text-[#98989d]">{formatTs(word.updatedAt)}</td>
                       <td className="max-w-xs truncate p-3 text-xs text-[#ff3b30]">{word.errorSummary ?? (word.failedTaskCount ? `有 ${word.failedTaskCount} 个失败子任务` : "—")}</td>
                       <td className="p-3">
                         {word.failedTaskCount > 0 && <Button variant="outline" size="sm" onClick={(event) => {
@@ -398,7 +398,7 @@ export default function InitializePage() {
                       </td>
                     </tr>
                     {expanded && <tr className="border-t border-black/[0.03] bg-[#007aff]/[0.025] dark:border-white/[0.04] dark:bg-white/[0.02]">
-                      <td colSpan={7} className="px-5 py-3">
+                      <td colSpan={5} className="px-5 py-3">
                         <div className="space-y-2 pl-9">
                           {word.tasks.map((task) => <button key={task.id} type="button" className="block w-full rounded-[14px] border border-white/60 bg-white/55 p-3 text-left shadow-[0_3px_12px_rgba(0,0,0,0.03)] transition hover:border-[#007aff]/25 hover:bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]" onClick={() => void openDetail(task.id)}>
                             <div className="flex flex-wrap items-center justify-between gap-2">

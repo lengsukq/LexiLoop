@@ -105,9 +105,21 @@ export function StudySettingsTab({
                 </Select>
               </label>
               <label className="min-w-28 space-y-1.5">
-                <span className="text-xs font-medium">播放速度</span>
-                <Select className="w-full" value={settings.playbackSpeed} onChange={(event) => update("playbackSpeed", Number(event.target.value))}>
-                  <option value={0.75}>0.75x</option><option value={1}>1.0x</option><option value={1.25}>1.25x</option><option value={1.5}>1.5x</option>
+                <span className="text-xs font-medium">单词语速</span>
+                <Select className="w-full" value={settings.wordSpeed} onChange={(event) => update("wordSpeed", Number(event.target.value))}>
+                  <option value={0.5}>0.5x</option><option value={0.75}>0.75x</option><option value={1}>1.0x</option><option value={1.25}>1.25x</option><option value={1.5}>1.5x</option><option value={2}>2.0x</option>
+                </Select>
+              </label>
+              <label className="min-w-28 space-y-1.5">
+                <span className="text-xs font-medium">短语语速</span>
+                <Select className="w-full" value={settings.phraseSpeed} onChange={(event) => update("phraseSpeed", Number(event.target.value))}>
+                  <option value={0.5}>0.5x</option><option value={0.75}>0.75x</option><option value={1}>1.0x</option><option value={1.25}>1.25x</option><option value={1.5}>1.5x</option><option value={2}>2.0x</option>
+                </Select>
+              </label>
+              <label className="min-w-28 space-y-1.5">
+                <span className="text-xs font-medium">句子语速</span>
+                <Select className="w-full" value={settings.sentenceSpeed} onChange={(event) => update("sentenceSpeed", Number(event.target.value))}>
+                  <option value={0.5}>0.5x</option><option value={0.75}>0.75x</option><option value={1}>1.0x</option><option value={1.25}>1.25x</option><option value={1.5}>1.5x</option><option value={2}>2.0x</option>
                 </Select>
               </label>
               <div className="flex items-end pb-1"><Toggle label="自动播放发音" checked={settings.autoPlayPronunciation} onChange={(value) => update("autoPlayPronunciation", value)} /></div>

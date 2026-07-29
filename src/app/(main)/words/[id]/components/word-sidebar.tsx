@@ -45,7 +45,16 @@ function ReviewStatusCard({ word, onToggleSuspended }: { word: WordDetail; onTog
 }
 
 function InitializationQualityCard({ word }: { word: WordDetail }) {
-  return <Card><details className="group"><summary className="relative z-10 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-[15px] font-bold tracking-tight [&::-webkit-details-marker]:hidden sm:px-5 sm:py-5"><span>AI 初始化质量</span><ChevronDown className="size-4 text-[#8e8e93] transition-transform group-open:rotate-180" /></summary><CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm dark:border-white/[0.06] dark:bg-white/[0.04]"><div className="flex items-center justify-between gap-2"><b className="truncate">{attempt.providerId}</b><Badge tone={attempt.status === "SUCCESS" ? "green" : attempt.status === "FAILED" ? "red" : "amber"}>{attempt.status}</Badge></div>{attempt.metadata?.qualityScore !== undefined && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">质量分：{attempt.metadata.qualityScore} · Token：{attempt.metadata.inputTokens ?? "?"} + {attempt.metadata.outputTokens ?? "?"}</p>}{attempt.errorMessage && <p className="mt-2 text-xs text-[#ff3b30]">{attempt.errorMessage}</p>}</div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无初始化记录。</p>}</CardContent></details></Card>;
+  return <Card><details className="group"><summary className="relative z-10 flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 text-[15px] font-bold tracking-tight [&::-webkit-details-marker]:hidden sm:px-5 sm:py-5"><span>初始化来源与补充</span><ChevronDown className="size-4 text-[#8e8e93] transition-transform group-open:rotate-180" /></summary><CardContent>{word.providerAttempts.length ? <div className="space-y-3">{word.providerAttempts.slice(0, 6).map((attempt, index) => <div key={`${attempt.providerId}-${attempt.createdAt}-${index}`} className="rounded-[16px] border border-white/50 bg-white/40 p-3 text-sm dark:border-white/[0.06] dark:bg-white/[0.04]"><div className="flex items-center justify-between gap-2"><b className="truncate">{providerLabel(attempt.providerId)}</b><Badge tone={attempt.status === "SUCCESS" ? "green" : attempt.status === "FAILED" ? "red" : "amber"}>{attempt.status}</Badge></div>{attempt.metadata?.qualityScore !== undefined && <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">质量分：{attempt.metadata.qualityScore} · Token：{attempt.metadata.inputTokens ?? "?"} + {attempt.metadata.outputTokens ?? "?"}</p>}{attempt.errorMessage && <p className="mt-2 text-xs text-[#ff3b30]">{attempt.errorMessage}</p>}</div>)}</div> : <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">尚无初始化记录。</p>}</CardContent></details></Card>;
+}
+
+function providerLabel(providerId: string): string {
+  if (providerId === "youdao") return "有道词典";
+  if (providerId.startsWith("ai:")) return "AI 补充";
+  if (providerId === "dictionaryapi.dev") return "DictionaryAPI";
+  if (providerId === "mymemory") return "MyMemory";
+  if (providerId === "tencent-translate") return "腾讯翻译";
+  return providerId;
 }
 
 function RecentReviewsCard({ word }: { word: WordDetail }) {

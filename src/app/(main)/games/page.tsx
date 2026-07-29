@@ -8,9 +8,10 @@ import {
   Layers, Loader2, Puzzle, RotateCcw, Trophy, Volume2, XCircle, Zap,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
-import { playCachedTts } from "@/lib/tts-client";
+import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import { Badge, Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
+import { GameSummary, type SummaryItem } from "@/components/game-summary";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import type { LeaderboardSummary } from "@/lib/types";
 import { WhackAMole } from "./whack-a-mole";
@@ -129,6 +130,7 @@ function GamesPageContent() {
   const [result, setResult] = useState<GameResult | null>(null);
   const [error, setError] = useState("");
   const [solvedTerms, setSolvedTerms] = useState<string[]>([]);
+  const [summaryItems, setSummaryItems] = useState<SummaryItem[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [tetrisDanger, setTetrisDanger] = useState(0);
 
@@ -163,6 +165,16 @@ function GamesPageContent() {
       durationMs: 0,
     });
     const elapsedMs = answers.reduce((sum, answer) => sum + answer.durationMs, 0);
+    setSummaryItems(currentSession.items.map((item) => {
+      const answer = answersRef.current.get(item.itemId);
+      const solved = answer?.solved ?? false;
+      const hadMistake = answer?.hadMistake ?? true;
+      return {
+        term: item.term,
+        definition: item.definition,
+        status: solved ? (hadMistake ? "recovered" : "correct") : "missed",
+      } satisfies SummaryItem;
+    }));
     try {
       const saved = await apiFetch<GameResult>(`/api/games/sessions/${currentSession.sessionId}/complete`, {
         method: "POST",
@@ -200,6 +212,11 @@ function GamesPageContent() {
 
   const current = session?.items[index] ?? null;
   const { reset: resetItemTimer, capture: captureItemDuration } = useActiveStopwatch(Boolean(phase === "playing" && current && !revealed));
+  useEffect(() => {
+    if (phase !== "playing" || !session) return;
+    void preloadTtsBatch(session.items.slice(index, index + 5).map((item) => ({ text: item.term, accent: "US" })));
+  }, [index, phase, session]);
+
   useEffect(() => {
     if (!current) return;
     resetItemTimer();
@@ -242,6 +259,7 @@ function GamesPageContent() {
       setCombo(0);
       setMistakeCount(0);
       setSolvedTerms([]);
+      setSummaryItems([]);
       setTetrisDanger(0);
       setRemainingMs(created.durationSeconds * 1000);
       setPhase("playing");
@@ -489,6 +507,7 @@ function GamesPageContent() {
             <div className="rounded-[16px] bg-[#ff3b30]/[0.08] p-3"><p className="text-2xl font-bold text-[#d70015] dark:text-[#ff453a]">{result.missed}</p><p className="text-xs text-[#8e8e93]">超时未完成</p></div>
           </div>
           <div><div className="mb-2 flex justify-between text-sm"><span className="text-[#6e6e73] dark:text-[#98989d]">首次正确率</span><b>{result.accuracy}%</b></div><Progress value={result.accuracy} /></div>
+          <GameSummary items={summaryItems} />
           <LeaderboardPanel leaderboard={result.leaderboard} />
           {(result.recovered > 0 || result.missed > 0) && <div className="flex items-start gap-3 rounded-[16px] bg-[#ff9500]/[0.08] p-4"><Flame className="mt-0.5 size-5 shrink-0 text-[#ff9500]" /><p className="text-sm leading-relaxed text-[#8a3b00] dark:text-[#ff9f0a]">错答或超时词条已记录为错词，后续小游戏和错词强化会优先抽取。</p></div>}
           <div className="grid gap-2 sm:grid-cols-2">

@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { Ear, Flame, RotateCcw, Trophy } from "lucide-react";
+import { GameSummary, type SummaryItem } from "@/components/game-summary";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import { Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
 import type { PhoneticAccent, PhoneticGameResult } from "./types";
 
-export function PhoneticResult({ result, accent, onRestart, onExit }: {
+export function PhoneticResult({ result, accent, items, onRestart, onExit }: {
   result: PhoneticGameResult;
   accent: PhoneticAccent;
+  items: SummaryItem[];
   onRestart: () => void;
   onExit: () => void;
 }) {
@@ -27,6 +29,7 @@ export function PhoneticResult({ result, accent, onRestart, onExit }: {
           <div className="rounded-[16px] bg-[#ff3b30]/[0.08] p-3"><p className="text-2xl font-bold text-[#d70015] dark:text-[#ff453a]">{result.missed}</p><p className="text-xs text-[#8e8e93]">超时或跳过</p></div>
         </div>
         <div><div className="mb-2 flex justify-between text-sm"><span className="text-[#6e6e73] dark:text-[#98989d]">首次正确率</span><b>{result.accuracy}%</b></div><Progress value={result.accuracy} /></div>
+        <GameSummary items={items} />
         <LeaderboardPanel leaderboard={result.leaderboard} />
         {(result.recovered > 0 || result.missed > 0) && <div className="flex items-start gap-3 rounded-[16px] bg-[#ff9500]/[0.08] p-4"><Flame className="mt-0.5 size-5 shrink-0 text-[#ff9500]" /><p className="text-sm leading-relaxed text-[#8a3b00] dark:text-[#ff9f0a]">答错或跳过的单词已记入错词状态，下一轮音标训练会优先出现。</p></div>}
         <div className="grid gap-2 sm:grid-cols-2">

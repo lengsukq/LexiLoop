@@ -29,6 +29,7 @@ export default function PhoneticsPage() {
     return <PhoneticResult
       result={game.result}
       accent={game.accent}
+      items={game.summaryItems}
       onRestart={() => void game.start()}
       onExit={game.exit}
     />;

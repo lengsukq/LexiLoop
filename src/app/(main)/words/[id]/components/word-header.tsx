@@ -90,8 +90,9 @@ function WordBadges({ word }: { word: WordDetail }) {
     <InitializationBadge status={word.initializationStatus} onGradient />
     <MasteryBadge level={word.masteryLevel} onGradient />
     {word.content.summary.cefrLevel && <Badge tone="glass">CEFR {word.content.summary.cefrLevel}</Badge>}
-    {word.contentSource === "AI_ONLY" && <Badge tone="glass">纯 AI 生成</Badge>}
-    {word.contentSource === "DICTIONARY_ONLY" && <Badge tone="glass">词典</Badge>}
+    {word.contentSource === "AI_ONLY" && <Badge tone="glass">AI 内容（手动启用）</Badge>}
+    {word.contentSource === "MIXED" && <Badge tone="glass">词典 + AI 补充</Badge>}
+    {word.contentSource === "DICTIONARY_ONLY" && <Badge tone="glass">词典内容</Badge>}
     {word.wrongWordState?.active && <Badge tone="glass">活跃错词</Badge>}
   </div>;
 }

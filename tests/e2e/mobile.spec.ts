@@ -8,7 +8,7 @@ for (const width of [320, 375, 390]) {
     await expect(page.getByRole("link", { name: "今日" })).toBeVisible();
     await expect(page.getByRole("link", { name: "复习" })).toBeVisible();
     await expect(page.getByRole("link", { name: "单词本" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "添加" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "添加", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "打开更多导航" })).toBeVisible();
     const hasNoHorizontalOverflow = await page.locator("body").evaluate((body) => body.scrollWidth <= window.innerWidth);
     expect(hasNoHorizontalOverflow).toBeTruthy();

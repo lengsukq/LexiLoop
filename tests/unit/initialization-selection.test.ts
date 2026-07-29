@@ -35,7 +35,7 @@ describe("field-level initialization merge", () => {
 
   it("evaluates task success against only the requested fields", () => {
     const content = emptyDictionaryContent();
-    content.pronunciations = [{ accent: "GENERAL", phonetic: "test", audioUrl: null, source: "ecdict", isSynthetic: false }];
+    content.pronunciations = [{ accent: "US", phonetic: "test", audioUrl: null, source: "ecdict", isSynthetic: false }];
     expect(requestedFieldStatus(content, ["pronunciations.phonetic"])).toBe("READY");
     expect(requestedFieldStatus(content, ["pronunciations.phonetic", "pronunciations.audio"])).toBe("PARTIAL");
     expect(requestedFieldStatus(content, ["definitions"])).toBe("FAILED");

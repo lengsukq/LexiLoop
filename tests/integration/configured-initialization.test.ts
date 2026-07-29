@@ -14,7 +14,7 @@ function insertWord(term: string, phonetic?: string): number {
       (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
        synonyms_json, antonyms_json, tags_json, provider_metadata_json, updated_at)
       VALUES (?, '[]', ?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`)
-      .run(wordId, JSON.stringify([{ accent: "GENERAL", phonetic, audioUrl: null, source: "test", isSynthetic: false }]), now);
+      .run(wordId, JSON.stringify([{ accent: "US", phonetic, audioUrl: null, source: "test", isSynthetic: false }]), now);
   }
   return wordId;
 }

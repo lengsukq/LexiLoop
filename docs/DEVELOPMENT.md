@@ -14,6 +14,10 @@ LexiLoop（词环）是单用户、自托管的 Next.js 词汇学习应用。核
 - Vitest、Playwright
 - Docker Compose：app + worker
 
+## 认证
+
+应用支持通过运行时环境变量 `LEXILOOP_PASSWORD` 启用单密码登录。变量未设置或为空时不启用认证；设置后，页面和业务 API 都需要有效的 7 天登录 Cookie，`/api/health` 保留为公开健康检查入口。密码不写入数据库，修改密码需要重新创建 app 容器。
+
 ## 3. 核心流程
 
 1. 上传 EasyDict CSV。

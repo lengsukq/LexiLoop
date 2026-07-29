@@ -41,10 +41,19 @@ yarn check
 
 ```bash
 cp .env.example .env
+# 可选：在 .env 中设置 LEXILOOP_PASSWORD；留空则不启用登录密码
 docker compose up -d --build
 ```
 
 访问 `http://FNOS_IP:3000`。持久数据保存在 `./data`。
+
+如果在 `.env` 中设置了 `LEXILOOP_PASSWORD`，进入 LexiLoop 页面时需要输入密码；不需要用户名。登录状态默认保留 7 天。修改或移除密码后，重新创建 app 容器使新的运行时环境变量生效：
+
+```bash
+docker compose up -d --force-recreate app
+```
+
+密码只在容器运行时注入，不会写入 SQLite 数据库。
 
 恢复 SQLite 备份后，页面会提示重启：
 

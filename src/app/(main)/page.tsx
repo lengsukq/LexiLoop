@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, AudioLines, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Headphones, Loader2, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowRight, AudioLines, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Headphones, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 import { DailyAiSuggestion } from "./daily-ai-suggestion";
@@ -21,6 +21,7 @@ interface Dashboard {
     dueReviewCount: number; plannedDueReviewCount: number;
     wrongWordCount: number; plannedWrongWordCount: number;
     newWordCount: number; plannedNewWordCount: number;
+    sentenceReviewCount: number; plannedSentenceReviewCount: number;
     plannedTotal: number; estimatedMinutes: number;
   };
 }
@@ -188,6 +189,13 @@ export default function HomePage() {
               subtitle="根据释义回忆英文"
               gradient="from-[#ff9500] to-[#ff6961]"
             />
+            <PracticeLink
+              href="/study?mode=SENTENCE_REVIEW"
+              icon={<MessageSquareText className="size-5" />}
+              title="句子复习"
+              subtitle={`理解与还原完整句子 · ${data.plan.sentenceReviewCount} 个待练`}
+              gradient="from-[#5856d6] to-[#af52de]"
+            />
           </CardContent>
         </Card>
       </section>
@@ -242,5 +250,5 @@ function PracticeLink({ href, icon, title, subtitle, gradient }: {
 }
 
 function sessionLabel(sessionType: string): string {
-  return ({ DAILY: "今日学习", NEW_WORDS: "新词学习", DUE_REVIEW: "到期复习", WRONG_WORDS: "错词强化", LISTENING: "听力拼写", SPELLING: "中文拼写", AI_RECOMMENDED: "AI 今日必做题" } as Record<string, string>)[sessionType] ?? "学习会话";
+  return ({ DAILY: "今日学习", NEW_WORDS: "新词学习", DUE_REVIEW: "到期复习", WRONG_WORDS: "错词强化", LISTENING: "听力拼写", SPELLING: "中文拼写", SENTENCE_REVIEW: "句子复习", AI_RECOMMENDED: "AI 今日必做题" } as Record<string, string>)[sessionType] ?? "学习会话";
 }

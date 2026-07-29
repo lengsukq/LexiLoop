@@ -1,6 +1,7 @@
 import type {
   AffixItem,
   DictionaryContent,
+  EntryType,
   LearningContent,
   LexicalSummary,
   RelatedWordItem,
@@ -22,8 +23,11 @@ const EMPTY_LEARNING: LearningContent = {
 };
 
 const EMPTY_SENTENCE_ANALYSIS: SentenceAnalysis = {
+  grammarPattern: null,
+  grammarExplanation: null,
   grammarNotes: [],
   keyExpressions: [],
+  similarExamples: [],
   variations: [],
 };
 
@@ -95,7 +99,7 @@ export function emptyDictionaryContent(): DictionaryContent {
     definitions: [], pronunciations: [], examples: [], phrases: [], forms: [],
     synonyms: [], antonyms: [], wordFamily: [], confusedWords: [], roots: [], affixes: [],
     summary: { ...EMPTY_SUMMARY }, learning: { ...EMPTY_LEARNING, commonMistakes: [] },
-    sentenceAnalysis: { ...EMPTY_SENTENCE_ANALYSIS, grammarNotes: [], keyExpressions: [], variations: [] }, tags: [],
+    sentenceAnalysis: { ...EMPTY_SENTENCE_ANALYSIS, grammarNotes: [], keyExpressions: [], similarExamples: [], variations: [] }, tags: [],
   };
 }
 
@@ -129,6 +133,8 @@ export function normalizeDictionaryContent(content: Partial<DictionaryContent> |
       commonMistakes: Array.isArray(learning.commonMistakes) ? learning.commonMistakes.map(cleanText).filter(Boolean) : [],
     },
     sentenceAnalysis: {
+      grammarPattern: cleanText(sentenceAnalysis.grammarPattern) || null,
+      grammarExplanation: cleanText(sentenceAnalysis.grammarExplanation) || null,
       grammarNotes: Array.isArray(sentenceAnalysis.grammarNotes) ? sentenceAnalysis.grammarNotes.map(cleanText).filter(Boolean) : [],
       keyExpressions: Array.isArray(sentenceAnalysis.keyExpressions) ? sentenceAnalysis.keyExpressions.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -136,6 +142,13 @@ export function normalizeDictionaryContent(content: Partial<DictionaryContent> |
         const expression = cleanText(record.expression);
         const meaning = cleanText(record.meaning);
         return expression && meaning ? [{ expression, meaning, note: cleanText(record.note) || null }] : [];
+      }) : [],
+      similarExamples: Array.isArray(sentenceAnalysis.similarExamples) ? sentenceAnalysis.similarExamples.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const record = item as unknown as Record<string, unknown>;
+        const sentence = cleanText(record.sentence);
+        const translation = cleanText(record.translation);
+        return sentence && translation ? [{ sentence, translation, focus: cleanText(record.focus) || null }] : [];
       }) : [],
       variations: Array.isArray(sentenceAnalysis.variations) ? sentenceAnalysis.variations.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -290,8 +303,11 @@ export function mergeDictionaryContent(...contents: Array<Partial<DictionaryCont
       commonMistakes: [...new Set([...result.learning.commonMistakes, ...content.learning.commonMistakes])],
     };
     result.sentenceAnalysis = {
+      grammarPattern: result.sentenceAnalysis.grammarPattern ?? content.sentenceAnalysis.grammarPattern,
+      grammarExplanation: result.sentenceAnalysis.grammarExplanation ?? content.sentenceAnalysis.grammarExplanation,
       grammarNotes: [...new Set([...result.sentenceAnalysis.grammarNotes, ...content.sentenceAnalysis.grammarNotes])],
       keyExpressions: [...result.sentenceAnalysis.keyExpressions, ...content.sentenceAnalysis.keyExpressions.filter((incoming) => !result.sentenceAnalysis.keyExpressions.some((current) => current.expression.toLocaleLowerCase() === incoming.expression.toLocaleLowerCase()))],
+      similarExamples: [...result.sentenceAnalysis.similarExamples, ...content.sentenceAnalysis.similarExamples.filter((incoming) => !result.sentenceAnalysis.similarExamples.some((current) => current.sentence.toLocaleLowerCase() === incoming.sentence.toLocaleLowerCase()))],
       variations: [...result.sentenceAnalysis.variations, ...content.sentenceAnalysis.variations.filter((incoming) => !result.sentenceAnalysis.variations.some((current) => current.sentence.toLocaleLowerCase() === incoming.sentence.toLocaleLowerCase()))],
     };
     for (const value of content.tags) tags.add(value);
@@ -301,7 +317,19 @@ export function mergeDictionaryContent(...contents: Array<Partial<DictionaryCont
   return result;
 }
 
-export function contentStatus(content: DictionaryContent): "READY" | "PARTIAL" | "FAILED" {
+export function contentStatus(content: DictionaryContent, entryType: EntryType = "WORD"): "READY" | "PARTIAL" | "FAILED" {
+  if (entryType === "SENTENCE") {
+    const hasMeaning = content.definitions.some((item) => item.text.trim())
+      || Boolean(content.summary.translation?.trim())
+      || Boolean(content.summary.shortDefinition?.trim());
+    if (!hasMeaning) return "FAILED";
+    const hasAnalysis = Boolean(content.sentenceAnalysis.grammarPattern || content.sentenceAnalysis.grammarExplanation)
+      || content.sentenceAnalysis.grammarNotes.length > 0
+      || content.sentenceAnalysis.keyExpressions.length > 0
+      || content.sentenceAnalysis.similarExamples.length > 0
+      || content.sentenceAnalysis.variations.length > 0;
+    return hasAnalysis ? "READY" : "PARTIAL";
+  }
   if (content.definitions.length === 0) return "FAILED";
   return content.examples.length > 0 ? "READY" : "PARTIAL";
 }

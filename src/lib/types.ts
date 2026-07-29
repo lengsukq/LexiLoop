@@ -43,6 +43,7 @@ export const INITIALIZATION_PROVIDER_IDS = [
   "ai",
   "mymemory",
   "tencent-translate",
+  "youdao",
 ] as const;
 export type InitializationProviderId = (typeof INITIALIZATION_PROVIDER_IDS)[number];
 
@@ -71,7 +72,7 @@ export type MasteryLevel = (typeof MASTERY_LEVELS)[number];
 export const REVIEW_RATINGS = ["AGAIN", "HARD", "GOOD", "EASY"] as const;
 export type ReviewRating = (typeof REVIEW_RATINGS)[number];
 
-export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING", "AI_RECOMMENDED"] as const;
+export const STUDY_MODES = ["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING", "SENTENCE_REVIEW", "AI_RECOMMENDED"] as const;
 export type StudyMode = (typeof STUDY_MODES)[number];
 
 export const QUESTION_TYPES = ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING"] as const;
@@ -190,9 +191,18 @@ export interface SentenceVariationItem {
   translation: string | null;
 }
 
+export interface SentenceGrammarExampleItem {
+  sentence: string;
+  translation: string;
+  focus: string | null;
+}
+
 export interface SentenceAnalysis {
+  grammarPattern: string | null;
+  grammarExplanation: string | null;
   grammarNotes: string[];
   keyExpressions: SentenceExpressionItem[];
+  similarExamples: SentenceGrammarExampleItem[];
   variations: SentenceVariationItem[];
 }
 
@@ -230,6 +240,15 @@ export interface ProviderAttempt {
     qualityScore?: number;
     finishReason?: string | null;
     rawResponse?: string;
+    sourceEndpoint?: string;
+    fallbackUsed?: boolean;
+    endpointAttempts?: Array<{
+      endpoint: string;
+      status: "SUCCESS" | "EMPTY" | "FAILED";
+      statusCode?: number;
+      errorCode?: string;
+      errorMessage?: string;
+    }>;
   };
 }
 
@@ -266,6 +285,7 @@ export interface AppSettings {
   tencentTranslateSecretId: string;
   tencentTranslateSecretKey: string;
   tencentTranslateProjectId: number;
+  youdaoEnabled: boolean;
   translationProviderOrder: InitializationProviderId[];
   llmConfig: LlmConfig;
 }

@@ -35,21 +35,49 @@ export function decayStaleWrongWords(): number {
 /** Re-queue FAILED initialization jobs that still have remaining attempts. */
 export function autoRetryFailedJobs(): number {
   const now = Date.now();
-  const result = sqlite.prepare(`UPDATE initialization_jobs
-    SET status = 'QUEUED', locked_at = NULL, locked_by = NULL,
-        available_at = ?, last_error_code = 'AUTO_RETRY', updated_at = ?
-    WHERE status = 'FAILED' AND attempt_count < max_attempts
-      AND (completed_at IS NULL OR completed_at < ?)`).run(now, now, now - FAILED_RETRY_COOLDOWN_MS);
-  if (result.changes > 0) {
-    const queuedWords = sqlite.prepare(
-      "SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED' AND task_type = 'INITIALIZE'",
-    ).all() as Array<{ word_id: number }>;
-    for (const job of queuedWords) {
-      sqlite.prepare("UPDATE words SET initialization_status = 'QUEUED', updated_at = ? WHERE id = ? AND initialization_status = 'FAILED'")
-        .run(now, job.word_id);
+  return sqlite.transaction(() => {
+    // Step 1: Delete FAILED jobs that already have a QUEUED/RUNNING counterpart.
+    // These are redundant and would cause UNIQUE constraint violations if retried.
+    sqlite.prepare(`DELETE FROM initialization_jobs
+      WHERE status = 'FAILED'
+        AND EXISTS (
+          SELECT 1 FROM initialization_jobs AS other
+          WHERE other.word_id = initialization_jobs.word_id
+            AND other.task_type = initialization_jobs.task_type
+            AND other.id != initialization_jobs.id
+            AND other.status IN ('QUEUED', 'RUNNING')
+        )`).run();
+
+    // Step 2: Deduplicate remaining FAILED jobs — keep only the first one per (word_id, task_type).
+    // Multiple FAILED jobs for the same word could be queued if a user re-triggers initialization
+    // before the maintenance loop runs, and updating them all to QUEUED would hit the partial unique index.
+    sqlite.prepare(`DELETE FROM initialization_jobs
+      WHERE status = 'FAILED'
+        AND id > (
+          SELECT MIN(id) FROM initialization_jobs AS keep
+          WHERE keep.word_id = initialization_jobs.word_id
+            AND keep.task_type = initialization_jobs.task_type
+            AND keep.status = initialization_jobs.status
+        )`).run();
+
+    // Step 3: Retry remaining FAILED jobs that haven't exhausted their attempts.
+    const result = sqlite.prepare(`UPDATE initialization_jobs
+      SET status = 'QUEUED', locked_at = NULL, locked_by = NULL,
+          available_at = ?, last_error_code = 'AUTO_RETRY', updated_at = ?
+      WHERE status = 'FAILED' AND attempt_count < max_attempts
+        AND (completed_at IS NULL OR completed_at < ?)`).run(now, now, now - FAILED_RETRY_COOLDOWN_MS);
+
+    if (result.changes > 0) {
+      const queuedWords = sqlite.prepare(
+        "SELECT DISTINCT word_id FROM initialization_jobs WHERE status = 'QUEUED' AND task_type = 'INITIALIZE'",
+      ).all() as Array<{ word_id: number }>;
+      for (const job of queuedWords) {
+        sqlite.prepare("UPDATE words SET initialization_status = 'QUEUED', updated_at = ? WHERE id = ? AND initialization_status = 'FAILED'")
+          .run(now, job.word_id);
+      }
     }
-  }
-  return result.changes;
+    return result.changes;
+  }).immediate();
 }
 
 /** Expire study sessions that have been pending for too long (24h). */

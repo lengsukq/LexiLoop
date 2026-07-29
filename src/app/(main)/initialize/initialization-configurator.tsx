@@ -83,7 +83,7 @@ const PRESETS: Array<{ id: string; label: string; description: string; icon: typ
   },
 ];
 
-const PROVIDER_PRIORITY: InitializationProviderId[] = ["merriam-webster", "ecdict", "dictionaryapi.dev", "ai", "mymemory"];
+const PROVIDER_PRIORITY: InitializationProviderId[] = ["merriam-webster", "ecdict", "dictionaryapi.dev", "ai", "youdao", "mymemory", "tencent-translate"];
 
 function sameFields(left: InitializationField[], right: InitializationField[]) {
   return left.length === right.length && left.every((field) => right.includes(field));

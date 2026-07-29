@@ -27,6 +27,7 @@ export interface ReviewWordRow {
   normalized_term: string;
   source_language: string;
   target_language: string;
+  content_type: string;
   initialization_status: string;
   is_suspended: number;
   definitions_json: string | null;

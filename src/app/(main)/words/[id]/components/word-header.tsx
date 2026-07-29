@@ -62,7 +62,17 @@ export function WordHeader({
             {missingTranslation && <TranslationAction busy={translationBusy} onTranslate={onTranslateSummary} />}
             {translationMessage && missingTranslation && <p className={`mt-2 max-w-2xl text-xs ${translationMessage.startsWith("已") ? "text-emerald-100" : "text-amber-200"}`}>{translationMessage}</p>}
             <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {entryTypeLabel(word.entryType)}</p>
-            <PronunciationControls accent={selectedAccent} tip={ttsTip} onAccentChange={onAccentChange} onPlay={onPlay} />
+            <PronunciationControls
+              accent={selectedAccent}
+              phonetic={
+                word.content.pronunciations.find((p) => p.accent === selectedAccent)?.phonetic
+                ?? word.content.pronunciations.find((p) => p.accent === "UK")?.phonetic
+                ?? null
+              }
+              tip={ttsTip}
+              onAccentChange={onAccentChange}
+              onPlay={onPlay}
+            />
           </div>
           <div className="shrink-0 self-start rounded-3xl bg-white/15 p-5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:self-auto">
             <p className="text-4xl font-bold">{word.masteryScore}</p>
@@ -95,15 +105,19 @@ function TranslationAction({ busy, onTranslate }: { busy: boolean; onTranslate: 
   </div>;
 }
 
-function PronunciationControls({ accent, tip, onAccentChange, onPlay }: {
+function PronunciationControls({ accent, phonetic, tip, onAccentChange, onPlay }: {
   accent: "US" | "UK" | "GENERAL";
+  phonetic: string | null;
   tip: string;
   onAccentChange: (accent: "US" | "UK" | "GENERAL") => void;
   onPlay: () => Promise<void>;
 }) {
   return <div className="mt-4 flex flex-wrap items-center gap-2">
-    <div className="flex overflow-hidden rounded-lg border border-white/25">
-      {(["US", "UK", "GENERAL"] as const).map((value) => <button key={value} type="button" onClick={() => onAccentChange(value)} className={`px-2.5 py-1 text-xs font-medium transition ${accent === value ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{value === "US" ? "美" : value === "UK" ? "英" : "通用"}</button>)}
+    <div className="flex items-center gap-2">
+      <div className="flex overflow-hidden rounded-lg border border-white/25">
+        {(["US", "UK", "GENERAL"] as const).map((value) => <button key={value} type="button" onClick={() => onAccentChange(value)} className={`px-2.5 py-1 text-xs font-medium transition ${accent === value ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{value === "US" ? "美" : value === "UK" ? "英" : "通用"}</button>)}
+      </div>
+      {phonetic && <span className="text-sm font-medium tracking-wide text-white/90">{phonetic}</span>}
     </div>
     <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void onPlay()}><Volume2 className="size-4" />播放发音</button>
     {tip && <p className="w-full text-xs text-amber-300">{tip}</p>}

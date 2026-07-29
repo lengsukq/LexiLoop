@@ -11,6 +11,7 @@ const PROVIDER_LABELS: Record<InitializationProviderId, string> = {
   ai: "AI 词条初始化",
   mymemory: "MyMemory 翻译",
   "tencent-translate": "腾讯翻译",
+  youdao: "有道词典",
 };
 
 export function StudySettingsTab({
@@ -39,23 +40,43 @@ export function StudySettingsTab({
 
   const providerOrder = settings.translationProviderOrder ?? [];
 
-  function handleDragStart(index: number) {
-    dragIndex.current = index;
+  function isProviderActive(id: InitializationProviderId): boolean {
+    switch (id) {
+      case "dictionaryapi.dev": return settings.dictionaryApiEnabled;
+      case "mymemory": return settings.myMemoryEnabled;
+      case "merriam-webster": return settings.merriamWebsterEnabled;
+      case "youdao": return settings.youdaoEnabled;
+      case "ecdict": return settings.ecdictEnabled;
+      case "tencent-translate": return settings.tencentTranslateEnabled;
+      case "ai": return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
+      default: return true;
+    }
   }
 
-  function handleDragOver(event: React.DragEvent, index: number) {
+  const visibleProviders = providerOrder.filter(isProviderActive);
+
+  function handleDragStart(visibleIndex: number) {
+    const providerId = visibleProviders[visibleIndex];
+    if (providerId) dragIndex.current = providerOrder.indexOf(providerId);
+  }
+
+  function handleDragOver(event: React.DragEvent, visibleIndex: number) {
     event.preventDefault();
-    setDragOverIndex(index);
+    setDragOverIndex(visibleIndex);
   }
 
-  function handleDrop(index: number) {
+  function handleDrop(dropVisibleIndex: number) {
     const from = dragIndex.current;
     setDragOverIndex(null);
     dragIndex.current = null;
-    if (from === null || from === index) return;
+    if (from === null) return;
+    const targetId = visibleProviders[dropVisibleIndex];
+    if (!targetId) return;
+    const to = providerOrder.indexOf(targetId);
+    if (from === to) return;
     const reordered = [...providerOrder];
     const [moved] = reordered.splice(from, 1) as [InitializationProviderId];
-    reordered.splice(index, 0, moved);
+    reordered.splice(to, 0, moved);
     update("translationProviderOrder", reordered);
   }
 
@@ -117,24 +138,24 @@ export function StudySettingsTab({
 
           <section>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">数据来源与执行顺序</h3>
-            <p className="mb-3 text-xs text-[#aeaeb2]">拖动调整翻译/词典查询优先级，排在上方的来源会先被执行。</p>
+            <p className="mb-3 text-xs text-[#aeaeb2]">拖动调整翻译/词典查询优先级，排在上方的来源会先被执行。未启用的数据源不会出现在列表中。</p>
             <div className="space-y-1.5">
-              {providerOrder.map((id, index) => (
+              {visibleProviders.map((id, visibleIndex) => (
                 <div
                   key={id}
                   draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(event) => handleDragOver(event, index)}
-                  onDrop={() => handleDrop(index)}
+                  onDragStart={() => handleDragStart(visibleIndex)}
+                  onDragOver={(event) => handleDragOver(event, visibleIndex)}
+                  onDrop={() => handleDrop(visibleIndex)}
                   onDragEnd={handleDragEnd}
                   className={`flex cursor-grab items-center gap-3 rounded-[12px] border px-3 py-2.5 transition-all active:cursor-grabbing ${
-                    dragOverIndex === index
+                    dragOverIndex === visibleIndex
                       ? "border-[#007aff]/40 bg-[#007aff]/[0.06]"
                       : "border-black/[0.06] bg-white/[0.6] dark:border-white/[0.08] dark:bg-white/[0.04]"
                   }`}
                 >
                   <GripVertical className="size-4 shrink-0 text-[#aeaeb2]" />
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#007aff]/[0.08] text-[10px] font-bold text-[#007aff]">{index + 1}</span>
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#007aff]/[0.08] text-[10px] font-bold text-[#007aff]">{visibleIndex + 1}</span>
                   <span className="text-sm font-medium">{PROVIDER_LABELS[id] ?? id}</span>
                 </div>
               ))}
@@ -149,6 +170,7 @@ export function StudySettingsTab({
               <Toggle label="DictionaryAPI.dev" checked={settings.dictionaryApiEnabled} onChange={(value) => update("dictionaryApiEnabled", value)} />
               <Toggle label="MyMemory 翻译" checked={settings.myMemoryEnabled} onChange={(value) => update("myMemoryEnabled", value)} />
               <Toggle label="Merriam-Webster 词典" checked={settings.merriamWebsterEnabled} onChange={(value) => update("merriamWebsterEnabled", value)} />
+              <Toggle label="有道词典" checked={settings.youdaoEnabled} onChange={(value) => update("youdaoEnabled", value)} />
             </div>
           </section>
 

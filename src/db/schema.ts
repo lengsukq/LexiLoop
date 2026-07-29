@@ -55,7 +55,7 @@ export const wordContents = sqliteTable("word_contents", {
   affixesJson: text("affixes_json", { mode: "json" }).$type<AffixItem[]>().notNull().default([]),
   summaryJson: text("summary_json", { mode: "json" }).$type<LexicalSummary>().notNull().default({ shortDefinition: null, translation: null, cefrLevel: null, frequency: null }),
   learningJson: text("learning_json", { mode: "json" }).$type<LearningContent>().notNull().default({ pronunciationTip: null, mnemonic: null, commonMistakes: [] }),
-  sentenceAnalysisJson: text("sentence_analysis_json", { mode: "json" }).$type<SentenceAnalysis>().notNull().default({ grammarNotes: [], keyExpressions: [], variations: [] }),
+  sentenceAnalysisJson: text("sentence_analysis_json", { mode: "json" }).$type<SentenceAnalysis>().notNull().default({ grammarPattern: null, grammarExplanation: null, grammarNotes: [], keyExpressions: [], similarExamples: [], variations: [] }),
   tagsJson: text("tags_json", { mode: "json" }).$type<string[]>().notNull().default([]),
   providerMetadataJson: text("provider_metadata_json", { mode: "json" }).$type<ProviderAttempt[]>().notNull().default([]),
   contentSource: text("content_source").notNull().default("MIXED"),

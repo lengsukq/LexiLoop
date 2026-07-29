@@ -52,7 +52,9 @@ export async function getDashboard() {
     todayAccuracy: todayLogs.length ? Math.round(todayLogs.filter((item) => item.is_correct).length / todayLogs.length * 100) : null,
     resumeSession: resumable ? {
       id: resumable.id,
-      sessionType: resumable.source_type === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : resumable.session_type,
+      sessionType: resumable.source_type === "AI_RECOMMENDED" || resumable.source_type === "SENTENCE_REVIEW"
+        ? resumable.source_type
+        : resumable.session_type,
       startedAt: new Date(resumable.started_at).toISOString(),
       remainingCount: resumable.remaining_count,
       plannedCount: resumable.planned_count,

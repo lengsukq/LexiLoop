@@ -29,9 +29,10 @@ export function maxAttemptsFromSettings(): number {
 }
 
 function usableContentStatus(wordId: number): InitializationStatus | null {
-  const row = sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(wordId) as Record<string, unknown> | undefined;
+  const row = sqlite.prepare(`SELECT wc.*, w.content_type FROM word_contents wc
+    JOIN words w ON w.id = wc.word_id WHERE wc.word_id = ?`).get(wordId) as Record<string, unknown> | undefined;
   if (!row) return null;
-  const status = contentStatus(dictionaryContentFromRow(row));
+  const status = contentStatus(dictionaryContentFromRow(row), String(row.content_type ?? "WORD") as import("@/lib/types").EntryType);
   return status === "FAILED" ? null : status;
 }
 

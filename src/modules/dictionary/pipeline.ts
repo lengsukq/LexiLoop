@@ -11,6 +11,7 @@ import { DictionaryApiProvider } from "./providers/dictionary-api";
 import { EcdictProvider } from "./providers/ecdict";
 import { MyMemoryProvider } from "./providers/mymemory";
 import { AiLexicalProvider } from "./providers/ai-lexical";
+import { YoudaoProvider } from "./providers/youdao";
 import { MerriamWebsterProvider } from "./providers/merriam-webster";
 import { TencentTranslateProvider } from "./providers/tencent-translate";
 import { mergeDictionaryContent } from "./content";
@@ -25,6 +26,7 @@ export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, Initializat
   "merriam-webster": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   "dictionaryapi.dev": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   ecdict: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "forms", "tags"],
+  youdao: ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms"],
   ai: ["definitions", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"],
   mymemory: ["definitions"],
   "tencent-translate": ["definitions"],
@@ -44,6 +46,7 @@ function createProvider(id: InitializationProviderId, settings: AppSettings): Di
     if (!settings.tencentTranslateEnabled || !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim()) return null;
     return new TencentTranslateProvider({ secretId: settings.tencentTranslateSecretId.trim(), secretKey: settings.tencentTranslateSecretKey.trim(), projectId: settings.tencentTranslateProjectId });
   }
+  if (id === "youdao") return settings.youdaoEnabled ? new YoudaoProvider() : null;
   return null;
 }
 
@@ -59,8 +62,8 @@ function providersFor(settings: AppSettings, selected?: InitializationProviderId
     }
   } else {
     order = settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled
-      ? ["merriam-webster", "ai", "dictionaryapi.dev", "ecdict"]
-      : ["merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory"];
+      ? ["merriam-webster", "ai", "dictionaryapi.dev", "ecdict", "youdao"]
+      : ["merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory", "youdao"];
   }
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }

@@ -78,7 +78,7 @@ export function claimStudyItem(input: AnswerInput, now: number): void {
 
 export function findReviewWord(wordId: number): ReviewWordRow | undefined {
   return sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language,
-      w.initialization_status, w.is_suspended, c.definitions_json
+      w.content_type, w.initialization_status, w.is_suspended, c.definitions_json
     FROM words w LEFT JOIN word_contents c ON c.word_id = w.id WHERE w.id = ?`)
     .get(wordId) as ReviewWordRow | undefined;
 }

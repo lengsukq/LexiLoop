@@ -10,6 +10,14 @@ describe("EasyDict parser and normalization", () => {
     expect(detectEntryType("well-known")).toBe("WORD");
   });
 
+  it("detects complete short and long sentences without turning common phrases into sentences", () => {
+    expect(detectEntryType("I love you")).toBe("SENTENCE");
+    expect(detectEntryType("How are you?")).toBe("SENTENCE");
+    expect(detectEntryType("She wants to learn English")).toBe("SENTENCE");
+    expect(detectEntryType("in front of")).toBe("PHRASE");
+    expect(detectEntryType("as soon as possible")).toBe("PHRASE");
+  });
+
   it("requires EasyDict headers", () => {
     const result = parseEasyDictCsv("word,language\nhello,en\n");
     expect(result.parseErrors[0]).toContain("缺少必要列");

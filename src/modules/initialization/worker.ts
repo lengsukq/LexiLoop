@@ -3,6 +3,7 @@ import type {
   AiTaskType,
   AppSettings,
   DictionaryContent,
+  EntryType,
   InitializationField,
   InitializationMode,
   InitializationProviderId,
@@ -202,20 +203,24 @@ export async function processJob(job: ClaimedJob): Promise<void> {
   const requestedFields = normalizeRequestedFields(job.requestedFields);
   const sourceLanguage = String(word.source_language);
   const targetLanguage = String(word.target_language);
+  const entryType = String(word.content_type ?? word.entry_type) as EntryType;
   const targetDefinitionsReady = requestedFieldStatusForLanguages(
     existing,
     ["definitions"],
     sourceLanguage,
     targetLanguage,
   ) === "READY";
+  const existingContentReady = entryType === "SENTENCE"
+    ? contentStatus(existing, entryType) !== "FAILED"
+    : targetDefinitionsReady;
 
-  if (job.mode === "SKIP_INITIALIZED" && targetDefinitionsReady) {
-    completeJob(job, contentStatus(existing), Date.now());
+  if (job.mode === "SKIP_INITIALIZED" && existingContentReady) {
+    completeJob(job, contentStatus(existing, entryType), Date.now());
     return;
   }
   if (job.mode === "FILL_MISSING_FIELDS" && requestedFields.length
     && requestedFieldStatusForLanguages(existing, requestedFields, sourceLanguage, targetLanguage) === "READY") {
-    completeJob(job, "READY", Date.now(), contentStatus(existing));
+    completeJob(job, "READY", Date.now(), contentStatus(existing, entryType));
     return;
   }
 
@@ -224,7 +229,7 @@ export async function processJob(job: ClaimedJob): Promise<void> {
     const result = await lookupDictionary({
       term: String(word.term),
       normalizedTerm: String(word.normalized_term),
-      entryType: String(word.content_type ?? word.entry_type) as import("@/lib/types").EntryType,
+      entryType,
       sourceLanguage,
       targetLanguage,
       initializationMode: job.mode,
@@ -248,9 +253,15 @@ export async function processJob(job: ClaimedJob): Promise<void> {
 
     const incomingStatus = requestedFields.length
       ? requestedFieldStatusForLanguages(result.content, requestedFields, sourceLanguage, targetLanguage)
-      : contentStatus(result.content);
+      : contentStatus(result.content, entryType);
     if (incomingStatus === "FAILED") {
-      failOrRetry(job, result.hasTransientFailure, result.hasTransientFailure ? "PROVIDER_TRANSIENT_FAILURE" : "REQUESTED_FIELDS_EMPTY", requestedFields.length ? "所选数据来源没有返回本次要求的字段" : "没有获取到可用释义", now);
+      const attemptSummary = result.attempts
+        .map((a) => `${a.providerId}=${a.status}${a.errorCode ? `[${a.errorCode}]` : ""}${a.fieldsReturned.length ? `(${a.fieldsReturned.join(",")})` : ""}`)
+        .join(" ");
+      const detail = requestedFields.length
+        ? `所选数据来源没有返回本次要求的字段。Provider 执行情况：${attemptSummary}`
+        : `没有获取到可用释义。Provider 执行情况：${attemptSummary}`;
+      failOrRetry(job, result.hasTransientFailure, result.hasTransientFailure ? "PROVIDER_TRANSIENT_FAILURE" : "REQUESTED_FIELDS_EMPTY", detail, now);
       return;
     }
 
@@ -259,8 +270,8 @@ export async function processJob(job: ClaimedJob): Promise<void> {
       : job.mode === "FORCE_OVERWRITE"
         ? preserveUserContent(existing, result.content)
         : mergeDictionaryContent(existing, result.content);
-    const taskStatus = requestedFields.length ? incomingStatus : contentStatus(merged);
-    let wordStatus = contentStatus(merged);
+    const taskStatus = requestedFields.length ? incomingStatus : contentStatus(merged, entryType);
+    let wordStatus = contentStatus(merged, entryType);
     if (wordStatus === "FAILED" && taskStatus !== "FAILED") wordStatus = "PARTIAL";
     saveContent(job.wordId, merged, result.attempts, result.contentSource, now);
     completeJob(job, taskStatus, now, wordStatus);

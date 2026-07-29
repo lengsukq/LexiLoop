@@ -77,6 +77,14 @@ export async function getInitializationOptions() {
       reason: !settings.tencentTranslateEnabled ? "请先在设置中启用" : !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim() ? "尚未配置 API 密钥" : null,
       capabilities: PROVIDER_CAPABILITIES["tencent-translate"],
     },
+    {
+      id: "youdao",
+      label: "有道词典",
+      enabled: settings.youdaoEnabled,
+      available: settings.youdaoEnabled,
+      reason: settings.youdaoEnabled ? null : "请先在设置中启用",
+      capabilities: PROVIDER_CAPABILITIES.youdao,
+    },
   ];
   return { providers };
 }
@@ -164,7 +172,14 @@ export async function getJobDetails(jobId: number) {
   // sentenceAnalysis
   const saJson = wordContent?.sentence_analysis_json as string | undefined;
   const sa = saJson ? JSON.parse(saJson) : null;
-  contentFields.sentenceAnalysis = sa && (sa.grammarNotes?.length > 0 || sa.keyExpressions?.length > 0);
+  contentFields.sentenceAnalysis = sa && Boolean(
+    sa.grammarPattern
+    || sa.grammarExplanation
+    || sa.grammarNotes?.length > 0
+    || sa.keyExpressions?.length > 0
+    || sa.similarExamples?.length > 0
+    || sa.variations?.length > 0
+  );
 
   const formatAttempt = (a: Record<string, unknown>) => ({
     id: a.id as number,

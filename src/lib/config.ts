@@ -40,7 +40,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tencentTranslateSecretId: "",
   tencentTranslateSecretKey: "",
   tencentTranslateProjectId: 0,
-  translationProviderOrder: ["merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory"] as InitializationProviderId[],
+  youdaoEnabled: process.env.YOUDO_API_ENABLED !== "false",
+  translationProviderOrder: ["merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory", "youdao"] as InitializationProviderId[],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

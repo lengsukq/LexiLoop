@@ -30,6 +30,14 @@ interface CandidatePools {
   limits: StudyLimits;
 }
 
+type CandidateScope = "LEXICAL" | "SENTENCE" | "ALL";
+
+function candidateScopeSql(scope: CandidateScope): string {
+  if (scope === "SENTENCE") return "AND COALESCE(w.content_type, w.entry_type) = 'SENTENCE'";
+  if (scope === "LEXICAL") return "AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE'";
+  return "";
+}
+
 function candidateAvailabilitySql(): string {
   return `NOT EXISTS (
     SELECT 1 FROM study_session_items skipped
@@ -50,26 +58,29 @@ function candidateAvailabilitySql(): string {
   )`;
 }
 
-function dueCandidates(limit: number, now: number): Candidate[] {
+function dueCandidates(limit: number, now: number, scope: CandidateScope): Candidate[] {
   return sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type
     FROM review_cards c JOIN words w ON w.id = c.word_id
     WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}
     ORDER BY (CAST(? - c.due_at AS REAL) / 86400000.0) * (1.0 + c.difficulty * 0.15) DESC LIMIT ?`).all(now, now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, now, limit) as Candidate[];
 }
 
-function wrongCandidates(limit: number, now: number): Candidate[] {
+function wrongCandidates(limit: number, now: number, scope: CandidateScope): Candidate[] {
   return sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type
     FROM wrong_word_states x JOIN words w ON w.id = x.word_id
     WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}
     ORDER BY x.updated_at ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as Candidate[];
 }
 
-function newCandidates(limit: number, now: number): Candidate[] {
+function newCandidates(limit: number, now: number, scope: CandidateScope): Candidate[] {
   return sqlite.prepare(`SELECT w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type
     FROM words w LEFT JOIN review_cards c ON c.word_id = w.id
     WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}
     ORDER BY COALESCE(w.source_created_at, w.created_at) ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as Candidate[];
 }
@@ -136,6 +147,7 @@ function interleave(groups: Array<{ items: Candidate[]; take: number }>): Candid
 }
 
 function questionFor(mode: StudyMode, taskType: string): QuestionType {
+  if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING";
   if (mode === "LISTENING") return "LISTENING_SPELLING";
   if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING";
   if (taskType === "NEW") return "EN_TO_ZH_CHOICE";
@@ -185,6 +197,7 @@ function selectCandidates(mode: StudyMode, pools: CandidatePools): Candidate[] {
     case "NEW_WORDS": return pools.fresh.slice(0, pools.limits.fresh);
     case "LISTENING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }]);
     case "SPELLING": return interleave([{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }]);
+    case "SENTENCE_REVIEW": return interleave([{ items: groups.due, take: 4 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }]);
     case "AI_RECOMMENDED": return [];
     case "DAILY": return interleave(adaptiveDailyRatios(groups));
   }
@@ -200,7 +213,7 @@ function adaptiveDailyRatios(groups: { due: Candidate[]; wrong: Candidate[]; fre
   return [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }];
 }
 
-async function loadPools(now: number): Promise<CandidatePools> {
+async function loadPools(now: number, scope: CandidateScope = "LEXICAL"): Promise<CandidatePools> {
   const settings = await getSettings();
   const limits = {
     due: settings.dailyDueReviewLimit,
@@ -209,23 +222,26 @@ async function loadPools(now: number): Promise<CandidatePools> {
   };
   const overlapBuffer = limits.due + limits.wrong + limits.fresh;
   return {
-    due: dueCandidates(limits.due + overlapBuffer, now),
-    wrong: wrongCandidates(limits.wrong + overlapBuffer, now),
-    fresh: newCandidates(limits.fresh + overlapBuffer, now),
+    due: dueCandidates(limits.due + overlapBuffer, now, scope),
+    wrong: wrongCandidates(limits.wrong + overlapBuffer, now, scope),
+    fresh: newCandidates(limits.fresh + overlapBuffer, now, scope),
     limits,
   };
 }
 
-function countAvailableCandidates(now: number) {
+function countAvailableCandidates(now: number, scope: CandidateScope = "LEXICAL") {
   const skippedAfter = now - SKIP_COOLDOWN_MS;
   const due = sqlite.prepare(`SELECT count(*) AS count FROM review_cards c JOIN words w ON w.id = c.word_id
     WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}`).get(now, skippedAfter, now - SESSION_RESUME_TTL_MS) as { count: number };
   const wrong = sqlite.prepare(`SELECT count(*) AS count FROM wrong_word_states x JOIN words w ON w.id = x.word_id
     WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}`).get(skippedAfter, now - SESSION_RESUME_TTL_MS) as { count: number };
   const fresh = sqlite.prepare(`SELECT count(*) AS count FROM words w LEFT JOIN review_cards c ON c.word_id = w.id
     WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      ${candidateScopeSql(scope)}
       AND ${candidateAvailabilitySql()}`).get(skippedAfter, now - SESSION_RESUME_TTL_MS) as { count: number };
   return { due: due.count, wrong: wrong.count, fresh: fresh.count };
 }
@@ -233,8 +249,10 @@ function countAvailableCandidates(now: number) {
 export async function getDailyStudyPlan() {
   const now = Date.now();
   const active = activePendingPlan(now);
-  const pools = await loadPools(now);
+  const pools = await loadPools(now, "LEXICAL");
+  const sentencePools = await loadPools(now, "SENTENCE");
   const selected = selectCandidates("DAILY", pools);
+  const selectedSentences = selectCandidates("SENTENCE_REVIEW", sentencePools);
   const dueSet = new Set(pools.due.map((item) => item.id));
   const wrongSet = new Set(pools.wrong.map((item) => item.id));
   const planned = { REVIEW: active.REVIEW, WRONG: active.WRONG, NEW: active.NEW };
@@ -242,7 +260,9 @@ export async function getDailyStudyPlan() {
     const task = taskFor("DAILY", candidate, { due: dueSet, wrong: wrongSet });
     if (task === "REVIEW" || task === "WRONG" || task === "NEW") planned[task] += 1;
   }
-  const available = countAvailableCandidates(now);
+  const available = countAvailableCandidates(now, "LEXICAL");
+  const availableSentences = countAvailableCandidates(now, "SENTENCE");
+  const activeSentences = activePendingSentenceCount(now);
   const activeTotal = active.REVIEW + active.WRONG + active.NEW;
   const plannedTotal = activeTotal + selected.length;
   const estimatedSeconds = planned.REVIEW * 35 + planned.WRONG * 55 + planned.NEW * 70;
@@ -253,6 +273,8 @@ export async function getDailyStudyPlan() {
     plannedWrongWordCount: planned.WRONG,
     newWordCount: available.fresh + active.NEW,
     plannedNewWordCount: planned.NEW,
+    sentenceReviewCount: availableSentences.due + availableSentences.wrong + availableSentences.fresh + activeSentences,
+    plannedSentenceReviewCount: selectedSentences.length + activeSentences,
     plannedTotal,
     activeSessionTasks: activeTotal,
     estimatedMinutes: plannedTotal === 0 ? 0 : Math.max(1, Math.ceil(estimatedSeconds / 60)),
@@ -287,11 +309,19 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
       ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
     return row?.id ?? null;
   }
+  if (mode === "SENTENCE_REVIEW") {
+    const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
+      WHERE s.source_type = 'SENTENCE_REVIEW' AND s.completed_at IS NULL AND s.started_at >= ?
+        AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
+      ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
+    return row?.id ?? null;
+  }
   if (mode === "DAILY") {
     const row = sqlite.prepare(`SELECT s.id FROM study_sessions s
       WHERE s.completed_at IS NULL AND s.started_at >= ?
         AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
-      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+        AND COALESCE(s.source_type, '') <> 'SENTENCE_REVIEW'
+        AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
         AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
       ORDER BY s.started_at DESC LIMIT 1`).get(ttl) as { id: number } | undefined;
     return row?.id ?? null;
@@ -302,6 +332,7 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
   const exact = sqlite.prepare(`SELECT s.id FROM study_sessions s
     WHERE s.session_type = ? AND s.completed_at IS NULL AND s.started_at >= ?
       AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+      AND COALESCE(s.source_type, '') <> 'SENTENCE_REVIEW'
       AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
       AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING')
     ORDER BY s.started_at DESC LIMIT 1`).get(mode, ttl) as { id: number } | undefined;
@@ -311,7 +342,8 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
     const daily = sqlite.prepare(`SELECT s.id FROM study_sessions s
       WHERE s.completed_at IS NULL AND s.started_at >= ?
         AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
-      AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+        AND COALESCE(s.source_type, '') <> 'SENTENCE_REVIEW'
+        AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
         AND EXISTS (SELECT 1 FROM study_session_items i WHERE i.study_session_id = s.id AND i.status = 'PENDING' AND i.task_type = ?)
       ORDER BY s.started_at DESC LIMIT 1`).get(ttl, taskType) as { id: number } | undefined;
     if (daily) return daily.id;
@@ -333,12 +365,25 @@ function activePendingPlan(now: number) {
     LEFT JOIN review_cards c ON c.word_id = w.id
     LEFT JOIN wrong_word_states x ON x.word_id = w.id
     WHERE i.status = 'PENDING' AND s.completed_at IS NULL AND s.started_at >= ?
+      AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE'
       AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
       AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
     GROUP BY category`).all(now, now - SESSION_RESUME_TTL_MS) as Array<{ category: "REVIEW" | "WRONG" | "NEW"; count: number }>;
   const result = { REVIEW: 0, WRONG: 0, NEW: 0 };
   for (const row of rows) result[row.category] = Number(row.count);
   return result;
+}
+
+function activePendingSentenceCount(now: number): number {
+  const row = sqlite.prepare(`SELECT count(*) AS count
+    FROM study_session_items i
+    JOIN study_sessions s ON s.id = i.study_session_id
+    JOIN words w ON w.id = i.word_id
+    WHERE i.status = 'PENDING' AND s.completed_at IS NULL AND s.started_at >= ?
+      AND COALESCE(w.content_type, w.entry_type) = 'SENTENCE'
+      AND s.source_type = 'SENTENCE_REVIEW'`)
+    .get(now - SESSION_RESUME_TTL_MS) as { count: number };
+  return Number(row.count);
 }
 
 export async function startStudySession(mode: StudyMode, resume = true) {
@@ -349,7 +394,8 @@ export async function startStudySession(mode: StudyMode, resume = true) {
     if (resumableId) return getStudySession(resumableId, true);
   }
 
-  const pools = await loadPools(now);
+  const scope: CandidateScope = mode === "SENTENCE_REVIEW" ? "SENTENCE" : mode === "AI_RECOMMENDED" ? "ALL" : "LEXICAL";
+  const pools = await loadPools(now, scope);
   const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
   if (mode === "AI_RECOMMENDED" && recommended!.length === 0) {
     throw new Error("AI_RECOMMENDED_ALL_DONE");
@@ -357,8 +403,8 @@ export async function startStudySession(mode: StudyMode, resume = true) {
   const selected: Candidate[] = recommended ?? selectCandidates(mode, pools);
   const dueSet = new Set(pools.due.map((item) => item.id));
   const wrongSet = new Set(pools.wrong.map((item) => item.id));
-  const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode;
-  const sourceType = mode === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : null;
+  const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode === "SENTENCE_REVIEW" ? "DUE_REVIEW" : mode;
+  const sourceType = mode === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : mode === "SENTENCE_REVIEW" ? "SENTENCE_REVIEW" : null;
   const sessionId = sqlite.transaction(() => {
     const session = sqlite.prepare(`INSERT INTO study_sessions
       (session_type, source_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at)
@@ -387,7 +433,7 @@ export function getStudySession(sessionId: number, resumed = false) {
     w.id AS word_id, w.term, w.source_language, w.target_language, w.content_type,
     c.definitions_json, c.pronunciations_json, c.examples_json, c.phrases_json, c.forms_json,
     c.synonyms_json, c.antonyms_json, c.word_family_json, c.confused_words_json,
-    c.roots_json, c.affixes_json, c.summary_json, c.learning_json, c.tags_json
+    c.roots_json, c.affixes_json, c.summary_json, c.learning_json, c.sentence_analysis_json, c.tags_json
     FROM study_session_items i JOIN words w ON w.id = i.word_id
     LEFT JOIN word_contents c ON c.word_id = w.id
     WHERE i.study_session_id = ? ORDER BY i.position ASC`).all(sessionId) as Array<Record<string, unknown>>;
@@ -421,7 +467,9 @@ export function getStudySession(sessionId: number, resumed = false) {
     resumeIndex: resumeIndex === -1 ? items.length : resumeIndex,
     session: {
       id: Number(session.id),
-      sessionType: session.source_type === "AI_RECOMMENDED" ? "AI_RECOMMENDED" : String(session.session_type),
+      sessionType: session.source_type === "AI_RECOMMENDED" || session.source_type === "SENTENCE_REVIEW"
+        ? String(session.source_type)
+        : String(session.session_type),
       startedAt: new Date(Number(session.started_at)).toISOString(),
       completedAt: session.completed_at ? new Date(Number(session.completed_at)).toISOString() : null,
       plannedCount: Number(session.planned_count),

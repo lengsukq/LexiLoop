@@ -170,8 +170,8 @@ const manualDefinitionSchema = z.object({
 
 export function updateManualDefinition(wordId: number, input: unknown) {
   const values = manualDefinitionSchema.parse(input);
-  const word = sqlite.prepare("SELECT id, target_language FROM words WHERE id = ?").get(wordId) as {
-    id: number; target_language: string;
+  const word = sqlite.prepare("SELECT id, target_language, content_type FROM words WHERE id = ?").get(wordId) as {
+    id: number; target_language: string; content_type: import("@/lib/types").EntryType;
   } | undefined;
   if (!word) throw new Error("WORD_NOT_FOUND");
   const row = sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(wordId) as Record<string, unknown> | undefined;
@@ -186,7 +186,7 @@ export function updateManualDefinition(wordId: number, input: unknown) {
       isUserEdited: true,
     });
   }
-  const status = contentStatus(content);
+  const status = contentStatus(content, word.content_type);
   const now = Date.now();
   sqlite.transaction(() => {
     sqlite.prepare(`INSERT INTO word_contents

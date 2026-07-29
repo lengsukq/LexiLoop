@@ -18,7 +18,12 @@ export function hasInitializationField(content: DictionaryContent, field: Initia
     case "pronunciations.audio": return content.pronunciations.some((item) => Boolean(item.audioUrl?.trim()));
     case "summary": return Boolean(content.summary.shortDefinition || content.summary.translation || content.summary.cefrLevel || content.summary.frequency);
     case "learning": return Boolean(content.learning.pronunciationTip || content.learning.mnemonic || content.learning.commonMistakes.length);
-    case "sentenceAnalysis": return Boolean(content.sentenceAnalysis.grammarNotes.length || content.sentenceAnalysis.keyExpressions.length || content.sentenceAnalysis.variations.length);
+    case "sentenceAnalysis": return Boolean(
+      content.sentenceAnalysis.grammarPattern
+      && content.sentenceAnalysis.grammarExplanation
+      && content.sentenceAnalysis.grammarNotes.length > 0
+      && content.sentenceAnalysis.similarExamples.length >= 3
+    );
     default: return content[field as SimpleArrayField].length > 0;
   }
 }

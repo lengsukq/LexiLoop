@@ -75,6 +75,9 @@ export function useSettingsData() {
         body: action === "remove" ? undefined : JSON.stringify({ action }),
       });
       setEcdict(status);
+      // Sync ecdictEnabled into the local settings state so the Study tab's
+      // data-source order list and the backend pipeline see the correct value.
+      setSettings((current) => current ? { ...current, ecdictEnabled: status.enabled } : current);
       setMessage(action === "download" ? "ECDICT 已下载并启用。" : action === "remove" ? "ECDICT 已移除。" : "ECDICT 状态已更新。");
     } catch (reason) {
       setError(errorMessage(reason, "操作失败"));
@@ -90,7 +93,9 @@ export function useSettingsData() {
     try {
       const form = new FormData();
       form.append("file", file);
-      setEcdict(await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: "PUT", body: form }));
+      const status = await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: "PUT", body: form });
+      setEcdict(status);
+      setSettings((current) => current ? { ...current, ecdictEnabled: status.enabled } : current);
       setMessage("ECDICT 文件校验通过并已启用。");
     } catch (reason) {
       setError(errorMessage(reason, "上传失败"));

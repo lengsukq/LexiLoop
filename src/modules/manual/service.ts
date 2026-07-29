@@ -133,7 +133,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
     );
   }
   const content = normalizeDictionaryContent(result.content);
-  if (contentStatus(content) === "FAILED") {
+  if (contentStatus(content, contentType) === "FAILED") {
     throw new ManualPreviewError("AI_PREVIEW_EMPTY", "AI 没有生成可用释义，请调整输入或重新生成。");
   }
   const attempts = result.attempts.map((attempt) => ({
@@ -203,7 +203,7 @@ export function confirmManualPreview(input: unknown) {
       .get(row.normalized_term, row.source_language, row.target_language) as { id: number; initialization_status: string } | undefined;
     let created = false;
     if (!word) {
-      const status = contentStatus(previewContent);
+      const status = contentStatus(previewContent, row.content_type);
       const inserted = sqlite.prepare(`INSERT INTO words
         (term, normalized_term, source_language, target_language, source_language_name, target_language_name,
          entry_type, content_type, initialization_status, mastery_level, mastery_score, is_suspended,
@@ -222,7 +222,7 @@ export function confirmManualPreview(input: unknown) {
     const finalContent = existingRow
       ? mergeDictionaryContent(dictionaryContentFromRow(existingRow), previewContent)
       : previewContent;
-    const finalStatus = contentStatus(finalContent);
+    const finalStatus = contentStatus(finalContent, row.content_type);
     saveContent(word.id, finalContent, attempts, now);
     saveAttempts(word.id, attempts, now);
     sqlite.prepare("UPDATE words SET content_type = ?, initialization_status = ?, updated_at = ? WHERE id = ?")

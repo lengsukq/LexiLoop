@@ -29,6 +29,16 @@ function targetDefinitions(word: ReviewWordRow): DefinitionValue[] {
   return target.length ? target : definitions;
 }
 
+function normalizeSentenceAnswer(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/[\p{P}\p{S}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function expectedAnswer(input: AnswerInput, word: ReviewWordRow, definitions: DefinitionValue[]): string {
   const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
   return definitionQuestion ? definitions.map((definition) => definition.text).join("；") : word.term;
@@ -36,7 +46,12 @@ function expectedAnswer(input: AnswerInput, word: ReviewWordRow, definitions: De
 
 function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definitions: DefinitionValue[]): boolean {
   const spelling = input.questionType === "ZH_TO_EN_SPELLING" || input.questionType === "LISTENING_SPELLING";
-  if (spelling) return normalizeTerm(input.userAnswer ?? "", word.source_language) === word.normalized_term;
+  if (spelling) {
+    if (word.content_type === "SENTENCE") {
+      return normalizeSentenceAnswer(input.userAnswer ?? "") === normalizeSentenceAnswer(word.term);
+    }
+    return normalizeTerm(input.userAnswer ?? "", word.source_language) === word.normalized_term;
+  }
   if (input.questionType === "EN_TO_ZH_CHOICE") {
     const correctDefinition = definitions[0]?.text;
     return correctDefinition ? (input.userAnswer ?? "").trim() === correctDefinition.trim() : input.rating !== "AGAIN";
@@ -53,11 +68,12 @@ export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): A
   const effectiveRating: ReviewRating = objectivelyScored && !isCorrect ? "AGAIN" : input.rating;
   const expected = expectedAnswer(input, word, definitions);
   const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
+  const reversePrompt = definitions.map((definition) => definition.text).join("；");
 
   return {
     isCorrect,
     effectiveRating,
     expectedAnswer: expected,
-    presentedPrompt: definitionQuestion ? word.term : expected,
+    presentedPrompt: definitionQuestion ? word.term : reversePrompt,
   };
 }

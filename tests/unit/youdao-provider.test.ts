@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LookupInput } from "@/lib/types";
 import { YoudaoProvider } from "@/modules/dictionary/providers/youdao";
+import { parseYoudaoHtml } from "@/modules/dictionary/providers/youdao-parser";
 
 const baseInput: LookupInput = {
   term: "hello",
@@ -34,7 +35,7 @@ describe("YoudaoProvider fallback", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("dict.youdao.com/w/eng/hello");
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain("www.youdao.com/result");
     expect(result.content?.definitions).toEqual([
-      expect.objectContaining({ language: "zh-CHS", partOfSpeech: "int", text: "你好" }),
+      expect.objectContaining({ language: "zh-CN", partOfSpeech: "int", text: "你好" }),
     ]);
     expect(result.content?.pronunciations).toHaveLength(2);
     expect(result.metadata).toEqual(expect.objectContaining({
@@ -102,6 +103,43 @@ describe("YoudaoProvider fallback", () => {
     const provider = new YoudaoProvider();
     expect(provider.supports(baseInput)).toBe(true);
     expect(provider.supports({ ...baseInput, sourceLanguage: "nl" })).toBe(false);
-    expect(provider.supports({ ...baseInput, entryType: "PHRASE" })).toBe(false);
+    expect(provider.supports({ ...baseInput, entryType: "PHRASE" })).toBe(true);
+    expect(provider.supports({ ...baseInput, entryType: "SENTENCE" })).toBe(true);
+  });
+
+  it("parses dictionary sections, separated word forms, phrases, and source labels", () => {
+    const result = parseYoudaoHtml(html(
+      "hello", "英 [həˈləʊ]", "美 [həˈloʊ]", "简明", "int. 你好", "n. 招呼，问候",
+      "复数", "hellos", "网络释义", "1", "hello", "您好", "短语", "1", "Hello Kitty", "凯蒂猫",
+      "双语例句", "1", "Hello, Paul, they chorused.", "你好，保罗。",
+    ), { term: "hello", entryType: "WORD", targetLanguage: "zh-CN" });
+
+    expect(result?.definitions).toEqual([
+      expect.objectContaining({ language: "zh-CN", partOfSpeech: "int", text: "你好", source: "youdao" }),
+      expect.objectContaining({ language: "zh-CN", partOfSpeech: "n", text: "招呼，问候" }),
+    ]);
+    expect(result?.forms).toEqual([expect.objectContaining({ type: "PLURAL", value: "hellos" })]);
+    expect(result?.phrases).toEqual(expect.arrayContaining([
+      expect.objectContaining({ phrase: "Hello Kitty", translation: "凯蒂猫", source: "youdao:phrase" }),
+    ]));
+    expect(result?.examples).toEqual([
+      expect.objectContaining({ sentence: "Hello, Paul, they chorused.", translation: "你好，保罗。", source: "youdao:example" }),
+    ]);
+  });
+
+  it("uses the direct Youdao translation for phrases and sentences", () => {
+    const phrase = parseYoudaoHtml(html("有道翻译", "to take care of", "照顾", "以上为机器翻译"), {
+      term: "to take care of", entryType: "PHRASE", targetLanguage: "zh-CN",
+    });
+    const sentence = parseYoudaoHtml(html("有道翻译", "I am tired", "我累了", "以上为机器翻译"), {
+      term: "I am tired", entryType: "SENTENCE", targetLanguage: "zh-CN",
+    });
+
+    expect(phrase?.summary?.translation).toBe("照顾");
+    expect(phrase?.phrases).toEqual(expect.arrayContaining([
+      expect.objectContaining({ phrase: "to take care of", translation: "照顾", source: "youdao:translation" }),
+    ]));
+    expect(sentence?.summary?.translation).toBe("我累了");
+    expect(sentence?.examples?.[0]).toEqual(expect.objectContaining({ sentence: "I am tired", translation: "我累了" }));
   });
 });

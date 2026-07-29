@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "@/lib/config";
 import type { AppSettings } from "@/lib/types";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
 import { settingsForAiAttempt } from "@/modules/settings/service";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function settingsWithAiEnabled(): AppSettings {
   return {
@@ -10,6 +14,7 @@ function settingsWithAiEnabled(): AppSettings {
     dictionaryApiEnabled: false,
     myMemoryEnabled: false,
     ecdictEnabled: false,
+    youdaoEnabled: false,
     llmConfig: {
       providers: [
         { id: "openai", name: "OpenAI", apiType: "openai", apiKey: "", baseUrl: "https://api.openai.com/v1" },
@@ -39,7 +44,7 @@ describe("AI lexical pipeline", () => {
     expect(settingsForAiAttempt(settings, 2).llmConfig.purposes.IMPORT_ENRICHMENT.providerId).toBe("fallback");
   });
 
-  it("requires the AI provider to succeed when AI initialization is enabled", async () => {
+  it("falls back to AI only when no dictionary provider returns definitions", async () => {
     const result = await lookupDictionary({
       term: "happy",
       normalizedTerm: "happy",
@@ -48,12 +53,28 @@ describe("AI lexical pipeline", () => {
       targetLanguage: "zh-CN",
     }, settingsWithAiEnabled());
 
-    expect(result.requiredProviderFailure).toEqual({
-      transient: false,
-      errorCode: "AI_CONFIG_INCOMPLETE",
-      errorMessage: "AI 提供商、API Key、接口地址或模型未配置完整",
-    });
-    expect(result.attempts[0]?.providerId).toContain("ai:openai");
-    expect(result.attempts[0]?.status).toBe("FAILED");
+    expect(result.requiredProviderFailure).toBeNull();
+    // 所有词典来源禁用 → 无释义 → 降级尝试 AI（配置不完整时安全失败）
+    expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["ai:openai:gpt-4o-mini"]);
+    expect(result.attempts[0]?.errorCode).toBe("AI_CONFIG_INCOMPLETE");
+  });
+
+  it("uses Youdao as the default fact source even when AI supplementation is enabled", async () => {
+    const settings = settingsWithAiEnabled();
+    settings.youdaoEnabled = true;
+    settings.translationProviderOrder = ["youdao"];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html><body><div>简明</div><div>int. 你好</div></body></html>", { status: 200 })));
+
+    const result = await lookupDictionary({
+      term: "hello",
+      normalizedTerm: "hello",
+      entryType: "WORD",
+      sourceLanguage: "en",
+      targetLanguage: "zh-CN",
+    }, settings);
+
+    expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["youdao"]);
+    expect(result.content.definitions[0]).toEqual(expect.objectContaining({ source: "youdao", text: "你好" }));
+    expect(result.requiredProviderFailure).toBeNull();
   });
 });

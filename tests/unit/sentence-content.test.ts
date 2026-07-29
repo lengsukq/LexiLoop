@@ -15,8 +15,10 @@ function sentenceContent() {
 }
 
 describe("sentence content status", () => {
-  it("treats a translated sentence without analysis as partial", () => {
-    expect(contentStatus(sentenceContent(), "SENTENCE")).toBe("PARTIAL");
+  it("treats a directly translated sentence without analysis as ready", () => {
+    const content = sentenceContent();
+    content.summary.translation = "我已经完成工作了。";
+    expect(contentStatus(content, "SENTENCE")).toBe("READY");
   });
 
   it("marks a translated and analyzed sentence ready", () => {

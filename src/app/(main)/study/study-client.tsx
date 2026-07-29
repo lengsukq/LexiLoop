@@ -5,12 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Headphones, Home, Keyboard, Loader2, MessageSquareText, RotateCcw, Sparkles, Volume2, XCircle } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts } from "@/lib/tts-client";
+import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type { DictionaryContent, QuestionType, ReviewRating, StudyMode } from "@/lib/types";
 import { Badge, Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
-
-function currentTimestamp(): number {
-  return Date.now();
-}
 
 function clientId(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -62,8 +59,8 @@ export function StudyClient() {
   const rawMode = params.get("mode") as StudyMode | null;
   const mode: StudyMode = rawMode && MODES.has(rawMode) ? rawMode : "DAILY";
   const started = useRef(false);
-  const itemStartedAt = useRef(0);
   const answerIdRef = useRef("");
+  const questionDurationRef = useRef<number | null>(null);
   const autoPlayedRef = useRef("");
   const answerInputRef = useRef<HTMLInputElement>(null);
   const sentenceAnswerRef = useRef<HTMLTextAreaElement>(null);
@@ -131,12 +128,19 @@ export function StudyClient() {
   useEffect(() => { if (!started.current) { started.current = true; void start(); } }, [start]);
 
   const current = data?.items[index] ?? null;
+  const { reset: resetQuestionTimer, capture: captureActiveQuestionDuration } = useActiveStopwatch(Boolean(current && !revealed && !submitting));
+  const captureQuestionDuration = useCallback(() => {
+    if (questionDurationRef.current === null) questionDurationRef.current = captureActiveQuestionDuration();
+    return questionDurationRef.current;
+  }, [captureActiveQuestionDuration]);
+
   useEffect(() => {
     if (current) {
-      itemStartedAt.current = currentTimestamp();
+      questionDurationRef.current = null;
+      resetQuestionTimer();
       answerIdRef.current = clientId();
     }
-  }, [current]);
+  }, [current, resetQuestionTimer]);
   useEffect(() => {
     if (!current) return;
     if (current.word.entryType === "SENTENCE" && current.questionType === "ZH_TO_EN_SPELLING") return;
@@ -165,6 +169,7 @@ export function StudyClient() {
   }
   async function reveal() {
     if (!current) return;
+    captureQuestionDuration();
     dismissKeyboard();
     setRevealed(true); setLastResult(null);
     try { setIntervals(await apiFetch<Interval[]>("/api/reviews/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordId: current.word.id }) })); }
@@ -179,7 +184,7 @@ export function StudyClient() {
         clientAnswerId: answerIdRef.current || clientId(), wordId: current.word.id, studySessionId: sessionId,
         studySessionItemId: current.itemId, rating, questionType: current.questionType,
         userAnswer: current.questionType === "EN_TO_ZH_CHOICE" ? (selectedChoice ?? undefined) : (userAnswer || undefined),
-        durationMs: Math.max(0, currentTimestamp() - itemStartedAt.current),
+        durationMs: captureQuestionDuration(),
       }) });
       setLastResult(result);
       await new Promise((resolve) => window.setTimeout(resolve, 650));
@@ -189,6 +194,7 @@ export function StudyClient() {
   }
   async function skip() {
     if (!current || !data) return;
+    captureActiveQuestionDuration();
     dismissKeyboard();
     setSubmitting(true); setError("");
     try {
@@ -231,6 +237,7 @@ export function StudyClient() {
               const isSelected = choice === selectedChoice;
               const showState = revealed && (isCorrect || isSelected);
               return <button key={choice} type="button" disabled={revealed} onClick={() => {
+                captureQuestionDuration();
                 setSelectedChoice(choice); setRevealed(true); setLastResult(null);
                 void apiFetch<Interval[]>("/api/reviews/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordId: current.word.id }) }).then(setIntervals).catch(() => setIntervals([]));
               }} className={`ios-press glass-inner rounded-[16px] border-[1.5px] px-5 py-3.5 text-left text-[15px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-[#34c759] bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-[#30d158]" : "border-[#ff3b30] bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-[#ff453a]") : "border-white/50 hover:border-[#007aff]/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>{choice}</button>;
@@ -303,7 +310,7 @@ export function StudyClient() {
   </div>;
 }
 function Pronunciation({ item }: { item: Item }) {
-  const [selectedAccent, setSelectedAccent] = useState<"US" | "UK" | "GENERAL">("US");
+  const [selectedAccent, setSelectedAccent] = useState<"US" | "UK">("US");
   const [ttsTip, setTtsTip] = useState("");
   const current = item.word.content.pronunciations.find((p) => p.accent === selectedAccent);
   async function play() {
@@ -311,11 +318,11 @@ function Pronunciation({ item }: { item: Item }) {
     const played = await playCachedTts(item.word.term, selectedAccent);
     if (!played) setTtsTip("发音播放失败，请检查浏览器自动播放权限或网络。");
   }
-  const accentLabel: Record<string, string> = { US: "美", UK: "英", GENERAL: "通用" };
+  const accentLabel: Record<string, string> = { US: "美", UK: "英" };
   return <div className="mt-5">
     <div className="flex flex-wrap items-center justify-center gap-2">
       <div className="flex overflow-hidden rounded-full border border-black/[0.08] bg-black/[0.03] dark:border-white/[0.08] dark:bg-white/[0.04]">
-        {(["US", "UK", "GENERAL"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)}
+        {(["US", "UK"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)}
           className={`px-3 py-1 text-xs font-semibold transition-all duration-200 ${selectedAccent === accent ? "bg-[#007aff] text-white shadow-[0_2px_8px_rgba(0,122,255,0.3)]" : "text-[#6e6e73] hover:text-[#007aff] dark:text-[#98989d] dark:hover:text-[#0a84ff]"}`}>
           {accentLabel[accent] ?? accent}
         </button>)}

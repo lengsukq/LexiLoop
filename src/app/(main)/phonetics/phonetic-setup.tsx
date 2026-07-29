@@ -44,7 +44,7 @@ export function PhoneticSetup({
               className={`ios-press rounded-[18px] border p-4 text-left transition ${accent === value ? "border-[#007aff]/40 bg-[#007aff]/[0.09] shadow-[0_8px_28px_rgba(0,122,255,0.1)]" : "glass-inner border-white/45 dark:border-white/[0.08]"}`}
             >
               <b className="text-lg">{value === "US" ? "美式发音" : "英式发音"}</b>
-              <p className="mt-1 text-xs text-[#8e8e93]">{value === "US" ? "优先使用 US / 通用音标" : "优先使用 UK / 通用音标"}</p>
+              <p className="mt-1 text-xs text-[#8e8e93]">{value === "US" ? "优先使用 US 音标" : "优先使用 UK 音标"}</p>
             </button>)}
           </div>
         </div>

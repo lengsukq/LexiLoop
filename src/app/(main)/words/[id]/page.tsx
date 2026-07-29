@@ -59,7 +59,15 @@ export default function WordDetailPage() {
           onSave={detail.saveManualDefinition}
           onTranslate={detail.translateSummary}
         />
-        <ExamplesCard word={word} translationBusy={detail.translationBusy} translationMessage={detail.translationMessage} onTranslate={detail.translateExamples} onPlay={detail.playText} />
+        <ExamplesCard
+          word={word}
+          translationBusy={detail.translationBusy}
+          translationMessage={detail.translationMessage}
+          onTranslate={detail.translateExamples}
+          onTranslateExample={detail.translateExample}
+          onDeleteExample={detail.deleteExample}
+          onPlay={detail.playText}
+        />
         <SentenceAnalysisCard word={word} />
         <LearningCard word={word} busy={detail.mnemonicBusy} error={detail.mnemonicError} onGenerate={detail.generateMnemonic} />
         <ExtendedContentCard word={word} onRelatedSelect={detail.openRelated} />

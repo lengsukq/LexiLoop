@@ -24,11 +24,11 @@ export function WordHeader({
   onTranslateSummary,
 }: {
   word: WordDetail;
-  selectedAccent: "US" | "UK" | "GENERAL";
+  selectedAccent: "US" | "UK";
   ttsTip: string;
   translationBusy: boolean;
   translationMessage: string;
-  onAccentChange: (accent: "US" | "UK" | "GENERAL") => void;
+  onAccentChange: (accent: "US" | "UK") => void;
   onPlay: () => Promise<void>;
   onInitialize: (mode?: "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE") => Promise<void>;
   onRemove: () => Promise<void>;
@@ -106,16 +106,16 @@ function TranslationAction({ busy, onTranslate }: { busy: boolean; onTranslate: 
 }
 
 function PronunciationControls({ accent, phonetic, tip, onAccentChange, onPlay }: {
-  accent: "US" | "UK" | "GENERAL";
+  accent: "US" | "UK";
   phonetic: string | null;
   tip: string;
-  onAccentChange: (accent: "US" | "UK" | "GENERAL") => void;
+  onAccentChange: (accent: "US" | "UK") => void;
   onPlay: () => Promise<void>;
 }) {
   return <div className="mt-4 flex flex-wrap items-center gap-2">
     <div className="flex items-center gap-2">
       <div className="flex overflow-hidden rounded-lg border border-white/25">
-        {(["US", "UK", "GENERAL"] as const).map((value) => <button key={value} type="button" onClick={() => onAccentChange(value)} className={`px-2.5 py-1 text-xs font-medium transition ${accent === value ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{value === "US" ? "美" : value === "UK" ? "英" : "通用"}</button>)}
+        {(["US", "UK"] as const).map((value) => <button key={value} type="button" onClick={() => onAccentChange(value)} className={`px-2.5 py-1 text-xs font-medium transition ${accent === value ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{value === "US" ? "美" : "英"}</button>)}
       </div>
       {phonetic && <span className="text-sm font-medium tracking-wide text-white/90">{phonetic}</span>}
     </div>

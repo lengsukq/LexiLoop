@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts } from "@/lib/tts-client";
+import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type {
   PhoneticAccent,
   PhoneticAnswerState,
@@ -41,12 +42,12 @@ export function usePhoneticGame() {
   const maxComboRef = useRef(0);
   const remainingMsRef = useRef(0);
   const deadlineRef = useRef(0);
-  const itemStartedAtRef = useRef(0);
   const finishingRef = useRef(false);
   const lockedRef = useRef(false);
   const autoPlayedRef = useRef<number | null>(null);
 
   const current = session?.items[index] ?? null;
+  const { reset: resetItemTimer, capture: captureItemDuration } = useActiveStopwatch(Boolean(phase === "playing" && current && !correctFeedback));
 
   const playCurrent = useCallback(async () => {
     const item = sessionRef.current?.items[index];
@@ -63,14 +64,14 @@ export function usePhoneticGame() {
     lockedRef.current = true;
     setPhase("saving");
     setError("");
-    const elapsedMs = Math.max(0, activeSession.durationSeconds * 1000 - remainingMsRef.current);
     const answers = activeSession.items.map((item) => answersRef.current.get(item.itemId) ?? {
       itemId: item.itemId,
       wordId: item.wordId,
       solved: false,
       hadMistake: true,
-      durationMs: Math.round(elapsedMs / Math.max(1, activeSession.items.length)),
+      durationMs: 0,
     });
+    const elapsedMs = answers.reduce((sum, answer) => sum + answer.durationMs, 0);
 
     try {
       const saved = await apiFetch<PhoneticGameResult>(`/api/phonetics/sessions/${activeSession.sessionId}/complete`, {
@@ -99,7 +100,7 @@ export function usePhoneticGame() {
       wordId: item.wordId,
       solved,
       hadMistake: mistakeItemsRef.current.has(item.itemId) || !solved,
-      durationMs: Math.max(0, Date.now() - itemStartedAtRef.current),
+      durationMs: captureItemDuration(),
     });
     const activeSession = sessionRef.current;
     if (!activeSession || index >= activeSession.items.length - 1) {
@@ -113,7 +114,7 @@ export function usePhoneticGame() {
       lockedRef.current = false;
       setIndex((value) => value + 1);
     }, solved ? CORRECT_FEEDBACK_MS : 260);
-  }, [finish, index]);
+  }, [captureItemDuration, finish, index]);
 
   const markMistake = useCallback((item: PhoneticGameItem) => {
     mistakeItemsRef.current.add(item.itemId);
@@ -203,12 +204,12 @@ export function usePhoneticGame() {
 
   useEffect(() => {
     if (!current) return;
-    itemStartedAtRef.current = Date.now();
+    resetItemTimer();
     if (current.challengeType !== "SOUND_TO_PHONETIC" || autoPlayedRef.current === current.itemId) return;
     autoPlayedRef.current = current.itemId;
     const timer = window.setTimeout(() => void playCurrent(), 180);
     return () => window.clearTimeout(timer);
-  }, [current, playCurrent]);
+  }, [current, playCurrent, resetItemTimer]);
 
   const exit = useCallback(() => {
     sessionRef.current = null;

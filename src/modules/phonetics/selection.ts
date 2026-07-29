@@ -9,7 +9,7 @@ const OPTION_COUNT = 4;
 
 interface PhoneticCandidate extends PracticeCandidate {
   phonetic: string;
-  phoneticAccent: "US" | "UK" | "GENERAL";
+  phoneticAccent: "US" | "UK";
 }
 
 function parsePronunciations(value: string): PronunciationItem[] {
@@ -20,7 +20,12 @@ function parsePronunciations(value: string): PronunciationItem[] {
       && typeof item === "object"
       && typeof (item as PronunciationItem).accent === "string"
       && typeof (item as PronunciationItem).phonetic === "string"
-    )) : [];
+    )).map((item) => ({
+      ...item,
+      // Legacy rows may still contain GENERAL; treat them as US without
+      // exposing a third accent in the game or settings.
+      accent: (item as unknown as { accent: string }).accent === "UK" ? "UK" as const : "US" as const,
+    })) : [];
   } catch {
     return [];
   }
@@ -37,11 +42,10 @@ function displayPhonetic(value: string): string {
 function selectPronunciation(
   pronunciationsJson: string,
   accent: PhoneticAccent,
-): { phonetic: string; accent: "US" | "UK" | "GENERAL" } | null {
+): { phonetic: string; accent: "US" | "UK" } | null {
   const pronunciations = parsePronunciations(pronunciationsJson)
     .filter((item) => Boolean(item.phonetic?.trim()));
-  const selected = pronunciations.find((item) => item.accent === accent)
-    ?? pronunciations.find((item) => item.accent === "GENERAL");
+  const selected = pronunciations.find((item) => item.accent === accent);
   if (!selected?.phonetic) return null;
   const phonetic = displayPhonetic(selected.phonetic);
   return phonetic ? { phonetic, accent: selected.accent } : null;

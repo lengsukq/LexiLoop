@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts } from "@/lib/tts-client";
+import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import { Badge, Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import type { LeaderboardSummary } from "@/lib/types";
@@ -139,7 +140,6 @@ function GamesPageContent() {
   const maxComboRef = useRef(0);
   const remainingMsRef = useRef(0);
   const deadlineRef = useRef(0);
-  const itemStartedAtRef = useRef(0);
   const finishingRef = useRef(false);
   const autoPlayedRef = useRef<number | null>(null);
   const autoStartRef = useRef(false);
@@ -155,14 +155,14 @@ function GamesPageContent() {
     finishingRef.current = true;
     setPhase("saving");
     setError("");
-    const elapsedMs = Math.max(0, currentSession.durationSeconds * 1000 - remainingMsRef.current);
     const answers = currentSession.items.map((item) => answersRef.current.get(item.itemId) ?? {
       itemId: item.itemId,
       wordId: item.wordId,
       solved: false,
       hadMistake: true,
-      durationMs: Math.round(elapsedMs / Math.max(1, currentSession.items.length)),
+      durationMs: 0,
     });
+    const elapsedMs = answers.reduce((sum, answer) => sum + answer.durationMs, 0);
     try {
       const saved = await apiFetch<GameResult>(`/api/games/sessions/${currentSession.sessionId}/complete`, {
         method: "POST",
@@ -199,15 +199,16 @@ function GamesPageContent() {
   }, [finishGame, phase, session]);
 
   const current = session?.items[index] ?? null;
+  const { reset: resetItemTimer, capture: captureItemDuration } = useActiveStopwatch(Boolean(phase === "playing" && current && !revealed));
   useEffect(() => {
     if (!current) return;
-    itemStartedAtRef.current = Date.now();
+    resetItemTimer();
     if ((session?.mode === "LISTENING_PICK" || session?.mode === "MEANING_BLITZ") && autoPlayedRef.current !== current.itemId) {
       autoPlayedRef.current = current.itemId;
       const timer = window.setTimeout(() => void playCachedTts(current.term, "US"), 180);
       return () => window.clearTimeout(timer);
     }
-  }, [current, session?.mode]);
+  }, [current, resetItemTimer, session?.mode]);
 
   const startGame = useCallback(async (selectedMode: GameMode) => {
     setMode(selectedMode);
@@ -275,7 +276,7 @@ function GamesPageContent() {
       wordId: item.wordId,
       solved: true,
       hadMistake: mistakeItemsRef.current.has(item.itemId),
-      durationMs: Math.max(0, Date.now() - itemStartedAtRef.current),
+      durationMs: captureItemDuration(),
     });
     setBuiltLetterIds([]);
     setWrongChoice(null);
@@ -295,7 +296,7 @@ function GamesPageContent() {
       wordId: item.wordId,
       solved: false,
       hadMistake: true,
-      durationMs: Math.max(0, Date.now() - itemStartedAtRef.current),
+      durationMs: captureItemDuration(),
     });
     if (!session || index >= session.items.length - 1) {
       window.setTimeout(() => void finishGame(), 260);
@@ -405,6 +406,7 @@ function GamesPageContent() {
 
   function revealWord() {
     if (!current || revealed) return;
+    captureItemDuration();
     pausedAtRef.current = Date.now();
     pausedRef.current = true;
     markMistake(current);
@@ -416,13 +418,12 @@ function GamesPageContent() {
     if (!current || !revealed) return;
     deadlineRef.current += Date.now() - pausedAtRef.current;
     pausedRef.current = false;
-    const activeMs = Math.max(0, pausedAtRef.current - itemStartedAtRef.current);
     answersRef.current.set(current.itemId, {
       itemId: current.itemId,
       wordId: current.wordId,
       solved: false,
       hadMistake: true,
-      durationMs: activeMs,
+      durationMs: captureItemDuration(),
     });
     setRevealed(false);
     setBuiltLetterIds([]);

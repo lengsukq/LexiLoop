@@ -1,14 +1,42 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Clock3, ExternalLink, Loader2, RefreshCw, RotateCcw, Server, Sparkles, XCircle } from "lucide-react";
-import { apiFetch, formatDate } from "@/lib/client-api";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, RefreshCw, RotateCcw, Server, Sparkles, XCircle } from "lucide-react";
+import { apiFetch, formatDate as formatClientDate } from "@/lib/client-api";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, EmptyState, PageHeader, Pagination, Progress } from "@/components/ui";
 import { InitializationBadge } from "@/components/status-badges";
 import { InitializationConfigurator } from "./initialization-configurator";
 
 interface StatusData { summary: Record<string, number>; wordSummary: Record<string, number>; workers: Array<{ workerId: string; status: string; currentJobId: number | null; lastSeenAt: string; startedAt: string }>; }
-interface Job { id: number; wordId: number; term: string; taskType: string; status: string; mode: string; priority: number; attemptCount: number; maxAttempts: number; lastError: string | null; lastErrorCode: string | null; createdAt: string; updatedAt: string; completedAt: string | null; }
+interface InitializationTask {
+  id: number;
+  taskType: string;
+  status: string;
+  mode: string;
+  attemptCount: number;
+  maxAttempts: number;
+  lastError: string | null;
+  lastErrorCode: string | null;
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+}
+
+interface InitializationWord {
+  wordId: number;
+  term: string;
+  normalizedTerm: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  status: string;
+  taskCount: number;
+  completedTaskCount: number;
+  failedTaskCount: number;
+  activeTaskCount: number;
+  updatedAt: number;
+  errorSummary: string | null;
+  tasks: InitializationTask[];
+}
 
 interface JobAttempt {
   id: number;
@@ -70,6 +98,10 @@ function formatTs(ts: number | string | null | undefined): string {
   return d.toLocaleString("zh-CN");
 }
 
+function formatDate(value: string | number): string {
+  return formatClientDate(typeof value === "number" ? new Date(value).toISOString() : value);
+}
+
 function durationText(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
@@ -100,14 +132,16 @@ function contentFieldLabel(key: string): string {
 
 export default function InitializePage() {
   const [status, setStatus] = useState<StatusData | null>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [words, setWords] = useState<InitializationWord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [filter, setFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
+  const [retryingWordId, setRetryingWordId] = useState<number | null>(null);
   const [selectedWordIds, setSelectedWordIds] = useState<Set<number>>(new Set());
+  const [expandedWordIds, setExpandedWordIds] = useState<Set<number>>(new Set());
 
   // Dialog state
   const [detailJobId, setDetailJobId] = useState<number | null>(null);
@@ -127,10 +161,10 @@ export default function InitializePage() {
       params.set("pageSize", String(PAGE_SIZE));
       const [statusData, jobData] = await Promise.all([
         apiFetch<StatusData>("/api/initialization/status"),
-        apiFetch<{ jobs: Job[]; total: number }>(`/api/initialization?${params}`),
+        apiFetch<{ items: InitializationWord[]; total: number }>(`/api/initialization?${params}`),
       ]);
       setStatus(statusData);
-      setJobs(jobData.jobs);
+      setWords(jobData.items);
       setTotalCount(jobData.total);
       setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "加载失败"); }
@@ -157,12 +191,28 @@ export default function InitializePage() {
   }
 
   async function retryFailed() {
-    const ids = jobs.filter((job) => job.status === "FAILED").map((job) => job.id);
-    if (!ids.length) return;
+    const wordIds = words.filter((word) => word.failedTaskCount > 0).map((word) => word.wordId);
+    if (!wordIds.length) return;
     setRetrying(true);
-    try { await apiFetch("/api/initialization/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobIds: ids }) }); await load(); }
+    try { await apiFetch("/api/initialization/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordIds }) }); await load(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "重试失败"); }
     finally { setRetrying(false); }
+  }
+  async function retryWord(wordId: number) {
+    setRetryingWordId(wordId);
+    setError("");
+    try {
+      await apiFetch("/api/initialization/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wordIds: [wordId] }),
+      });
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "重试失败");
+    } finally {
+      setRetryingWordId(null);
+    }
   }
   function toggleWordSelection(wordId: number) {
     setSelectedWordIds((current) => {
@@ -176,7 +226,16 @@ export default function InitializePage() {
   function selectVisibleWords() {
     setSelectedWordIds((current) => {
       const next = new Set(current);
-      for (const job of jobs) next.add(job.wordId);
+      for (const word of words) next.add(word.wordId);
+      return next;
+    });
+  }
+
+  function toggleWordExpansion(wordId: number) {
+    setExpandedWordIds((current) => {
+      const next = new Set(current);
+      if (next.has(wordId)) next.delete(wordId);
+      else next.add(wordId);
       return next;
     });
   }
@@ -236,13 +295,138 @@ export default function InitializePage() {
           </summary>
           <div className="mt-3">
             {status.workers.length ? <div className="grid gap-2 sm:grid-cols-2">{status.workers.map((worker) => <div key={worker.workerId} className="flex items-center justify-between gap-3 rounded-[14px] bg-black/[0.025] p-3 text-sm dark:bg-white/[0.035]"><div className="min-w-0"><b className="block truncate">{worker.workerId}</b><p className="mt-1 text-xs text-[#8e8e93]">最后心跳：{formatDate(worker.lastSeenAt)}{worker.currentJobId ? ` · 任务 #${worker.currentJobId}` : ""}</p></div><Badge tone={worker.status === "ERROR" ? "red" : worker.status === "WORKING" ? "blue" : "green"}>{worker.status}</Badge></div>)}</div> : <p className="rounded-[14px] bg-[#ff9500]/[0.06] p-3 text-sm text-[#c93400] dark:text-[#ff9f0a]">主程序启动后会自动运行后台引擎；若持续无心跳，请检查配置和服务日志。</p>}
-            {jobs.some((job) => job.status === "FAILED") && <Button className="mt-3" variant="outline" size="sm" onClick={() => void retryFailed()} disabled={retrying}>{retrying ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}重试当前失败任务</Button>}
+            {words.some((word) => word.failedTaskCount > 0) && <Button className="mt-3" variant="outline" size="sm" onClick={() => void retryFailed()} disabled={retrying}>{retrying ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}重试当前失败词条</Button>}
           </div>
         </details>
       </CardContent>
     </Card>}
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>按词条查看记录</CardTitle>
+            <p className="mt-1 text-xs text-[#aeaeb2]">每个词条只占一行，展开后查看具体初始化子任务。</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              className="h-9 w-48 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition placeholder:text-[#aeaeb2] focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]"
+              placeholder="搜索词条..."
+              value={searchQuery}
+              onChange={(event) => handleSearchChange(event.target.value)}
+            />
+            <select
+              className="h-9 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
+              value={filter}
+              onChange={(event) => handleFilterChange(event.target.value)}
+            >
+              <option value="">全部状态</option>
+              <option value="QUEUED">排队</option>
+              <option value="RUNNING">处理中</option>
+              <option value="READY">就绪</option>
+              <option value="PARTIAL">部分完成</option>
+              <option value="FAILED">失败</option>
+            </select>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {error && <div className="mb-4 rounded-[16px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.06] p-3 text-sm text-[#d70015] shadow-[0_4px_16px_rgba(255,59,48,0.05)] backdrop-blur-sm dark:text-[#ff453a]">{error}</div>}
+        {selectedWordIds.size > 0 && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[#007aff]/15 bg-[#007aff]/[0.06] p-3 text-sm text-[#005ecb] dark:text-[#64b5ff]">
+          <span>已选 {selectedWordIds.size} 个词条，可在上方配置初始化。</span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedWordIds(new Set())}>取消选择</Button>
+            <Button size="sm" onClick={() => document.getElementById("initialization-configurator")?.scrollIntoView({ behavior: "smooth", block: "start" })}>配置初始化</Button>
+          </div>
+        </div>}
+        {words.length ? <>
+          <div className="overflow-auto rounded-[18px] border border-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-white/[0.08]">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-black/[0.03] text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]">
+                <tr>
+                  <th className="w-10 p-3"><input type="checkbox" aria-label="选择当前页全部词条" checked={words.length > 0 && words.every((word) => selectedWordIds.has(word.wordId))} onChange={(event) => {
+                    if (event.target.checked) selectVisibleWords();
+                    else setSelectedWordIds((current) => {
+                      const next = new Set(current);
+                      for (const word of words) next.delete(word.wordId);
+                      return next;
+                    });
+                  }} /></th>
+                  <th className="p-3">词条</th>
+                  <th className="p-3">总体状态</th>
+                  <th className="p-3">子任务进度</th>
+                  <th className="p-3">更新时间</th>
+                  <th className="p-3">错误</th>
+                  <th className="w-24 p-3">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {words.map((word) => {
+                  const expanded = expandedWordIds.has(word.wordId);
+                  return <Fragment key={word.wordId}>
+                    <tr
+                      className="cursor-pointer border-t border-black/[0.04] transition hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]"
+                      onClick={() => toggleWordExpansion(word.wordId)}
+                    >
+                      <td className="p-3" onClick={(event) => event.stopPropagation()}>
+                        <input type="checkbox" aria-label={`选择 ${word.term}`} checked={selectedWordIds.has(word.wordId)} onChange={() => toggleWordSelection(word.wordId)} />
+                      </td>
+                      <td className="p-3 font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="grid size-7 shrink-0 place-items-center rounded-[10px] bg-[#007aff]/[0.08] text-[#007aff] dark:text-[#0a84ff]">
+                            {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                          </span>
+                          <Link href={`/words/${word.wordId}`} className="text-[#007aff] hover:underline dark:text-[#0a84ff]" onClick={(event) => event.stopPropagation()}>
+                            <span className="inline-flex items-center gap-1">{word.term}<ExternalLink className="size-3" /></span>
+                          </Link>
+                        </div>
+                      </td>
+                      <td className="p-3"><InitializationBadge status={word.status} /></td>
+                      <td className="p-3">
+                        <span className="font-medium">{word.completedTaskCount}/{word.taskCount}</span>
+                        <span className="ml-1 text-xs text-[#8e8e93]">已完成</span>
+                        {word.activeTaskCount > 0 && <span className="ml-2 text-xs text-[#007aff]">· {word.activeTaskCount} 个处理中</span>}
+                      </td>
+                      <td className="p-3 text-xs text-[#6e6e73] dark:text-[#98989d]">{formatTs(word.updatedAt)}</td>
+                      <td className="max-w-xs truncate p-3 text-xs text-[#ff3b30]">{word.errorSummary ?? (word.failedTaskCount ? `有 ${word.failedTaskCount} 个失败子任务` : "—")}</td>
+                      <td className="p-3">
+                        {word.failedTaskCount > 0 && <Button variant="outline" size="sm" onClick={(event) => {
+                          event.stopPropagation();
+                          void retryWord(word.wordId);
+                        }} disabled={retryingWordId !== null}>
+                          {retryingWordId === word.wordId ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}重试
+                        </Button>}
+                      </td>
+                    </tr>
+                    {expanded && <tr className="border-t border-black/[0.03] bg-[#007aff]/[0.025] dark:border-white/[0.04] dark:bg-white/[0.02]">
+                      <td colSpan={7} className="px-5 py-3">
+                        <div className="space-y-2 pl-9">
+                          {word.tasks.map((task) => <button key={task.id} type="button" className="block w-full rounded-[14px] border border-white/60 bg-white/55 p-3 text-left shadow-[0_3px_12px_rgba(0,0,0,0.03)] transition hover:border-[#007aff]/25 hover:bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]" onClick={() => void openDetail(task.id)}>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{TASK_TYPE_LABELS[task.taskType] ?? task.taskType}</span>
+                                <InitializationBadge status={task.status} />
+                              </div>
+                              <span className="text-xs text-[#8e8e93]">任务 #{task.id}</span>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6e6e73] dark:text-[#98989d]">
+                              <span>重试 {task.attemptCount}/{task.maxAttempts}</span>
+                              <span>更新时间：{formatTs(task.updatedAt)}</span>
+                              {task.lastError && <span className="max-w-full truncate text-[#ff3b30]">{task.lastError}</span>}
+                            </div>
+                          </button>)}
+                        </div>
+                      </td>
+                    </tr>}
+                  </Fragment>;
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3"><Pagination page={page} totalPages={totalPages} total={totalCount} onChange={setPage} /></div>
+        </> : <EmptyState title="暂无初始化任务" description="导入 CSV 后，初始化任务会显示在这里。" />}
+      </CardContent>
+    </Card>
     <InitializationConfigurator selectedWordIds={selectedWordIds} setSelectedWordIds={setSelectedWordIds} onQueued={load} />
-    <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>任务记录</CardTitle><p className="mt-1 text-xs text-[#aeaeb2]">勾选词条后可在上方配置字段、词典与写入方式。</p></div><div className="flex items-center gap-2"><input className="h-9 w-48 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition placeholder:text-[#aeaeb2] focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]" placeholder="搜索词条..." value={searchQuery} onChange={(event) => handleSearchChange(event.target.value)} /><select className="h-9 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]" value={filter} onChange={(event) => handleFilterChange(event.target.value)}><option value="">全部状态</option><option value="QUEUED">排队</option><option value="RUNNING">处理中</option><option value="READY">就绪</option><option value="PARTIAL">部分完成</option><option value="FAILED">失败</option></select></div></div></CardHeader><CardContent>{error && <div className="mb-4 rounded-[16px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.06] p-3 text-sm text-[#d70015] shadow-[0_4px_16px_rgba(255,59,48,0.05)] backdrop-blur-sm dark:text-[#ff453a]">{error}</div>}{selectedWordIds.size > 0 && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[#007aff]/15 bg-[#007aff]/[0.06] p-3 text-sm text-[#005ecb] dark:text-[#64b5ff]"><span>已选 {selectedWordIds.size} 个词条，可在上方按字段和词典创建任务。</span><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setSelectedWordIds(new Set())}>取消选择</Button><Button size="sm" onClick={() => document.getElementById("initialization-configurator")?.scrollIntoView({ behavior: "smooth", block: "start" })}>配置初始化</Button></div></div>}{jobs.length ? <><div className="overflow-auto rounded-[18px] border border-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-white/[0.08]"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-black/[0.03] text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]"><tr><th className="w-10 p-3"><input type="checkbox" aria-label="选择当前页全部词条" checked={jobs.length > 0 && jobs.every((job) => selectedWordIds.has(job.wordId))} onChange={(event) => { if (event.target.checked) selectVisibleWords(); else setSelectedWordIds((current) => { const next = new Set(current); for (const job of jobs) next.delete(job.wordId); return next; }); }} /></th><th className="p-3">任务</th><th className="p-3">词条</th><th className="p-3">模式</th><th className="p-3">状态</th><th className="p-3">尝试</th><th className="p-3">更新时间</th><th className="p-3">错误</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id} className="cursor-pointer border-t border-black/[0.04] transition hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]" onClick={() => void openDetail(job.id)}><td className="p-3" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`选择 ${job.term}`} checked={selectedWordIds.has(job.wordId)} onChange={() => toggleWordSelection(job.wordId)} /></td><td className="p-3 text-[#aeaeb2]">#{job.id}</td><td className="p-3 font-medium"><Link href={`/words/${job.wordId}`} className="text-[#007aff] hover:underline dark:text-[#0a84ff]" onClick={(e) => e.stopPropagation()}><span className="inline-flex items-center gap-1">{job.term}<ExternalLink className="size-3" /></span></Link></td><td className="p-3 text-xs text-[#6e6e73] dark:text-[#98989d]">{MODE_LABELS[job.mode] ?? job.mode}</td><td className="p-3"><InitializationBadge status={job.status} /></td><td className="p-3">{job.attemptCount}/{job.maxAttempts}</td><td className="p-3 text-xs text-[#6e6e73] dark:text-[#98989d]">{formatDate(job.updatedAt)}</td><td className="max-w-xs truncate p-3 text-xs text-[#ff3b30]">{job.lastError ?? "—"}</td></tr>)}</tbody></table></div><div className="mt-3"><Pagination page={page} totalPages={totalPages} total={totalCount} onChange={setPage} /></div></> : <EmptyState title="暂无初始化任务" description="导入 CSV 后，初始化任务会显示在这里。" />}</CardContent></Card>
 
     <Dialog open={detailJobId !== null} onClose={() => setDetailJobId(null)} title={detailData ? `任务 #${detailData.job.id} 详情` : "任务详情"}>
       {detailLoading && <div className="flex items-center justify-center py-8"><Loader2 className="size-6 animate-spin text-[#007aff]" /></div>}

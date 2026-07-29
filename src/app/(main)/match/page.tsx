@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts } from "@/lib/tts-client";
+import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type { LeaderboardSummary } from "@/lib/types";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress, buttonClass } from "@/components/ui";
@@ -89,6 +90,7 @@ export default function MatchPage() {
   const remainingMsRef = useRef(0);
   const deadlineRef = useRef(0);
   const finishingRef = useRef(false);
+  const { reset: resetActiveTimer, capture: captureActiveDuration } = useActiveStopwatch(phase === "playing");
 
   const finishGame = useCallback(async () => {
     const current = sessionRef.current;
@@ -98,7 +100,7 @@ export default function MatchPage() {
     setSelected(null);
     setError("");
 
-    const elapsedMs = Math.max(0, current.durationSeconds * 1000 - remainingMsRef.current);
+    const elapsedMs = captureActiveDuration();
     try {
       const saved = await apiFetch<MatchResult>(`/api/match/sessions/${current.sessionId}/complete`, {
         method: "POST",
@@ -124,7 +126,7 @@ export default function MatchPage() {
       setPhase("save-error");
       finishingRef.current = false;
     }
-  }, []);
+  }, [captureActiveDuration]);
 
   useEffect(() => {
     if (phase !== "playing" || !session) return;
@@ -159,6 +161,7 @@ export default function MatchPage() {
       remainingMsRef.current = created.durationSeconds * 1000;
       deadlineRef.current = Date.now() + created.durationSeconds * 1000;
       finishingRef.current = false;
+      resetActiveTimer();
       setSession(created);
       setWords(shuffle(created.pairs));
       setDefinitions(shuffle(created.pairs));

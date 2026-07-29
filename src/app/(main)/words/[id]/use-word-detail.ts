@@ -21,7 +21,7 @@ export function useWordDetail(wordId: string) {
   const [manualDefinition, setManualDefinition] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [selectedAccent, setSelectedAccent] = useState<"US" | "UK" | "GENERAL">("US");
+  const [selectedAccent, setSelectedAccent] = useState<"US" | "UK">("US");
   const [ttsTip, setTtsTip] = useState("");
   const [relatedSelection, setRelatedSelection] = useState<RelatedSelection | null>(null);
   const [relatedPreview, setRelatedPreview] = useState<RelatedPreview | null>(null);
@@ -226,6 +226,35 @@ export function useWordDetail(wordId: string) {
     );
   }
 
+  async function translateExample(index: number) {
+    if (!word) return;
+    setTranslationMessage("");
+    try {
+      const result = await apiFetch<{ translated: boolean }>(`/api/words/${word.id}/example-translations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index }),
+      });
+      await load();
+      setTranslationMessage(result.translated ? "已完成这条例句的中文翻译。" : "这条例句已经有翻译，或内容刚刚发生变化。");
+    } catch (reason) {
+      setTranslationMessage(errorMessage(reason, "例句翻译失败"));
+    }
+  }
+
+  async function deleteExample(index: number) {
+    if (!word) return;
+    try {
+      applyWord(await apiFetch<WordDetail>(`/api/words/${word.id}/examples`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ index }),
+      }));
+    } catch (reason) {
+      setError(errorMessage(reason, "删除例句失败"));
+    }
+  }
+
   async function translateSummary() {
     setTranslationMessage("");
     await runAiTask(
@@ -266,6 +295,8 @@ export function useWordDetail(wordId: string) {
     playText,
     generateMnemonic,
     translateExamples,
+    translateExample,
+    deleteExample,
     translateSummary,
   };
 }

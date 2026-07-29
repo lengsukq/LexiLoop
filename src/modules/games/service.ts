@@ -1,10 +1,8 @@
 import type { QuestionType } from "@/lib/types";
-import { recordScore } from "@/modules/leaderboard/service";
 import { selectPracticeCandidates } from "@/modules/practice/candidates";
 import { createChoicePool, shuffle } from "@/modules/practice/random";
 import {
   closeOpenPracticeSessions,
-  completePracticeSession,
   createPracticeSession,
 } from "@/modules/practice/sessions";
 import type {
@@ -14,6 +12,7 @@ import type {
   PracticeCandidateRow,
   PracticeTaskType,
 } from "@/modules/practice/types";
+export { completeGameSession } from "./completion";
 
 export const GAME_MODES = ["WORD_BUILDER", "LISTENING_PICK", "MEANING_BLITZ", "WHACK_A_MOLE", "WORD_STACK", "WORD_TETRIS"] as const;
 export type GameMode = (typeof GAME_MODES)[number];
@@ -163,59 +162,4 @@ export function startGameSession(mode: GameMode): GameSessionPayload {
     durationSeconds: config.durationSeconds,
     items: createGameItems(mode, candidates, itemIds),
   };
-}
-
-function calculateGameScore(summary: {
-  firstTryCorrect: number;
-  recovered: number;
-  maxCombo: number;
-  mistakeCount: number;
-}): number {
-  return Math.max(0, Math.round(
-    summary.firstTryCorrect * 100
-    + summary.recovered * 55
-    + summary.maxCombo * 12
-    - summary.mistakeCount * 20,
-  ));
-}
-
-export async function completeGameSession(input: {
-  sessionId: number;
-  mode: GameMode;
-  answers: GameAnswerInput[];
-  elapsedMs: number;
-  mistakeCount: number;
-  maxCombo: number;
-}) {
-  try {
-    const summary = await completePracticeSession({
-      sessionId: input.sessionId,
-      sourceType: `GAME_${input.mode}`,
-      clientAnswerPrefix: `game-${input.mode}`,
-      answers: input.answers,
-      elapsedMs: input.elapsedMs,
-      mistakeCount: input.mistakeCount,
-      maxCombo: input.maxCombo,
-      failureAnswer: "__GAME_MISTAKE__",
-    });
-    const score = calculateGameScore(summary);
-    const leaderboard = recordScore({
-      gameMode: input.mode,
-      score,
-      maxCombo: summary.maxCombo,
-      accuracy: summary.accuracy,
-      elapsedMs: summary.elapsedMs,
-    });
-    return {
-      ...summary,
-      mode: input.mode,
-      score,
-      leaderboard,
-    };
-  } catch (error) {
-    if (error instanceof Error && error.message === "PRACTICE_SESSION_NOT_FOUND") {
-      throw new Error("GAME_SESSION_NOT_FOUND");
-    }
-    throw error;
-  }
 }

@@ -58,7 +58,7 @@ export function PhoneticQuestion({
   return <div>
     <div className="mb-4 flex flex-wrap justify-center gap-2">
       {item.priority !== "NORMAL" && <Badge tone="red"><Flame className="size-3.5" />重点复习词</Badge>}
-      <Badge tone="blue"><Ear className="size-3.5" />{item.phoneticAccent === "US" ? "美式音标" : item.phoneticAccent === "UK" ? "英式音标" : "通用音标"}</Badge>
+      <Badge tone="blue"><Ear className="size-3.5" />{item.phoneticAccent === "US" ? "美式音标" : "英式音标"}</Badge>
     </div>
 
     <Prompt item={item} onPlay={onPlay} />

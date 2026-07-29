@@ -16,7 +16,7 @@ export interface PhoneticGameItem {
   term: string;
   definition: string;
   phonetic: string;
-  phoneticAccent: "US" | "UK" | "GENERAL";
+  phoneticAccent: "US" | "UK";
   challengeType: PhoneticChallengeType;
   choices: string[];
   priority: PracticePriority;

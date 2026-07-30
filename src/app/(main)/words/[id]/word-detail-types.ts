@@ -89,3 +89,17 @@ export interface RelatedSelection {
   item: RelatedWordItem;
   relation: RelationType;
 }
+
+export interface YoudaoPreviewData {
+  content: DictionaryContent;
+  attempts: Array<{
+    providerId: string;
+    status: string;
+    durationMs: number;
+    fieldsReturned: string[];
+    errorCode: string | null;
+    errorMessage: string | null;
+    metadata: Record<string, unknown> | null;
+  }>;
+  hasContent: boolean;
+}

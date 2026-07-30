@@ -167,7 +167,7 @@ export function StudySettingsTab({
           </section>
 
           <section>
-            <button type="button" onClick={() => setMwKeysExpanded((expanded) => !expanded)} className="flex items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
+            <button type="button" onClick={() => setMwKeysExpanded((expanded) => !expanded)} className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
               {mwKeysExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
               Merriam-Webster API 密钥 <span className="text-xs font-normal text-[#aeaeb2]">（可选）</span>
             </button>
@@ -193,7 +193,7 @@ export function StudySettingsTab({
             {tencentTestState !== "idle" && tencentTestMessage && (
               <p className={`mt-2 text-xs ${tencentTestState === "success" ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{tencentTestMessage}</p>
             )}
-            <button type="button" onClick={() => setTencentKeysExpanded((expanded) => !expanded)} className="mt-3 flex items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
+            <button type="button" onClick={() => setTencentKeysExpanded((expanded) => !expanded)} className="mt-3 flex min-h-11 items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
               {tencentKeysExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
               腾讯翻译 API 密钥
             </button>

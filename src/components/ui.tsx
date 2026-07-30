@@ -117,12 +117,12 @@ export function PageHeader({ title, description, action }: { title: string; desc
   );
 }
 
-export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  if (!open) return null;
+export function Dialog({ open, onClose, title, children, maxWidth = "max-w-lg", keepMounted = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; maxWidth?: string; keepMounted?: boolean }) {
+  if (!open && !keepMounted) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${open ? "" : "hidden"}`}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-md" onClick={onClose} />
-      <div className="liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-[28px] p-6">
+      <div className={`liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full ${maxWidth} overflow-y-auto rounded-[28px] p-6`}>
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-bold text-[#1c1c1e] dark:text-[#f5f5f7]">{title}</h2>
           <button onClick={onClose} className="ios-press grid size-8 place-items-center rounded-full bg-black/[0.06] text-[#6e6e73] dark:bg-white/[0.08] dark:text-[#98989d]">
@@ -156,7 +156,7 @@ export function Pagination({ page, totalPages, total, onChange, className }: {
       {total !== undefined && <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">共 {total} 条</p>}
       <nav className="flex items-center gap-1.5">
         <button
-          className="ios-press grid size-9 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          className="ios-press grid size-10 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
           aria-label="上一页"
@@ -168,7 +168,7 @@ export function Pagination({ page, totalPages, total, onChange, className }: {
             <button
               key={item}
               className={cn(
-                "ios-press size-9 rounded-[12px] text-sm font-medium transition-all duration-200",
+                "ios-press size-10 rounded-[12px] text-sm font-medium transition-all duration-200",
                 item === page
                   ? "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_14px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)]"
                   : "border border-white/50 bg-white/50 text-[#6e6e73] shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm hover:bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-[#98989d] dark:hover:bg-white/[0.1]",
@@ -178,7 +178,7 @@ export function Pagination({ page, totalPages, total, onChange, className }: {
           ),
         )}
         <button
-          className="ios-press grid size-9 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          className="ios-press grid size-10 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1)}
           aria-label="下一页"

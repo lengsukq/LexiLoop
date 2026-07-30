@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, RefreshCw, RotateCcw, Server, Sparkles, XCircle } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, Plus, RefreshCw, RotateCcw, Server, Sparkles, XCircle } from "lucide-react";
 import { apiFetch, formatDate as formatClientDate } from "@/lib/client-api";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, EmptyState, PageHeader, Pagination, Progress } from "@/components/ui";
 import { InitializationBadge } from "@/components/status-badges";
@@ -141,6 +141,7 @@ export default function InitializePage() {
   const [retrying, setRetrying] = useState(false);
   const [retryingWordId, setRetryingWordId] = useState<number | null>(null);
   const [selectedWordIds, setSelectedWordIds] = useState<Set<number>>(new Set());
+  const [configuratorOpen, setConfiguratorOpen] = useState(false);
   const [expandedWordIds, setExpandedWordIds] = useState<Set<number>>(new Set());
 
   // Dialog state
@@ -268,7 +269,7 @@ export default function InitializePage() {
     finally { setDetailQueueing(false); }
   }
 
-  return <div className="space-y-5"><PageHeader title="词条初始化" description="按词条范围、内容字段和数据来源创建初始化任务；支持只补音标或只刷新所选字段。" action={<Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button>} />
+  return <div className="space-y-5"><PageHeader title="词条初始化" description="按词条范围、内容字段和数据来源创建初始化任务；支持只补音标或只刷新所选字段。" action={<div className="flex items-center gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button><Button onClick={() => setConfiguratorOpen(true)}><Plus className="size-4" />创建任务</Button></div>} />
     {status && <Card>
       <CardContent className="pt-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.4fr)] lg:items-center">
@@ -343,14 +344,14 @@ export default function InitializePage() {
             <table className="w-full min-w-[840px] text-left text-sm">
               <thead className="bg-black/[0.03] text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]">
                 <tr>
-                  <th className="w-10 p-3"><input type="checkbox" aria-label="选择当前页全部词条" checked={words.length > 0 && words.every((word) => selectedWordIds.has(word.wordId))} onChange={(event) => {
+                  <th className="w-10 p-3"><label className="grid size-10 cursor-pointer place-items-center"><input type="checkbox" className="size-4.5 accent-[#007aff]" aria-label="选择当前页全部词条" checked={words.length > 0 && words.every((word) => selectedWordIds.has(word.wordId))} onChange={(event) => {
                     if (event.target.checked) selectVisibleWords();
                     else setSelectedWordIds((current) => {
                       const next = new Set(current);
                       for (const word of words) next.delete(word.wordId);
                       return next;
                     });
-                  }} /></th>
+                  }} /></label></th>
                   <th className="min-w-[160px] p-3">词条</th>
                   <th className="whitespace-nowrap p-3">状态</th>
                   <th className="min-w-[180px] p-3">错误</th>
@@ -366,7 +367,7 @@ export default function InitializePage() {
                       onClick={() => toggleWordExpansion(word.wordId)}
                     >
                       <td className="p-3" onClick={(event) => event.stopPropagation()}>
-                        <input type="checkbox" aria-label={`选择 ${word.term}`} checked={selectedWordIds.has(word.wordId)} onChange={() => toggleWordSelection(word.wordId)} />
+                        <label className="grid size-10 cursor-pointer place-items-center"><input type="checkbox" className="size-4.5 accent-[#007aff]" aria-label={`选择 ${word.term}`} checked={selectedWordIds.has(word.wordId)} onChange={() => toggleWordSelection(word.wordId)} /></label>
                       </td>
                       <td className="p-3 font-medium">
                         <div className="flex items-center gap-2">
@@ -426,7 +427,9 @@ export default function InitializePage() {
         </> : <EmptyState title="暂无初始化任务" description="导入 CSV 后，初始化任务会显示在这里。" />}
       </CardContent>
     </Card>
-    <InitializationConfigurator selectedWordIds={selectedWordIds} setSelectedWordIds={setSelectedWordIds} onQueued={load} />
+    <Dialog open={configuratorOpen} onClose={() => setConfiguratorOpen(false)} title="创建初始化任务" maxWidth="max-w-4xl" keepMounted>
+          <InitializationConfigurator selectedWordIds={selectedWordIds} setSelectedWordIds={setSelectedWordIds} onQueued={load} />
+        </Dialog>
 
     <Dialog open={detailJobId !== null} onClose={() => setDetailJobId(null)} title={detailData ? `任务 #${detailData.job.id} 详情` : "任务详情"}>
       {detailLoading && <div className="flex items-center justify-center py-8"><Loader2 className="size-6 animate-spin text-[#007aff]" /></div>}

@@ -328,7 +328,7 @@ function Pronunciation({ item }: { item: Item }) {
     <div className="flex flex-wrap items-center justify-center gap-2">
       <div className="flex overflow-hidden rounded-full border border-black/[0.08] bg-black/[0.03] dark:border-white/[0.08] dark:bg-white/[0.04]">
         {(["US", "UK"] as const).map((accent) => <button key={accent} type="button" onClick={() => setSelectedAccent(accent)}
-          className={`px-3 py-1 text-xs font-semibold transition-all duration-200 ${selectedAccent === accent ? "bg-[#007aff] text-white shadow-[0_2px_8px_rgba(0,122,255,0.3)]" : "text-[#6e6e73] hover:text-[#007aff] dark:text-[#98989d] dark:hover:text-[#0a84ff]"}`}>
+          className={`inline-flex min-h-10 items-center px-4 text-xs font-semibold transition-all duration-200 ${selectedAccent === accent ? "bg-[#007aff] text-white shadow-[0_2px_8px_rgba(0,122,255,0.3)]" : "text-[#6e6e73] hover:text-[#007aff] dark:text-[#98989d] dark:hover:text-[#0a84ff]"}`}>
           {accentLabel[accent] ?? accent}
         </button>)}
       </div>

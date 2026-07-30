@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { waitForAiTask } from "@/lib/ai-task-client";
 import { apiFetch } from "@/lib/client-api";
-import { playEntryTts } from "@/lib/tts-client";
+import { playEntryTtsPreferYoudao } from "@/lib/tts-client";
 import type { RelatedWordItem } from "@/lib/types";
 import type {
   RelatedPreview,
   RelatedSelection,
   RelationType,
   WordDetail,
+  YoudaoPreviewData,
 } from "./word-detail-types";
 
 function errorMessage(reason: unknown, fallback: string): string {
@@ -32,6 +33,11 @@ export function useWordDetail(wordId: string) {
   const [mnemonicError, setMnemonicError] = useState("");
   const [translationBusy, setTranslationBusy] = useState(false);
   const [translationMessage, setTranslationMessage] = useState("");
+  const [youdaoOpen, setYoudaoOpen] = useState(false);
+  const [youdaoPreview, setYoudaoPreview] = useState<YoudaoPreviewData | null>(null);
+  const [youdaoBusy, setYoudaoBusy] = useState(false);
+  const [youdaoApplying, setYoudaoApplying] = useState(false);
+  const [youdaoError, setYoudaoError] = useState("");
 
   const applyWord = useCallback((data: WordDetail) => {
     setWord(data);
@@ -175,8 +181,10 @@ export function useWordDetail(wordId: string) {
   async function playText(text = word?.term) {
     if (!text || !word) return;
     setTtsTip("");
-    const played = await playEntryTts(text, text === word.term ? word.entryType : "SENTENCE", selectedAccent);
-    if (!played) setTtsTip("Edge TTS 发音失败，请检查网络。");
+    const isWord = text === word.term;
+    const preferYoudao = isWord && word.content.pronunciations.some((pronunciation) => pronunciation.source === "youdao");
+    const played = await playEntryTtsPreferYoudao(text, isWord ? word.entryType : "SENTENCE", selectedAccent, preferYoudao);
+    if (!played) setTtsTip("发音播放失败，请检查网络。");
   }
 
   async function runAiTask(
@@ -256,6 +264,40 @@ export function useWordDetail(wordId: string) {
     );
   }
 
+  async function fetchYoudaoPreview() {
+    if (!word) return;
+    setYoudaoOpen(true);
+    setYoudaoPreview(null);
+    setYoudaoError("");
+    setYoudaoBusy(true);
+    try {
+      setYoudaoPreview(await apiFetch<YoudaoPreviewData>(`/api/words/${word.id}/youdao-preview`, { method: "POST" }));
+    } catch (reason) {
+      setYoudaoError(errorMessage(reason, "有道词典获取失败"));
+    } finally {
+      setYoudaoBusy(false);
+    }
+  }
+
+  async function applyYoudao(mode: "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE") {
+    if (!word || !youdaoPreview) return;
+    setYoudaoApplying(true);
+    setYoudaoError("");
+    try {
+      applyWord(await apiFetch<WordDetail>(`/api/words/${word.id}/youdao-apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, content: youdaoPreview.content, attempts: youdaoPreview.attempts }),
+      }));
+      setYoudaoOpen(false);
+      setYoudaoPreview(null);
+    } catch (reason) {
+      setYoudaoError(errorMessage(reason, "应用有道词典内容失败"));
+    } finally {
+      setYoudaoApplying(false);
+    }
+  }
+
   return {
     word,
     note,
@@ -289,5 +331,13 @@ export function useWordDetail(wordId: string) {
     translateExample,
     deleteExample,
     translateSummary,
+    youdaoOpen,
+    setYoudaoOpen,
+    youdaoPreview,
+    youdaoBusy,
+    youdaoApplying,
+    youdaoError,
+    fetchYoudaoPreview,
+    applyYoudao,
   };
 }

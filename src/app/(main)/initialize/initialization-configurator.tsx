@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronDown, Database, ListChecks,
-  Loader2, Search, Settings2, Sparkles, Volume2,
+  Loader2, Search, Sparkles, Volume2,
 } from "lucide-react";
 import type { InitializationField, InitializationProviderId, ProviderStrategy } from "@/lib/types";
 import { apiFetch } from "@/lib/client-api";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Badge, Button } from "@/components/ui";
 
 interface ProviderOption {
   id: InitializationProviderId;
@@ -256,19 +256,13 @@ export function InitializationConfigurator({
     }
   }
 
-  return <Card id="initialization-configurator">
-    <CardHeader>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2"><Settings2 className="size-5 text-[#5856d6]" />创建初始化任务</CardTitle>
-          <p className="mt-1 text-sm text-[#6e6e73] dark:text-[#98989d]">先选择常用方案，需要时再展开高级设置。</p>
-        </div>
-        <Badge tone="blue">{activePreset?.label ?? `自定义 ${requestedFields.length} 项`}</Badge>
-      </div>
-    </CardHeader>
+  return <div id="initialization-configurator" className="space-y-5">
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">先选择常用方案，需要时再展开高级设置。</p>
+      <Badge tone="blue">{activePreset?.label ?? `自定义 ${requestedFields.length} 项`}</Badge>
+    </div>
 
-    <CardContent>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           <section>
             <div className="mb-3 flex items-center justify-between">
@@ -397,8 +391,7 @@ export function InitializationConfigurator({
           </div>
         </aside>
       </div>
-    </CardContent>
-  </Card>;
+  </div>;
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {

@@ -467,7 +467,7 @@ function GamesPageContent() {
           <p className="relative mx-auto mt-2 max-w-xl text-sm leading-relaxed text-white/75 sm:text-[15px]">独立于每日复习队列。错词、近期忘记和模糊的词会优先出现在小游戏中。</p>
         </div>
         <CardContent className="space-y-5 py-5 sm:px-8 sm:py-7">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <Link href="/match" className="ios-press glass-inner group flex items-center gap-4 rounded-[18px] border border-white/40 p-4 transition-all hover:border-[#af52de]/35 hover:shadow-[0_10px_32px_rgba(175,82,222,0.12)] dark:border-white/[0.08]">
               <span className="grid size-12 shrink-0 place-items-center rounded-[15px] bg-gradient-to-br from-[#af52de] to-[#5856d6] text-white shadow-lg"><Gamepad2 className="size-6" /></span>
               <span className="min-w-0"><b className="block text-[16px]">限时词汇配对</b><small className="mt-1 block text-[13px] text-[#8e8e93]">英文与释义组队配对 · 连击计分</small></span>

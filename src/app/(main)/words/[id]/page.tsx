@@ -12,6 +12,7 @@ import { RelatedWordDialog } from "./components/related-word-dialog";
 import { SentenceAnalysisCard } from "./components/sentence-analysis-card";
 import { WordHeader } from "./components/word-header";
 import { WordSidebar } from "./components/word-sidebar";
+import { YoudaoPreviewDialog } from "./components/youdao-preview-dialog";
 import { useWordDetail } from "./use-word-detail";
 
 export default function WordDetailPage() {
@@ -41,6 +42,7 @@ export default function WordDetailPage() {
       onAccentChange={detail.setSelectedAccent}
       onPlay={() => detail.playText()}
       onInitialize={detail.initialize}
+      onYoudaoFetch={detail.fetchYoudaoPreview}
       onRemove={detail.remove}
       onTranslateSummary={detail.translateSummary}
     />
@@ -90,5 +92,16 @@ export default function WordDetailPage() {
       onClose={() => detail.setRelatedSelection(null)}
       onAdd={detail.addRelated}
     />}
+
+    <YoudaoPreviewDialog
+      open={detail.youdaoOpen}
+      preview={detail.youdaoPreview}
+      busy={detail.youdaoBusy}
+      applying={detail.youdaoApplying}
+      error={detail.youdaoError}
+      onClose={() => detail.setYoudaoOpen(false)}
+      onRetry={() => void detail.fetchYoudaoPreview()}
+      onApply={detail.applyYoudao}
+    />
   </div>;
 }

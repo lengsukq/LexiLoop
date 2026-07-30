@@ -100,7 +100,7 @@ export function DailyAiSuggestion() {
     </CardHeader>
 
     <CardContent>
-      <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-[20px] bg-gradient-to-br from-[#5856d6]/10 via-[#af52de]/[0.07] to-[#007aff]/[0.06] p-4 sm:p-5">
           <div className="flex items-start gap-4">
             <div className="grid size-16 shrink-0 place-items-center rounded-full border-[6px] border-white/70 bg-white/80 shadow-[0_8px_24px_rgba(88,86,214,0.12)] dark:border-white/[0.08] dark:bg-white/[0.08]">
@@ -125,11 +125,11 @@ export function DailyAiSuggestion() {
         </div>
 
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-[#ff3b30]" />AI 今日必做题</h3><p className="mt-1 text-xs text-[#8e8e93]">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red">{data.recommendedItems.length} 题</Badge></div>
+          <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-[#ff3b30]" />AI 今日必做题</h3><p className="mt-1 text-xs text-[#8e8e93]">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red" className="shrink-0">{data.recommendedItems.length} 题</Badge></div>
           {data.recommendedItems.length ? <>
             <div className="grid max-h-[290px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {data.recommendedItems.map((item, index) => <div key={item.wordId} className="rounded-[15px] border border-black/[0.05] bg-black/[0.02] p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
-                <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-2"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#ff3b30]/10 text-[11px] font-bold text-[#ff3b30]">{index + 1}</span><b className="truncate text-sm">{item.term}</b></span><Badge tone="slate">{QUESTION_LABELS[item.questionType] ?? "复习"}</Badge></div>
+                <div className="flex items-center justify-between gap-2"><span className="flex min-w-0 items-center gap-2"><span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#ff3b30]/10 text-[11px] font-bold text-[#ff3b30]">{index + 1}</span><b className="min-w-0 truncate text-sm">{item.term}</b></span><Badge tone="slate" className="shrink-0">{QUESTION_LABELS[item.questionType] ?? "复习"}</Badge></div>
                 {item.definition && <p className="mt-2 truncate text-xs text-[#6e6e73] dark:text-[#98989d]">{item.definition}</p>}
                 <p className="mt-1.5 text-xs leading-relaxed text-[#8e8e93]">{item.reason}</p>
               </div>)}

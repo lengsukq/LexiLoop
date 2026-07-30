@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  BookText,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -20,6 +21,7 @@ export function WordHeader({
   onAccentChange,
   onPlay,
   onInitialize,
+  onYoudaoFetch,
   onRemove,
   onTranslateSummary,
 }: {
@@ -31,6 +33,7 @@ export function WordHeader({
   onAccentChange: (accent: "US" | "UK") => void;
   onPlay: () => Promise<void>;
   onInitialize: (mode?: "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE") => Promise<void>;
+  onYoudaoFetch: () => Promise<void>;
   onRemove: () => Promise<void>;
   onTranslateSummary: () => Promise<void>;
 }) {
@@ -42,6 +45,7 @@ export function WordHeader({
       <Link href="/words" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />返回单词本</Link>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void onInitialize()}><Sparkles className="size-4" />补全缺失内容</Button>
+        <Button variant="outline" size="sm" onClick={() => void onYoudaoFetch()}><BookText className="size-4" />有道词典</Button>
         <Button variant="ghost" size="sm" onClick={() => {
           if (window.confirm("重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？")) {
             void onInitialize("FORCE_OVERWRITE");

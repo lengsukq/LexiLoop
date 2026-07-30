@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { shuffle } from "@/lib/array";
 import { playCachedTts } from "@/lib/tts-client";
 import type { GameItem } from "./types";
 
@@ -22,15 +23,6 @@ interface Block {
   col: number;
   duration: number;
   state: BlockState;
-}
-
-function shuffle<T>(items: T[]): T[] {
-  const output = [...items];
-  for (let index = output.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [output[index], output[randomIndex]] = [output[randomIndex]!, output[index]!];
-  }
-  return output;
 }
 
 export function WordTetris({ item, danger, dangerCap, onSolved, onMistake, onLand }: {

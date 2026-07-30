@@ -4,14 +4,19 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft, AudioLines, Blocks, Brain, CheckCircle2, Clock3, Flame, Gamepad2, Hammer, Headphones,
-  Layers, Loader2, Puzzle, RotateCcw, Trophy, Volume2, XCircle, Zap,
+  ArrowLeft, AudioLines, Blocks, Brain, CheckCircle2, Flame, Gamepad2, Hammer, Headphones,
+  Layers, Loader2, Puzzle, RotateCcw, Volume2, XCircle, Zap,
 } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
+import { useGameCountdown } from "@/lib/use-game-countdown";
+import { useGameScoring } from "@/lib/use-game-scoring";
+import type { GameAnswerState, GamePhase } from "@/lib/game-types";
 import { Badge, Button, Card, CardContent, Progress, buttonClass } from "@/components/ui";
 import { GameSummary, type SummaryItem } from "@/components/game-summary";
+import { GameErrorBanner, GamePlayHeader, GameSavingOverlay } from "@/components/game-hud";
+import { GameMistakeCallout, GameResultAccuracy, GameResultHero, GameResultStats } from "@/components/game-result";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import type { LeaderboardSummary } from "@/lib/types";
 import { WhackAMole } from "./whack-a-mole";
@@ -21,7 +26,6 @@ import type { GameItem } from "./types";
 
 const GAME_MODES = ["WORD_BUILDER", "LISTENING_PICK", "MEANING_BLITZ", "WHACK_A_MOLE", "WORD_STACK", "WORD_TETRIS"] as const;
 type GameMode = (typeof GAME_MODES)[number];
-type Phase = "setup" | "loading" | "playing" | "saving" | "save-error" | "result";
 
 const TETRIS_DANGER_CAP = 5;
 
@@ -45,14 +49,6 @@ interface GameResult {
   maxCombo: number;
   elapsedMs: number;
   leaderboard?: LeaderboardSummary;
-}
-
-interface AnswerState {
-  itemId: number;
-  wordId: number;
-  solved: boolean;
-  hadMistake: boolean;
-  durationMs: number;
 }
 
 const CONFIG: Record<GameMode, {
@@ -110,23 +106,15 @@ function validMode(value: string | null): value is GameMode {
   return Boolean(value && GAME_MODES.includes(value as GameMode));
 }
 
-function formatTime(ms: number): string {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
 function GamesPageContent() {
   const searchParams = useSearchParams();
   const initialMode = validMode(searchParams.get("mode")) ? searchParams.get("mode") as GameMode : null;
   const [mode, setMode] = useState<GameMode | null>(initialMode);
-  const [phase, setPhase] = useState<Phase>("setup");
+  const [phase, setPhase] = useState<GamePhase>("setup");
   const [session, setSession] = useState<GameSession | null>(null);
   const [index, setIndex] = useState(0);
   const [builtLetterIds, setBuiltLetterIds] = useState<string[]>([]);
   const [wrongChoice, setWrongChoice] = useState<string | null>(null);
-  const [combo, setCombo] = useState(0);
-  const [mistakeCount, setMistakeCount] = useState(0);
-  const [remainingMs, setRemainingMs] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [error, setError] = useState("");
   const [solvedTerms, setSolvedTerms] = useState<string[]>([]);
@@ -134,19 +122,17 @@ function GamesPageContent() {
   const [revealed, setRevealed] = useState(false);
   const [tetrisDanger, setTetrisDanger] = useState(0);
 
+  const {
+    combo, mistakeCount,
+    incrementCombo, resetCombo, flagMistakeItems, recordMistake,
+    reset: resetScoring, getMaxCombo, getMistakeCount, hasMistake,
+  } = useGameScoring();
+
   const sessionRef = useRef<GameSession | null>(null);
-  const answersRef = useRef<Map<number, AnswerState>>(new Map());
-  const mistakeItemsRef = useRef<Set<number>>(new Set());
-  const mistakeCountRef = useRef(0);
-  const comboRef = useRef(0);
-  const maxComboRef = useRef(0);
-  const remainingMsRef = useRef(0);
-  const deadlineRef = useRef(0);
+  const answersRef = useRef<Map<number, GameAnswerState>>(new Map());
   const finishingRef = useRef(false);
   const autoPlayedRef = useRef<number | null>(null);
   const autoStartRef = useRef(false);
-  const pausedRef = useRef(false);
-  const pausedAtRef = useRef(0);
   const dragStateRef = useRef<{ startX: number; startY: number; startId: string; startZone: "pool" | "built"; active: boolean } | null>(null);
   const suppressClickRef = useRef(false);
   const tetrisDangerRef = useRef(0);
@@ -183,8 +169,8 @@ function GamesPageContent() {
           mode: currentSession.mode,
           answers,
           elapsedMs,
-          mistakeCount: mistakeCountRef.current,
-          maxCombo: maxComboRef.current,
+          mistakeCount: getMistakeCount(),
+          maxCombo: getMaxCombo(),
         }),
       });
       setResult(saved);
@@ -194,21 +180,9 @@ function GamesPageContent() {
       setPhase("save-error");
       finishingRef.current = false;
     }
-  }, []);
+  }, [getMaxCombo, getMistakeCount]);
 
-  useEffect(() => {
-    if (phase !== "playing" || !session) return;
-    const tick = () => {
-      if (pausedRef.current) return;
-      const next = Math.max(0, deadlineRef.current - Date.now());
-      remainingMsRef.current = next;
-      setRemainingMs(next);
-      if (next <= 0) void finishGame();
-    };
-    tick();
-    const timer = window.setInterval(tick, 200);
-    return () => window.clearInterval(timer);
-  }, [finishGame, phase, session]);
+  const { remainingMs, start: startCountdown, pause: pauseCountdown, resume: resumeCountdown } = useGameCountdown(phase === "playing" && Boolean(session), () => void finishGame());
 
   const current = session?.items[index] ?? null;
   const { reset: resetItemTimer, capture: captureItemDuration } = useActiveStopwatch(Boolean(phase === "playing" && current && !revealed));
@@ -240,34 +214,25 @@ function GamesPageContent() {
       });
       sessionRef.current = created;
       answersRef.current = new Map();
-      mistakeItemsRef.current = new Set();
-      mistakeCountRef.current = 0;
-      comboRef.current = 0;
-      maxComboRef.current = 0;
       tetrisDangerRef.current = 0;
-      remainingMsRef.current = created.durationSeconds * 1000;
-      deadlineRef.current = Date.now() + created.durationSeconds * 1000;
       finishingRef.current = false;
       autoPlayedRef.current = null;
-      pausedRef.current = false;
-      pausedAtRef.current = 0;
+      resetScoring();
+      startCountdown(created.durationSeconds * 1000);
       setSession(created);
       setIndex(0);
       setBuiltLetterIds([]);
       setWrongChoice(null);
       setRevealed(false);
-      setCombo(0);
-      setMistakeCount(0);
       setSolvedTerms([]);
       setSummaryItems([]);
       setTetrisDanger(0);
-      setRemainingMs(created.durationSeconds * 1000);
       setPhase("playing");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建小游戏失败");
       setPhase("setup");
     }
-  }, []);
+  }, [resetScoring, startCountdown]);
 
   useEffect(() => {
     if (!initialMode || autoStartRef.current) return;
@@ -276,24 +241,17 @@ function GamesPageContent() {
   }, [initialMode, startGame]);
 
   function markMistake(item: GameItem) {
-    mistakeItemsRef.current.add(item.itemId);
-    mistakeCountRef.current += 1;
-    comboRef.current = 0;
-    setMistakeCount(mistakeCountRef.current);
-    setCombo(0);
+    recordMistake(item.itemId);
   }
 
   function advanceSolved(item: GameItem) {
-    const nextCombo = comboRef.current + 1;
-    comboRef.current = nextCombo;
-    maxComboRef.current = Math.max(maxComboRef.current, nextCombo);
-    setCombo(nextCombo);
+    incrementCombo();
     setSolvedTerms((terms) => [...terms, item.term]);
     answersRef.current.set(item.itemId, {
       itemId: item.itemId,
       wordId: item.wordId,
       solved: true,
-      hadMistake: mistakeItemsRef.current.has(item.itemId),
+      hadMistake: hasMistake(item.itemId),
       durationMs: captureItemDuration(),
     });
     setBuiltLetterIds([]);
@@ -306,9 +264,8 @@ function GamesPageContent() {
   }
 
   function advanceFailed(item: GameItem) {
-    mistakeItemsRef.current.add(item.itemId);
-    comboRef.current = 0;
-    setCombo(0);
+    flagMistakeItems(item.itemId);
+    resetCombo();
     answersRef.current.set(item.itemId, {
       itemId: item.itemId,
       wordId: item.wordId,
@@ -425,8 +382,7 @@ function GamesPageContent() {
   function revealWord() {
     if (!current || revealed) return;
     captureItemDuration();
-    pausedAtRef.current = Date.now();
-    pausedRef.current = true;
+    pauseCountdown();
     markMistake(current);
     setRevealed(true);
     void playCachedTts(current.term, "US");
@@ -434,8 +390,7 @@ function GamesPageContent() {
 
   function confirmRevealed() {
     if (!current || !revealed) return;
-    deadlineRef.current += Date.now() - pausedAtRef.current;
-    pausedRef.current = false;
+    resumeCountdown();
     answersRef.current.set(current.itemId, {
       itemId: current.itemId,
       wordId: current.wordId,
@@ -484,7 +439,7 @@ function GamesPageContent() {
               </button>;
             })}
           </div>
-          {error && <div className="rounded-[14px] bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] dark:text-[#ff453a]">{error}</div>}
+          <GameErrorBanner error={error} />
         </CardContent>
       </Card>
     </div>;
@@ -494,22 +449,13 @@ function GamesPageContent() {
     const config = CONFIG[mode];
     return <div className="mx-auto max-w-2xl space-y-5 py-5">
       <Card className="overflow-hidden">
-        <div className={`bg-gradient-to-br ${config.gradient} px-5 py-9 text-center text-white sm:py-12`}>
-          <span className="mx-auto grid size-20 place-items-center rounded-full bg-white/15 backdrop-blur-xl"><Trophy className="size-10" /></span>
-          <p className="mt-5 text-sm font-semibold text-white/70">{config.title}得分</p>
-          <h1 className="mt-1 text-5xl font-black tracking-tight">{result.score}</h1>
-          <p className="mt-2 text-sm text-white/70">用时 {(result.elapsedMs / 1000).toFixed(1)} 秒 · 最长 {result.maxCombo} 连击</p>
-        </div>
+        <GameResultHero gradient={`bg-gradient-to-br ${config.gradient}`} label={`${config.title}得分`} score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} />
         <CardContent className="space-y-5 py-6 sm:px-8">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-[16px] bg-[#34c759]/[0.08] p-3"><p className="text-2xl font-bold text-[#248a3d] dark:text-[#30d158]">{result.firstTryCorrect}</p><p className="text-xs text-[#8e8e93]">一次正确</p></div>
-            <div className="rounded-[16px] bg-[#ff9500]/[0.08] p-3"><p className="text-2xl font-bold text-[#c93400] dark:text-[#ff9f0a]">{result.recovered}</p><p className="text-xs text-[#8e8e93]">纠正完成</p></div>
-            <div className="rounded-[16px] bg-[#ff3b30]/[0.08] p-3"><p className="text-2xl font-bold text-[#d70015] dark:text-[#ff453a]">{result.missed}</p><p className="text-xs text-[#8e8e93]">超时未完成</p></div>
-          </div>
-          <div><div className="mb-2 flex justify-between text-sm"><span className="text-[#6e6e73] dark:text-[#98989d]">首次正确率</span><b>{result.accuracy}%</b></div><Progress value={result.accuracy} /></div>
+          <GameResultStats firstTryCorrect={result.firstTryCorrect} recovered={result.recovered} missed={result.missed} missedLabel="超时未完成" />
+          <GameResultAccuracy accuracy={result.accuracy} />
           <GameSummary items={summaryItems} />
           <LeaderboardPanel leaderboard={result.leaderboard} />
-          {(result.recovered > 0 || result.missed > 0) && <div className="flex items-start gap-3 rounded-[16px] bg-[#ff9500]/[0.08] p-4"><Flame className="mt-0.5 size-5 shrink-0 text-[#ff9500]" /><p className="text-sm leading-relaxed text-[#8a3b00] dark:text-[#ff9f0a]">错答或超时词条已记录为错词，后续小游戏和错词强化会优先抽取。</p></div>}
+          {(result.recovered > 0 || result.missed > 0) && <GameMistakeCallout>错答或超时词条已记录为错词，后续小游戏和错词强化会优先抽取。</GameMistakeCallout>}
           <div className="grid gap-2 sm:grid-cols-2">
             <Button size="lg" onClick={() => void startGame(mode)}><RotateCcw className="size-5" />再来一轮</Button>
             <button type="button" className={buttonClass("outline", "lg")} onClick={() => { setPhase("setup"); setSession(null); setResult(null); }}><Gamepad2 className="size-5" />选择其他游戏</button>
@@ -522,15 +468,10 @@ function GamesPageContent() {
   if (!session || !current || !mode) return null;
   const config = CONFIG[mode];
   const progress = index / Math.max(1, session.items.length) * 100;
-  const urgent = remainingMs <= 10_000;
   const builtLetters = builtLetterIds.map((id) => current.letters.find((letter) => letter.id === id)).filter(Boolean) as Array<{ id: string; value: string }>;
 
   return <div className="mx-auto max-w-3xl space-y-3 pb-3 sm:space-y-5 sm:py-4">
-    <div className="flex items-center justify-between gap-3">
-      <button type="button" className={buttonClass("ghost", "sm")} onClick={() => { setPhase("setup"); setSession(null); }}><ArrowLeft className="size-4" />退出</button>
-      <div className={`flex items-center gap-2 rounded-full px-4 py-2 font-mono text-lg font-bold ${urgent ? "animate-pulse bg-[#ff3b30]/10 text-[#ff3b30]" : "bg-[#007aff]/10 text-[#007aff] dark:text-[#0a84ff]"}`}><Clock3 className="size-5" />{formatTime(remainingMs)}</div>
-      <Badge tone={combo >= 3 ? "amber" : "slate"}><Flame className="size-3.5" />{combo} 连击</Badge>
-    </div>
+    <GamePlayHeader remainingMs={remainingMs} combo={combo} exit={<button type="button" className={buttonClass("ghost", "sm")} onClick={() => { setPhase("setup"); setSession(null); }}><ArrowLeft className="size-4" />退出</button>} />
     <div className="space-y-2"><div className="flex justify-between text-xs text-[#8e8e93]"><span>{config.title} · 第 {index + 1}/{session.items.length} 题</span><span>错答 {mistakeCount}</span></div><Progress value={progress} /></div>
 
     <Card className="overflow-hidden">
@@ -588,8 +529,8 @@ function GamesPageContent() {
       </CardContent>
     </Card>
 
-    {error && <div className="flex items-center justify-between gap-3 rounded-[14px] bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] dark:text-[#ff453a]"><span>{error}</span><button type="button" className="font-semibold" onClick={() => void finishGame()}>重试保存</button></div>}
-    {phase === "saving" && <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 backdrop-blur-sm"><div className="liquid-glass-elevated rounded-[22px] px-7 py-6 text-center"><Loader2 className="mx-auto size-8 animate-spin text-[#007aff]" /><p className="mt-3 text-sm font-semibold">正在结算并更新错词…</p></div></div>}
+    <GameErrorBanner error={error} onRetry={() => void finishGame()} />
+    {phase === "saving" && <GameSavingOverlay />}
   </div>;
 }
 

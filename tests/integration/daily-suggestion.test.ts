@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_SETTINGS } from "@/lib/config";
 import { sqlite } from "@/db/client";
 import { getTodaySuggestion, suggestionDateKey } from "@/modules/suggestions/service";
+import { updateSettings } from "@/modules/settings/service";
 import { startStudySession } from "@/modules/study/service";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function insertReadyWord(term: string, definition: string): number {
   const now = Date.now();
@@ -26,6 +32,52 @@ function insertYesterdayReview(wordId: number, options: { correct: boolean; rati
 }
 
 describe("daily AI suggestion", () => {
+  it("retries with the configured fallback model after an invalid AI response", async () => {
+    await updateSettings({
+      llmConfig: {
+        providers: [
+          { id: "primary", name: "Primary", apiType: "openai", apiKey: "test-key", baseUrl: "https://primary.test/v1" },
+          { id: "fallback", name: "Fallback", apiType: "openai", apiKey: "test-key", baseUrl: "https://fallback.test/v1" },
+        ],
+        purposes: {
+          ...DEFAULT_SETTINGS.llmConfig.purposes,
+          SUGGESTION: {
+            ...DEFAULT_SETTINGS.llmConfig.purposes.SUGGESTION,
+            enabled: true,
+            providerId: "primary",
+            model: "primary-model",
+            retryProviderId: "fallback",
+            retryModel: "fallback-model",
+          },
+        },
+      },
+    });
+    const invalidPayload = JSON.stringify({ choices: [{ message: { content: '{"headline":"不完整' } }] });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(invalidPayload, { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        headline: "备用建议",
+        summary: "先复习高风险词。",
+        strengths: [],
+        risks: [],
+        actions: ["先完成重点复习"],
+        recommended: [],
+      }) } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getTodaySuggestion({ force: true });
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    const firstBody = JSON.parse(String(calls[0]?.[1]?.body));
+    const retryBody = JSON.parse(String(calls[1]?.[1]?.body));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(firstBody.model).toBe("primary-model");
+    expect(retryBody.model).toBe("fallback-model");
+    expect(result.generator).toBe("AI");
+    expect(result.headline).toBe("备用建议");
+    expect(result.generationWarning).toBeNull();
+  });
+
   it("reviews yesterday and prioritizes the weakest word without requiring AI configuration", async () => {
     const weakId = insertReadyWord("fragile", "脆弱的");
     const strongId = insertReadyWord("stable", "稳定的");

@@ -63,4 +63,27 @@ describe("configured initialization queue", () => {
     expect(job.requested_fields_json).toBeNull();
     expect(job.requested_providers_json).toBeNull();
   });
+
+  it("persists the dedicated Youdao source boundary with all Youdao fields", () => {
+    const wordId = insertWord("youdao-only");
+    const requestedFields = ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary"] as const;
+    const queued = queueConfiguredInitialization({
+      requestedFields: [...requestedFields],
+      requestedProviders: ["youdao"],
+      providerStrategy: "PRIORITY_FALLBACK",
+      mode: "FORCE_OVERWRITE",
+      onlyMissing: false,
+      wordIds: [wordId],
+    });
+
+    expect(queued.selectedWords).toBe(1);
+    const job = sqlite.prepare(`SELECT mode, requested_fields_json, requested_providers_json, provider_strategy
+      FROM initialization_jobs WHERE word_id = ?`).get(wordId) as {
+        mode: string; requested_fields_json: string; requested_providers_json: string; provider_strategy: string;
+      };
+    expect(job.mode).toBe("FORCE_OVERWRITE");
+    expect(JSON.parse(job.requested_fields_json)).toEqual(requestedFields);
+    expect(JSON.parse(job.requested_providers_json)).toEqual(["youdao"]);
+    expect(job.provider_strategy).toBe("PRIORITY_FALLBACK");
+  });
 });

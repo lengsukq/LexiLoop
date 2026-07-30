@@ -44,6 +44,20 @@ describe("AI lexical pipeline", () => {
     expect(settingsForAiAttempt(settings, 2).llmConfig.purposes.IMPORT_ENRICHMENT.providerId).toBe("fallback");
   });
 
+  it("can switch the configured purpose to its fallback model", () => {
+    const settings = settingsWithAiEnabled();
+    settings.llmConfig.purposes.SUGGESTION = {
+      ...settings.llmConfig.purposes.SUGGESTION,
+      enabled: true,
+      providerId: "openai",
+      model: "gpt-4o-mini",
+      retryModel: "gpt-4.1-mini",
+    };
+
+    expect(settingsForAiAttempt(settings, 1, "SUGGESTION").llmConfig.purposes.SUGGESTION.model).toBe("gpt-4o-mini");
+    expect(settingsForAiAttempt(settings, 2, "SUGGESTION").llmConfig.purposes.SUGGESTION.model).toBe("gpt-4.1-mini");
+  });
+
   it("falls back to AI only when no dictionary provider returns definitions", async () => {
     const result = await lookupDictionary({
       term: "happy",
@@ -76,5 +90,50 @@ describe("AI lexical pipeline", () => {
     expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["youdao"]);
     expect(result.content.definitions[0]).toEqual(expect.objectContaining({ source: "youdao", text: "你好" }));
     expect(result.requiredProviderFailure).toBeNull();
+  });
+
+  it("keeps an explicit Youdao selection strict when the dictionary returns no content", async () => {
+    const settings = settingsWithAiEnabled();
+    settings.youdaoEnabled = true;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html><body>没有匹配结果</body></html>", { status: 200 })));
+
+    const result = await lookupDictionary({
+      term: "not-a-word",
+      normalizedTerm: "not-a-word",
+      entryType: "WORD",
+      sourceLanguage: "en",
+      targetLanguage: "zh-CN",
+      requestedFields: ["definitions"],
+      requestedProviders: ["youdao"],
+      providerStrategy: "PRIORITY_FALLBACK",
+    }, settings);
+
+    expect(result.content.definitions).toHaveLength(0);
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0]?.providerId).toBe("youdao");
+    expect(result.attempts[0]?.status).toBe("FAILED");
+  });
+
+  it("falls back from Youdao's primary endpoint to its official result endpoint", async () => {
+    const settings = settingsWithAiEnabled();
+    settings.youdaoEnabled = true;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response("<html><body><div>简明</div><div>int. 你好</div></body></html>", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await lookupDictionary({
+      term: "hello",
+      normalizedTerm: "hello",
+      entryType: "WORD",
+      sourceLanguage: "en",
+      targetLanguage: "zh-CN",
+      requestedProviders: ["youdao"],
+      providerStrategy: "PRIORITY_FALLBACK",
+    }, settings);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.content.definitions[0]).toEqual(expect.objectContaining({ source: "youdao", text: "你好" }));
+    expect(result.attempts[0]?.metadata?.endpointAttempts).toHaveLength(2);
   });
 });

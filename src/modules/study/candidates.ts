@@ -3,7 +3,7 @@ import type { EntryType, QuestionType, StudyMode } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { getTodayRecommendedItems } from "@/modules/suggestions/service";
 
-export interface StudyCandidate { id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType; }
+export interface StudyCandidate { id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType; continuousTaskType?: "REVIEW" | "WRONG" | "NEW"; }
 export type CandidateScope = "LEXICAL" | "SENTENCE" | "ALL";
 type RecommendedCandidate = StudyCandidate & { recommendedQuestionType: QuestionType };
 type Pools = { due: StudyCandidate[]; wrong: StudyCandidate[]; fresh: StudyCandidate[]; limits: { due: number; wrong: number; fresh: number } };
@@ -54,6 +54,49 @@ function wrongCandidates(limit: number, now: number, scope: CandidateScope): Stu
 }
 function newCandidates(limit: number, now: number, scope: CandidateScope): StudyCandidate[] { return sqlite.prepare(`SELECT ${selectColumns} FROM words w LEFT JOIN review_cards c ON c.word_id = w.id WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()} ORDER BY COALESCE(w.source_created_at, w.created_at) ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as StudyCandidate[]; }
 
+function leastRecentlyReviewedCandidates(limit: number, now: number, scope: CandidateScope, excludedIds: number[]): StudyCandidate[] {
+  const exclusion = excludedIds.length ? `AND w.id NOT IN (${excludedIds.map(() => "?").join(",")})` : "";
+  return sqlite.prepare(`SELECT ${selectColumns},
+      COALESCE(last_reviews.last_reviewed_at, w.source_created_at, w.created_at) AS last_reviewed_at
+    FROM words w
+    LEFT JOIN (
+      SELECT word_id, MAX(reviewed_at) AS last_reviewed_at
+      FROM review_logs
+      GROUP BY word_id
+    ) last_reviews ON last_reviews.word_id = w.id
+    WHERE w.is_suspended = 0
+      AND w.initialization_status IN ('READY','PARTIAL')
+      ${scopeSql(scope)}
+      AND ${availabilitySql()}
+      ${exclusion}
+    ORDER BY last_reviewed_at ASC, w.id ASC
+    LIMIT ?`).all(
+    now - SKIP_COOLDOWN_MS,
+    now - SESSION_RESUME_TTL_MS,
+    ...excludedIds,
+    limit,
+  ) as StudyCandidate[];
+}
+
+/** Selects a continuation batch, keeping due and wrong items ahead of fresh words. */
+export function continuousCandidates(limit: number, now: number, scope: CandidateScope = "LEXICAL"): StudyCandidate[] {
+  const selected: StudyCandidate[] = [];
+  const seen = new Set<number>();
+  const take = (items: StudyCandidate[], taskType: StudyCandidate["continuousTaskType"]) => {
+    for (const item of items) {
+      if (selected.length >= limit || seen.has(item.id)) continue;
+      seen.add(item.id);
+      selected.push({ ...item, continuousTaskType: taskType });
+    }
+  };
+
+  take(dueCandidates(limit, now, scope), "REVIEW");
+  take(wrongCandidates(limit - selected.length, now, scope), "WRONG");
+  take(newCandidates(limit - selected.length, now, scope), "NEW");
+  if (selected.length < limit) take(leastRecentlyReviewedCandidates(limit - selected.length, now, scope, [...seen]), "REVIEW");
+  return selected;
+}
+
 function startOfToday(now: number): number { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now)); const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "01"; return new Date(`${value("year")}-${value("month")}-${value("day")}T00:00:00.000`).getTime(); }
 export async function aiRecommendedCandidates(now: number): Promise<RecommendedCandidate[]> {
   const recommendations = await getTodayRecommendedItems(); if (!recommendations.length) return [];
@@ -68,8 +111,8 @@ export function selectCandidates(mode: StudyMode, pools: Pools): StudyCandidate[
   const ratios: Array<{ items: StudyCandidate[]; take: number }> = mode === "LISTENING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }] : mode === "SPELLING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }] : mode === "SENTENCE_REVIEW" ? [{ items: groups.due, take: 4 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }] : adaptiveDailyRatios(groups);
   return interleave(ratios);
 }
-export function questionFor(mode: StudyMode, taskType: string): QuestionType { if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING"; if (mode === "LISTENING") return "LISTENING_SPELLING"; if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING"; return mode === "DAILY" || mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH"; }
-export function taskFor(mode: StudyMode, candidate: StudyCandidate, sets: { due: Set<number>; wrong: Set<number> }): "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING" { if (mode === "LISTENING") return "LISTENING"; if (mode === "SPELLING") return "SPELLING"; if (mode === "DUE_REVIEW") return "REVIEW"; if (mode === "NEW_WORDS") return "NEW"; if (sets.due.has(candidate.id)) return "REVIEW"; if (sets.wrong.has(candidate.id)) return "WRONG"; return "NEW"; }
+export function questionFor(mode: StudyMode, taskType: string, position = 0): QuestionType { if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING"; if (mode === "LISTENING") return "LISTENING_SPELLING"; if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING"; if (mode === "DAILY") return position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE"; return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH"; }
+export function taskFor(mode: StudyMode, candidate: StudyCandidate, sets: { due: Set<number>; wrong: Set<number> }): "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING" { if (mode === "LISTENING") return "LISTENING"; if (mode === "SPELLING") return "SPELLING"; if (mode === "DUE_REVIEW") return "REVIEW"; if (mode === "NEW_WORDS") return "NEW"; if (candidate.continuousTaskType) return candidate.continuousTaskType; if (sets.due.has(candidate.id)) return "REVIEW"; if (sets.wrong.has(candidate.id)) return "WRONG"; return "NEW"; }
 type PoolLimits = { due: number; wrong: number; fresh: number };
 
 function dailySoftLimit(target: number, used: number): number {

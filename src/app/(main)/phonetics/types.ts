@@ -1,8 +1,9 @@
 import type { LeaderboardSummary } from "@/lib/types";
+import type { GameAnswerState, GamePhase } from "@/lib/game-types";
 
 export type PhoneticAccent = "US" | "UK";
 export type PhoneticChallengeType = "SOUND_TO_PHONETIC" | "PHONETIC_TO_WORD" | "WORD_TO_PHONETIC";
-export type PhoneticPhase = "setup" | "loading" | "playing" | "saving" | "save-error" | "result";
+export type PhoneticPhase = GamePhase;
 
 export interface PhoneticGameItem {
   itemId: number;
@@ -37,10 +38,4 @@ export interface PhoneticGameResult {
   leaderboard?: LeaderboardSummary;
 }
 
-export interface PhoneticAnswerState {
-  itemId: number;
-  wordId: number;
-  solved: boolean;
-  hadMistake: boolean;
-  durationMs: number;
-}
+export type PhoneticAnswerState = GameAnswerState;

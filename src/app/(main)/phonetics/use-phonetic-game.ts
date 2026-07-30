@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
+import { useGameCountdown } from "@/lib/use-game-countdown";
+import { useGameScoring } from "@/lib/use-game-scoring";
 import type { SummaryItem } from "@/components/game-summary";
 import type {
   PhoneticAccent,
@@ -26,9 +28,6 @@ export function usePhoneticGame() {
   const [phase, setPhase] = useState<PhoneticPhase>("setup");
   const [session, setSession] = useState<PhoneticGameSession | null>(null);
   const [index, setIndex] = useState(0);
-  const [remainingMs, setRemainingMs] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [mistakeCount, setMistakeCount] = useState(0);
   const [wrongChoice, setWrongChoice] = useState<string | null>(null);
   const [correctFeedback, setCorrectFeedback] = useState(false);
   const [audioError, setAudioError] = useState("");
@@ -36,14 +35,14 @@ export function usePhoneticGame() {
   const [result, setResult] = useState<PhoneticGameResult | null>(null);
   const [summaryItems, setSummaryItems] = useState<SummaryItem[]>([]);
 
+  const {
+    combo, mistakeCount,
+    incrementCombo, recordMistake,
+    reset: resetScoring, getMaxCombo, getMistakeCount, hasMistake,
+  } = useGameScoring();
+
   const sessionRef = useRef<PhoneticGameSession | null>(null);
   const answersRef = useRef<Map<number, PhoneticAnswerState>>(new Map());
-  const mistakeItemsRef = useRef<Set<number>>(new Set());
-  const mistakeCountRef = useRef(0);
-  const comboRef = useRef(0);
-  const maxComboRef = useRef(0);
-  const remainingMsRef = useRef(0);
-  const deadlineRef = useRef(0);
   const finishingRef = useRef(false);
   const lockedRef = useRef(false);
   const autoPlayedRef = useRef<number | null>(null);
@@ -97,8 +96,8 @@ export function usePhoneticGame() {
         body: JSON.stringify({
           answers,
           elapsedMs,
-          mistakeCount: mistakeCountRef.current,
-          maxCombo: maxComboRef.current,
+          mistakeCount: getMistakeCount(),
+          maxCombo: getMaxCombo(),
         }),
       });
       setResult(saved);
@@ -109,14 +108,14 @@ export function usePhoneticGame() {
       finishingRef.current = false;
       lockedRef.current = false;
     }
-  }, []);
+  }, [getMaxCombo, getMistakeCount]);
 
   const advance = useCallback((item: PhoneticGameItem, solved: boolean) => {
     answersRef.current.set(item.itemId, {
       itemId: item.itemId,
       wordId: item.wordId,
       solved,
-      hadMistake: mistakeItemsRef.current.has(item.itemId) || !solved,
+      hadMistake: hasMistake(item.itemId) || !solved,
       durationMs: captureItemDuration(),
     });
     const activeSession = sessionRef.current;
@@ -131,21 +130,15 @@ export function usePhoneticGame() {
       lockedRef.current = false;
       setIndex((value) => value + 1);
     }, solved ? CORRECT_FEEDBACK_MS : 260);
-  }, [captureItemDuration, finish, index]);
+  }, [captureItemDuration, finish, hasMistake, index]);
 
-  const markMistake = useCallback((item: PhoneticGameItem) => {
-    mistakeItemsRef.current.add(item.itemId);
-    mistakeCountRef.current += 1;
-    comboRef.current = 0;
-    setMistakeCount(mistakeCountRef.current);
-    setCombo(0);
-  }, []);
+  const { remainingMs, start: startCountdown } = useGameCountdown(phase === "playing" && Boolean(session), () => void finish());
 
   const choose = useCallback((choice: string) => {
     const item = sessionRef.current?.items[index];
     if (!item || lockedRef.current || wrongChoice || correctFeedback) return;
     if (choice !== expectedChoice(item)) {
-      markMistake(item);
+      recordMistake(item.itemId);
       setWrongChoice(choice);
       if (item.challengeType === "SOUND_TO_PHONETIC") void playCurrent();
       window.setTimeout(() => setWrongChoice(null), WRONG_FEEDBACK_MS);
@@ -153,22 +146,19 @@ export function usePhoneticGame() {
     }
 
     lockedRef.current = true;
-    const nextCombo = comboRef.current + 1;
-    comboRef.current = nextCombo;
-    maxComboRef.current = Math.max(maxComboRef.current, nextCombo);
-    setCombo(nextCombo);
+    incrementCombo();
     setCorrectFeedback(true);
     void playCurrent();
     advance(item, true);
-  }, [advance, correctFeedback, index, markMistake, playCurrent, wrongChoice]);
+  }, [advance, correctFeedback, incrementCombo, index, playCurrent, recordMistake, wrongChoice]);
 
   const skip = useCallback(() => {
     const item = sessionRef.current?.items[index];
     if (!item || lockedRef.current) return;
     lockedRef.current = true;
-    markMistake(item);
+    recordMistake(item.itemId);
     advance(item, false);
-  }, [advance, index, markMistake]);
+  }, [advance, index, recordMistake]);
 
   const start = useCallback(async () => {
     setPhase("loading");
@@ -182,20 +172,13 @@ export function usePhoneticGame() {
       });
       sessionRef.current = created;
       answersRef.current = new Map();
-      mistakeItemsRef.current = new Set();
-      mistakeCountRef.current = 0;
-      comboRef.current = 0;
-      maxComboRef.current = 0;
-      remainingMsRef.current = created.durationSeconds * 1000;
-      deadlineRef.current = Date.now() + created.durationSeconds * 1000;
       finishingRef.current = false;
       lockedRef.current = false;
       autoPlayedRef.current = null;
+      resetScoring();
+      startCountdown(created.durationSeconds * 1000);
       setSession(created);
       setIndex(0);
-      setRemainingMs(created.durationSeconds * 1000);
-      setCombo(0);
-      setMistakeCount(0);
       setWrongChoice(null);
       setCorrectFeedback(false);
       setAudioError("");
@@ -205,20 +188,7 @@ export function usePhoneticGame() {
       setError(reason instanceof Error ? reason.message : "创建音标训练失败");
       setPhase("setup");
     }
-  }, [accent]);
-
-  useEffect(() => {
-    if (phase !== "playing" || !session) return;
-    const tick = () => {
-      const next = Math.max(0, deadlineRef.current - Date.now());
-      remainingMsRef.current = next;
-      setRemainingMs(next);
-      if (next <= 0) void finish();
-    };
-    tick();
-    const timer = window.setInterval(tick, 200);
-    return () => window.clearInterval(timer);
-  }, [finish, phase, session]);
+  }, [accent, resetScoring, startCountdown]);
 
   useEffect(() => {
     if (!current) return;

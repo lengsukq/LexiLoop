@@ -53,8 +53,14 @@ function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definitions: D
     return normalizeTerm(input.userAnswer ?? "", word.source_language) === word.normalized_term;
   }
   if (input.questionType === "EN_TO_ZH_CHOICE") {
-    const correctDefinition = definitions[0]?.text;
-    return correctDefinition ? (input.userAnswer ?? "").trim() === correctDefinition.trim() : input.rating !== "AGAIN";
+    const correctDefinitions = definitions.map((definition) => definition.text.trim()).filter(Boolean);
+    const answer = (input.userAnswer ?? "").trim();
+    return correctDefinitions.length > 0
+      ? [correctDefinitions.join("；"), ...correctDefinitions].some((correct) => answer === correct)
+      : input.rating !== "AGAIN";
+  }
+  if (input.questionType === "ZH_TO_EN_CHOICE") {
+    return normalizeTerm(input.userAnswer ?? "", word.source_language) === word.normalized_term;
   }
   return input.rating !== "AGAIN";
 }
@@ -64,7 +70,8 @@ export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): A
   const isCorrect = isAnswerCorrect(input, word, definitions);
   const objectivelyScored = input.questionType === "ZH_TO_EN_SPELLING"
     || input.questionType === "LISTENING_SPELLING"
-    || input.questionType === "EN_TO_ZH_CHOICE";
+    || input.questionType === "EN_TO_ZH_CHOICE"
+    || input.questionType === "ZH_TO_EN_CHOICE";
   const effectiveRating: ReviewRating = objectivelyScored && !isCorrect ? "AGAIN" : input.rating;
   const expected = expectedAnswer(input, word, definitions);
   const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";

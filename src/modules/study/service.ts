@@ -1,7 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { QuestionType, StudyMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
-import { aiRecommendedCandidates, loadPools, questionFor, selectCandidates, taskFor, type CandidateScope, type StudyCandidate } from "./candidates";
+import { aiRecommendedCandidates, continuousCandidates, loadPools, questionFor, selectCandidates, taskFor, type CandidateScope, type StudyCandidate } from "./candidates";
 import { getStudySession } from "./view";
 
 const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
@@ -37,18 +37,20 @@ function findResumableSession(mode: StudyMode, now: number): number | null {
   return daily?.id ?? null;
 }
 
-export async function startStudySession(mode: StudyMode, resume = true) {
+export async function startStudySession(mode: StudyMode, resume = true, continuous = false) {
   const now = Date.now(); expireStaleSessions(now);
   if (resume) { const resumableId = findResumableSession(mode, now); if (resumableId) return getStudySession(resumableId, true); }
   const scope: CandidateScope = mode === "SENTENCE_REVIEW" ? "SENTENCE" : mode === "AI_RECOMMENDED" ? "ALL" : "LEXICAL";
   const pools = await loadPools(now, scope, { applyDailySoftQuota: mode === "DAILY" }); const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
   if (mode === "AI_RECOMMENDED" && !recommended?.length) throw new Error("AI_RECOMMENDED_ALL_DONE");
-  const selected: StudyCandidate[] = recommended ?? selectCandidates(mode, pools); const due = new Set(pools.due.map((item) => item.id)); const wrong = new Set(pools.wrong.map((item) => item.id));
+  let selected: StudyCandidate[] = recommended ?? selectCandidates(mode, pools);
+  if (mode === "DAILY" && continuous && selected.length === 0) selected = continuousCandidates(10, now);
+  const due = new Set(pools.due.map((item) => item.id)); const wrong = new Set(pools.wrong.map((item) => item.id));
   const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode === "SENTENCE_REVIEW" ? "DUE_REVIEW" : mode; const sourceType = mode === "AI_RECOMMENDED" || mode === "SENTENCE_REVIEW" ? mode : null;
   const sessionId = sqlite.transaction(() => {
     const session = sqlite.prepare("INSERT INTO study_sessions (session_type, source_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?)").run(persistedMode, sourceType, now, selected.length === 0 ? now : null, selected.length, now);
     const id = Number(session.lastInsertRowid); const insert = sqlite.prepare("INSERT INTO study_session_items (study_session_id, position, word_id, task_type, question_type, status, created_at) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)");
-    selected.forEach((candidate, index) => { const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong }); const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType; insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType), now); });
+    selected.forEach((candidate, index) => { const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong }); const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType; insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index), now); });
     return id;
   }).immediate();
   return getStudySession(sessionId, false);

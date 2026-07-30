@@ -9,6 +9,7 @@ const settingsSchema = z.object({
   dailyWrongWordLimit: z.number().int().min(0).max(100),
   dailyDueReviewLimit: z.number().int().min(1).max(500),
   targetRetentionRate: z.number().min(0.7).max(0.99),
+  choiceRevealDelaySeconds: z.number().int().min(0).max(60),
   defaultAccent: z.preprocess((value) => value === "GENERAL" ? "US" : value, z.enum(["US", "UK"])),
   wordSpeed: z.number().min(0.5).max(2).default(1),
   phraseSpeed: z.number().min(0.5).max(2).default(1),

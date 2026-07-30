@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dailyWrongWordLimit: 10,
   dailyDueReviewLimit: 30,
   targetRetentionRate: 0.9,
+  choiceRevealDelaySeconds: 2,
   defaultAccent: "US",
   wordSpeed: 1,
   phraseSpeed: 1,

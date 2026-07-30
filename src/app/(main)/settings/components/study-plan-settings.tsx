@@ -11,6 +11,10 @@ export function StudyPlanSettings({ settings, update }: { settings: AppSettings;
       <NumberField label="每日新词" value={settings.dailyNewWords} min={0} max={100} onChange={(value) => update("dailyNewWords", value)} />
       <NumberField label="每日错词上限" value={settings.dailyWrongWordLimit} min={0} max={100} onChange={(value) => update("dailyWrongWordLimit", value)} />
       <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
+      <div className="space-y-1.5">
+        <NumberField label="选择题选项延迟（秒）" value={settings.choiceRevealDelaySeconds} min={0} max={60} onChange={(value) => update("choiceRevealDelaySeconds", value)} />
+        <p className="text-xs leading-tight text-[#aeaeb2]">两种选择题均适用；0 秒立即显示，默认 2 秒。</p>
+      </div>
       <label className="space-y-1.5">
         <span className="text-sm font-medium leading-none">目标记忆率</span>
         <Select className="w-full" value={settings.targetRetentionRate} onChange={(event) => update("targetRetentionRate", Number(event.target.value))}>

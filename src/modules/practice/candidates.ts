@@ -13,11 +13,14 @@ const CANDIDATE_QUERY_LIMIT = 160;
 export function extractPreferredDefinition(definitionsJson: string, targetLanguage: string): string | null {
   try {
     const definitions = JSON.parse(definitionsJson) as Array<{ language?: string; text?: string }>;
-    const targetDefinition = definitions.find(
-      (definition) => definition.language === targetLanguage && definition.text?.trim(),
-    );
-    const fallbackDefinition = definitions.find((definition) => definition.text?.trim());
-    return (targetDefinition?.text ?? fallbackDefinition?.text ?? "").trim() || null;
+    const targetDefinitions = definitions
+      .filter((definition) => definition.language === targetLanguage && definition.text?.trim())
+      .map((definition) => definition.text!.trim());
+    const fallbackDefinitions = definitions
+      .filter((definition) => definition.text?.trim())
+      .map((definition) => definition.text!.trim());
+    const selectedDefinitions = targetDefinitions.length ? targetDefinitions : fallbackDefinitions;
+    return selectedDefinitions.join("；") || null;
   } catch {
     return null;
   }

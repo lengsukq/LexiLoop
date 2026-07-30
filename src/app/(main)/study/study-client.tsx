@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, Headphones, Home, Keyboard, Loader2, MessageSquareText, RotateCcw, Sparkles, Volume2, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Clock3, Headphones, Home, Keyboard, Loader2, MessageSquareText, RotateCcw, Sparkles, Volume2, XCircle } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, playEntryTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
@@ -19,6 +19,7 @@ function clientId(): string {
 interface Item {
   itemId: number; position: number; taskType: string; questionType: QuestionType; status: string; skipReason: string | null;
   choices?: string[];
+  choiceDefinitions?: Record<string, string>;
   word: { id: number; term: string; sourceLanguage: string; targetLanguage: string; entryType: string; content: DictionaryContent };
 }
 interface SessionData {
@@ -35,7 +36,9 @@ const MODE_LABELS: Record<StudyMode, string> = { DAILY: "今日学习", NEW_WORD
 
 function targetDefinitions(item: Item): string[] {
   const target = item.word.content.definitions.filter((definition) => definition.language === item.word.targetLanguage);
-  return (target.length ? target : item.word.content.definitions).map((definition) => definition.text);
+  return (target.length ? target : item.word.content.definitions)
+    .map((definition) => definition.text.trim())
+    .filter(Boolean);
 }
 async function playWord(item: Item): Promise<boolean> {
   return playEntryTts(item.word.term, item.word.entryType);
@@ -52,6 +55,12 @@ function entryTypeLabel(type: string): string {
 }
 function normalizeSentenceAnswer(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase().replace(/[’‘]/g, "'").replace(/[\p{P}\p{S}]+/gu, " ").replace(/\s+/g, " ").trim();
+}
+function normalizeChoiceAnswer(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+}
+function choiceOptionsDelayLabel(seconds: number): string {
+  return seconds === 0 ? "正在显示选项…" : `${seconds} 秒后显示选项`;
 }
 
 export function StudyClient() {
@@ -72,27 +81,26 @@ export function StudyClient() {
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+  const [choicesVisible, setChoicesVisible] = useState(false);
   const [error, setError] = useState("");
-  const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [inputFocused, setInputFocused] = useState(false);
+  const [choiceRevealDelaySeconds, setChoiceRevealDelaySeconds] = useState(2);
+  const choiceRevealTimerRef = useRef<number | null>(null);
+  const [autoContinue, setAutoContinue] = useState(mode === "DAILY");
+  const autoContinueRef = useRef(mode === "DAILY");
+  const [autoStopReason, setAutoStopReason] = useState<"USER" | "EXHAUSTED" | null>(null);
 
   useEffect(() => {
-    const viewport = window.visualViewport;
-    const updateViewport = () => {
-      const height = Math.round(viewport?.height ?? window.innerHeight);
-      setVisualViewportHeight(height);
-      setKeyboardOpen(Boolean(viewport && window.innerHeight - height > 120));
-    };
-    updateViewport();
-    viewport?.addEventListener("resize", updateViewport);
-    viewport?.addEventListener("scroll", updateViewport);
-    window.addEventListener("resize", updateViewport);
-    return () => {
-      viewport?.removeEventListener("resize", updateViewport);
-      viewport?.removeEventListener("scroll", updateViewport);
-      window.removeEventListener("resize", updateViewport);
-    };
+    let cancelled = false;
+    void apiFetch<{ choiceRevealDelaySeconds?: number }>("/api/settings")
+      .then((settings) => {
+        if (!cancelled && typeof settings.choiceRevealDelaySeconds === "number") {
+          setChoiceRevealDelaySeconds(Math.max(0, settings.choiceRevealDelaySeconds));
+        }
+      })
+      .catch(() => {
+        // Keep the two-second default if settings are temporarily unavailable.
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const dismissKeyboard = useCallback(() => {
@@ -100,7 +108,6 @@ export function StudyClient() {
     sentenceAnswerRef.current?.blur();
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
-    setInputFocused(false);
   }, []);
 
   const applySession = useCallback((session: SessionData) => {
@@ -112,16 +119,22 @@ export function StudyClient() {
     setIntervals([]);
     setLastResult(null);
     setSelectedChoice(null);
+    setChoicesVisible(false);
   }, [dismissKeyboard]);
 
   const start = useCallback(async (forceNew = false) => {
-    setError(""); setData(null); setIndex(0); setRevealed(false); setUserAnswer(""); setLastResult(null); setSelectedChoice(null);
+    setError(""); setData(null); setIndex(0); setRevealed(false); setUserAnswer(""); setLastResult(null); setSelectedChoice(null); setChoicesVisible(false);
     try {
       const session = await apiFetch<SessionData>("/api/study/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, resume: !forceNew }),
+        body: JSON.stringify({ mode, resume: !forceNew, continuous: mode === "DAILY" && autoContinueRef.current }),
       });
+      if (mode === "DAILY" && autoContinueRef.current && session.items.length === 0) {
+        autoContinueRef.current = false;
+        setAutoContinue(false);
+        setAutoStopReason("EXHAUSTED");
+      }
       applySession(session);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "创建会话失败"); }
   }, [applySession, mode]);
@@ -144,11 +157,24 @@ export function StudyClient() {
       questionDurationRef.current = null;
       resetQuestionTimer();
       answerIdRef.current = clientId();
+      const isChoiceQuestion = current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE";
+      const delayMs = Math.max(0, choiceRevealDelaySeconds) * 1000;
+      choiceRevealTimerRef.current = window.setTimeout(() => {
+        choiceRevealTimerRef.current = null;
+        setChoicesVisible(true);
+      }, isChoiceQuestion ? delayMs : 0);
     }
-  }, [current, resetQuestionTimer]);
+    return () => {
+      if (choiceRevealTimerRef.current !== null) {
+        window.clearTimeout(choiceRevealTimerRef.current);
+        choiceRevealTimerRef.current = null;
+      }
+    };
+  }, [choiceRevealDelaySeconds, current, resetQuestionTimer]);
   useEffect(() => {
     if (!current) return;
     if (current.word.entryType === "SENTENCE" && current.questionType === "ZH_TO_EN_SPELLING") return;
+    if (current.questionType === "ZH_TO_EN_CHOICE") return;
 
     const playbackKey = `${data?.session.id ?? 0}:${current.itemId}`;
     if (autoPlayedRef.current === playbackKey) return;
@@ -160,9 +186,32 @@ export function StudyClient() {
     return () => window.clearTimeout(timer);
   }, [current, data?.session.id]);
   const complete = Boolean(data && (data.session.completedAt || data.resumeIndex >= data.items.length));
+  const autoContinuationPending = Boolean(data && autoContinue && complete && data.items.length > 0);
+  useEffect(() => {
+    if (!autoContinuationPending) return;
+    const timer = window.setTimeout(() => void start(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [autoContinuationPending, start]);
+
+  function stopAutoContinue() {
+    autoContinueRef.current = false;
+    setAutoContinue(false);
+    setAutoStopReason("USER");
+  }
+
+  function resumeAutoContinue() {
+    autoContinueRef.current = true;
+    setAutoContinue(true);
+    setAutoStopReason(null);
+    void start(true);
+  }
+
   const definitions = current ? targetDefinitions(current) : [];
+  const definitionText = definitions.join("；");
   const exactLocal = current && current.questionType === "EN_TO_ZH_CHOICE"
-    ? (selectedChoice ? selectedChoice === definitions[0] : null)
+    ? (selectedChoice ? selectedChoice === definitionText : null)
+    : current && current.questionType === "ZH_TO_EN_CHOICE"
+      ? (selectedChoice ? normalizeChoiceAnswer(selectedChoice) === normalizeChoiceAnswer(current.word.term) : null)
     : current && current.questionType !== "EN_TO_ZH"
       ? current.word.entryType === "SENTENCE"
         ? normalizeSentenceAnswer(userAnswer) === normalizeSentenceAnswer(current.word.term)
@@ -174,6 +223,10 @@ export function StudyClient() {
   }
   async function reveal() {
     if (!current) return;
+    if (choiceRevealTimerRef.current !== null) {
+      window.clearTimeout(choiceRevealTimerRef.current);
+      choiceRevealTimerRef.current = null;
+    }
     captureQuestionDuration();
     dismissKeyboard();
     setRevealed(true); setLastResult(null);
@@ -188,7 +241,7 @@ export function StudyClient() {
       const result = await apiFetch<AnswerResult>("/api/study/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         clientAnswerId: answerIdRef.current || clientId(), wordId: current.word.id, studySessionId: sessionId,
         studySessionItemId: current.itemId, rating, questionType: current.questionType,
-        userAnswer: current.questionType === "EN_TO_ZH_CHOICE" ? (selectedChoice ?? undefined) : (userAnswer || undefined),
+        userAnswer: current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" ? (selectedChoice ?? undefined) : (userAnswer || undefined),
         durationMs: captureQuestionDuration(),
       }) });
       setLastResult(result);
@@ -216,38 +269,56 @@ export function StudyClient() {
   if (!data && !error) return <div className="grid min-h-[75vh] place-items-center"><div className="animate-scale-in text-center"><Loader2 className="mx-auto size-10 animate-spin text-[#007aff]" /><p className="mt-3 text-[15px] text-[#8e8e93]">正在生成 {MODE_LABELS[mode]} 队列…</p></div></div>;
   if (error && !data) return <div className="mx-auto max-w-xl py-20 text-center"><AlertCircle className="mx-auto size-12 text-[#ff3b30]" /><h1 className="mt-4 text-xl font-bold">无法开始学习</h1><p className="mt-2 text-[15px] text-[#6e6e73]">{error}</p><div className="mt-6 flex justify-center gap-3"><Button onClick={() => void start()}><RotateCcw className="size-4" />重试</Button><Link href="/" className={buttonClass("outline")}>返回首页</Link></div></div>;
   if (!data) return null;
-  if (complete) return <div className="mx-auto max-w-2xl py-12"><Card><CardContent className="py-16 text-center"><span className="animate-scale-in mx-auto grid size-20 place-items-center rounded-full bg-[#34c759]/12 text-[#34c759]"><CheckCircle2 className="size-10" /></span><h1 className="mt-5 text-2xl font-bold tracking-tight">本轮学习完成</h1><p className="mt-2 text-[15px] text-[#6e6e73]">已处理 {data.session.completedCount} 个任务，正确 {data.session.correctCount} 个，稍后再学 {data.session.skippedCount} 个。</p><div className="mt-7 flex flex-wrap justify-center gap-3"><Button onClick={() => void start(true)}><RotateCcw className="size-4" />生成新一轮</Button><Link href="/" className={buttonClass("outline")}><Home className="size-4" />返回今日</Link></div></CardContent></Card></div>;
+  if (autoContinuationPending) return <div className="mx-auto max-w-2xl py-12"><Card><CardContent className="py-16 text-center"><span className="animate-scale-in mx-auto grid size-20 place-items-center rounded-full bg-[#007aff]/10 text-[#007aff]"><Loader2 className="size-10 animate-spin" /></span><h1 className="mt-5 text-2xl font-bold tracking-tight">正在准备下一批</h1><p className="mt-2 text-[15px] text-[#6e6e73]">这一批已完成，马上继续循环学习。</p><div className="mt-7 flex flex-wrap justify-center gap-3"><Button variant="outline" onClick={stopAutoContinue}><XCircle className="size-4" />结束学习</Button><Link href="/" className={buttonClass("ghost")}><Home className="size-4" />返回今日</Link></div></CardContent></Card></div>;
+  if (complete) return <div className="mx-auto max-w-2xl py-12"><Card><CardContent className="py-16 text-center"><span className="animate-scale-in mx-auto grid size-20 place-items-center rounded-full bg-[#34c759]/12 text-[#34c759]"><CheckCircle2 className="size-10" /></span><h1 className="mt-5 text-2xl font-bold tracking-tight">{autoStopReason === "USER" ? "无限学习已暂停" : data.items.length === 0 ? "暂时没有更多可学习词条" : "本轮学习完成"}</h1><p className="mt-2 text-[15px] text-[#6e6e73]">已处理 {data.session.completedCount} 个任务，正确 {data.session.correctCount} 个，稍后再学 {data.session.skippedCount} 个。</p><div className="mt-7 flex flex-wrap justify-center gap-3">{mode === "DAILY" && autoStopReason === "USER" && data.items.length > 0 && <Button onClick={resumeAutoContinue}><RotateCcw className="size-4" />继续无限学习</Button>}<Button onClick={() => void start(true)}><RotateCcw className="size-4" />生成新一轮</Button><Link href="/" className={buttonClass("outline")}><Home className="size-4" />返回今日</Link></div></CardContent></Card></div>;
   if (!current) return null;
 
   const progress = data.session.plannedCount ? data.session.completedCount / data.session.plannedCount * 100 : 100;
   const activeMode = MODES.has(data.session.sessionType as StudyMode) ? data.session.sessionType as StudyMode : mode;
-  const compactKeyboardLayout = keyboardOpen || (!revealed && inputFocused && visualViewportHeight !== null && visualViewportHeight < 650);
-  const measuredCardHeight = visualViewportHeight
-    ? Math.max(compactKeyboardLayout ? 190 : 300, visualViewportHeight - (compactKeyboardLayout ? 48 : 116))
-    : null;
-  return <div className={`animate-fade-up mx-auto max-w-3xl ${compactKeyboardLayout ? "space-y-2" : "space-y-5"}`}>
-    {!compactKeyboardLayout && <div className="flex flex-wrap items-center justify-between gap-2"><Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link><div className="text-center"><div className="flex items-center justify-center gap-2"><p className="text-[15px] font-bold">{MODE_LABELS[activeMode]}</p>{data.resumed && <Badge tone="amber">继续上次</Badge>}</div><p className="text-xs text-[#aeaeb2]">已处理 {data.session.completedCount} / {data.session.plannedCount}</p></div><Badge tone={current.taskType === "WRONG" ? "red" : current.taskType === "NEW" ? "purple" : "blue"}>{current.taskType}</Badge></div>}
-    {!compactKeyboardLayout && <Progress value={progress} />}
-    <Card style={measuredCardHeight ? { height: `${measuredCardHeight}px` } : undefined} className={`h-[calc(100dvh-7.25rem)] max-h-[720px] overflow-hidden sm:h-[calc(100dvh-8rem)] lg:h-[calc(100dvh-9.5rem)] ${compactKeyboardLayout ? "min-h-[180px]" : "min-h-[260px] sm:min-h-[420px]"}`}><CardContent className={`grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 sm:px-10 ${compactKeyboardLayout ? "py-3" : "py-5 sm:py-7"}`}>
+  return <div className="animate-fade-up mx-auto max-w-3xl space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-2"><Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link><div className="text-center"><div className="flex items-center justify-center gap-2"><p className="text-[15px] font-bold">{MODE_LABELS[activeMode]}</p>{data.resumed && <Badge tone="amber">继续上次</Badge>}</div><p className="text-xs text-[#aeaeb2]">已处理 {data.session.completedCount} / {data.session.plannedCount}</p></div><Badge tone={current.taskType === "WRONG" ? "red" : current.taskType === "NEW" ? "purple" : "blue"}>{current.taskType}</Badge></div>
+    <Progress value={progress} />
+    <Card className="h-[calc(100dvh-7.25rem)] max-h-[720px] min-h-[260px] overflow-hidden sm:h-[calc(100dvh-8rem)] sm:min-h-[420px] lg:h-[calc(100dvh-9.5rem)]"><CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-5 sm:px-10 sm:py-7">
       <div className="flex items-center justify-between text-xs text-[#aeaeb2]"><span>{entryTypeLabel(current.word.entryType)}</span><span>{current.word.sourceLanguage} → {current.word.targetLanguage}</span></div>
       <div className="min-h-0 overflow-y-auto overscroll-contain">
-        <div className={`flex min-h-full w-full flex-col items-center px-1 text-center ${revealed ? "justify-start py-[clamp(0.5rem,2vh,1.25rem)]" : compactKeyboardLayout ? "justify-start py-2" : "justify-center py-[clamp(1rem,4vh,3rem)]"}`}>
-        {current.questionType === "EN_TO_ZH_CHOICE" ? <>
+        <div className={`flex min-h-full w-full flex-col items-center px-1 text-center ${revealed ? "justify-start py-[clamp(0.5rem,2vh,1.25rem)]" : "justify-center py-[clamp(1rem,4vh,3rem)]"}`}>
+        {current.questionType === "ZH_TO_EN_CHOICE" ? <>
+          <p className="text-[13px] text-[#8e8e93]">根据释义选择单词</p>
+          <div className="glass-inner mt-4 w-full max-w-xl rounded-[18px] border border-[#007aff]/10 bg-[#007aff]/[0.045] px-5 py-4 text-left shadow-[0_12px_36px_rgba(0,122,255,0.06)] sm:px-7 sm:py-5">
+            {definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`} className="text-xl font-bold leading-relaxed sm:text-2xl">{definition}</p>) : <p className="text-xl font-bold">暂无释义</p>}
+          </div>
+          {!revealed && <p className="mt-5 text-[13px] text-[#8e8e93]">{choicesVisible ? "点击候选单词可试听发音，再检查答案" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {choicesVisible ? <div className={`grid w-full max-w-xl gap-3 ${revealed ? "mt-4" : "mt-6"}`}>
+            {(current.choices ?? []).map((choice) => {
+              const isCorrect = normalizeChoiceAnswer(choice) === normalizeChoiceAnswer(current.word.term);
+              const isSelected = choice === selectedChoice;
+              const showState = revealed && (isCorrect || isSelected);
+              const choiceDefinition = current.choiceDefinitions?.[choice];
+              return <button key={choice} type="button" onClick={() => {
+                void playEntryTts(choice, choice === current.word.term ? current.word.entryType : "WORD");
+                if (!revealed) setSelectedChoice(choice);
+              }} className={`ios-press rounded-[16px] border-[1.5px] px-5 py-3.5 text-left transition-all duration-200 ${showState ? (isCorrect ? "border-[#34c759] bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-[#30d158]" : "border-[#ff3b30] bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-[#ff453a]") : isSelected ? "border-[#007aff]/55 bg-[#007aff]/[0.08] text-[#005ecb] shadow-[0_8px_28px_rgba(0,122,255,0.12)] dark:text-[#0a84ff]" : "glass-inner border-white/50 hover:border-[#007aff]/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>
+                <span className="flex items-center justify-between gap-3"><span className="text-[16px] font-semibold">{choice}</span><Volume2 className="size-4 shrink-0 opacity-55" /></span>
+                {revealed && <span className="mt-1.5 block text-[13px] font-normal leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{choiceDefinition ?? "暂无释义"}</span>}
+              </button>;
+            })}
+          </div> : <div className="glass-inner mt-6 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-5 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆释义，选项即将出现</div>}
+        </> : current.questionType === "EN_TO_ZH_CHOICE" ? <>
           <p className="text-[13px] text-[#8e8e93]">选择正确的释义</p>
           <h1 className={`break-words font-bold tracking-tight ${revealed ? "mt-2 text-2xl sm:text-3xl" : "mt-4 text-3xl sm:text-5xl lg:text-6xl"}`}>{current.word.term}</h1>
           {!revealed && <Pronunciation item={current} />}
-          <div className={`grid w-full max-w-xl gap-3 ${revealed ? "mt-4" : "mt-8"}`}>
+          {choicesVisible ? <div className={`grid w-full max-w-xl gap-3 ${revealed ? "mt-4" : "mt-8"}`}>
             {(current.choices ?? []).map((choice) => {
-              const isCorrect = choice === definitions[0];
+              const isCorrect = choice === definitionText;
               const isSelected = choice === selectedChoice;
               const showState = revealed && (isCorrect || isSelected);
-              return <button key={choice} type="button" disabled={revealed} onClick={() => {
+              return <button key={choice} type="button" aria-pressed={isSelected} disabled={revealed} onClick={() => {
                 captureQuestionDuration();
-                setSelectedChoice(choice); setRevealed(true); setLastResult(null);
-                void apiFetch<Interval[]>("/api/reviews/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordId: current.word.id }) }).then(setIntervals).catch(() => setIntervals([]));
-              }} className={`ios-press glass-inner rounded-[16px] border-[1.5px] px-5 py-3.5 text-left text-[15px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-[#34c759] bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-[#30d158]" : "border-[#ff3b30] bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-[#ff453a]") : "border-white/50 hover:border-[#007aff]/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>{choice}</button>;
+                setSelectedChoice(choice); setLastResult(null);
+                void reveal();
+              }} className={`ios-press rounded-[16px] border-[1.5px] px-5 py-3.5 text-left text-[15px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-[#34c759] bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-[#30d158]" : "border-[#ff3b30] bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-[#ff453a]") : isSelected ? "border-[#007aff]/55 bg-[#007aff]/[0.08] text-[#005ecb] shadow-[0_8px_28px_rgba(0,122,255,0.12)] dark:text-[#0a84ff]" : "glass-inner border-white/50 hover:border-[#007aff]/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>{choice}</button>;
             })}
-          </div>
+          </div> : <div className="glass-inner mt-8 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-5 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆单词含义，释义选项即将出现</div>}
         </> : current.questionType === "EN_TO_ZH" ? <>
           {!revealed && <p className="text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "理解句意、语法和关键表达" : "回忆它的含义"}</p>}
           {!revealed && <h1 className={`mt-4 break-words font-bold tracking-tight ${current.word.entryType === "SENTENCE" ? "max-w-2xl text-2xl leading-relaxed sm:text-4xl" : "text-3xl sm:text-5xl lg:text-6xl"}`}>{current.word.term}</h1>}
@@ -257,24 +328,24 @@ export function StudyClient() {
         </> : current.questionType === "ZH_TO_EN_SPELLING" ? <>
           {revealed ? <div className="w-full max-w-xl">
             <p className="text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "根据中文还原完整英文句子" : "根据释义拼写英文"}</p>
-            <h1 className="mt-2 text-xl font-bold leading-relaxed sm:text-2xl">{definitions[0] ?? "暂无释义"}</h1>
+            <div className="mt-2 space-y-1 text-xl font-bold leading-relaxed sm:text-2xl">{definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`}>{definition}</p>) : <p>暂无释义</p>}</div>
           </div> : <>
-            {!compactKeyboardLayout && <span className="grid size-14 place-items-center rounded-[16px] bg-[#ff9500]/12 text-[#ff9500]">{current.word.entryType === "SENTENCE" ? <MessageSquareText className="size-7" /> : <Keyboard className="size-7" />}</span>}
-            <p className={`${compactKeyboardLayout ? "mt-1" : "mt-5"} text-[13px] text-[#8e8e93]`}>{current.word.entryType === "SENTENCE" ? "根据中文翻译还原完整英文句子" : "根据释义拼写英文"}</p>
-            <h1 className={`${compactKeyboardLayout ? "mt-1 max-h-16 overflow-y-auto text-lg" : "mt-3 text-2xl"} max-w-xl font-bold leading-relaxed`}>{definitions[0] ?? "暂无释义"}</h1>
-            {!compactKeyboardLayout && <button type="button" onClick={() => void playWord(current)} className="ios-press mt-4 inline-flex items-center gap-2 rounded-full bg-[#007aff]/[0.08] px-4 py-2 text-sm font-semibold text-[#007aff] transition-all hover:bg-[#007aff]/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
+            <span className="grid size-14 place-items-center rounded-[16px] bg-[#ff9500]/12 text-[#ff9500]">{current.word.entryType === "SENTENCE" ? <MessageSquareText className="size-7" /> : <Keyboard className="size-7" />}</span>
+            <p className="mt-5 text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "根据中文翻译还原完整英文句子" : "根据释义拼写英文"}</p>
+            <div className="mt-3 max-w-xl text-2xl font-bold leading-relaxed">{definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`}>{definition}</p>) : <p>暂无释义</p>}</div>
+            <button type="button" onClick={() => void playWord(current)} className="ios-press mt-4 inline-flex items-center gap-2 rounded-full bg-[#007aff]/[0.08] px-4 py-2 text-sm font-semibold text-[#007aff] transition-all hover:bg-[#007aff]/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
               <Volume2 className="size-4" />{current.word.entryType === "SENTENCE" ? "听原句（提示）" : "重播发音"}
-            </button>}
-            {!compactKeyboardLayout && current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-4 font-mono text-xl tracking-[0.3em] text-[#007aff] sm:text-3xl">{getHintPattern(current.word.term)}</p>}
+            </button>
+            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-4 font-mono text-xl tracking-[0.3em] text-[#007aff] sm:text-3xl">{getHintPattern(current.word.term)}</p>}
             {current.word.entryType === "SENTENCE"
-              ? <textarea ref={sentenceAnswerRef} autoFocus rows={compactKeyboardLayout ? 2 : 4} autoCapitalize="sentences" autoCorrect="off" spellCheck={false} className={`${compactKeyboardLayout ? "mt-3 min-h-20" : "mt-5 min-h-32"} w-full max-w-xl resize-none glass-inner rounded-[16px] border-[1.5px] border-white/50 px-4 py-3 text-left text-lg leading-relaxed outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]`} value={userAnswer} onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入完整英文句子（Ctrl/⌘ + Enter 检查）" />
-              : <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className={`${compactKeyboardLayout ? "mt-3 h-12" : "mt-5 h-14"} w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-xl outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] sm:text-2xl dark:border-white/[0.08]`} value={userAnswer} onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入英文词条" />}
+              ? <textarea ref={sentenceAnswerRef} autoFocus rows={4} autoCapitalize="sentences" autoCorrect="off" spellCheck={false} className="mt-5 min-h-32 w-full max-w-xl resize-none glass-inner rounded-[16px] border-[1.5px] border-white/50 px-4 py-3 text-left text-lg leading-relaxed outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入完整英文句子（Ctrl/⌘ + Enter 检查）" />
+              : <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-5 h-14 w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-xl outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] sm:text-2xl dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入英文词条" />}
           </>}
         </> : <>
           {revealed ? <p className="text-[13px] text-[#8e8e93]">听力拼写答案</p> : <>
-            <button type="button" onClick={() => void playWord(current)} className={`ios-press grid place-items-center rounded-full bg-[#5ac8fa]/12 text-[#007aff] ${compactKeyboardLayout ? "size-12" : "size-20 sm:size-24"}`}><Headphones className={compactKeyboardLayout ? "size-6" : "size-9 sm:size-11"} /></button>
-            {!compactKeyboardLayout && <p className="mt-5 text-[13px] text-[#8e8e93]">已自动播放，也可点击上方按钮重播</p>}
-            <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className={`${compactKeyboardLayout ? "mt-3 h-12" : "mt-6 h-14"} w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-2xl outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]`} value={userAnswer} onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入听到的词条" />
+            <button type="button" onClick={() => void playWord(current)} className="ios-press grid size-20 place-items-center rounded-full bg-[#5ac8fa]/12 text-[#007aff] sm:size-24"><Headphones className="size-9 sm:size-11" /></button>
+            <p className="mt-5 text-[13px] text-[#8e8e93]">已自动播放，也可点击上方按钮重播</p>
+            <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-6 h-14 w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-2xl outline-none transition-all focus:border-[#007aff]/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入听到的词条" />
           </>}
         </>}
 
@@ -309,7 +380,9 @@ export function StudyClient() {
         </div>
       </div>
       <div className="shrink-0 pt-3 sm:pt-4">
-      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[13px] text-[#aeaeb2]">点击上方选项作答</div></div> : current.questionType !== "EN_TO_ZH" ? <div className={compactKeyboardLayout ? "grid grid-cols-3 gap-2" : "flex flex-col gap-2 sm:grid sm:grid-cols-[auto_auto_1fr]"}><Button variant="outline" size={compactKeyboardLayout ? "sm" : "lg"} onClick={() => void skip()} disabled={submitting} className={compactKeyboardLayout ? "min-w-0 px-2 text-xs" : "w-full sm:w-auto"}><Clock3 className="size-4 shrink-0" /><span className={compactKeyboardLayout ? "truncate" : ""}>稍后再学</span></Button><Button variant="outline" size={compactKeyboardLayout ? "sm" : "lg"} onClick={() => void reveal()} disabled={submitting} className={`${compactKeyboardLayout ? "min-w-0 px-2 text-xs" : "w-full sm:w-auto"} border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06]`}><XCircle className="size-4 shrink-0" />忘记</Button><Button size={compactKeyboardLayout ? "sm" : "lg"} className={compactKeyboardLayout ? "min-w-0 px-2 text-xs" : "w-full"} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span className={compactKeyboardLayout ? "truncate" : ""}>检查答案</span></Button></div> : <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className={`border-t border-black/[0.06] dark:border-white/[0.06] ${compactKeyboardLayout ? "pt-2" : "pt-4"}`}><div className={`grid ${compactKeyboardLayout ? "grid-cols-4 gap-1.5" : "grid-cols-2 gap-2 sm:grid-cols-4"}`}>{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-[#ff3b30]/25 text-[#d70015] shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-[#ff453a]", HARD: "glass-inner border-[#ff9500]/25 text-[#c93400] shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-[#ff9f0a]", GOOD: "glass-inner border-[#007aff]/25 text-[#0040dd] shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-[#34c759]/25 text-[#248a3d] shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-[#30d158]" } as const; return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press rounded-[16px] border-[1.5px] text-center transition-all duration-200 disabled:opacity-40 ${compactKeyboardLayout ? "px-1 py-2" : "p-3.5"} ${styles[rating]}`}><b className={`block ${compactKeyboardLayout ? "text-xs" : "text-[15px]"}`}>{labels[rating]}</b>{!compactKeyboardLayout && <span className="mt-1 block text-[11px] opacity-60">{interval ? formatInterval(interval.scheduledDays) : "—"}</span>}</button>; })}</div></div>}
+      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[13px] text-[#aeaeb2]">{choicesVisible ? "点击上方选项作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"> <Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button>{choicesVisible ? <Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting || !selectedChoice}><Sparkles className="size-5" />检查答案</Button> : <div className="self-center text-center text-[13px] text-[#aeaeb2]">{choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</div>}</div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className="w-full sm:w-auto"><Clock3 className="size-4 shrink-0" /><span>稍后再学</span></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className="w-full border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06] sm:w-auto"><XCircle className="size-4 shrink-0" />忘记</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span></Button></div> : <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[auto_1fr]"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className="w-full" onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className="border-t border-black/[0.06] pt-4 dark:border-white/[0.06]">
+        {current.questionType === "ZH_TO_EN_CHOICE" && <div className="mb-3 space-y-2"><Button size="lg" className="w-full" onClick={() => void rate(exactLocal === true ? "GOOD" : "AGAIN")} disabled={submitting}><ArrowRight className="size-5" />下一题</Button><p className="text-center text-xs text-[#8e8e93]">已按“{exactLocal === true ? "认识" : "忘记"}”记录，也可以选择下方熟悉度</p></div>}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-[#ff3b30]/25 text-[#d70015] shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-[#ff453a]", HARD: "glass-inner border-[#ff9500]/25 text-[#c93400] shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-[#ff9f0a]", GOOD: "glass-inner border-[#007aff]/25 text-[#0040dd] shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-[#34c759]/25 text-[#248a3d] shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-[#30d158]" } as const; return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press rounded-[16px] border-[1.5px] p-3.5 text-center transition-all duration-200 disabled:opacity-40 ${styles[rating]}`}><b className="block text-[15px]">{labels[rating]}</b><span className="mt-1 block text-[11px] opacity-60">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div></div>}
       </div>
     </CardContent></Card>
   </div>;

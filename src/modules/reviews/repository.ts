@@ -49,6 +49,7 @@ export function buildIdempotentResult(existing: ExistingReviewLog) {
     masteryScore: word.mastery_score,
     masteryLevel: word.mastery_level,
     wrongWordActive: Boolean(wrong?.active),
+    adaptiveFollowUp: null,
   };
 }
 

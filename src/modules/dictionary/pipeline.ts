@@ -146,7 +146,9 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
   const needsDefinitionFallback =
     contentStatus(content, input.entryType) === "FAILED" &&
     (!requestedFields.length || requestedFields.includes("definitions"));
-  if (needsDefinitionFallback) {
+  // An explicit provider list is an intentional source boundary. Do not silently
+  // add Tencent or AI when a user selected a specific dictionary, such as Youdao.
+  if (needsDefinitionFallback && !input.requestedProviders?.length) {
     const attempted = new Set(settled.map((item) => item.attempt.providerId.startsWith("ai:") ? "ai" : item.attempt.providerId));
     for (const fallbackId of ["tencent-translate", "ai"] as InitializationProviderId[]) {
       if (attempted.has(fallbackId)) continue;

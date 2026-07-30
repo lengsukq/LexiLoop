@@ -1,5 +1,5 @@
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
-import { getSettings } from "@/modules/settings/service";
+import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { z } from "zod";
 import { RECOMMENDATION_LIMIT } from "./content";
 import { extractJson } from "@/lib/json";
@@ -94,8 +94,9 @@ export async function generateAiSuggestion(
   metrics: DailySuggestionMetrics,
   qualityScore: number | null,
   candidates: SuggestionCandidate[],
+  attemptCount = 1,
 ): Promise<GeneratedAiSuggestion | null> {
-  const settings = await getSettings();
+  const settings = settingsForAiAttempt(await getSettings(), attemptCount, "SUGGESTION");
   const purpose = settings.llmConfig.purposes.SUGGESTION;
   if (!purpose.enabled) return null;
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);

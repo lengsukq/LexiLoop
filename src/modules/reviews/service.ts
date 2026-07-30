@@ -19,6 +19,7 @@ import {
 } from "./repository";
 import type { AnswerInput } from "./types";
 import { updateWrongWordState } from "./wrong-state";
+import { scheduleAdaptiveFollowUp } from "@/modules/study/adaptive";
 
 export async function processReviewAnswer(input: AnswerInput) {
   const settings = await getSettings();
@@ -68,6 +69,15 @@ export async function processReviewAnswer(input: AnswerInput) {
     const masteryScore = calculateMasteryScore(masteryInput);
     const masteryLevel = determineMasteryLevel(masteryInput, masteryScore);
     updateWordMastery(word.id, masteryScore, masteryLevel, now);
+    const adaptiveFollowUp = scheduleAdaptiveFollowUp({
+      sessionId: input.studySessionId!,
+      itemId: input.studySessionItemId!,
+      wordId: word.id,
+      currentQuestionType: input.questionType,
+      entryType: word.content_type as "WORD" | "PHRASE" | "SENTENCE",
+      isCorrect: evaluation.isCorrect,
+      now,
+    });
     finalizeStudySession(input.studySessionId!, evaluation.isCorrect, now);
 
     return {
@@ -81,6 +91,7 @@ export async function processReviewAnswer(input: AnswerInput) {
       masteryScore,
       masteryLevel,
       wrongWordActive: wrongState.active,
+      adaptiveFollowUp,
     };
   });
   return transaction.immediate();

@@ -1,7 +1,7 @@
 import { db, sqlite } from "@/db/client";
 import { settings } from "@/db/schema";
 import { DEFAULT_SETTINGS } from "@/lib/config";
-import type { AppSettings } from "@/lib/types";
+import type { AppSettings, LlmPurposeId } from "@/lib/types";
 import { z } from "zod";
 
 const settingsSchema = z.object({
@@ -64,8 +64,12 @@ export function invalidateSettingsCache(): void {
 }
 
 /** A retry can deliberately switch both provider and model without altering the saved primary binding. */
-export function settingsForAiAttempt(settings: AppSettings, attemptCount: number): AppSettings {
-  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+export function settingsForAiAttempt(
+  settings: AppSettings,
+  attemptCount: number,
+  purposeId: LlmPurposeId = "IMPORT_ENRICHMENT",
+): AppSettings {
+  const purpose = settings.llmConfig.purposes[purposeId];
   const retryModel = purpose.retryModel?.trim();
   if (attemptCount <= 1 || !retryModel) return settings;
   const retryProviderId = purpose.retryProviderId?.trim() || purpose.providerId;
@@ -75,7 +79,7 @@ export function settingsForAiAttempt(settings: AppSettings, attemptCount: number
       ...settings.llmConfig,
       purposes: {
         ...settings.llmConfig.purposes,
-        IMPORT_ENRICHMENT: { ...purpose, providerId: retryProviderId, model: retryModel },
+        [purposeId]: { ...purpose, providerId: retryProviderId, model: retryModel },
       },
     },
   };

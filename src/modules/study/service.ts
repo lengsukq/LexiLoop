@@ -41,7 +41,7 @@ export async function startStudySession(mode: StudyMode, resume = true) {
   const now = Date.now(); expireStaleSessions(now);
   if (resume) { const resumableId = findResumableSession(mode, now); if (resumableId) return getStudySession(resumableId, true); }
   const scope: CandidateScope = mode === "SENTENCE_REVIEW" ? "SENTENCE" : mode === "AI_RECOMMENDED" ? "ALL" : "LEXICAL";
-  const pools = await loadPools(now, scope); const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
+  const pools = await loadPools(now, scope, { applyDailySoftQuota: mode === "DAILY" }); const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
   if (mode === "AI_RECOMMENDED" && !recommended?.length) throw new Error("AI_RECOMMENDED_ALL_DONE");
   const selected: StudyCandidate[] = recommended ?? selectCandidates(mode, pools); const due = new Set(pools.due.map((item) => item.id)); const wrong = new Set(pools.wrong.map((item) => item.id));
   const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode === "SENTENCE_REVIEW" ? "DUE_REVIEW" : mode; const sourceType = mode === "AI_RECOMMENDED" || mode === "SENTENCE_REVIEW" ? mode : null;

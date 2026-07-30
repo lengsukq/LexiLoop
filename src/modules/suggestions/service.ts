@@ -24,10 +24,19 @@ async function generateSuggestion(now: number, dateKey: string): Promise<DailyAi
   let ai: Awaited<ReturnType<typeof generateAiSuggestion>> = null;
   let warning: string | null = null;
 
-  try {
-    ai = await generateAiSuggestion(metrics, qualityScore, candidates);
-  } catch (error) {
-    warning = error instanceof Error ? error.message : String(error);
+  for (const attemptCount of [1, 2]) {
+    try {
+      ai = await generateAiSuggestion(metrics, qualityScore, candidates, attemptCount);
+      if (ai) {
+        warning = null;
+        break;
+      }
+      if (attemptCount === 1) break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      warning = attemptCount === 1 ? `首次调用失败：${message}` : `重试后仍失败：${message}`;
+      if (attemptCount === 2) break;
+    }
   }
 
   const content: SuggestionContent = ai ? {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronDown, Database, ListChecks,
-  Loader2, Search, Sparkles, Volume2,
+  Loader2, LockKeyhole, Search, Sparkles, Volume2,
 } from "lucide-react";
 import type { InitializationField, InitializationProviderId, ProviderStrategy } from "@/lib/types";
 import { apiFetch } from "@/lib/client-api";
@@ -59,7 +59,13 @@ const FIELD_GROUPS: Array<{ label: string; fields: InitializationField[] }> = [
   { label: "扩展内容", fields: ["roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"] },
 ];
 
-const PRESETS: Array<{ id: string; label: string; description: string; icon: typeof Volume2; fields: InitializationField[] }> = [
+const YOUDAO_FIELDS: InitializationField[] = [
+  "definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary",
+];
+
+type SourceMode = "GENERAL" | "YOUDAO_ONLY";
+
+const PRESETS: Array<{ id: string; label: string; description: string; icon: typeof Volume2; fields: InitializationField[]; sourceMode?: SourceMode }> = [
   {
     id: "phonetic",
     label: "仅补音标",
@@ -81,6 +87,14 @@ const PRESETS: Array<{ id: string; label: string; description: string; icon: typ
     icon: Sparkles,
     fields: FIELD_GROUPS.flatMap((group) => group.fields),
   },
+  {
+    id: "youdao",
+    label: "有道词典",
+    description: "仅使用有道词典的权威内容",
+    icon: Database,
+    fields: YOUDAO_FIELDS,
+    sourceMode: "YOUDAO_ONLY",
+  },
 ];
 
 const PROVIDER_PRIORITY: InitializationProviderId[] = ["merriam-webster", "ecdict", "dictionaryapi.dev", "ai", "youdao", "mymemory", "tencent-translate"];
@@ -93,17 +107,20 @@ export function InitializationConfigurator({
   selectedWordIds,
   setSelectedWordIds,
   onQueued,
+  requestedScope,
 }: {
   selectedWordIds: Set<number>;
   setSelectedWordIds: Dispatch<SetStateAction<Set<number>>>;
   onQueued: () => Promise<void> | void;
+  requestedScope?: "ALL" | "SELECTED";
 }) {
   const [options, setOptions] = useState<OptionsData | null>(null);
   const [requestedFields, setRequestedFields] = useState<InitializationField[]>(["pronunciations.phonetic"]);
   const [requestedProviders, setRequestedProviders] = useState<InitializationProviderId[]>([]);
   const [providerStrategy, setProviderStrategy] = useState<ProviderStrategy>("PRIORITY_FALLBACK");
+  const [sourceMode, setSourceMode] = useState<SourceMode>("GENERAL");
   const [mode, setMode] = useState<"FILL_MISSING_FIELDS" | "FORCE_OVERWRITE">("FILL_MISSING_FIELDS");
-  const [scope, setScope] = useState<"ALL" | "SELECTED">("ALL");
+  const [scope, setScope] = useState<"ALL" | "SELECTED">(requestedScope ?? "ALL");
   const [wordQuery, setWordQuery] = useState("");
   const [wordResults, setWordResults] = useState<WordSearchData["items"]>([]);
   const [busy, setBusy] = useState<"options" | "words" | "preview" | "queue" | "">("options");
@@ -112,8 +129,8 @@ export function InitializationConfigurator({
   const [error, setError] = useState("");
 
   const activePreset = useMemo(
-    () => PRESETS.find((preset) => sameFields(requestedFields, preset.fields)),
-    [requestedFields],
+    () => PRESETS.find((preset) => (preset.sourceMode ?? "GENERAL") === sourceMode && sameFields(requestedFields, preset.fields)),
+    [requestedFields, sourceMode],
   );
   const providerMap = useMemo(
     () => new Map(options?.providers.map((provider) => [provider.id, provider]) ?? []),
@@ -140,12 +157,19 @@ export function InitializationConfigurator({
     setMessage("");
   }
 
-  function applyFields(fields: InitializationField[]) {
+  function eligibleProviders(fields: InitializationField[]): InitializationProviderId[] {
+    return PROVIDER_PRIORITY.filter((id) => options?.providers.some((provider) =>
+      provider.id === id && provider.available && fields.some((field) => provider.capabilities.includes(field))));
+  }
+
+  function applyFields(fields: InitializationField[], nextSourceMode = sourceMode) {
     const nextFields = [...new Set(fields)];
     setRequestedFields(nextFields);
-    if (options) {
-      const eligible = PROVIDER_PRIORITY.filter((id) => options.providers.some((provider) =>
-        provider.id === id && provider.available && nextFields.some((field) => provider.capabilities.includes(field))));
+    if (nextSourceMode === "YOUDAO_ONLY") {
+      setRequestedProviders(["youdao"]);
+      setProviderStrategy("PRIORITY_FALLBACK");
+    } else if (options) {
+      const eligible = eligibleProviders(nextFields);
       setRequestedProviders((current) => {
         const retained = current.filter((id) => eligible.includes(id));
         return [...retained, ...eligible.filter((id) => !retained.includes(id))];
@@ -161,6 +185,7 @@ export function InitializationConfigurator({
   }
 
   function toggleProvider(provider: ProviderOption) {
+    if (sourceMode === "YOUDAO_ONLY") return;
     if (!provider.available || !requestedFields.some((field) => provider.capabilities.includes(field))) return;
     setRequestedProviders((current) => current.includes(provider.id)
       ? current.filter((id) => id !== provider.id)
@@ -169,6 +194,7 @@ export function InitializationConfigurator({
   }
 
   function moveProvider(id: InitializationProviderId, offset: -1 | 1) {
+    if (sourceMode === "YOUDAO_ONLY") return;
     setRequestedProviders((current) => {
       const index = current.indexOf(id);
       const target = index + offset;
@@ -177,6 +203,19 @@ export function InitializationConfigurator({
       [next[index], next[target]] = [next[target]!, next[index]!];
       return next;
     });
+    invalidatePreview();
+  }
+
+  function applyPreset(preset: (typeof PRESETS)[number]) {
+    const nextSourceMode = preset.sourceMode ?? "GENERAL";
+    setSourceMode(nextSourceMode);
+    applyFields(preset.fields, nextSourceMode);
+  }
+
+  function switchToGeneralSources() {
+    setSourceMode("GENERAL");
+    setRequestedProviders(eligibleProviders(requestedFields));
+    setProviderStrategy("PRIORITY_FALLBACK");
     invalidatePreview();
   }
 
@@ -269,23 +308,25 @@ export function InitializationConfigurator({
               <h3 className="text-sm font-semibold">选择初始化方案</h3>
               <span className="text-xs text-[#aeaeb2]">{requestedFields.length} 个字段</span>
             </div>
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {PRESETS.map((preset) => {
-                const selected = sameFields(requestedFields, preset.fields);
+                const selected = (preset.sourceMode ?? "GENERAL") === sourceMode && sameFields(requestedFields, preset.fields);
+                const unavailable = preset.sourceMode === "YOUDAO_ONLY" && (options === null || !providerMap.get("youdao")?.available);
                 return <button
                   key={preset.id}
                   type="button"
-                  onClick={() => applyFields(preset.fields)}
+                  onClick={() => applyPreset(preset)}
+                  disabled={unavailable}
                   className={`ios-press rounded-[16px] border p-3 text-left transition ${selected
                     ? "border-[#007aff]/30 bg-[#007aff]/[0.08] shadow-[0_6px_18px_rgba(0,122,255,0.08)]"
-                    : "border-black/[0.06] bg-black/[0.02] hover:bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.03]"}`}
+                    : "border-black/[0.06] bg-black/[0.02] hover:bg-black/[0.04] dark:border-white/[0.08] dark:bg-white/[0.03]"} ${unavailable ? "cursor-not-allowed opacity-50" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className={`grid size-9 place-items-center rounded-[12px] ${selected ? "bg-[#007aff] text-white" : "bg-black/[0.05] text-[#6e6e73] dark:bg-white/[0.07] dark:text-[#98989d]"}`}><preset.icon className="size-4" /></span>
                     {selected && <CheckCircle2 className="size-4 text-[#007aff]" />}
                   </div>
                   <b className="mt-3 block text-sm">{preset.label}</b>
-                  <span className="mt-1 block text-xs leading-relaxed text-[#8e8e93]">{preset.description}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-[#8e8e93]">{unavailable ? (options === null ? "正在检查有道词典状态…" : providerMap.get("youdao")?.reason ?? "有道词典当前不可用") : preset.description}</span>
                 </button>;
               })}
             </div>
@@ -341,7 +382,13 @@ export function InitializationConfigurator({
               <ChevronDown className="size-4 shrink-0 text-[#8e8e93] transition group-open:rotate-180" />
             </summary>
             <div className="space-y-4 border-t border-black/[0.05] p-4 dark:border-white/[0.07]">
-              {busy === "options" ? <div className="flex items-center gap-2 text-sm text-[#8e8e93]"><Loader2 className="size-4 animate-spin" />加载来源状态…</div> : <div className="space-y-2">{options?.providers.map((provider) => {
+              {sourceMode === "YOUDAO_ONLY" ? <div className="rounded-[14px] border border-[#007aff]/15 bg-[#007aff]/[0.06] p-3">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-[12px] bg-[#007aff]/10 text-[#007aff]"><LockKeyhole className="size-4" /></span>
+                  <div className="min-w-0 flex-1"><p className="text-sm font-semibold">已锁定为有道词典</p><p className="mt-1 text-xs leading-relaxed text-[#6e6e73] dark:text-[#98989d]">本次任务只会请求有道词典，不会调用其他词典、翻译服务或 AI。</p></div>
+                </div>
+                <button type="button" onClick={switchToGeneralSources} className="mt-3 text-xs font-semibold text-[#007aff] dark:text-[#0a84ff]">切换为自定义来源</button>
+              </div> : busy === "options" ? <div className="flex items-center gap-2 text-sm text-[#8e8e93]"><Loader2 className="size-4 animate-spin" />加载来源状态…</div> : <div className="space-y-2">{options?.providers.map((provider) => {
                 const compatible = requestedFields.some((field) => provider.capabilities.includes(field));
                 const selectedIndex = requestedProviders.indexOf(provider.id);
                 const selectable = provider.available && compatible;
@@ -351,10 +398,10 @@ export function InitializationConfigurator({
                   {selectedIndex >= 0 && <div className="flex gap-1"><button type="button" aria-label="提高优先级" disabled={selectedIndex === 0} onClick={() => moveProvider(provider.id, -1)} className="grid size-8 place-items-center rounded-[10px] hover:bg-black/[0.05] disabled:opacity-30 dark:hover:bg-white/[0.06]"><ArrowUp className="size-4" /></button><button type="button" aria-label="降低优先级" disabled={selectedIndex === requestedProviders.length - 1} onClick={() => moveProvider(provider.id, 1)} className="grid size-8 place-items-center rounded-[10px] hover:bg-black/[0.05] disabled:opacity-30 dark:hover:bg-white/[0.06]"><ArrowDown className="size-4" /></button></div>}
                 </div>;
               })}</div>}
-              <div className="grid gap-2 sm:grid-cols-2">
+              {sourceMode === "GENERAL" && <div className="grid gap-2 sm:grid-cols-2">
                 <label className={`cursor-pointer rounded-[14px] border p-3 text-sm ${providerStrategy === "PRIORITY_FALLBACK" ? "border-[#007aff]/25 bg-[#007aff]/[0.05]" : "border-black/[0.05] dark:border-white/[0.07]"}`}><input className="mr-2" type="radio" checked={providerStrategy === "PRIORITY_FALLBACK"} onChange={() => { setProviderStrategy("PRIORITY_FALLBACK"); invalidatePreview(); }} />按优先级回退<p className="ml-5 mt-1 text-xs text-[#8e8e93]">满足字段后停止请求后续来源。</p></label>
                 <label className={`cursor-pointer rounded-[14px] border p-3 text-sm ${providerStrategy === "PARALLEL_MERGE" ? "border-[#007aff]/25 bg-[#007aff]/[0.05]" : "border-black/[0.05] dark:border-white/[0.07]"}`}><input className="mr-2" type="radio" checked={providerStrategy === "PARALLEL_MERGE"} onChange={() => { setProviderStrategy("PARALLEL_MERGE"); invalidatePreview(); }} />全部查询并合并<p className="ml-5 mt-1 text-xs text-[#8e8e93]">适合例句、近义词等汇总内容。</p></label>
-              </div>
+              </div>}
             </div>
           </details>
         </div>
@@ -366,8 +413,8 @@ export function InitializationConfigurator({
               <SummaryRow label="内容" value={activePreset?.label ?? `自定义 ${requestedFields.length} 项`} />
               <SummaryRow label="范围" value={scope === "ALL" ? "全部词条" : `已选 ${selectedWordIds.size} 个`} />
               <SummaryRow label="写入" value={mode === "FILL_MISSING_FIELDS" ? "仅补充缺失" : "刷新所选字段"} />
-              <SummaryRow label="来源" value={`${requestedProviders.length} 个`} />
-              <SummaryRow label="策略" value={providerStrategy === "PRIORITY_FALLBACK" ? "按优先级回退" : "全部查询并合并"} />
+              <SummaryRow label="来源" value={sourceMode === "YOUDAO_ONLY" ? "有道词典（仅此来源）" : `${requestedProviders.length} 个`} />
+              <SummaryRow label="策略" value={sourceMode === "YOUDAO_ONLY" ? "严格仅有道" : providerStrategy === "PRIORITY_FALLBACK" ? "按优先级回退" : "全部查询并合并"} />
             </div>
 
             <div className="mt-4 rounded-[14px] bg-white/70 p-3 dark:bg-black/20">

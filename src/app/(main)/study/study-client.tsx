@@ -27,7 +27,7 @@ interface SessionData {
   session: { id: number; sessionType: string; startedAt: string; completedAt: string | null; plannedCount: number; completedCount: number; correctCount: number; wrongCount: number; skippedCount: number; durationMs: number | null };
   items: Item[];
 }
-interface AnswerResult { isCorrect: boolean; rating: ReviewRating; expectedAnswer: string; nextDueAt: string | null; scheduledDays: number; masteryScore: number; masteryLevel: string; wrongWordActive: boolean; }
+interface AnswerResult { isCorrect: boolean; rating: ReviewRating; expectedAnswer: string; nextDueAt: string | null; scheduledDays: number; masteryScore: number; masteryLevel: string; wrongWordActive: boolean; adaptiveFollowUp?: { questionType: QuestionType; position: number; repetition: number } | null; }
 interface Interval { rating: ReviewRating; nextDueAt: string; scheduledDays: number; }
 
 const MODES = new Set<StudyMode>(["DAILY", "NEW_WORDS", "DUE_REVIEW", "WRONG_WORDS", "LISTENING", "SPELLING", "SENTENCE_REVIEW", "AI_RECOMMENDED"]);
@@ -304,7 +304,7 @@ export function StudyClient() {
             </div>
           </div>
         </div>}
-        {lastResult && <div className={`mt-4 flex items-center gap-2 text-[15px] font-semibold ${lastResult.isCorrect ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.isCorrect ? "已记录" : "已加入错词强化"}</div>}
+        {lastResult && <div className={`mt-4 flex items-center gap-2 text-[15px] font-semibold ${lastResult.isCorrect ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.isCorrect ? "已记录" : lastResult.adaptiveFollowUp ? "已加入错词强化，稍后会再次出现" : "已加入错词强化"}</div>}
         {error && <div className="mt-4 rounded-[14px] bg-[#ff3b30]/[0.08] p-3 text-[14px] text-[#d70015] dark:text-[#ff453a]">{error}</div>}
         </div>
       </div>

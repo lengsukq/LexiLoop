@@ -142,6 +142,7 @@ export default function InitializePage() {
   const [retryingWordId, setRetryingWordId] = useState<number | null>(null);
   const [selectedWordIds, setSelectedWordIds] = useState<Set<number>>(new Set());
   const [configuratorOpen, setConfiguratorOpen] = useState(false);
+  const [configuratorScope, setConfiguratorScope] = useState<"ALL" | "SELECTED">("ALL");
   const [expandedWordIds, setExpandedWordIds] = useState<Set<number>>(new Set());
 
   // Dialog state
@@ -241,6 +242,11 @@ export default function InitializePage() {
     });
   }
 
+  function openConfigurator(scope: "ALL" | "SELECTED" = selectedWordIds.size ? "SELECTED" : "ALL") {
+    setConfiguratorScope(scope);
+    setConfiguratorOpen(true);
+  }
+
   async function openDetail(jobId: number) {
     setDetailJobId(jobId);
     setDetailData(null);
@@ -269,7 +275,7 @@ export default function InitializePage() {
     finally { setDetailQueueing(false); }
   }
 
-  return <div className="space-y-5"><PageHeader title="词条初始化" description="按词条范围、内容字段和数据来源创建初始化任务；支持只补音标或只刷新所选字段。" action={<div className="flex items-center gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button><Button onClick={() => setConfiguratorOpen(true)}><Plus className="size-4" />创建任务</Button></div>} />
+  return <div className="space-y-5 pb-20 sm:pb-4"><PageHeader title="词条初始化" description="为词条补齐释义、音标、例句等学习内容；选择范围后创建后台任务。" action={<div className="flex items-center gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button><Button onClick={() => openConfigurator()}><Plus className="size-4" />创建任务</Button></div>} />
     {status && <Card>
       <CardContent className="pt-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.4fr)] lg:items-center">
@@ -301,6 +307,7 @@ export default function InitializePage() {
         </details>
       </CardContent>
     </Card>}
+    {words.length > 0 && <Pagination sticky page={page} totalPages={totalPages} total={totalCount} onChange={setPage} />}
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -308,15 +315,15 @@ export default function InitializePage() {
             <CardTitle>按词条查看记录</CardTitle>
             <p className="mt-1 text-xs text-[#aeaeb2]">每个词条只占一行，展开后查看具体初始化子任务。</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <input
-              className="h-9 w-48 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition placeholder:text-[#aeaeb2] focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08] dark:bg-white/[0.04]"
+              className="h-9 min-w-0 flex-1 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.03)] outline-none backdrop-blur-sm transition placeholder:text-[#aeaeb2] focus:border-[#007aff]/40 focus:shadow-[0_0_0_4px_rgba(0,122,255,0.08)] sm:w-48 sm:flex-none dark:border-white/[0.08] dark:bg-white/[0.04]"
               placeholder="搜索词条..."
               value={searchQuery}
               onChange={(event) => handleSearchChange(event.target.value)}
             />
             <select
-              className="h-9 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
+              className="h-9 w-[108px] shrink-0 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
               value={filter}
               onChange={(event) => handleFilterChange(event.target.value)}
             >
@@ -333,14 +340,65 @@ export default function InitializePage() {
       <CardContent>
         {error && <div className="mb-4 rounded-[16px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.06] p-3 text-sm text-[#d70015] shadow-[0_4px_16px_rgba(255,59,48,0.05)] backdrop-blur-sm dark:text-[#ff453a]">{error}</div>}
         {selectedWordIds.size > 0 && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-[#007aff]/15 bg-[#007aff]/[0.06] p-3 text-sm text-[#005ecb] dark:text-[#64b5ff]">
-          <span>已选 {selectedWordIds.size} 个词条，可在上方配置初始化。</span>
+          <span>已选 {selectedWordIds.size} 个词条。配置初始化会为它们补齐释义、音标、例句等内容。</span>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => setSelectedWordIds(new Set())}>取消选择</Button>
-            <Button size="sm" onClick={() => document.getElementById("initialization-configurator")?.scrollIntoView({ behavior: "smooth", block: "start" })}>配置初始化</Button>
+            <Button size="sm" onClick={() => openConfigurator("SELECTED")}>配置初始化</Button>
           </div>
         </div>}
         {words.length ? <>
-          <div className="overflow-auto rounded-[18px] border border-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-white/[0.08]">
+          <div className="space-y-2.5 sm:hidden">
+            <div className="flex items-center justify-between rounded-[14px] bg-black/[0.025] px-3 py-2 text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]">
+              <label className="flex cursor-pointer items-center gap-2.5">
+                <input type="checkbox" className="size-4 accent-[#007aff]" aria-label="选择当前页全部词条" checked={words.length > 0 && words.every((word) => selectedWordIds.has(word.wordId))} onChange={(event) => {
+                  if (event.target.checked) selectVisibleWords();
+                  else setSelectedWordIds((current) => {
+                    const next = new Set(current);
+                    for (const word of words) next.delete(word.wordId);
+                    return next;
+                  });
+                }} />
+                <span>选择当前页</span>
+              </label>
+              <span>{words.length} 条词条</span>
+            </div>
+            {words.map((word) => {
+              const expanded = expandedWordIds.has(word.wordId);
+              const completionPercent = word.taskCount ? Math.round(word.completedTaskCount / word.taskCount * 100) : 0;
+              return <div key={word.wordId} className="glass-inner rounded-[18px] p-3.5">
+                <div className="flex items-start gap-2.5">
+                  <label className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-[11px] bg-black/[0.025] dark:bg-white/[0.05]" onClick={(event) => event.stopPropagation()}>
+                    <input type="checkbox" className="size-4 accent-[#007aff]" aria-label={`选择 ${word.term}`} checked={selectedWordIds.has(word.wordId)} onChange={() => toggleWordSelection(word.wordId)} />
+                  </label>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <button type="button" className="grid size-7 shrink-0 place-items-center rounded-[9px] bg-[#007aff]/[0.08] text-[#007aff] dark:text-[#0a84ff]" onClick={() => toggleWordExpansion(word.wordId)} aria-label={expanded ? `收起 ${word.term}` : `展开 ${word.term}`}>{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</button>
+                      <Link href={`/words/${word.wordId}`} className="flex min-w-0 items-center gap-1 truncate font-semibold text-[#007aff] dark:text-[#0a84ff]" onClick={(event) => event.stopPropagation()}>{word.term}<ExternalLink className="size-3 shrink-0" /></Link>
+                    </div>
+                    <span className="mt-1.5 block text-xs text-[#8e8e93]">{word.completedTaskCount}/{word.taskCount} 已完成{word.activeTaskCount > 0 ? ` · ${word.activeTaskCount} 个处理中` : ""}</span>
+                  </div>
+                  <InitializationBadge status={word.status} />
+                </div>
+                <div className="mt-3 pl-[3.25rem]">
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-[#8e8e93]"><span>初始化进度</span><span>{completionPercent}%</span></div>
+                  <Progress value={word.completedTaskCount} max={Math.max(1, word.taskCount)} className="mt-1.5 h-1.5" />
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] text-[#aeaeb2]">{word.errorSummary ?? `更新时间：${formatTs(word.updatedAt)}`}</span>
+                    {word.failedTaskCount > 0 && <Button variant="outline" size="sm" className="h-8 shrink-0 px-2.5 text-xs" onClick={() => void retryWord(word.wordId)} disabled={retryingWordId !== null}>
+                      {retryingWordId === word.wordId ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}重试
+                    </Button>}
+                  </div>
+                </div>
+                {expanded && <div className="mt-3 space-y-2 border-t border-black/[0.05] pt-3 dark:border-white/[0.08]">
+                  {word.tasks.map((task) => <button key={task.id} type="button" className="block w-full rounded-[13px] border border-white/60 bg-white/55 p-2.5 text-left shadow-[0_3px_12px_rgba(0,0,0,0.03)] transition hover:bg-white/75 dark:border-white/[0.07] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]" onClick={() => void openDetail(task.id)}>
+                    <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2 text-xs font-medium">{TASK_TYPE_LABELS[task.taskType] ?? task.taskType}<InitializationBadge status={task.status} /></span><span className="text-[11px] text-[#8e8e93]">任务 #{task.id}</span></div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[#6e6e73] dark:text-[#98989d]"><span>重试 {task.attemptCount}/{task.maxAttempts}</span><span>更新：{formatTs(task.updatedAt)}</span></div>
+                  </button>)}
+                </div>}
+              </div>;
+            })}
+          </div>
+          <div className="hidden overflow-auto rounded-[18px] border border-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm dark:border-white/[0.08] sm:block">
             <table className="w-full min-w-[840px] text-left text-sm">
               <thead className="bg-black/[0.03] text-xs text-[#6e6e73] dark:bg-white/[0.04] dark:text-[#98989d]">
                 <tr>
@@ -423,12 +481,11 @@ export default function InitializePage() {
               </tbody>
             </table>
           </div>
-          <div className="mt-3"><Pagination page={page} totalPages={totalPages} total={totalCount} onChange={setPage} /></div>
         </> : <EmptyState title="暂无初始化任务" description="导入 CSV 后，初始化任务会显示在这里。" />}
       </CardContent>
     </Card>
-    <Dialog open={configuratorOpen} onClose={() => setConfiguratorOpen(false)} title="创建初始化任务" maxWidth="max-w-4xl" keepMounted>
-          <InitializationConfigurator selectedWordIds={selectedWordIds} setSelectedWordIds={setSelectedWordIds} onQueued={load} />
+    <Dialog open={configuratorOpen} onClose={() => setConfiguratorOpen(false)} title="配置初始化" maxWidth="max-w-4xl">
+          <InitializationConfigurator selectedWordIds={selectedWordIds} setSelectedWordIds={setSelectedWordIds} onQueued={load} requestedScope={configuratorScope} />
         </Dialog>
 
     <Dialog open={detailJobId !== null} onClose={() => setDetailJobId(null)} title={detailData ? `任务 #${detailData.job.id} 详情` : "任务详情"}>

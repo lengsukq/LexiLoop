@@ -51,7 +51,7 @@ export function DefinitionsCard({
           ? <div className="rounded-[16px] border border-[#34c759]/15 bg-[#34c759]/[0.07] p-4 shadow-[0_4px_16px_rgba(52,199,89,0.04)]">
               <div className="flex flex-wrap gap-2"><Badge tone="green">中文概览</Badge></div>
               <p className="mt-2 break-words text-[16px] font-medium leading-7">{summaryTranslation}</p>
-              <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">这是词条概览；点击“补全中文释义”可逐条翻译下面的英英原文。</p>
+              <p className="mt-2 text-xs text-[#6e6e73] dark:text-[#98989d]">这是词条概览；点击“补全中文释义”可逐条翻译下面的英文原文。</p>
             </div>
           : <div className="rounded-[16px] border border-[#ff9500]/15 bg-[#ff9500]/[0.07] p-4 text-sm text-[#8a3b00] dark:text-[#ff9f0a]">
               暂无中文释义。可以补全翻译，或直接填写手动释义继续学习。
@@ -61,7 +61,7 @@ export function DefinitionsCard({
 
       {sourceDefinitions.length > 0 && <details className="group mt-4 rounded-[16px] border border-black/[0.05] bg-black/[0.018] dark:border-white/[0.07] dark:bg-white/[0.025]">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-[#6e6e73] [&::-webkit-details-marker]:hidden dark:text-[#98989d]">
-          <span>查看英英原文（{sourceDefinitions.length} 条）</span>
+          <span>查看英文原文（{sourceDefinitions.length} 条）</span>
           <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-3 border-t border-black/[0.05] p-3 dark:border-white/[0.07]">

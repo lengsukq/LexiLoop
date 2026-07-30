@@ -147,16 +147,20 @@ function paginationRange(page: number, totalPages: number): (number | "...")[] {
   return pages;
 }
 
-export function Pagination({ page, totalPages, total, onChange, className }: {
-  page: number; totalPages: number; total?: number; onChange: (page: number) => void; className?: string;
+export function Pagination({ page, totalPages, total, onChange, className, sticky = false }: {
+  page: number; totalPages: number; total?: number; onChange: (page: number) => void; className?: string; sticky?: boolean;
 }) {
   if (totalPages <= 1) return null;
   return (
-    <div className={cn("flex flex-col items-center gap-3 sm:flex-row sm:justify-between", className)}>
-      {total !== undefined && <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">共 {total} 条</p>}
-      <nav className="flex items-center gap-1.5">
+    <div className={cn(
+      sticky ? "flex-row items-center justify-between gap-2" : "flex-col items-center gap-3 sm:flex-row sm:justify-between",
+      sticky && "liquid-glass liquid-glass-specular liquid-glass-edge sticky top-3 z-20 mx-auto w-full overflow-hidden rounded-[18px] bg-white/[0.9] px-2.5 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.12),0_3px_12px_rgba(0,0,0,0.06)] backdrop-blur-2xl dark:bg-[#1c1c1e]/[0.9] sm:rounded-[20px] sm:px-4 sm:py-3",
+      className,
+    )}>
+      {total !== undefined && <p className={cn("text-sm text-[#6e6e73] dark:text-[#98989d]", sticky && "whitespace-nowrap text-xs")}>共 {total} 条</p>}
+      <nav className={cn("flex items-center gap-1.5", sticky && "gap-1 sm:gap-1.5")}>
         <button
-          className="ios-press grid size-10 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          className={cn(sticky ? "ios-press grid size-9 place-items-center rounded-[11px]" : "ios-press grid size-10 place-items-center rounded-[12px]", "border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]", sticky && "sm:size-10 sm:rounded-[12px]")}
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
           aria-label="上一页"
@@ -168,7 +172,7 @@ export function Pagination({ page, totalPages, total, onChange, className }: {
             <button
               key={item}
               className={cn(
-                "ios-press size-10 rounded-[12px] text-sm font-medium transition-all duration-200",
+                sticky ? "ios-press size-9 rounded-[11px] text-[13px] font-medium transition-all duration-200 sm:size-10 sm:rounded-[12px] sm:text-sm" : "ios-press size-10 rounded-[12px] text-sm font-medium transition-all duration-200",
                 item === page
                   ? "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_14px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)]"
                   : "border border-white/50 bg-white/50 text-[#6e6e73] shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm hover:bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-[#98989d] dark:hover:bg-white/[0.1]",
@@ -178,7 +182,7 @@ export function Pagination({ page, totalPages, total, onChange, className }: {
           ),
         )}
         <button
-          className="ios-press grid size-10 place-items-center rounded-[12px] border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]"
+          className={cn(sticky ? "ios-press grid size-9 place-items-center rounded-[11px]" : "ios-press grid size-10 place-items-center rounded-[12px]", "border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]", sticky && "sm:size-10 sm:rounded-[12px]")}
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1)}
           aria-label="下一页"

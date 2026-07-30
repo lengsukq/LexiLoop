@@ -125,7 +125,7 @@ export function DailyAiSuggestion() {
         </div>
 
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-[#ff3b30]" />AI 今日必做题</h3><p className="mt-1 text-xs text-[#8e8e93]">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red" className="shrink-0">{data.recommendedItems.length} 题</Badge></div>
+          <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-[#ff3b30]" />{data.generator === "AI" ? "AI 今日必做题" : "今日重点复习"}</h3><p className="mt-1 text-xs text-[#8e8e93]">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red" className="shrink-0">{data.recommendedItems.length} 题</Badge></div>
           {data.recommendedItems.length ? <>
             <div className="grid max-h-[290px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {data.recommendedItems.map((item, index) => <div key={item.wordId} className="rounded-[15px] border border-black/[0.05] bg-black/[0.02] p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
@@ -134,7 +134,7 @@ export function DailyAiSuggestion() {
                 <p className="mt-1.5 text-xs leading-relaxed text-[#8e8e93]">{item.reason}</p>
               </div>)}
             </div>
-            <Link href="/study?mode=AI_RECOMMENDED" className={`${buttonClass("primary", "lg")} mt-4 w-full`}><Brain className="size-5" />开始 AI 必做题<ArrowRight className="size-5" /></Link>
+            <Link href="/study?mode=AI_RECOMMENDED" className={`${buttonClass("primary", "lg")} mt-4 w-full`}><Brain className="size-5" />{data.generator === "AI" ? "开始 AI 必做题" : "开始重点复习"}<ArrowRight className="size-5" /></Link>
           </> : <div className="grid min-h-52 place-items-center rounded-[18px] border border-dashed border-black/[0.08] text-center dark:border-white/[0.1]"><div><Target className="mx-auto size-7 text-[#34c759]" /><b className="mt-2 block text-sm">暂时没有高风险词条</b><p className="mt-1 text-xs text-[#8e8e93]">可以继续完成常规今日学习。</p></div></div>}
         </div>
       </div>

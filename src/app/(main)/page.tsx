@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, AudioLines, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Headphones, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowRight, AudioLines, Blocks, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Hammer, Headphones, Layers, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 import { DailyAiSuggestion } from "./daily-ai-suggestion";
@@ -138,31 +138,8 @@ export default function HomePage() {
 
       <DailyAiSuggestion />
 
-      {/* Stats Grid */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {[
-          { label: "总词数", value: data.totalWords, detail: `${data.initializedWords} 个可学习`, icon: BookOpen, gradient: "from-[#007aff] to-[#5ac8fa]" },
-          { label: "已掌握", value: data.masteredWords, detail: `${Math.round((data.masteredWords / Math.max(1, data.totalWords)) * 100)}% 掌握率`, icon: CheckCircle2, gradient: "from-[#34c759] to-[#30d158]" },
-          { label: "今日已处理", value: data.todayProcessed, detail: data.todayAccuracy === null ? `${data.todaySkipped} 个稍后再学` : `${data.todayAccuracy}% 正确率`, icon: Brain, gradient: "from-[#af52de] to-[#bf5af2]" },
-          { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-[#ff3b30] to-[#ff6961]" : "from-[#8e8e93] to-[#aeaeb2]" },
-        ].map((item, index) => (
-          <Card key={item.label} className={`ios-lift animate-fade-up stagger-${index + 1}`}>
-            <CardContent className="flex items-center gap-3 pt-4 sm:gap-4 sm:pt-5">
-              <div className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${item.gradient} text-white shadow-lg sm:size-12 sm:rounded-[14px]`}>
-                <item.icon className="size-5 sm:size-6" />
-              </div>
-              <div>
-                <p className="text-[12px] font-medium text-[#8e8e93] dark:text-[#636366] sm:text-[13px]">{item.label}</p>
-                <p className="text-[22px] font-bold tracking-tight sm:text-[26px]">{item.value}</p>
-                <p className="hidden text-xs text-[#aeaeb2] dark:text-[#48484a] sm:block">{item.detail}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-
-      {/* Queue + Practice */}
-      <section className="grid gap-4 sm:gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+      {/* Today's queue */}
+      <section className="space-y-4 sm:space-y-5">
         <Card className="animate-fade-up stagger-3">
           <CardHeader><CardTitle>今日队列</CardTitle></CardHeader>
           <CardContent className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
@@ -172,9 +149,32 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
+        {/* Stats move directly below today's queue for a clearer daily overview. */}
+        <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          {[
+            { label: "总词数", value: data.totalWords, detail: `${data.initializedWords} 个可学习`, icon: BookOpen, gradient: "from-[#007aff] to-[#5ac8fa]" },
+            { label: "已掌握", value: data.masteredWords, detail: `${Math.round((data.masteredWords / Math.max(1, data.totalWords)) * 100)}% 掌握率`, icon: CheckCircle2, gradient: "from-[#34c759] to-[#30d158]" },
+            { label: "今日已处理", value: data.todayProcessed, detail: data.todayAccuracy === null ? `${data.todaySkipped} 个稍后再学` : `${data.todayAccuracy}% 正确率`, icon: Brain, gradient: "from-[#af52de] to-[#bf5af2]" },
+            { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-[#ff3b30] to-[#ff6961]" : "from-[#8e8e93] to-[#aeaeb2]" },
+          ].map((item, index) => (
+            <Card key={item.label} className={`ios-lift animate-fade-up stagger-${index + 1}`}>
+              <CardContent className="flex items-center gap-3 pt-4 sm:gap-4 sm:pt-5">
+                <div className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${item.gradient} text-white shadow-lg sm:size-12 sm:rounded-[14px]`}>
+                  <item.icon className="size-5 sm:size-6" />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-[#8e8e93] dark:text-[#636366] sm:text-[13px]">{item.label}</p>
+                  <p className="text-[22px] font-bold tracking-tight sm:text-[26px]">{item.value}</p>
+                  <p className="hidden text-xs text-[#aeaeb2] dark:text-[#48484a] sm:block">{item.detail}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
         <Card className="animate-fade-up stagger-4">
           <CardHeader><CardTitle>专项练习</CardTitle></CardHeader>
-          <CardContent className="space-y-2.5 sm:space-y-3">
+          <CardContent className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
             <PracticeLink
               href="/study?mode=LISTENING"
               icon={<Headphones className="size-5" />}
@@ -203,14 +203,16 @@ export default function HomePage() {
       <Card className="animate-fade-up stagger-5">
         <CardHeader className="flex-row items-center justify-between gap-3">
           <div><CardTitle>趣味训练</CardTitle><p className="mt-1 text-xs text-[#8e8e93]">独立游戏模式，不占用今日复习队列</p></div>
-          <Link href="/games" className="inline-flex items-center gap-1 text-sm font-semibold text-[#007aff] dark:text-[#0a84ff]">全部游戏<ArrowRight className="size-4" /></Link>
         </CardHeader>
-        <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5 sm:gap-3">
+        <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
           <PracticeLink href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-[#af52de] to-[#5856d6]" />
           <PracticeLink href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-[#007aff]" />
           <PracticeLink href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-[#ff9500] to-[#ff6961]" />
           <PracticeLink href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-[#007aff]" />
           <PracticeLink href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-[#34c759] to-[#007aff]" />
+          <PracticeLink href="/games?mode=WHACK_A_MOLE" icon={<Hammer className="size-5" />} title="词汇地鼠" subtitle="锤出正确单词" gradient="from-[#34c759] to-[#00c7be]" />
+          <PracticeLink href="/games?mode=WORD_STACK" icon={<Layers className="size-5" />} title="单词堆堆乐" subtitle="点词块搭高塔" gradient="from-[#ff2d55] to-[#ff9500]" />
+          <PracticeLink href="/games?mode=WORD_TETRIS" icon={<Blocks className="size-5" />} title="词汇俄罗斯方块" subtitle="点中下落的正确单词" gradient="from-[#5856d6] to-[#af52de]" />
         </CardContent>
       </Card>
     </div>

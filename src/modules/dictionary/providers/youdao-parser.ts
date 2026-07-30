@@ -65,7 +65,7 @@ export function parseYoudaoHtml(html: string, optionsOrTerm: YoudaoParseOptions 
   const examples = parseExamples(lines, options.term);
   const phrases = parsePhrases(lines);
   const content: Partial<DictionaryContent> = {
-    pronunciations: options.entryType === "WORD" ? parsePhonetics(lines) : [],
+    pronunciations: options.entryType === "WORD" ? parsePhonetics(lines, options.term) : [],
     definitions,
     forms: options.entryType === "WORD" ? parseWordForms(lines) : [],
     examples,

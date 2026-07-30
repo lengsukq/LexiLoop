@@ -46,12 +46,14 @@ function matchesTerm(sentence: string, term: string): boolean {
   return new RegExp(`(?:^|[^a-z])${escaped}(?:$|[^a-z])`, "i").test(sentence);
 }
 
-export function parsePhonetics(lines: string[]): DictionaryContent["pronunciations"] {
+export function parsePhonetics(lines: string[], term = ""): DictionaryContent["pronunciations"] {
   const text = lines.join(" "); const result: DictionaryContent["pronunciations"] = [];
+  const trimmedTerm = term.trim();
+  const audioBase = trimmedTerm ? `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(trimmedTerm)}` : null;
   const uk = text.match(/英\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/英\s*\/\s*([^/]+?)\s*\//);
   const us = text.match(/美\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/美\s*\/\s*([^/]+?)\s*\//);
-  if (uk?.[1]) result.push({ accent: "UK", phonetic: uk[1].trim(), audioUrl: null, source: dictionarySource, isSynthetic: false });
-  if (us?.[1]) result.push({ accent: "US", phonetic: us[1].trim(), audioUrl: null, source: dictionarySource, isSynthetic: false });
+  if (uk?.[1]) result.push({ accent: "UK", phonetic: uk[1].trim(), audioUrl: audioBase ? `${audioBase}&type=1` : null, source: dictionarySource, isSynthetic: false });
+  if (us?.[1]) result.push({ accent: "US", phonetic: us[1].trim(), audioUrl: audioBase ? `${audioBase}&type=2` : null, source: dictionarySource, isSynthetic: false });
   return result;
 }
 

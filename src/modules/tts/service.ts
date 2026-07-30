@@ -182,3 +182,36 @@ export async function generateTtsAudio(options: TtsOptions): Promise<TtsResult> 
     return { ok: false, error: message };
   }
 }
+
+const YOUDAO_ACCENT_TYPE: Record<string, number> = { UK: 1, US: 2 };
+
+export async function fetchYoudaoAudio(options: TtsOptions): Promise<TtsResult> {
+  const accent = (options.accent ?? "US").trim().toUpperCase() === "UK" ? "UK" : "US";
+  const cacheKey = `youdao:${ttsCacheKey(options.word, accent)}`;
+
+  const cached = ttsCacheGet(cacheKey);
+  if (cached) return { ok: true, audio: cached };
+
+  try {
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(options.word)}&type=${YOUDAO_ACCENT_TYPE[accent]}`;
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(10_000),
+      headers: { "user-agent": "Mozilla/5.0 LexiLoop", accept: "audio/mpeg,*/*" },
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: `有道发音返回 ${response.status}` };
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      return { ok: false, error: "有道发音返回空数据" };
+    }
+
+    ttsCacheSet(cacheKey, arrayBuffer);
+    return { ok: true, audio: arrayBuffer };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "有道发音请求失败";
+    return { ok: false, error: message };
+  }
+}

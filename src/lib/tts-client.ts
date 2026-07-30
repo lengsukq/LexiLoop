@@ -136,9 +136,7 @@ async function writeCachedAudio(key: string, blob: Blob): Promise<void> {
   });
 }
 
-async function loadTtsAudio(term: string, accent: string): Promise<Blob | null> {
-  const normalizedAccent = normalizeAccent(accent);
-  const key = audioCacheKey(term, normalizedAccent);
+async function fetchAndCacheAudio(key: string, url: string): Promise<Blob | null> {
   const cached = await readCachedAudio(key);
   if (cached) return cached;
 
@@ -147,7 +145,7 @@ async function loadTtsAudio(term: string, accent: string): Promise<Blob | null> 
 
   const request = (async () => {
     try {
-      const response = await fetch(`/api/tts?word=${encodeURIComponent(term)}&accent=${encodeURIComponent(normalizedAccent)}`);
+      const response = await fetch(url);
       if (!response.ok) return null;
 
       const blob = await response.blob();
@@ -163,6 +161,20 @@ async function loadTtsAudio(term: string, accent: string): Promise<Blob | null> 
 
   pendingAudio.set(key, request);
   return request;
+}
+
+async function loadTtsAudio(term: string, accent: string): Promise<Blob | null> {
+  const normalizedAccent = normalizeAccent(accent);
+  const key = audioCacheKey(term, normalizedAccent);
+  return fetchAndCacheAudio(key, `/api/tts?word=${encodeURIComponent(term)}&accent=${encodeURIComponent(normalizedAccent)}`);
+}
+
+async function loadYoudaoAudio(term: string, accent: string): Promise<Blob | null> {
+  const normalizedAccent = normalizeAccent(accent);
+  const normalizedTerm = term.trim().normalize("NFKC").toLocaleLowerCase("en-US");
+  if (!normalizedTerm) return null;
+  const key = `youdao:v1:${normalizedAccent}:${normalizedTerm}`;
+  return fetchAndCacheAudio(key, `/api/tts/youdao?word=${encodeURIComponent(term)}&accent=${encodeURIComponent(normalizedAccent)}`);
 }
 
 export async function preloadTts(text: string, accent = "US"): Promise<boolean> {
@@ -208,10 +220,7 @@ function stopActiveAudio(): void {
   }
 }
 
-export async function playCachedTts(term: string, accent = "US", category: TtsCategory = "word"): Promise<boolean> {
-  const [blob, playbackRate] = await Promise.all([loadTtsAudio(term, accent), resolveSpeed(category)]);
-  if (!blob) return false;
-
+async function playBlob(blob: Blob, playbackRate: number): Promise<boolean> {
   stopActiveAudio();
   const objectUrl = URL.createObjectURL(blob);
   const audio = new Audio(objectUrl);
@@ -232,6 +241,24 @@ export async function playCachedTts(term: string, accent = "US", category: TtsCa
     release();
     return false;
   }
+}
+
+export async function playCachedTts(term: string, accent = "US", category: TtsCategory = "word"): Promise<boolean> {
+  const [blob, playbackRate] = await Promise.all([loadTtsAudio(term, accent), resolveSpeed(category)]);
+  if (!blob) return false;
+  return playBlob(blob, playbackRate);
+}
+
+/**
+ * Playback helper that prefers Youdao real-human audio when `preferYoudao`
+ * is true, falling back to Edge TTS if the Youdao audio is unavailable.
+ */
+export async function playEntryTtsPreferYoudao(term: string, entryType: string, accent = "US", preferYoudao = false): Promise<boolean> {
+  const playbackRate = await resolveSpeed(entryTypeToTtsCategory(entryType));
+  let blob = preferYoudao ? await loadYoudaoAudio(term, accent) : null;
+  if (!blob) blob = await loadTtsAudio(term, accent);
+  if (!blob) return false;
+  return playBlob(blob, playbackRate);
 }
 
 /**

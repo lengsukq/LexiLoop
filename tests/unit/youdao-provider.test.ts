@@ -118,6 +118,10 @@ describe("YoudaoProvider fallback", () => {
       expect.objectContaining({ language: "zh-CN", partOfSpeech: "int", text: "你好", source: "youdao" }),
       expect.objectContaining({ language: "zh-CN", partOfSpeech: "n", text: "招呼，问候" }),
     ]);
+    expect(result?.pronunciations).toEqual([
+      expect.objectContaining({ accent: "UK", phonetic: "həˈləʊ", audioUrl: "https://dict.youdao.com/dictvoice?audio=hello&type=1", source: "youdao" }),
+      expect.objectContaining({ accent: "US", phonetic: "həˈloʊ", audioUrl: "https://dict.youdao.com/dictvoice?audio=hello&type=2", source: "youdao" }),
+    ]);
     expect(result?.forms).toEqual([expect.objectContaining({ type: "PLURAL", value: "hellos" })]);
     expect(result?.phrases).toEqual(expect.arrayContaining([
       expect.objectContaining({ phrase: "Hello Kitty", translation: "凯蒂猫", source: "youdao:phrase" }),

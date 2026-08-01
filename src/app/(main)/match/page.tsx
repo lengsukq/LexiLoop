@@ -273,7 +273,7 @@ export default function MatchPage() {
 
     <Card className="overflow-hidden">
       <CardHeader className="pb-2"><CardTitle>点击英文与对应释义</CardTitle></CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2 pb-4 sm:gap-4 sm:px-7 sm:pb-7">
+      <CardContent className="grid grid-cols-1 gap-2 pb-4 min-[420px]:grid-cols-2 sm:gap-4 sm:px-7 sm:pb-7">
         <div className="space-y-2 sm:space-y-3">
           {words.map((item) => <MatchCard key={item.itemId} side="word" item={item} selected={selected} matched={matched.has(item.itemId)} wrong={wrongFlash.has(`word:${item.itemId}`)} onClick={() => selectCard("word", item)} />)}
         </div>
@@ -299,7 +299,7 @@ function MatchCard({ side, item, selected, matched, wrong, onClick }: {
   const active = selected?.side === side && selected.itemId === item.itemId;
   const priority = side === "word" && item.priority !== "NORMAL";
   return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[58px] w-full items-center rounded-[15px] border px-3 py-2.5 text-left transition-all duration-200 sm:min-h-[68px] sm:rounded-[18px] sm:px-4 ${matched ? "pointer-events-none scale-95 border-[#34c759]/20 bg-[#34c759]/[0.08] opacity-0" : wrong ? "animate-[shake_0.35s_ease-in-out] border-[#ff3b30] bg-[#ff3b30]/10 text-[#d70015] dark:text-[#ff453a]" : active ? "border-[#007aff] bg-[#007aff]/10 shadow-[0_6px_24px_rgba(0,122,255,0.18)]" : "glass-inner border-white/45 hover:border-[#007aff]/35 dark:border-white/[0.08]"}`}>
-    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] sm:text-[17px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-[#ff3b30]">重点复习</small>}</span> : <span className="line-clamp-3 text-[13px] leading-snug sm:text-[14px]">{item.definition}</span>}
+    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] sm:text-[17px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-[#ff3b30]">重点复习</small>}</span> : <span className="line-clamp-4 break-words text-[13px] leading-snug sm:text-[14px]">{item.definition}</span>}
     {active && <span className="absolute right-2 top-2 size-2 rounded-full bg-[#007aff]" />}
     {wrong && <XCircle className="absolute right-2 top-2 size-4 text-[#ff3b30]" />}
   </button>;

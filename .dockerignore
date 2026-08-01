@@ -4,6 +4,7 @@ node_modules
 coverage
 test-results
 playwright-report
+test-screenshots
 data/*.sqlite*
 data/backups/*
 data/reference/*

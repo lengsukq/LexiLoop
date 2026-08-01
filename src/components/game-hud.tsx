@@ -24,7 +24,7 @@ export function GameComboBadge({ combo }: { combo: number }) {
  * (Link) while games/phonetics reset locally (button).
  */
 export function GamePlayHeader({ remainingMs, combo, exit }: { remainingMs: number; combo: number; exit: ReactNode }) {
-  return <div className="flex items-center justify-between gap-3">
+  return <div className="flex flex-wrap items-center justify-between gap-3">
     {exit}
     <GameTimerPill remainingMs={remainingMs} />
     <GameComboBadge combo={combo} />

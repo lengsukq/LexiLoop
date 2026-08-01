@@ -73,7 +73,7 @@ export function PhoneticQuestion({
           type="button"
           onClick={() => onChoose(choice)}
           disabled={Boolean(wrongChoice) || correctFeedback}
-          className={`ios-press min-h-20 rounded-[18px] border px-4 py-4 text-center transition-all ${
+          className={`ios-press flex min-h-20 items-center justify-center rounded-[18px] border px-4 py-4 text-center transition-all ${
             wrong
               ? "border-[#ff3b30] bg-[#ff3b30]/10 text-[#d70015] dark:text-[#ff453a]"
               : correct
@@ -83,7 +83,7 @@ export function PhoneticQuestion({
         >
           {wrong && <XCircle className="mr-2 inline size-4" />}
           {correct && <CheckCircle2 className="mr-2 inline size-4" />}
-          <span className={item.challengeType === "PHONETIC_TO_WORD" ? "text-lg font-bold" : "font-serif text-xl font-bold tracking-wide"}>{choice}</span>
+          <span className={`min-w-0 break-words ${item.challengeType === "PHONETIC_TO_WORD" ? "text-lg font-bold" : "font-serif text-xl font-bold tracking-wide"}`}>{choice}</span>
         </button>;
       })}
     </div>

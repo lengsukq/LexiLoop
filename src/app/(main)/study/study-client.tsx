@@ -301,7 +301,7 @@ export function StudyClient() {
         {current.questionType === "ZH_TO_EN_CHOICE" ? <>
           <p className="text-[13px] text-[#8e8e93]">根据释义选择单词</p>
           <div className="glass-inner mt-3 w-full max-w-xl rounded-[16px] border border-[#007aff]/10 bg-[#007aff]/[0.045] px-4 py-3 text-left shadow-[0_12px_36px_rgba(0,122,255,0.06)] sm:px-6 sm:py-4">
-            {definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`} className="text-lg font-bold leading-snug sm:text-xl">{definition}</p>) : <p className="text-lg font-bold">暂无释义</p>}
+            <DefinitionBlock definitions={definitions} className="text-lg font-bold leading-snug sm:text-xl" />
           </div>
           {!revealed && <p className="mt-3 text-[13px] text-[#8e8e93]">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
           {choicesVisible ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
@@ -353,11 +353,11 @@ export function StudyClient() {
         </> : current.questionType === "ZH_TO_EN_SPELLING" ? <>
           {revealed ? <div className="w-full max-w-xl">
             <p className="text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "根据中文还原完整英文句子" : "根据释义拼写英文"}</p>
-            <div className="mt-1.5 space-y-1 text-lg font-bold leading-snug sm:text-xl">{definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`}>{definition}</p>) : <p>暂无释义</p>}</div>
+            <div className="mt-1.5 space-y-1 text-lg font-bold leading-snug sm:text-xl"><DefinitionBlock definitions={definitions} /></div>
           </div> : <>
             <span className="grid size-12 place-items-center rounded-[16px] bg-[#ff9500]/12 text-[#ff9500]">{current.word.entryType === "SENTENCE" ? <MessageSquareText className="size-6" /> : <Keyboard className="size-6" />}</span>
             <p className="mt-3 text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "根据中文翻译还原完整英文句子" : "根据释义拼写英文"}</p>
-            <div className="mt-2 max-w-xl text-xl font-bold leading-snug">{definitions.length > 0 ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`}>{definition}</p>) : <p>暂无释义</p>}</div>
+            <div className="mt-2 max-w-xl text-xl font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
             <button type="button" onClick={() => void playWord(current)} className="ios-press mt-3 inline-flex items-center gap-2 rounded-full bg-[#007aff]/[0.08] px-4 py-2 text-sm font-semibold text-[#007aff] transition-all hover:bg-[#007aff]/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
               <Volume2 className="size-4" />{current.word.entryType === "SENTENCE" ? "听原句（提示）" : "重播发音"}
             </button>
@@ -388,7 +388,7 @@ export function StudyClient() {
                 </button>
               </div>
               <div className="mt-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.06]">
-                {definitions.map((definition) => <p key={definition} className="mt-1 text-[14px] leading-relaxed text-[#6e6e73] sm:text-[15px] dark:text-[#98989d]">{definition}</p>)}
+                <DefinitionBlock definitions={definitions} className="mt-1 text-[14px] leading-relaxed text-[#6e6e73] sm:text-[15px] dark:text-[#98989d]" />
               </div>
               {hasExtraDetails && <button type="button" onClick={() => setShowDetails((value) => !value)} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-[#007aff] transition hover:opacity-80 dark:text-[#0a84ff]"><ChevronDown className={`size-4 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`} />{showDetails ? "收起学习内容" : "展开例句与助记词"}</button>}
               {showDetails && <div className="mt-3 space-y-3">
@@ -415,6 +415,24 @@ export function StudyClient() {
     </CardContent></Card>
   </div>;
 }
+function DefinitionBlock({ definitions, className = "" }: { definitions: string[]; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const needsClamp = definitions.some((definition) => definition.length > 40);
+  const content = definitions.length > 0
+    ? definitions.map((definition, definitionIndex) => <p key={`${definition}-${definitionIndex}`} className={className}>{definition}</p>)
+    : <p className={className}>暂无释义</p>;
+  if (!needsClamp) return <>{content}</>;
+  return (
+    <div className="w-full">
+      <div className={expanded ? "" : "line-clamp-3"}>{content}</div>
+      <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#007aff]/[0.08] px-2.5 py-1 text-[12px] font-semibold text-[#007aff] transition hover:bg-[#007aff]/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
+        <ChevronDown className={`size-3.5 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        {expanded ? "收起" : "查看全部"}
+      </button>
+    </div>
+  );
+}
+
 function Pronunciation({ item }: { item: Item }) {
   const [selectedAccent, setSelectedAccent] = useState<"US" | "UK">("US");
   const [ttsTip, setTtsTip] = useState("");

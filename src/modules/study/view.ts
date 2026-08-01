@@ -2,6 +2,49 @@ import { sqlite } from "@/db/client";
 import type { DictionaryContent, EntryType, QuestionType, StudyItemView } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 
+const DISTRACTOR_POOL_SIZE = 80;
+const DISTRACTOR_TAKE_SIZE = 12;
+
+interface DistractorRow {
+  word_id: number;
+  term: string;
+  definitions_json: string;
+}
+
+let distractorPool: DistractorRow[] = [];
+
+/** Refills the module-level distractor pool with one randomized query. */
+function refillDistractorPool(): void {
+  distractorPool = sqlite.prepare(`SELECT w.id AS word_id, w.term, c.definitions_json
+    FROM word_contents c JOIN words w ON w.id = c.word_id
+    WHERE w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+      AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]'
+    ORDER BY RANDOM() LIMIT ?`).all(DISTRACTOR_POOL_SIZE) as DistractorRow[];
+}
+
+/**
+ * Returns distractor candidates without running a RANDOM()-ordered query per
+ * question. Pulls from the cached pool and refills it in bulk when depleted.
+ */
+function takeDistractorRows(excludedWordIds: ReadonlySet<number>, count: number): DistractorRow[] {
+  if (distractorPool.length < count * 2) refillDistractorPool();
+  const collect = (pool: DistractorRow[]): DistractorRow[] => {
+    const rows: DistractorRow[] = [];
+    for (const row of pool) {
+      if (excludedWordIds.has(row.word_id)) continue;
+      rows.push(row);
+      if (rows.length >= count) break;
+    }
+    return rows;
+  };
+  const firstPass = collect(distractorPool);
+  if (firstPass.length >= count) return firstPass;
+  // Rare exhaustion: refill once more before giving up.
+  refillDistractorPool();
+  const secondPass = collect(distractorPool);
+  return secondPass.length >= firstPass.length ? secondPass : firstPass;
+}
+
 export function getStudySession(sessionId: number, resumed = false) {
   const session = sqlite.prepare("SELECT * FROM study_sessions WHERE id = ?").get(sessionId) as Record<string, unknown> | undefined;
   if (!session) throw new Error("STUDY_SESSION_NOT_FOUND");
@@ -47,7 +90,7 @@ function shuffle<T>(items: T[]): T[] {
 function generateMeaningChoices(wordId: number, targetLanguage: string, content: DictionaryContent): string[] {
   const definitions = targetDefinitionTexts(content, targetLanguage);
   const correct = definitions.join("；"); if (!correct) return [];
-  const rows = sqlite.prepare(`SELECT c.definitions_json FROM word_contents c JOIN words w ON w.id = c.word_id WHERE c.word_id != ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]' ORDER BY RANDOM() LIMIT 12`).all(wordId) as Array<{ definitions_json: string }>;
+  const rows = takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
   const distractors: string[] = []; const seen = new Set([correct.toLocaleLowerCase()]);
   for (const row of rows) { if (distractors.length >= 3) break; const text = definitionTexts(row.definitions_json, targetLanguage)[0]; if (text && !seen.has(text.toLocaleLowerCase())) { seen.add(text.toLocaleLowerCase()); distractors.push(text); } }
   return shuffle([correct, ...distractors]);
@@ -60,7 +103,7 @@ function generateWordChoices(wordId: number, term: string, targetLanguage: strin
   const choices = [correct];
   const choiceDefinitions: Record<string, string> = { [correct]: correctDefinitions.join("；") };
   const seen = new Set([correct.toLocaleLowerCase()]);
-  const rows = sqlite.prepare(`SELECT w.term, c.definitions_json FROM word_contents c JOIN words w ON w.id = c.word_id WHERE c.word_id != ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]' ORDER BY RANDOM() LIMIT 12`).all(wordId) as Array<{ term: string; definitions_json: string }>;
+  const rows = takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
   for (const row of rows) {
     if (choices.length >= 4) break;
     const candidateTerm = row.term.trim();

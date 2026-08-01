@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sqlite } from "@/db/client";
 import { updateSettings } from "@/modules/settings/service";
 import { processReviewAnswer } from "@/modules/reviews/service";
-import { continuousCandidates } from "@/modules/study/candidates";
+import { continuousCandidates, dailyProgress, selectCandidates } from "@/modules/study/candidates";
 import { skipStudyItem, startStudySession } from "@/modules/study/service";
 
 function insertReadyWord(term: string): number {
@@ -27,6 +27,18 @@ function insertDueCard(wordId: number, now: number): void {
     (word_id, due_at, stability, difficulty, elapsed_days, scheduled_days, reps, lapses,
      fsrs_state, learning_steps, last_review_at, created_at, updated_at)
     VALUES (?, ?, 1, 5, 1, 1, 1, 0, 2, 0, ?, ?, ?)`).run(wordId, now - 86_400_000, now - 172_800_000, now, now);
+}
+
+function candidate(id: number, term: string) {
+  return { id, term, normalized_term: term, source_language: "en", target_language: "zh-CN", content_type: "WORD" as const };
+}
+
+function seededRandom(seed: number) {
+  let value = seed >>> 0;
+  return () => {
+    value = (value * 1_664_525 + 1_013_904_223) >>> 0;
+    return value / 4_294_967_296;
+  };
 }
 
 describe("study prioritization", () => {
@@ -69,7 +81,7 @@ describe("study prioritization", () => {
 
     const session = await startStudySession("DAILY", false, true);
 
-    expect(session.items.map((item) => item.word.id)).toEqual([firstId, secondId]);
+    expect(new Set(session.items.map((item) => item.word.id))).toEqual(new Set([firstId, secondId]));
     expect(session.items.every((item) => item.taskType === "NEW")).toBe(true);
   });
 
@@ -88,10 +100,41 @@ describe("study prioritization", () => {
        fsrs_state, learning_steps, last_review_at, created_at, updated_at)
       VALUES (?, ?, 10, 5, 1, 10, 2, 0, 2, 0, ?, ?, ?)`).run(oldId, now + 86_400_000, now - 30 * 86_400_000, now, now);
 
-    const candidates = continuousCandidates(4, now);
+    const candidates = continuousCandidates(4, now, "LEXICAL", () => 0);
 
     expect(candidates.map((item) => item.id)).toEqual([dueId, wrongId, newId, oldId]);
     expect(candidates.map((item) => item.continuousTaskType)).toEqual(["REVIEW", "WRONG", "NEW", "REVIEW"]);
+  });
+
+  it("mixes daily categories with weighted randomness without starving fresh words", () => {
+    const pools = {
+      due: Array.from({ length: 10 }, (_, index) => candidate(index + 1, `due-${index}`)),
+      wrong: Array.from({ length: 5 }, (_, index) => candidate(index + 11, `wrong-${index}`)),
+      fresh: Array.from({ length: 5 }, (_, index) => candidate(index + 16, `fresh-${index}`)),
+      limits: { due: 10, wrong: 5, fresh: 5 },
+    };
+    const runs = Array.from({ length: 40 }, (_, index) => selectCandidates("DAILY", pools, { random: seededRandom(index + 1) }));
+    const orders = new Set(runs.map((items) => items.map((item) => item.id).join(",")));
+    const freshIds = new Set(pools.fresh.map((item) => item.id));
+    const freshInFirstNine = runs.reduce((total, items) => total + items.slice(0, 9).filter((item) => freshIds.has(item.id)).length, 0);
+
+    expect(orders.size).toBeGreaterThan(1);
+    expect(freshInFirstNine).toBeGreaterThan(40);
+    expect(runs.every((items) => items.length === 20)).toBe(true);
+    expect(runs[0]).toHaveLength(20);
+  });
+
+  it("counts game tasks in the daily category quotas", () => {
+    const now = Date.now();
+    const wordId = insertReadyWord("game-review");
+    const sessionId = Number(sqlite.prepare(`INSERT INTO study_sessions
+      (session_type, source_type, started_at, completed_at, planned_count, completed_count, created_at)
+      VALUES ('DAILY', 'GAME_MEANING_BLITZ', ?, ?, 1, 1, ?)`).run(now, now, now).lastInsertRowid);
+    sqlite.prepare(`INSERT INTO study_session_items
+      (study_session_id, position, word_id, task_type, question_type, status, answered_at, created_at)
+      VALUES (?, 0, ?, 'REVIEW', 'EN_TO_ZH_CHOICE', 'ANSWERED', ?, ?)`).run(sessionId, wordId, now, now);
+
+    expect(dailyProgress(now)).toMatchObject({ due: 1, wrong: 0, fresh: 0 });
   });
 
   it("cycles reviewed words in a later batch after all fresh words are processed", async () => {

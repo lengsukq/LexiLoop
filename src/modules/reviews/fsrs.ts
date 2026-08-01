@@ -1,13 +1,25 @@
 import { createEmptyCard, FSRS, Rating, State, type Card, type Grade, type RecordLogItem } from "ts-fsrs";
 import type { ReviewRating } from "@/lib/types";
 
+const fsrsInstances = new Map<number, FSRS>();
+
+/** Creates (or reuses) an FSRS scheduler instance for the given target retention rate (0.7–0.99). */
+function cachedFsrs(requestRetention: number): FSRS {
+  let instance = fsrsInstances.get(requestRetention);
+  if (!instance) {
+    instance = new FSRS({
+      request_retention: requestRetention,
+      maximum_interval: 3650,
+      enable_fuzz: true,
+    });
+    fsrsInstances.set(requestRetention, instance);
+  }
+  return instance;
+}
+
 /** Creates an FSRS scheduler instance with the given target retention rate (0.7–0.99). */
-export function createFsrs(requestRetention = 0.9) {
-  return new FSRS({
-    request_retention: requestRetention,
-    maximum_interval: 3650,
-    enable_fuzz: true,
-  });
+export function createFsrs(requestRetention = 0.9): FSRS {
+  return cachedFsrs(requestRetention);
 }
 
 export function emptyCard(now = new Date()): Card {

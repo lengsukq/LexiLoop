@@ -77,4 +77,42 @@ describe("review service", () => {
       status: "PENDING",
     });
   });
+
+  it("respects EASY on a wrong choice and clears wrong-word reinforcement", async () => {
+    const now = Date.now();
+    sqlite.prepare(`INSERT INTO words(term, normalized_term, source_language, target_language, entry_type, initialization_status, created_at, updated_at)
+      VALUES ('harbor','harbor','en','zh-CN','WORD','READY',?,?)`).run(now, now);
+    const wordId = Number((sqlite.prepare("SELECT id FROM words").get() as { id: number }).id);
+    sqlite.prepare(`INSERT INTO word_contents(word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json, synonyms_json, antonyms_json, tags_json, provider_metadata_json, updated_at)
+      VALUES (?, ?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`).run(
+      wordId,
+      JSON.stringify([{ language: "zh-CN", partOfSpeech: "n", text: "港口", source: "test", isUserEdited: false }]),
+      now,
+    );
+    sqlite.prepare(`INSERT INTO wrong_word_states
+      (word_id, active, wrong_count, hard_count, consecutive_correct, updated_at)
+      VALUES (?, 1, 2, 1, 0, ?)`).run(wordId, now);
+    const sessionId = Number(sqlite.prepare(`INSERT INTO study_sessions
+      (session_type, started_at, planned_count, created_at) VALUES ('DAILY', ?, 1, ?)`).run(now, now).lastInsertRowid);
+    const itemId = Number(sqlite.prepare(`INSERT INTO study_session_items
+      (study_session_id, position, word_id, task_type, question_type, status, created_at)
+      VALUES (?, 0, ?, 'WRONG', 'ZH_TO_EN_CHOICE', 'PENDING', ?)`).run(sessionId, wordId, now).lastInsertRowid);
+
+    const result = await processReviewAnswer({
+      clientAnswerId: crypto.randomUUID(),
+      wordId,
+      studySessionId: sessionId,
+      studySessionItemId: itemId,
+      rating: "EASY",
+      questionType: "ZH_TO_EN_CHOICE",
+      userAnswer: "walk",
+    });
+
+    expect(result.rating).toBe("EASY");
+    expect(result.isCorrect).toBe(false);
+    expect(result.wrongWordActive).toBe(false);
+    expect(result.adaptiveFollowUp).toBeNull();
+    expect((sqlite.prepare("SELECT rating FROM review_logs WHERE word_id = ?").get(wordId) as { rating: string }).rating).toBe("EASY");
+    expect((sqlite.prepare("SELECT active FROM wrong_word_states WHERE word_id = ?").get(wordId) as { active: number }).active).toBe(0);
+  });
 });

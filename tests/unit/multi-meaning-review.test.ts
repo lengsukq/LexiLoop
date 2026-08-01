@@ -70,6 +70,14 @@ describe("multi-meaning review content", () => {
       questionType: "ZH_TO_EN_CHOICE",
       userAnswer: "walk",
     }, word)).toMatchObject({ isCorrect: false, effectiveRating: "AGAIN" });
+
+    expect(evaluateReviewAnswer({
+      clientAnswerId: "reverse-choice-familiar",
+      wordId: 1,
+      rating: "EASY",
+      questionType: "ZH_TO_EN_CHOICE",
+      userAnswer: "walk",
+    }, word)).toMatchObject({ isCorrect: false, effectiveRating: "EASY" });
   });
 
   it("puts all meanings into the generated meaning choice", () => {

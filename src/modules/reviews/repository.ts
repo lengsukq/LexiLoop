@@ -11,6 +11,7 @@ import type {
 import { boundedActiveDurationMs, closeStudySessionWithActiveDuration } from "./duration";
 
 const MASTERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const PERFORMANCE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 export function findExistingReview(clientAnswerId: string): ExistingReviewLog | undefined {
   return sqlite.prepare(`SELECT id, word_id, study_session_id, study_session_item_id,
@@ -157,13 +158,134 @@ export function insertReviewLog(input: {
   return Number(result.lastInsertRowid);
 }
 
+function seedWordReviewStats(wordId: number, now: number): void {
+  const seeded = sqlite.prepare(`SELECT
+      count(*) AS total_reviews,
+      sum(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct_reviews,
+      sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again_30d,
+      sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again_14d,
+      sum(CASE WHEN is_correct = 0 AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_wrong_14d,
+      sum(CASE WHEN rating = 'HARD' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_hard_14d,
+      sum(CASE WHEN duration_ms IS NOT NULL AND duration_ms > 0 THEN duration_ms ELSE 0 END) AS total_duration_ms,
+      sum(CASE WHEN duration_ms IS NOT NULL AND duration_ms > 0 THEN 1 ELSE 0 END) AS duration_count,
+      max(reviewed_at) AS last_reviewed_at
+    FROM review_logs WHERE word_id = ?`).get(now - MASTERY_WINDOW_MS, now - PERFORMANCE_WINDOW_MS, now - PERFORMANCE_WINDOW_MS, now - PERFORMANCE_WINDOW_MS, wordId) as {
+      total_reviews: number | null;
+      correct_reviews: number | null;
+      recent_again_30d: number | null;
+      recent_again_14d: number | null;
+      recent_wrong_14d: number | null;
+      recent_hard_14d: number | null;
+      total_duration_ms: number | null;
+      duration_count: number | null;
+      last_reviewed_at: number | null;
+    };
+  sqlite.prepare(`INSERT INTO word_review_stats
+    (word_id, total_reviews, correct_reviews, recent_again_30d, recent_again_14d,
+     recent_wrong_14d, recent_hard_14d, total_duration_ms, duration_count,
+     last_reviewed_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    wordId,
+    seeded.total_reviews ?? 0,
+    seeded.correct_reviews ?? 0,
+    seeded.recent_again_30d ?? 0,
+    seeded.recent_again_14d ?? 0,
+    seeded.recent_wrong_14d ?? 0,
+    seeded.recent_hard_14d ?? 0,
+    seeded.total_duration_ms ?? 0,
+    seeded.duration_count ?? 0,
+    seeded.last_reviewed_at ?? now,
+    now,
+  );
+}
+
+/**
+ * Keeps word_review_stats current. Lifetime counters are incremented, while the
+ * 14/30 day window counters are recomputed for this word via the indexed
+ * (word_id, reviewed_at) lookup, which is cheap because per-word history is small.
+ * Must run inside the same transaction that inserted the review log.
+ */
+export function upsertWordReviewStats(input: {
+  wordId: number;
+  reviewedAt: number;
+  rating: ReviewRating;
+  isCorrect: boolean;
+  durationMs: number | null;
+}): void {
+  const window30 = input.reviewedAt - MASTERY_WINDOW_MS;
+  const window14 = input.reviewedAt - PERFORMANCE_WINDOW_MS;
+  const windowed = sqlite.prepare(`SELECT
+      SUM(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again_30d,
+      SUM(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again_14d,
+      SUM(CASE WHEN is_correct = 0 AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_wrong_14d,
+      SUM(CASE WHEN rating = 'HARD' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_hard_14d,
+      MAX(reviewed_at) AS last_reviewed_at
+    FROM review_logs WHERE word_id = ?`).get(window30, window14, window14, window14, input.wordId) as {
+      recent_again_30d: number | null;
+      recent_again_14d: number | null;
+      recent_wrong_14d: number | null;
+      recent_hard_14d: number | null;
+      last_reviewed_at: number | null;
+    };
+  const boundedDuration = input.durationMs != null && input.durationMs > 0 ? input.durationMs : 0;
+  sqlite.prepare(`INSERT INTO word_review_stats
+    (word_id, total_reviews, correct_reviews, recent_again_30d, recent_again_14d,
+     recent_wrong_14d, recent_hard_14d, total_duration_ms, duration_count,
+     last_reviewed_at, updated_at)
+    VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(word_id) DO UPDATE SET
+      total_reviews = total_reviews + 1,
+      correct_reviews = correct_reviews + excluded.correct_reviews,
+      recent_again_30d = excluded.recent_again_30d,
+      recent_again_14d = excluded.recent_again_14d,
+      recent_wrong_14d = excluded.recent_wrong_14d,
+      recent_hard_14d = excluded.recent_hard_14d,
+      total_duration_ms = total_duration_ms + excluded.total_duration_ms,
+      duration_count = duration_count + excluded.duration_count,
+      last_reviewed_at = excluded.last_reviewed_at,
+      updated_at = excluded.updated_at`)
+    .run(
+      input.wordId,
+      input.isCorrect ? 1 : 0,
+      windowed.recent_again_30d ?? 0,
+      windowed.recent_again_14d ?? 0,
+      windowed.recent_wrong_14d ?? 0,
+      windowed.recent_hard_14d ?? 0,
+      boundedDuration,
+      boundedDuration > 0 ? 1 : 0,
+      windowed.last_reviewed_at ?? input.reviewedAt,
+      input.reviewedAt,
+    );
+}
+
 export function loadReviewStatistics(wordId: number, now: number): ReviewStatistics {
-  return sqlite.prepare(`SELECT count(*) AS total,
-    sum(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct,
-    sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again,
-    avg(CASE WHEN duration_ms IS NOT NULL AND duration_ms > 0 THEN duration_ms ELSE NULL END) AS avg_duration
-    FROM review_logs WHERE word_id = ?`)
-    .get(now - MASTERY_WINDOW_MS, wordId) as ReviewStatistics;
+  const row = sqlite.prepare(`SELECT total_reviews, correct_reviews, recent_again_30d,
+      total_duration_ms, duration_count
+    FROM word_review_stats WHERE word_id = ?`).get(wordId) as {
+      total_reviews: number;
+      correct_reviews: number;
+      recent_again_30d: number;
+      total_duration_ms: number;
+      duration_count: number;
+    } | undefined;
+  if (!row) {
+    // Fallback for words that predate the materialized table (migration backfill
+    // misses nothing, but this keeps the answer path robust regardless).
+    const fallback = sqlite.prepare(`SELECT count(*) AS total,
+      sum(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct,
+      sum(CASE WHEN rating = 'AGAIN' AND reviewed_at >= ? THEN 1 ELSE 0 END) AS recent_again,
+      avg(CASE WHEN duration_ms IS NOT NULL AND duration_ms > 0 THEN duration_ms ELSE NULL END) AS avg_duration
+      FROM review_logs WHERE word_id = ?`)
+      .get(now - MASTERY_WINDOW_MS, wordId) as ReviewStatistics;
+    seedWordReviewStats(wordId, now);
+    return fallback;
+  }
+  return {
+    total: row.total_reviews,
+    correct: row.correct_reviews,
+    recent_again: row.recent_again_30d,
+    avg_duration: row.duration_count > 0 ? row.total_duration_ms / row.duration_count : null,
+  };
 }
 
 export function updateWordMastery(wordId: number, score: number, level: MasteryLevel, now: number): void {

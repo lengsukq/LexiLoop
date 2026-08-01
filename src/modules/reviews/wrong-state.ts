@@ -4,6 +4,12 @@ import type { WrongStateResult } from "./types";
 
 const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
 const DAY_MS = 86_400_000;
+const dayFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIMEZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+});
 
 interface WrongStateRow {
   active: number;
@@ -15,14 +21,11 @@ interface WrongStateRow {
 }
 
 function localDayOrdinal(timestamp: number): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: APP_TIMEZONE,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  }).formatToParts(new Date(timestamp));
-  const values = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
-  return Math.floor(Date.UTC(values.year!, values.month! - 1, values.day!) / DAY_MS);
+  const parts = dayFormatter.formatToParts(new Date(timestamp));
+  const year = Number(parts.find((part) => part.type === "year")?.value ?? 0);
+  const month = Number(parts.find((part) => part.type === "month")?.value ?? 1);
+  const day = Number(parts.find((part) => part.type === "day")?.value ?? 1);
+  return Math.floor(Date.UTC(year, month - 1, day) / DAY_MS);
 }
 
 function recordWrong(wordId: number, now: number): WrongStateResult {
@@ -53,6 +56,12 @@ function nextConsecutiveCorrect(current: WrongStateRow, now: number): number {
 
 export function updateWrongWordState(wordId: number, rating: ReviewRating, isCorrect: boolean, now: number): WrongStateResult {
   const current = sqlite.prepare("SELECT * FROM wrong_word_states WHERE word_id = ?").get(wordId) as WrongStateRow | undefined;
+  if (rating === "EASY") {
+    if (!current) return { active: false, consecutiveCorrect: 1 };
+    sqlite.prepare(`UPDATE wrong_word_states SET consecutive_correct = 1, last_correct_at = ?, active = 0,
+      resolved_at = ?, updated_at = ? WHERE word_id = ?`).run(now, now, now, wordId);
+    return { active: false, consecutiveCorrect: 1 };
+  }
   if (!isCorrect || rating === "AGAIN") return recordWrong(wordId, now);
   if (rating === "HARD") return recordHard(wordId, now);
   if (!current) return { active: false, consecutiveCorrect: 1 };

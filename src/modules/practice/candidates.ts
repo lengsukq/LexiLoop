@@ -6,7 +6,6 @@ import type {
   PracticeSelectionOptions,
 } from "@/modules/practice/types";
 
-const RECENT_MISTAKE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTIVE_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CANDIDATE_QUERY_LIMIT = 160;
 
@@ -47,10 +46,7 @@ function activeSessionExclusion(enabled: boolean): string {
 
 function loadCandidateRows(options: PracticeSelectionOptions): PracticeCandidateRow[] {
   const { now, excludeWordsInActiveSessions = false } = options;
-  const parameters: number[] = [
-    now - RECENT_MISTAKE_WINDOW_MS,
-    now - RECENT_MISTAKE_WINDOW_MS,
-  ];
+  const parameters: number[] = [];
   if (excludeWordsInActiveSessions) parameters.push(now - ACTIVE_SESSION_WINDOW_MS);
   parameters.push(now, CANDIDATE_QUERY_LIMIT);
 
@@ -62,26 +58,20 @@ function loadCandidateRows(options: PracticeSelectionOptions): PracticeCandidate
       COALESCE(x.hard_count, 0) AS hard_count,
       rc.due_at,
       COALESCE(w.mastery_score, 0) AS mastery_score,
-      COALESCE(recent.recent_again, 0) AS recent_again,
-      COALESCE(recent.recent_hard, 0) AS recent_hard
+      COALESCE(recent.recent_again_14d, 0) AS recent_again,
+      COALESCE(recent.recent_hard_14d, 0) AS recent_hard
     FROM words w
     JOIN word_contents c ON c.word_id = w.id
     LEFT JOIN wrong_word_states x ON x.word_id = w.id
     LEFT JOIN review_cards rc ON rc.word_id = w.id
-    LEFT JOIN (
-      SELECT word_id,
-        SUM(CASE WHEN reviewed_at >= ? AND rating = 'AGAIN' THEN 1 ELSE 0 END) AS recent_again,
-        SUM(CASE WHEN reviewed_at >= ? AND rating = 'HARD' THEN 1 ELSE 0 END) AS recent_hard
-      FROM review_logs
-      GROUP BY word_id
-    ) recent ON recent.word_id = w.id
+    LEFT JOIN word_review_stats recent ON recent.word_id = w.id
     WHERE w.is_suspended = 0
       AND w.initialization_status IN ('READY', 'PARTIAL')
       ${activeSessionExclusion(excludeWordsInActiveSessions)}
     ORDER BY
       COALESCE(x.active, 0) DESC,
-      COALESCE(recent.recent_again, 0) DESC,
-      COALESCE(recent.recent_hard, 0) DESC,
+      COALESCE(recent.recent_again_14d, 0) DESC,
+      COALESCE(recent.recent_hard_14d, 0) DESC,
       CASE WHEN rc.due_at IS NOT NULL AND rc.due_at <= ? THEN 1 ELSE 0 END DESC,
       COALESCE(x.wrong_count, 0) DESC,
       COALESCE(x.hard_count, 0) DESC,

@@ -72,7 +72,8 @@ export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): A
     || input.questionType === "LISTENING_SPELLING"
     || input.questionType === "EN_TO_ZH_CHOICE"
     || input.questionType === "ZH_TO_EN_CHOICE";
-  const effectiveRating: ReviewRating = objectivelyScored && !isCorrect ? "AGAIN" : input.rating;
+  const respectsEasyChoice = objectivelyScored && !isCorrect && input.rating === "EASY";
+  const effectiveRating: ReviewRating = objectivelyScored && !isCorrect && !respectsEasyChoice ? "AGAIN" : input.rating;
   const expected = expectedAnswer(input, word, definitions);
   const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
   const reversePrompt = definitions.map((definition) => definition.text).join("；");

@@ -8,8 +8,10 @@ import type {
   PracticeSessionItemReference,
   PracticeTaskType,
 } from "@/modules/practice/types";
-import { processReviewAnswer } from "@/modules/reviews/service";
+import { processReviewAnswersInTransaction } from "@/modules/reviews/service";
+import { getSettings } from "@/modules/settings/service";
 import { boundedActiveDurationMs, closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
+import type { AnswerInput } from "@/modules/reviews/types";
 import type { QuestionType } from "@/lib/types";
 
 interface CompletionRow {
@@ -118,6 +120,7 @@ export async function completePracticeSession(
   let recovered = 0;
   let missed = 0;
 
+  const pendingAnswers: AnswerInput[] = [];
   for (const row of rows) {
     const answer = submitted.get(`${row.item_id}:${row.word_id}`);
     const solved = Boolean(answer?.solved);
@@ -127,7 +130,7 @@ export async function completePracticeSession(
     else missed += 1;
 
     if (row.status !== "PENDING") continue;
-    await processReviewAnswer({
+    pendingAnswers.push({
       clientAnswerId: `${input.clientAnswerPrefix}-${input.sessionId}-${row.item_id}`,
       wordId: row.word_id,
       studySessionId: input.sessionId,
@@ -137,6 +140,11 @@ export async function completePracticeSession(
       userAnswer: solved && !hadMistake ? correctAnswer(row) : input.failureAnswer,
       durationMs: boundedActiveDurationMs(answer?.durationMs ?? averageDuration) ?? 0,
     });
+  }
+
+  if (pendingAnswers.length > 0) {
+    const settings = await getSettings();
+    processReviewAnswersInTransaction(pendingAnswers, settings);
   }
 
   return {

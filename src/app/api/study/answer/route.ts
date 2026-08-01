@@ -5,7 +5,7 @@ import { MAX_ACTIVE_ANSWER_DURATION_MS } from "@/modules/reviews/duration";
 import { processReviewAnswer } from "@/modules/reviews/service";
 import { z } from "zod";
 const schema = z.object({
-  clientAnswerId: z.string().uuid(),
+  clientAnswerId: z.string().min(8).max(128),
   wordId: z.number().int().positive(),
   studySessionId: z.number().int().positive().optional(),
   studySessionItemId: z.number().int().positive().optional(),

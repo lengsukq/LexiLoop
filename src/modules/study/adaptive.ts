@@ -3,7 +3,6 @@ import { sqlite } from "@/db/client";
 
 const MAX_FOLLOW_UPS_PER_WORD = 2;
 const FOLLOW_UP_DELAY = 3;
-const POSITION_SHIFT = 1_000_000;
 
 export interface AdaptiveFollowUp {
   questionType: QuestionType;
@@ -49,16 +48,19 @@ export function scheduleAdaptiveFollowUp(input: {
     .get(input.itemId, input.sessionId) as { position: number } | undefined;
   if (!current) return null;
 
-  const maxPosition = sqlite.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM study_session_items WHERE study_session_id = ?")
-    .get(input.sessionId) as { position: number };
-  const position = Math.min(current.position + FOLLOW_UP_DELAY, Number(maxPosition.position) + 1);
+  // Place the follow-up between the current item and the next one (or after the
+  // last item) using a fractional position, avoiding a full O(n) position rewrite
+  // while keeping the unique (study_session_id, position) constraint.
+  const next = sqlite.prepare(`SELECT position FROM study_session_items
+    WHERE study_session_id = ? AND position > ?
+    ORDER BY position ASC LIMIT 1`)
+    .get(input.sessionId, current.position) as { position: number } | undefined;
+  const position = next
+    ? current.position + Math.min(FOLLOW_UP_DELAY, (next.position - current.position) / 2)
+    : current.position + FOLLOW_UP_DELAY;
   const questionType = nextQuestionType(input.currentQuestionType, input.entryType);
   const now = input.now ?? Date.now();
 
-  sqlite.prepare(`UPDATE study_session_items SET position = position + ?
-    WHERE study_session_id = ? AND position >= ?`).run(POSITION_SHIFT, input.sessionId, position);
-  sqlite.prepare(`UPDATE study_session_items SET position = position - ?
-    WHERE study_session_id = ? AND position >= ?`).run(POSITION_SHIFT - 1, input.sessionId, position + POSITION_SHIFT);
   sqlite.prepare(`INSERT INTO study_session_items
     (study_session_id, position, word_id, task_type, question_type, status, created_at)
     VALUES (?, ?, ?, 'WRONG', ?, 'PENDING', ?)`)

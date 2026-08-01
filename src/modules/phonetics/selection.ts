@@ -51,10 +51,11 @@ function selectPronunciation(
   return phonetic ? { phonetic, accent: selected.accent } : null;
 }
 
-function hasPronunciation(candidate: PracticeCandidateRow, accent: PhoneticAccent): boolean {
+function hasPronunciation(candidate: PracticeCandidateRow): boolean {
+  // Cheap pre-filter; the actual accent-aware pronunciation lookup happens once
+  // in selectPhoneticCandidates to avoid parsing pronunciations_json twice.
   return candidate.content_type === "WORD"
-    && /^[a-zA-Z][a-zA-Z '-]{1,30}$/.test(candidate.term)
-    && selectPronunciation(candidate.pronunciations_json, accent) !== null;
+    && /^[a-zA-Z][a-zA-Z '-]{1,30}$/.test(candidate.term);
 }
 
 function phoneticIdentity(value: string): string {
@@ -110,7 +111,7 @@ export function selectPhoneticCandidates(options: {
   const candidates = selectPracticeCandidates({
     count: CANDIDATE_POOL_SIZE,
     now: options.now,
-    candidateFilter: (candidate) => hasPronunciation(candidate, options.accent),
+    candidateFilter: (candidate) => hasPronunciation(candidate),
   });
   const selected: PhoneticCandidate[] = [];
   const phonetics = new Set<string>();

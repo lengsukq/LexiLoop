@@ -88,7 +88,6 @@ export function StudyClient() {
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [choicesVisible, setChoicesVisible] = useState(false);
   const [error, setError] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
   const [choiceRevealDelaySeconds, setChoiceRevealDelaySeconds] = useState(2);
   const choiceRevealTimerRef = useRef<number | null>(null);
   const [autoContinue, setAutoContinue] = useState(mode === "DAILY");
@@ -214,15 +213,6 @@ export function StudyClient() {
 
   const definitions = current ? targetDefinitions(current) : [];
   const definitionText = definitions.join("；");
-  const hasExtraDetails = Boolean(current && (
-    current.word.content.learning.mnemonic
-    || (current.word.entryType !== "SENTENCE" && current.word.content.examples[0])
-    || (current.word.entryType === "SENTENCE" && (
-      current.word.content.sentenceAnalysis.grammarNotes.length > 0
-      || current.word.content.sentenceAnalysis.keyExpressions.length > 0
-      || current.word.content.sentenceAnalysis.variations.length > 0
-    ))
-  ));
   const exactLocal = current && current.questionType === "EN_TO_ZH_CHOICE"
     ? (selectedChoice ? selectedChoice === definitionText : null)
     : current && current.questionType === "ZH_TO_EN_CHOICE"
@@ -245,7 +235,6 @@ export function StudyClient() {
     captureQuestionDuration();
     dismissKeyboard();
     setRevealed(true); setLastResult(null);
-    setShowDetails(false);
     try { setIntervals(await apiFetch<Interval[]>("/api/reviews/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordId: current.word.id }) })); }
     catch { setIntervals([]); }
   }
@@ -390,16 +379,15 @@ export function StudyClient() {
               <div className="mt-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.06]">
                 <DefinitionBlock definitions={definitions} className="mt-1 text-[14px] leading-relaxed text-[#6e6e73] sm:text-[15px] dark:text-[#98989d]" />
               </div>
-              {hasExtraDetails && <button type="button" onClick={() => setShowDetails((value) => !value)} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-[#007aff] transition hover:opacity-80 dark:text-[#0a84ff]"><ChevronDown className={`size-4 transition-transform duration-200 ${showDetails ? "rotate-180" : ""}`} />{showDetails ? "收起学习内容" : "展开例句与助记词"}</button>}
-              {showDetails && <div className="mt-3 space-y-3">
+              <div className="mt-3 space-y-3">
               {current.word.entryType === "SENTENCE" && (current.word.content.sentenceAnalysis.grammarNotes.length > 0 || current.word.content.sentenceAnalysis.keyExpressions.length > 0 || current.word.content.sentenceAnalysis.variations.length > 0) && <div className="space-y-3 rounded-[14px] bg-[#007aff]/[0.055] p-3.5">
                 {current.word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="text-xs font-semibold text-[#007aff]">语法要点</p><ul className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{current.word.content.sentenceAnalysis.grammarNotes.map((note) => <li key={note}>• {note}</li>)}</ul></div>}
-                {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-[#007aff]">关键表达</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[14px] font-semibold">{item.expression}</p><p className="text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{item.meaning}{item.note ? ` · ${item.note}` : ""}</p></div>)}</div></div>}
-                {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-[#007aff]">替换句型</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[10px] bg-white/45 px-3 py-2 dark:bg-white/[0.04]"><p className="text-[13px] font-medium leading-relaxed">{item.sentence}</p>{item.translation && <p className="mt-0.5 text-xs text-[#8e8e93]">{item.translation}</p>}</div>)}</div></div>}
+                {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-[#007aff]">关键表达</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[14px] font-semibold">{item.expression}</p><ClampedText text={item.meaning + (item.note ? ` · ${item.note}` : "")} className="text-[13px] leading-relaxed text-[#6e6e73] dark:text-[#98989d]" /></div>)}</div></div>}
+                {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-[#007aff]">替换句型</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[10px] bg-white/45 px-3 py-2 dark:bg-white/[0.04]"><ClampedText text={item.sentence} className="text-[13px] font-medium leading-relaxed" />{item.translation && <ClampedText text={item.translation} className="mt-0.5 text-xs text-[#8e8e93]" />}</div>)}</div></div>}
               </div>}
-              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[12px] bg-black/[0.025] px-3 py-2.5 dark:bg-white/[0.035]"><div className="flex items-start justify-between gap-2"><p className="text-[14px] italic leading-relaxed text-[#8e8e93] sm:text-[15px]">{current.word.content.examples[0].sentence}</p><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-7 shrink-0 place-items-center rounded-full bg-[#007aff]/[0.08] text-[#007aff] transition hover:bg-[#007aff]/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3.5" /></button></div>{current.word.content.examples[0].translation && <p className="mt-1.5 text-[13px] leading-relaxed text-[#6e6e73] sm:text-[14px] dark:text-[#98989d]">{current.word.content.examples[0].translation}</p>}</div>}
-              {current.word.content.learning.mnemonic && <div className="flex items-start gap-2 rounded-[14px] bg-[#ff9500]/[0.08] p-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-[#ff9500]" /><p className="text-[13px] leading-relaxed text-[#c93400] sm:text-[14px] dark:text-[#ff9f0a]">{current.word.content.learning.mnemonic}</p></div>}
-              </div>}
+              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[12px] bg-black/[0.025] px-3 py-2.5 dark:bg-white/[0.035]"><div className="flex items-start justify-between gap-2"><ClampedText text={current.word.content.examples[0].sentence} className="text-[14px] italic leading-relaxed text-[#8e8e93] sm:text-[15px]" /><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-7 shrink-0 place-items-center rounded-full bg-[#007aff]/[0.08] text-[#007aff] transition hover:bg-[#007aff]/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3.5" /></button></div>{current.word.content.examples[0].translation && <ClampedText text={current.word.content.examples[0].translation} className="mt-1.5 text-[13px] leading-relaxed text-[#6e6e73] sm:text-[14px] dark:text-[#98989d]" />}</div>}
+              {current.word.content.learning.mnemonic && <div className="flex items-start gap-2 rounded-[14px] bg-[#ff9500]/[0.08] p-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-[#ff9500]" /><ClampedText text={current.word.content.learning.mnemonic} className="text-[13px] leading-relaxed text-[#c93400] sm:text-[14px] dark:text-[#ff9f0a]" /></div>}
+              </div>
             </div>
           </div>
         </div>}
@@ -415,6 +403,21 @@ export function StudyClient() {
     </CardContent></Card>
   </div>;
 }
+function ClampedText({ text, lines = 2, className = "" }: { text: string; lines?: number; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const needsClamp = text.length > 40;
+  if (!needsClamp) return <p className={className}>{text}</p>;
+  return (
+    <div className="w-full">
+      <p className={`${className} ${expanded ? "" : `line-clamp-${lines}`}`}>{text}</p>
+      <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#007aff]/[0.08] px-2 py-0.5 text-[11px] font-semibold text-[#007aff] transition hover:bg-[#007aff]/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
+        <ChevronDown className={`size-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        {expanded ? "收起" : "查看全部"}
+      </button>
+    </div>
+  );
+}
+
 function DefinitionBlock({ definitions, className = "" }: { definitions: string[]; className?: string }) {
   const [expanded, setExpanded] = useState(false);
   const needsClamp = definitions.some((definition) => definition.length > 40);

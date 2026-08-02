@@ -1,10 +1,9 @@
-import { getEcdictStatus } from "@/modules/ecdict/service";
 import { getSettings } from "@/modules/settings/service";
 import { PROVIDER_CAPABILITIES } from "@/modules/dictionary/pipeline";
 import type { InitializationField, InitializationProviderId } from "@/lib/types";
 
 export async function getInitializationOptions() {
-  const [settings, ecdict] = await Promise.all([getSettings(), getEcdictStatus()]);
+  const settings = await getSettings();
   const aiPurpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
   const aiProvider = settings.llmConfig.providers.find((provider) => provider.id === aiPurpose.providerId);
   const mwDictionaryReady = Boolean(settings.merriamWebsterDictionaryKey.trim());
@@ -35,14 +34,6 @@ export async function getInitializationOptions() {
       available: settings.dictionaryApiEnabled,
       reason: settings.dictionaryApiEnabled ? null : "请先在设置中启用",
       capabilities: PROVIDER_CAPABILITIES["dictionaryapi.dev"],
-    },
-    {
-      id: "ecdict",
-      label: "ECDICT",
-      enabled: settings.ecdictEnabled,
-      available: ecdict.installed && settings.ecdictEnabled,
-      reason: !ecdict.installed ? "尚未安装离线词典" : !settings.ecdictEnabled ? "词典当前已停用" : null,
-      capabilities: PROVIDER_CAPABILITIES.ecdict,
     },
     {
       id: "ai",

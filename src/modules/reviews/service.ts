@@ -101,7 +101,6 @@ async function processReviewAnswerCore(input: AnswerInput, settings: AppSettings
     rating: evaluation.effectiveRating,
     now,
   });
-  await finalizeStudySession(input.studySessionId!, evaluation.isCorrect, now);
 
   return {
     idempotent: false,

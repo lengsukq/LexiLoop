@@ -13,7 +13,7 @@ export const INITIALIZATION_FIELDS = [
 export type InitializationField = (typeof INITIALIZATION_FIELDS)[number];
 
 export const INITIALIZATION_PROVIDER_IDS = [
-  "merriam-webster", "dictionaryapi.dev", "ecdict", "ai", "mymemory", "tencent-translate", "youdao",
+  "merriam-webster", "dictionaryapi.dev", "ai", "mymemory", "tencent-translate", "youdao",
 ] as const;
 export type InitializationProviderId = (typeof INITIALIZATION_PROVIDER_IDS)[number];
 

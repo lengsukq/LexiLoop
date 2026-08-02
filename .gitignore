@@ -8,11 +8,20 @@ playwright-report/
 .env.local
 *.log
 *.tsbuildinfo
+
+# Database & personal data
 data/*.sqlite
 data/*.sqlite-*
+data/*.db
 data/backups/*
 data/reference/*
 !data/.gitkeep
 !data/backups/.gitkeep
 !data/reference/.gitkeep
+*.sqlite
+*.sqlite-*
+
+# Test artifacts
+test-screenshots/
+
 .DS_Store

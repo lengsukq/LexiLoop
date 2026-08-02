@@ -16,7 +16,6 @@ const settingsSchema = z.object({
   autoPlayPronunciation: z.boolean(),
   dictionaryApiEnabled: z.boolean(),
   myMemoryEnabled: z.boolean(),
-  ecdictEnabled: z.boolean(),
   merriamWebsterEnabled: z.boolean(),
   merriamWebsterDictionaryKey: z.string(),
   merriamWebsterThesaurusKey: z.string(),
@@ -27,7 +26,7 @@ const settingsSchema = z.object({
   tencentTranslateSecretKey: z.string(),
   tencentTranslateProjectId: z.number().int().min(0).max(999999),
   youdaoEnabled: z.boolean(),
-  translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ecdict", "ai", "mymemory", "tencent-translate", "youdao"])).max(10),
+  translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ai", "mymemory", "tencent-translate", "youdao"])).max(10),
   llmConfig: z.object({
     providers: z.array(z.object({
       id: z.string().min(1),

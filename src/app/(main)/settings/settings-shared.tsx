@@ -5,14 +5,6 @@ import { Input } from "@/components/ui";
 export type SettingsTab = "study" | "ai" | "data";
 export type TestState = "idle" | "testing" | "success" | "error";
 
-export interface EcdictStatus {
-  installed: boolean;
-  enabled: boolean;
-  fileSize: number;
-  path: string;
-  downloadUrl: string;
-}
-
 export interface ProviderOperationState {
   state: "idle" | "loading" | "testing" | "success" | "error";
   message: string;

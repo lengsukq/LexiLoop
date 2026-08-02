@@ -33,7 +33,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoPlayPronunciation: true,
   dictionaryApiEnabled: process.env.DICTIONARY_API_ENABLED !== "false",
   myMemoryEnabled: process.env.MYMEMORY_ENABLED !== "false",
-  ecdictEnabled: process.env.ECDICT_ENABLED === "true",
   merriamWebsterEnabled: false,
   merriamWebsterDictionaryKey: "",
   merriamWebsterThesaurusKey: "",
@@ -44,7 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tencentTranslateSecretKey: "",
   tencentTranslateProjectId: 0,
   youdaoEnabled: process.env.YOUDO_API_ENABLED !== "false",
-  translationProviderOrder: ["youdao", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "ecdict", "mymemory"] as InitializationProviderId[],
+  translationProviderOrder: ["youdao", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "mymemory"] as InitializationProviderId[],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

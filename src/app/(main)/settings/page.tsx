@@ -52,7 +52,6 @@ export default function SettingsPage() {
               tencentTestState={data.tencentTestState}
               tencentTestMessage={data.tencentTestMessage}
               onTestTencentTranslate={data.testTencentTranslate}
-              ecdict={data.ecdict}
             />
           )}
           {activeTab === "ai" && (
@@ -73,10 +72,7 @@ export default function SettingsPage() {
           )}
           {activeTab === "data" && (
             <DataSettingsTab
-              ecdict={data.ecdict}
               busy={data.busy}
-              onEcdictAction={data.ecdictAction}
-              onUploadEcdict={data.uploadEcdict}
               onRestore={data.restore}
             />
           )}

@@ -25,7 +25,7 @@ describe("configured initialization queue", () => {
     const missingId = await insertWord("beta");
     const input = {
       requestedFields: ["pronunciations.phonetic" as const],
-      requestedProviders: ["merriam-webster" as const, "ecdict" as const],
+      requestedProviders: ["merriam-webster" as const, "youdao" as const],
       providerStrategy: "PRIORITY_FALLBACK" as const,
       mode: "FILL_MISSING_FIELDS" as const,
       onlyMissing: true,
@@ -45,7 +45,7 @@ describe("configured initialization queue", () => {
         requested_fields_json: string; requested_providers_json: string; provider_strategy: string;
       };
     expect(JSON.parse(job.requested_fields_json)).toEqual(["pronunciations.phonetic"]);
-    expect(JSON.parse(job.requested_providers_json)).toEqual(["merriam-webster", "ecdict"]);
+    expect(JSON.parse(job.requested_providers_json)).toEqual(["merriam-webster", "youdao"]);
     expect(job.provider_strategy).toBe("PRIORITY_FALLBACK");
   });
 
@@ -53,7 +53,7 @@ describe("configured initialization queue", () => {
     const wordId = await insertWord("gamma");
     await queueWordInitialization(wordId, "FILL_MISSING_FIELDS", 100, {
       requestedFields: ["pronunciations.phonetic"],
-      requestedProviders: ["ecdict"],
+      requestedProviders: ["youdao"],
       providerStrategy: "PRIORITY_FALLBACK",
     });
     await queueWordInitialization(wordId);

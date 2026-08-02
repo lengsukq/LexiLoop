@@ -2,13 +2,12 @@ import { useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, GripVertical, Loader2, PlugZap, Volume2 } from "lucide-react";
 import type { AppSettings, InitializationProviderId } from "@/lib/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from "@/components/ui";
-import { Toggle, type EcdictStatus, type SettingsUpdater, type TestState } from "../settings-shared";
+import { Toggle, type SettingsUpdater, type TestState } from "../settings-shared";
 import { StudyPlanSettings } from "./study-plan-settings";
 
 const PROVIDER_LABELS: Record<InitializationProviderId, string> = {
   "merriam-webster": "Merriam-Webster",
   "dictionaryapi.dev": "DictionaryAPI.dev",
-  ecdict: "ECDICT 离线词典",
   ai: "AI 词条初始化",
   mymemory: "MyMemory 翻译",
   "tencent-translate": "腾讯翻译",
@@ -24,7 +23,6 @@ export function StudySettingsTab({
   tencentTestState,
   tencentTestMessage,
   onTestTencentTranslate,
-  ecdict,
 }: {
   settings: AppSettings;
   update: SettingsUpdater;
@@ -34,7 +32,6 @@ export function StudySettingsTab({
   tencentTestState: TestState;
   tencentTestMessage: string;
   onTestTencentTranslate: () => Promise<void>;
-  ecdict: EcdictStatus | null;
 }) {
   const [mwKeysExpanded, setMwKeysExpanded] = useState(false);
   const [tencentKeysExpanded, setTencentKeysExpanded] = useState(false);
@@ -49,7 +46,6 @@ export function StudySettingsTab({
       case "mymemory": return settings.myMemoryEnabled;
       case "merriam-webster": return settings.merriamWebsterEnabled;
       case "youdao": return settings.youdaoEnabled;
-      case "ecdict": return Boolean(settings.ecdictEnabled && ecdict?.installed);
       case "tencent-translate": return settings.tencentTranslateEnabled;
       case "ai": return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
       default: return true;

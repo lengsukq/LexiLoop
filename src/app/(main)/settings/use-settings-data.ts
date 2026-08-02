@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { configureTtsSpeeds } from "@/lib/tts-client";
 import type { AppSettings } from "@/lib/types";
-import type { EcdictStatus, TestState } from "./settings-shared";
+import type { TestState } from "./settings-shared";
 
 function errorMessage(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
@@ -10,7 +10,6 @@ function errorMessage(reason: unknown, fallback: string): string {
 
 export function useSettingsData() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [ecdict, setEcdict] = useState<EcdictStatus | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
@@ -26,12 +25,8 @@ export function useSettingsData() {
 
   const load = useCallback(async () => {
     try {
-      const [values, status] = await Promise.all([
-        apiFetch<AppSettings>("/api/settings"),
-        apiFetch<EcdictStatus>("/api/settings/ecdict"),
-      ]);
+      const values = await apiFetch<AppSettings>("/api/settings");
       setSettings(values);
-      setEcdict(status);
       setError("");
     } catch (reason) {
       setError(errorMessage(reason, "加载失败"));
@@ -62,45 +57,6 @@ export function useSettingsData() {
       setMessage("学习设置已保存。新会话和内置后台引擎会使用最新配置。");
     } catch (reason) {
       setError(errorMessage(reason, "保存失败"));
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function ecdictAction(action: "download" | "enable" | "disable" | "remove") {
-    setBusy(action);
-    resetFeedback();
-    try {
-      const status = await apiFetch<EcdictStatus>("/api/settings/ecdict", {
-        method: action === "remove" ? "DELETE" : "POST",
-        headers: action === "remove" ? undefined : { "Content-Type": "application/json" },
-        body: action === "remove" ? undefined : JSON.stringify({ action }),
-      });
-      setEcdict(status);
-      // Sync ecdictEnabled into the local settings state so the Study tab's
-      // data-source order list and the backend pipeline see the correct value.
-      setSettings((current) => current ? { ...current, ecdictEnabled: status.enabled } : current);
-      setMessage(action === "download" ? "ECDICT 已下载并启用。" : action === "remove" ? "ECDICT 已移除。" : "ECDICT 状态已更新。");
-    } catch (reason) {
-      setError(errorMessage(reason, "操作失败"));
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function uploadEcdict(file?: File) {
-    if (!file) return;
-    setBusy("upload-ecdict");
-    resetFeedback();
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const status = await apiFetch<EcdictStatus>("/api/settings/ecdict", { method: "PUT", body: form });
-      setEcdict(status);
-      setSettings((current) => current ? { ...current, ecdictEnabled: status.enabled } : current);
-      setMessage("ECDICT 文件校验通过并已启用。");
-    } catch (reason) {
-      setError(errorMessage(reason, "上传失败"));
     } finally {
       setBusy("");
     }
@@ -172,7 +128,6 @@ export function useSettingsData() {
   return {
     settings,
     setSettings,
-    ecdict,
     error,
     message,
     busy,
@@ -183,8 +138,6 @@ export function useSettingsData() {
     load,
     update,
     save,
-    ecdictAction,
-    uploadEcdict,
     restore,
     testTts,
     testTencentTranslate,

@@ -137,7 +137,13 @@ export function createPgFacade(
   pgTypes.setTypeParser(pgTypes.builtins.INT8, (value) => Number(value));
   pgTypes.setTypeParser(pgTypes.builtins.NUMERIC, (value) => Number(value));
 
-  const pool = new Pool({ connectionString: normalizePgUrl(connectionString) });
+  const pool = new Pool({
+    connectionString: normalizePgUrl(connectionString),
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    ssl: { rejectUnauthorized: false },
+  });
   const transactionStore = new AsyncLocalStorage<TransactionConnection>();
   let ready: Promise<void> = Promise.resolve();
   if (onInit) {

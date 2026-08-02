@@ -3,16 +3,18 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeEach } from "vitest";
 
-// Load .env.local so DATABASE_URL is available even when the test runner does
-// not apply Next.js-style environment file loading.
+// Load .env and .env.local so DATABASE_URL is available even when the test runner
+// does not apply Next.js-style environment file loading.
 (function loadLocalEnv(): void {
-  const envFile = path.join(process.cwd(), ".env.local");
-  if (!fs.existsSync(envFile)) return;
-  for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
-    if (!match) continue;
-    const [key, value] = [match[1], match[2]];
-    if (key && value !== undefined && !(key in process.env)) process.env[key] = value;
+  for (const envName of [".env", ".env.local"]) {
+    const envFile = path.join(process.cwd(), envName);
+    if (!fs.existsSync(envFile)) continue;
+    for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
+      const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+      if (!match) continue;
+      const [key, value] = [match[1], match[2]];
+      if (key && value !== undefined && !(key in process.env)) process.env[key] = value;
+    }
   }
 })();
 
@@ -27,10 +29,8 @@ if (productionUrl) {
 
 const backupDir = path.join(os.tmpdir(), `lexiloop-backups-${process.pid}`);
 process.env.BACKUP_DIR = backupDir;
-process.env.ECDICT_DATABASE_PATH = path.join(os.tmpdir(), `lexiloop-ecdict-${process.pid}.sqlite`);
 process.env.DICTIONARY_API_ENABLED = "false";
 process.env.MYMEMORY_ENABLED = "false";
-process.env.ECDICT_ENABLED = "false";
 
 const ALL_TABLES = [
   "provider_attempts",

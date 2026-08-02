@@ -52,37 +52,37 @@ export async function recoverStaleJobs(staleAfterMs = 10 * 60_000): Promise<numb
 export async function claimJobs(workerId: string, limit: number): Promise<ClaimedJob[]> {
   const now = Date.now();
   await recoverStaleJobs();
-  return await sqlite.transaction(async () => {
-    const candidates = await sqlite.prepare(`SELECT id, word_id, task_type, mode, attempt_count, max_attempts,
-        requested_fields_json, requested_providers_json, provider_strategy
-      FROM initialization_jobs
+  const rows = await sqlite.prepare(`UPDATE initialization_jobs SET status = 'RUNNING', locked_at = ?, locked_by = ?,
+      attempt_count = attempt_count + 1, updated_at = ?
+    WHERE id IN (
+      SELECT id FROM initialization_jobs
       WHERE status = 'QUEUED' AND attempt_count < max_attempts
         AND (available_at IS NULL OR available_at <= ?)
-      ORDER BY priority DESC, created_at ASC LIMIT ?`).all(now, limit) as Array<{
+      ORDER BY priority DESC, created_at ASC
+      LIMIT ?
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, word_id, task_type, mode, attempt_count, max_attempts,
+      requested_fields_json, requested_providers_json, provider_strategy`).all(now, workerId, now, now, limit) as Array<{
         id: number; word_id: number; task_type: AiTaskType; mode: InitializationMode; attempt_count: number; max_attempts: number;
         requested_fields_json: string | null; requested_providers_json: string | null; provider_strategy: ProviderStrategy | null;
       }>;
-    const claimed: ClaimedJob[] = [];
-    const claim = sqlite.prepare(`UPDATE initialization_jobs SET status = 'RUNNING', locked_at = ?, locked_by = ?,
-      attempt_count = attempt_count + 1, updated_at = ? WHERE id = ? AND status = 'QUEUED'`);
-    for (const candidate of candidates) {
-      const result = await claim.run(now, workerId, now, candidate.id);
-      if (result.changes !== 1) continue;
-      if (candidate.task_type === "INITIALIZE") await setWordOperationalStatus(candidate.word_id, "RUNNING", now);
-      claimed.push({
-        id: candidate.id,
-        wordId: candidate.word_id,
-        taskType: candidate.task_type,
-        mode: candidate.mode,
-        attemptCount: candidate.attempt_count + 1,
-        maxAttempts: candidate.max_attempts,
-        requestedFields: parseStringArray<InitializationField>(candidate.requested_fields_json),
-        requestedProviders: parseStringArray<InitializationProviderId>(candidate.requested_providers_json),
-        providerStrategy: candidate.provider_strategy ?? "PARALLEL_MERGE",
-      });
-    }
-    return claimed;
-  }).immediate();
+  const claimed: ClaimedJob[] = [];
+  for (const row of rows) {
+    if (row.task_type === "INITIALIZE") await setWordOperationalStatus(row.word_id, "RUNNING", now);
+    claimed.push({
+      id: row.id,
+      wordId: row.word_id,
+      taskType: row.task_type,
+      mode: row.mode,
+      attemptCount: row.attempt_count,
+      maxAttempts: row.max_attempts,
+      requestedFields: parseStringArray<InitializationField>(row.requested_fields_json),
+      requestedProviders: parseStringArray<InitializationProviderId>(row.requested_providers_json),
+      providerStrategy: row.provider_strategy ?? "PARALLEL_MERGE",
+    });
+  }
+  return claimed;
 }
 
 async function saveAttempts(jobId: number, wordId: number, attempts: ProviderAttempt[], now: number): Promise<void> {

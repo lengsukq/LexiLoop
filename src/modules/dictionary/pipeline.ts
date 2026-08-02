@@ -8,7 +8,6 @@ import type {
 } from "@/lib/types";
 import type { DictionaryProvider } from "./provider";
 import { DictionaryApiProvider } from "./providers/dictionary-api";
-import { EcdictProvider } from "./providers/ecdict";
 import { MyMemoryProvider } from "./providers/mymemory";
 import { AiLexicalProvider } from "./providers/ai-lexical";
 import { YoudaoProvider } from "./providers/youdao";
@@ -25,7 +24,6 @@ import {
 export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, InitializationField[]> = {
   "merriam-webster": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   "dictionaryapi.dev": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
-  ecdict: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "forms", "tags"],
   youdao: ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary"],
   ai: ["definitions", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"],
   mymemory: ["definitions"],
@@ -39,7 +37,6 @@ function providerKey(provider: DictionaryProvider): InitializationProviderId {
 function createProvider(id: InitializationProviderId, settings: AppSettings): DictionaryProvider | null {
   if (id === "merriam-webster") return settings.merriamWebsterEnabled ? new MerriamWebsterProvider(settings) : null;
   if (id === "dictionaryapi.dev") return settings.dictionaryApiEnabled ? new DictionaryApiProvider() : null;
-  if (id === "ecdict") return settings.ecdictEnabled ? new EcdictProvider() : null;
   if (id === "ai") return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled ? new AiLexicalProvider(settings) : null;
   if (id === "mymemory") return settings.myMemoryEnabled ? new MyMemoryProvider() : null;
   if (id === "tencent-translate") {
@@ -59,7 +56,7 @@ function providersFor(settings: AppSettings, selected?: InitializationProviderId
     // must be dictionary-backed, while AI runs as an explicit supplemental task.
     order = [...settings.translationProviderOrder];
   } else {
-    order = ["youdao", "merriam-webster", "dictionaryapi.dev", "ecdict", "mymemory"];
+    order = ["youdao", "merriam-webster", "dictionaryapi.dev", "mymemory"];
   }
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }

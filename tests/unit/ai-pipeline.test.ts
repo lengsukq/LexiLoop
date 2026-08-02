@@ -13,7 +13,6 @@ function settingsWithAiEnabled(): AppSettings {
     ...DEFAULT_SETTINGS,
     dictionaryApiEnabled: false,
     myMemoryEnabled: false,
-    ecdictEnabled: false,
     youdaoEnabled: false,
     llmConfig: {
       providers: [

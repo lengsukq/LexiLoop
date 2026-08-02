@@ -1,1 +1,0 @@
-ALTER TABLE word_contents ADD COLUMN content_source TEXT NOT NULL DEFAULT 'MIXED';

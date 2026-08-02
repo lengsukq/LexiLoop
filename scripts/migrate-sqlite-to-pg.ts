@@ -15,11 +15,12 @@ process.loadEnvFile(resolve(import.meta.dirname, "../.env"));
 pgTypes.setTypeParser(pgTypes.builtins.INT8, (v) => Number(v));
 pgTypes.setTypeParser(pgTypes.builtins.NUMERIC, (v) => Number(v));
 
-const sqlitePath = process.argv[2];
-if (!sqlitePath) {
+const sqlitePathArg = process.argv[2];
+if (!sqlitePathArg) {
   console.error("Usage: npx tsx scripts/migrate-sqlite-to-pg.ts <sqlite-file>");
   process.exit(1);
 }
+const sqlitePath: string = sqlitePathArg;
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -130,7 +131,7 @@ async function main() {
       if (fixed) console.log(`   provider_attempts: nullified ${fixed} orphaned job refs`);
     }
 
-    const columns = Object.keys(rows[0]);
+    const columns = Object.keys(rows[0]!);
     const colList = columns.map((c) => `"${c}"`).join(", ");
 
     const client = await pool.connect();

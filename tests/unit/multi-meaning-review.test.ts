@@ -72,6 +72,14 @@ describe("multi-meaning review content", () => {
     }, word)).toMatchObject({ isCorrect: false, effectiveRating: "AGAIN" });
 
     expect(evaluateReviewAnswer({
+      clientAnswerId: "reverse-choice-fuzzy",
+      wordId: 1,
+      rating: "HARD",
+      questionType: "ZH_TO_EN_CHOICE",
+      userAnswer: "walk",
+    }, word)).toMatchObject({ isCorrect: false, effectiveRating: "HARD" });
+
+    expect(evaluateReviewAnswer({
       clientAnswerId: "reverse-choice-familiar",
       wordId: 1,
       rating: "EASY",

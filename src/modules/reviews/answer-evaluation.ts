@@ -73,7 +73,11 @@ export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): A
     || input.questionType === "EN_TO_ZH_CHOICE"
     || input.questionType === "ZH_TO_EN_CHOICE";
   const respectsEasyChoice = objectivelyScored && !isCorrect && input.rating === "EASY";
-  const effectiveRating: ReviewRating = objectivelyScored && !isCorrect && !respectsEasyChoice ? "AGAIN" : input.rating;
+  // A wrong answer rated "fuzzy" keeps the HARD grade: it is not treated as a
+  // full lapse, so it enters the wrong-word pool but is reviewed in a later
+  // session instead of being re-inserted into the current one.
+  const respectsHardChoice = objectivelyScored && !isCorrect && input.rating === "HARD";
+  const effectiveRating: ReviewRating = objectivelyScored && !isCorrect && !respectsEasyChoice && !respectsHardChoice ? "AGAIN" : input.rating;
   const expected = expectedAnswer(input, word, definitions);
   const definitionQuestion = input.questionType === "EN_TO_ZH" || input.questionType === "EN_TO_ZH_CHOICE";
   const reversePrompt = definitions.map((definition) => definition.text).join("；");

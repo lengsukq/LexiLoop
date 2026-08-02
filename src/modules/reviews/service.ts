@@ -102,6 +102,7 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
     currentQuestionType: input.questionType,
     entryType: word.content_type as "WORD" | "PHRASE" | "SENTENCE",
     isCorrect: evaluation.isCorrect || evaluation.effectiveRating === "EASY",
+    rating: evaluation.effectiveRating,
     now,
   });
   finalizeStudySession(input.studySessionId!, evaluation.isCorrect, now);

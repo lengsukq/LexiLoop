@@ -24,7 +24,7 @@ function dueCandidates(limit: number, now: number, scope: CandidateScope): Study
     LEFT JOIN word_review_stats performance ON performance.word_id = w.id
     WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()}
     ORDER BY
-      (CAST(? - c.due_at AS REAL) / 86400000.0) * (1.0 + c.difficulty * 0.15)
+      MIN((CAST(? - c.due_at AS REAL) / 86400000.0), 10) * (1.0 + c.difficulty * 0.15)
       + COALESCE(performance.recent_wrong_14d, 0) * 1.2
       + COALESCE(performance.recent_again_14d, 0) * 0.8
       + COALESCE(performance.recent_hard_14d, 0) * 0.35 DESC,
@@ -39,7 +39,7 @@ function dueCandidates(limit: number, now: number, scope: CandidateScope): Study
 function wrongCandidates(limit: number, now: number, scope: CandidateScope): StudyCandidate[] {
   return sqlite.prepare(`SELECT ${selectColumns} FROM wrong_word_states x JOIN words w ON w.id = x.word_id
     WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()}
-    ORDER BY x.wrong_count DESC, x.hard_count DESC, COALESCE(x.last_wrong_at, x.updated_at) ASC LIMIT ?`).all(
+    ORDER BY x.wrong_count DESC, x.hard_count DESC, COALESCE(x.last_wrong_at, x.updated_at) DESC LIMIT ?`).all(
     now - SKIP_COOLDOWN_MS,
     now - SESSION_RESUME_TTL_MS,
     limit,
@@ -169,7 +169,7 @@ export function selectCandidates(mode: StudyMode, pools: Pools, options: { rando
   const ratios: Array<{ items: StudyCandidate[]; take: number }> = mode === "LISTENING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }] : mode === "SPELLING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }] : [{ items: groups.due, take: 4 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }];
   return interleave(ratios);
 }
-export function questionFor(mode: StudyMode, taskType: string, position = 0): QuestionType { if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING"; if (mode === "LISTENING") return "LISTENING_SPELLING"; if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING"; if (mode === "DAILY") return position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE"; return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH"; }
+export function questionFor(mode: StudyMode, taskType: string, position = 0): QuestionType { if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING"; if (mode === "LISTENING") return "LISTENING_SPELLING"; if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING"; if (mode === "DAILY") return taskType === "NEW" ? "EN_TO_ZH" : position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE"; return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH"; }
 export function taskFor(mode: StudyMode, candidate: StudyCandidate, sets: { due: Set<number>; wrong: Set<number> }): "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING" { if (mode === "LISTENING") return "LISTENING"; if (mode === "SPELLING") return "SPELLING"; if (mode === "DUE_REVIEW") return "REVIEW"; if (mode === "NEW_WORDS") return "NEW"; if (candidate.continuousTaskType) return candidate.continuousTaskType; if (sets.due.has(candidate.id)) return "REVIEW"; if (sets.wrong.has(candidate.id)) return "WRONG"; return "NEW"; }
 type PoolLimits = { due: number; wrong: number; fresh: number };
 

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 import { DefinitionsCard } from "./components/definitions-card";
+import { EditWordDialog } from "./components/edit-word-dialog";
 import { ExamplesCard } from "./components/examples-card";
 import { ExtendedContentCard } from "./components/extended-content-card";
 import { LearningCard } from "./components/learning-card";
@@ -18,6 +20,7 @@ import { useWordDetail } from "./use-word-detail";
 export default function WordDetailPage() {
   const params = useParams<{ id: string }>();
   const detail = useWordDetail(params.id);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (!detail.word && !detail.error) {
     return <div className="grid min-h-[70vh] place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>;
@@ -43,6 +46,7 @@ export default function WordDetailPage() {
       onPlay={() => detail.playText()}
       onInitialize={detail.initialize}
       onYoudaoFetch={detail.fetchYoudaoPreview}
+      onEdit={() => setEditOpen(true)}
       onRemove={detail.remove}
       onTranslateSummary={detail.translateSummary}
     />
@@ -103,5 +107,16 @@ export default function WordDetailPage() {
       onRetry={() => void detail.fetchYoudaoPreview()}
       onApply={detail.applyYoudao}
     />
+
+    {editOpen && <EditWordDialog
+      open
+      wordId={word.id}
+      initialTerm={word.term}
+      sourceLanguage={word.sourceLanguage}
+      targetLanguage={word.targetLanguage}
+      entryType={word.entryType}
+      onClose={() => setEditOpen(false)}
+      onSaved={() => void detail.load()}
+    />}
   </div>;
 }

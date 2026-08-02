@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookText,
   Loader2,
+  Pencil,
   RefreshCw,
   Sparkles,
   Trash2,
@@ -22,6 +23,7 @@ export function WordHeader({
   onPlay,
   onInitialize,
   onYoudaoFetch,
+  onEdit,
   onRemove,
   onTranslateSummary,
 }: {
@@ -34,6 +36,7 @@ export function WordHeader({
   onPlay: () => Promise<void>;
   onInitialize: (mode?: "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE") => Promise<void>;
   onYoudaoFetch: () => Promise<void>;
+  onEdit: () => void;
   onRemove: () => Promise<void>;
   onTranslateSummary: () => Promise<void>;
 }) {
@@ -46,6 +49,7 @@ export function WordHeader({
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void onInitialize()}><Sparkles className="size-4" />补全缺失内容</Button>
         <Button variant="outline" size="sm" onClick={() => void onYoudaoFetch()}><BookText className="size-4" />有道词典</Button>
+        <Button variant="outline" size="sm" onClick={onEdit}><Pencil className="size-4" />编辑</Button>
         <Button variant="ghost" size="sm" onClick={() => {
           if (window.confirm("重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？")) {
             void onInitialize("FORCE_OVERWRITE");

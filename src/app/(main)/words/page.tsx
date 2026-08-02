@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Clock3, Loader2, Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, Clock3, Loader2, Pencil, Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { apiFetch, formatDate } from "@/lib/client-api";
 import { Badge, Button, Card, CardContent, Dialog, EmptyState, Input, PageHeader, Pagination, Select, buttonClass } from "@/components/ui";
 import { InitializationBadge, MasteryBadge } from "@/components/status-badges";
+import { EditWordDialog } from "./[id]/components/edit-word-dialog";
 import { LearningOverview } from "./learning-overview";
 
 interface WordItem { id: number; term: string; sourceLanguage: string; targetLanguage: string; entryType: string; initializationStatus: string; masteryLevel: string; masteryScore: number; isSuspended: boolean; createdAt: string; dueAt: string | null; reps: number; wrongWordActive: boolean; definition: string | null; hasPronunciation: boolean; }
@@ -21,6 +22,7 @@ export default function WordsPage() {
   const [data, setData] = useState<ResponseData | null>(null);
   const [error, setError] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [editingWord, setEditingWord] = useState<WordItem | null>(null);
 
   useEffect(() => { const timer = window.setTimeout(() => { setQuery(queryInput.trim()); setPage(1); }, 350); return () => window.clearTimeout(timer); }, [queryInput]);
   const load = useCallback(async () => {
@@ -50,6 +52,16 @@ export default function WordsPage() {
     {error && <div className="glass-inner rounded-[14px] border-[#ff3b30]/15 p-4 text-sm text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.08)] dark:text-[#ff453a]">{error}</div>}
     {!data && !error && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>}
     {data && data.items.length === 0 && <EmptyState icon={<BookOpen className="size-10 text-[#aeaeb2]" />} title="没有匹配的词条" description={query || status || mastery || special ? "调整筛选条件后再试。" : "先导入 EasyDict CSV，初始化完成后即可开始学习。"} action={!query && !status && !mastery && !special ? <Link href="/import" className={buttonClass("primary")}>导入 CSV</Link> : undefined} />}
-    {data && data.items.length > 0 && <>{hasPagination && <Pagination sticky page={data.pagination.page} totalPages={Math.max(1, data.pagination.pages)} total={data.pagination.total} onChange={setPage} />}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{data.items.map((word) => <Link key={word.id} href={`/words/${word.id}`} className="group min-w-0"><Card className="ios-lift h-full min-h-[112px] sm:min-h-[128px]"><CardContent className="flex h-full items-start gap-3 pt-4 sm:gap-4 sm:pt-5"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[16px] font-semibold tracking-tight transition-colors sm:text-[17px] group-hover:text-[#007aff] dark:group-hover:text-[#0a84ff]">{word.term}</h2>{word.wrongWordActive && <Badge tone="red">错词</Badge>}{word.isSuspended && <Badge>已暂停</Badge>}</div><p className="mt-1 truncate text-sm text-[#6e6e73] dark:text-[#98989d]">{word.definition ?? "暂无释义"}</p><div className="mt-2.5 flex flex-wrap items-center gap-2 sm:mt-3"><InitializationBadge status={word.initializationStatus} /><MasteryBadge level={word.masteryLevel} /><span className="text-xs text-[#aeaeb2] dark:text-[#48484a]">{word.sourceLanguage} → {word.targetLanguage}</span>{word.dueAt && <span className="inline-flex items-center gap-1 text-xs text-[#aeaeb2] dark:text-[#48484a]"><Clock3 className="size-3" />{formatDate(word.dueAt, { month: "numeric", day: "numeric" })}</span>}</div></div><div className="shrink-0 text-right"><p className="text-xl font-bold text-[#007aff] dark:text-[#0a84ff]">{word.masteryScore}</p><p className="text-[11px] text-[#aeaeb2] dark:text-[#48484a]">熟练度</p><ArrowRight className="ml-auto mt-3 size-4 text-[#c7c7cc] transition-transform group-hover:translate-x-1 dark:text-[#38383a]" /></div></CardContent></Card></Link>)}</div></>}
+    {data && data.items.length > 0 && <>{hasPagination && <Pagination sticky page={data.pagination.page} totalPages={Math.max(1, data.pagination.pages)} total={data.pagination.total} onChange={setPage} />}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{data.items.map((word) => <Link key={word.id} href={`/words/${word.id}`} className="group min-w-0"><Card className="ios-lift h-full min-h-[112px] sm:min-h-[128px]"><CardContent className="flex h-full items-start gap-3 pt-4 sm:gap-4 sm:pt-5"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[16px] font-semibold tracking-tight transition-colors sm:text-[17px] group-hover:text-[#007aff] dark:group-hover:text-[#0a84ff]">{word.term}</h2>{word.wrongWordActive && <Badge tone="red">错词</Badge>}{word.isSuspended && <Badge>已暂停</Badge>}</div><p className="mt-1 truncate text-sm text-[#6e6e73] dark:text-[#98989d]">{word.definition ?? "暂无释义"}</p><div className="mt-2.5 flex flex-wrap items-center gap-2 sm:mt-3"><InitializationBadge status={word.initializationStatus} /><MasteryBadge level={word.masteryLevel} /><span className="text-xs text-[#aeaeb2] dark:text-[#48484a]">{word.sourceLanguage} → {word.targetLanguage}</span>{word.dueAt && <span className="inline-flex items-center gap-1 text-xs text-[#aeaeb2] dark:text-[#48484a]"><Clock3 className="size-3" />{formatDate(word.dueAt, { month: "numeric", day: "numeric" })}</span>}</div></div><div className="flex shrink-0 flex-col items-end"><button type="button" aria-label="编辑词条" title="编辑词条" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setEditingWord(word); }} className="grid size-7 place-items-center rounded-full text-[#aeaeb2] transition hover:bg-[#007aff]/10 hover:text-[#007aff] dark:hover:bg-[#0a84ff]/15 dark:hover:text-[#0a84ff]"><Pencil className="size-3.5" /></button><p className="text-xl font-bold leading-none text-[#007aff] dark:text-[#0a84ff]">{word.masteryScore}</p><p className="text-[11px] text-[#aeaeb2] dark:text-[#48484a]">熟练度</p><ArrowRight className="mt-2 size-4 text-[#c7c7cc] transition-transform group-hover:translate-x-1 dark:text-[#38383a]" /></div></CardContent></Card></Link>)}</div></>}
+    {editingWord && <EditWordDialog
+      open
+      wordId={editingWord.id}
+      initialTerm={editingWord.term}
+      sourceLanguage={editingWord.sourceLanguage}
+      targetLanguage={editingWord.targetLanguage}
+      entryType={editingWord.entryType}
+      onClose={() => setEditingWord(null)}
+      onSaved={() => void load()}
+    />}
   </div>;
 }

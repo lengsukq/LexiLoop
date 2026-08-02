@@ -70,7 +70,7 @@ export function YoudaoPreviewDialog({
   </Dialog>;
 }
 
-function PreviewContent({ preview }: { preview: YoudaoPreviewData }) {
+export function PreviewContent({ preview }: { preview: YoudaoPreviewData }) {
   const { content } = preview;
   return <div className="max-h-[45vh] space-y-4 overflow-y-auto pr-1">
     {content.summary.translation && <div className="rounded-[16px] border border-[#007aff]/10 bg-[#007aff]/[0.06] p-3">
@@ -106,14 +106,14 @@ function PreviewContent({ preview }: { preview: YoudaoPreviewData }) {
   </div>;
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+export function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-2">
     <p className="text-xs font-medium uppercase tracking-wide text-[#aeaeb2]">{label}</p>
     <div className="space-y-2">{children}</div>
   </div>;
 }
 
-function formLabel(type: string): string {
+export function formLabel(type: string): string {
   const labels: Record<string, string> = {
     PLURAL: "复数", THIRD_PERSON: "三单", PRESENT_PARTICIPLE: "现在分词",
     PAST: "过去式", PAST_PARTICIPLE: "过去分词", COMPARATIVE: "比较级", SUPERLATIVE: "最高级",

@@ -23,7 +23,7 @@ function responseText(payload: unknown, apiType: "openai" | "anthropic"): string
 }
 
 export async function generateChineseMnemonic(wordId: number, attemptCount = 1): Promise<void> {
-  const word = sqlite.prepare("SELECT term, source_language, target_language FROM words WHERE id = ?").get(wordId) as Record<string, unknown> | undefined;
+  const word = await sqlite.prepare("SELECT term, source_language, target_language FROM words WHERE id = ?").get(wordId) as Record<string, unknown> | undefined;
   if (!word) throw new Error("WORD_NOT_FOUND");
   const settings = settingsForAiAttempt(await getSettings(), attemptCount);
   const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
@@ -51,12 +51,12 @@ export async function generateChineseMnemonic(wordId: number, attemptCount = 1):
   if (!isChineseMnemonic(mnemonic)) mnemonic = await request("\n\n上一版没有按要求使用中文。请完全重写：只保留目标英文词本身，其他叙述必须是简体中文。");
   if (!isChineseMnemonic(mnemonic)) throw new Error("AI_MNEMONIC_LANGUAGE_INVALID");
 
-  const row = sqlite.prepare("SELECT learning_json FROM word_contents WHERE word_id = ?").get(wordId) as { learning_json: string | null } | undefined;
+  const row = await sqlite.prepare("SELECT learning_json FROM word_contents WHERE word_id = ?").get(wordId) as { learning_json: string | null } | undefined;
   const learning = row?.learning_json ? JSON.parse(row.learning_json) : { pronunciationTip: null, mnemonic: null, commonMistakes: [] };
   learning.mnemonic = mnemonic;
   const now = Date.now();
-  if (row) sqlite.prepare("UPDATE word_contents SET learning_json = ?, content_version = content_version + 1, updated_at = ? WHERE word_id = ?").run(JSON.stringify(learning), now, wordId);
-  else sqlite.prepare("INSERT INTO word_contents(word_id, learning_json, content_version, initialized_at, updated_at) VALUES (?, ?, 1, ?, ?)").run(wordId, JSON.stringify(learning), now, now);
+  if (row) await sqlite.prepare("UPDATE word_contents SET learning_json = ?, content_version = content_version + 1, updated_at = ? WHERE word_id = ?").run(JSON.stringify(learning), now, wordId);
+  else await sqlite.prepare("INSERT INTO word_contents(word_id, learning_json, content_version, initialized_at, updated_at) VALUES (?, ?, 1, ?, ?)").run(wordId, JSON.stringify(learning), now, now);
 }
 
 export async function runSupplementalTask(taskType: "MNEMONIC" | "EXAMPLE_TRANSLATIONS", wordId: number, attemptCount = 1): Promise<void> {

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!id) return fail("WORD_ID_INVALID", "词条 ID 无效。");
     const term = request.nextUrl.searchParams.get("term")?.trim();
     if (!term) return fail("RELATED_TERM_REQUIRED", "请选择关联词。");
-    return ok(previewRelatedWord(id, term));
+    return ok(await previewRelatedWord(id, term));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "关联词参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "WORD_NOT_FOUND") return fail("WORD_NOT_FOUND", "词条不存在。", 404);
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try {
     const id = parseId((await context.params).id);
     if (!id) return fail("WORD_ID_INVALID", "词条 ID 无效。");
-    return ok(addRelatedWord(id, await request.json()));
+    return ok(await addRelatedWord(id, await request.json()));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "关联词参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "WORD_NOT_FOUND") return fail("WORD_NOT_FOUND", "词条不存在。", 404);

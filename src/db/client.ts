@@ -1,28 +1,19 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "@/db/schema";
-import { applyMigrations } from "@/db/migrate";
+import { applyPgMigrations } from "@/db/migrate-pg";
+import { createPgFacade, type SqliteLikeDatabase } from "@/db/executor";
 
-type DbBundle = {
-  sqlite: Database.Database;
-  db: ReturnType<typeof drizzle<typeof schema>>;
-};
+const globalDb = globalThis as typeof globalThis & { __lexiloopDbFacade?: SqliteLikeDatabase };
 
-const globalDb = globalThis as typeof globalThis & { __lexiloopDb?: DbBundle };
-
-function createBundle(): DbBundle {
-  const databasePath = process.env.DATABASE_PATH ?? "./data/app.sqlite";
-  const sqlite = new Database(databasePath);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
-  sqlite.pragma("synchronous = NORMAL");
-  applyMigrations(sqlite);
-  return { sqlite, db: drizzle(sqlite, { schema }) };
+function createBundle(): SqliteLikeDatabase {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL is required in PostgreSQL mode");
+  return createPgFacade(databaseUrl, (pool) => applyPgMigrations(pool));
 }
 
-const bundle = globalDb.__lexiloopDb ?? createBundle();
-if (process.env.NODE_ENV !== "production") globalDb.__lexiloopDb = bundle;
+const bundle = globalDb.__lexiloopDbFacade ?? createBundle();
+if (process.env.NODE_ENV !== "production") globalDb.__lexiloopDbFacade = bundle;
 
-export const sqlite = bundle.sqlite;
-export const db = bundle.db;
+/**
+ * Unified database handle backed by PostgreSQL. The name is kept as `sqlite`
+ * for historical reasons; it always dispatches to the Postgres driver now.
+ */
+export const sqlite = bundle;

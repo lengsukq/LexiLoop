@@ -77,12 +77,12 @@ function mapWordRow(row: Record<string, unknown>) {
   };
 }
 
-export function listWords(filters: WordListFilters) {
+export async function listWords(filters: WordListFilters) {
   const { where, params } = buildFilters(filters);
-  const total = sqlite.prepare(`SELECT count(*) AS count FROM words w
+  const total = await sqlite.prepare(`SELECT count(*) AS count FROM words w
     LEFT JOIN review_cards c ON c.word_id = w.id
     LEFT JOIN wrong_word_states x ON x.word_id = w.id WHERE ${where}`).get(...params) as { count: number };
-  const rows = sqlite.prepare(`SELECT w.*, c.due_at, c.reps, x.active AS wrong_active,
+  const rows = await sqlite.prepare(`SELECT w.*, c.due_at, c.reps, x.active AS wrong_active,
     wc.definitions_json, wc.pronunciations_json
     FROM words w LEFT JOIN review_cards c ON c.word_id = w.id
     LEFT JOIN wrong_word_states x ON x.word_id = w.id
@@ -103,8 +103,8 @@ function mapReview(row: Record<string, unknown>) {
   };
 }
 
-export function getWordDetail(wordId: number) {
-  const row = sqlite.prepare(`SELECT w.*, wc.*, c.due_at, c.stability, c.difficulty, c.elapsed_days,
+export async function getWordDetail(wordId: number) {
+  const row = await sqlite.prepare(`SELECT w.*, wc.*, c.due_at, c.stability, c.difficulty, c.elapsed_days,
     c.scheduled_days, c.reps, c.lapses, c.fsrs_state, c.last_review_at,
     x.active AS wrong_active, x.wrong_count, x.hard_count, x.consecutive_correct,
     x.last_wrong_at, x.last_correct_at, x.resolved_at
@@ -113,9 +113,9 @@ export function getWordDetail(wordId: number) {
     LEFT JOIN wrong_word_states x ON x.word_id = w.id WHERE w.id = ?`).get(wordId) as Record<string, unknown> | undefined;
   if (!row) return null;
   const content: DictionaryContent = row.word_id == null ? emptyDictionaryContent() : dictionaryContentFromRow(row);
-  const recentReviews = sqlite.prepare(`SELECT id, reviewed_at, rating, question_type, is_correct, duration_ms
+  const recentReviews = await sqlite.prepare(`SELECT id, reviewed_at, rating, question_type, is_correct, duration_ms
     FROM review_logs WHERE word_id = ? ORDER BY reviewed_at DESC LIMIT 20`).all(wordId) as Array<Record<string, unknown>>;
-  const attempts = sqlite.prepare(`SELECT provider_id, status, duration_ms, fields_returned_json, error_code, error_message, metadata_json, created_at
+  const attempts = await sqlite.prepare(`SELECT provider_id, status, duration_ms, fields_returned_json, error_code, error_message, metadata_json, created_at
     FROM provider_attempts WHERE word_id = ? ORDER BY created_at DESC LIMIT 20`).all(wordId) as Array<Record<string, unknown>>;
   return {
     id: Number(row.id), term: String(row.term), normalizedTerm: String(row.normalized_term),

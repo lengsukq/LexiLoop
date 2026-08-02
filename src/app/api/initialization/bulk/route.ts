@@ -26,10 +26,10 @@ export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json().catch(() => ({})));
     const configured = Boolean(input.requestedFields?.length || input.requestedProviders?.length || input.providerStrategy || input.onlyMissing !== undefined);
-    if (configured) return ok(queueConfiguredInitialization(input));
+    if (configured) return ok(await queueConfiguredInitialization(input));
     return ok(input.wordIds
-      ? queueSelectedInitialization(input.wordIds, input.mode)
-      : queueBulkInitialization(input.mode, input.onlyWithoutAi));
+      ? await queueSelectedInitialization(input.wordIds, input.mode)
+      : await queueBulkInitialization(input.mode, input.onlyWithoutAi));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "批量初始化参数无效。", 400, error.issues);
     return internalError(error, "创建批量初始化任务失败。");

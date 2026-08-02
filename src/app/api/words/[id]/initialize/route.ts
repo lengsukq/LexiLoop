@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const id = Number((await context.params).id);
     if (!Number.isInteger(id) || id <= 0) return fail("WORD_ID_INVALID", "词条 ID 无效。");
     const input = schema.parse(await request.json().catch(() => ({})));
-    return ok({ jobId: queueWordInitialization(id, input.mode, 100, input), queued: true, mode: input.mode });
+    return ok({ jobId: await queueWordInitialization(id, input.mode, 100, input), queued: true, mode: input.mode });
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "补全参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "WORD_NOT_FOUND") return fail("WORD_NOT_FOUND", "词条不存在。", 404);

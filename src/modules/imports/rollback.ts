@@ -31,21 +31,21 @@ function mapBatch(row: Record<string, unknown>) {
   };
 }
 
-export function listImportBatches(limit = 50) {
-  return (sqlite.prepare("SELECT * FROM import_batches ORDER BY created_at DESC LIMIT ?").all(limit) as Array<Record<string, unknown>>).map(mapBatch);
+export async function listImportBatches(limit = 50) {
+  return (await sqlite.prepare("SELECT * FROM import_batches ORDER BY created_at DESC LIMIT ?").all(limit) as Array<Record<string, unknown>>).map(mapBatch);
 }
 
-export function rollbackImportBatch(batchId: number) {
-  const batch = sqlite.prepare("SELECT * FROM import_batches WHERE id = ?").get(batchId) as (BatchState & { id: number; created_at: number }) | undefined;
+export async function rollbackImportBatch(batchId: number) {
+  const batch = await sqlite.prepare("SELECT * FROM import_batches WHERE id = ?").get(batchId) as (BatchState & { id: number; created_at: number }) | undefined;
   if (!batch) throw new ImportRollbackError("IMPORT_BATCH_NOT_FOUND", "导入批次不存在。");
   const eligibility = rollbackEligibility(batch);
   if (!eligibility.canRollback) throw new ImportRollbackError("IMPORT_BATCH_NOT_ROLLBACKABLE", eligibility.reason ?? "该批次不能撤销。");
-  const createdRows = sqlite.prepare(`SELECT ir.word_id, w.term FROM import_rows ir JOIN words w ON w.id = ir.word_id
+  const createdRows = await sqlite.prepare(`SELECT ir.word_id, w.term FROM import_rows ir JOIN words w ON w.id = ir.word_id
     WHERE ir.import_batch_id = ? AND ir.status = 'IMPORTED' AND ir.word_id IS NOT NULL`).all(batchId) as Array<{ word_id: number; term: string }>;
   const createdIds = new Set(createdRows.map((row) => row.word_id));
   if (!createdIds.size) {
     const now = Date.now();
-    sqlite.prepare("UPDATE import_batches SET status = 'ROLLED_BACK', rolled_back_at = ? WHERE id = ?").run(now, batchId);
+    await sqlite.prepare("UPDATE import_batches SET status = 'ROLLED_BACK', rolled_back_at = ? WHERE id = ?").run(now, batchId);
     return { batchId, deletedWords: 0, status: "ROLLED_BACK" as const };
   }
   const blockers = new Set<number>();
@@ -55,8 +55,8 @@ export function rollbackImportBatch(batchId: number) {
     `SELECT DISTINCT ir.word_id FROM import_rows ir JOIN study_session_items si ON si.word_id = ir.word_id WHERE ir.import_batch_id = ? AND ir.status = 'IMPORTED'`,
     `SELECT DISTINCT ir.word_id FROM import_rows ir JOIN words w ON w.id = ir.word_id WHERE ir.import_batch_id = ? AND ir.status = 'IMPORTED' AND (w.user_note IS NOT NULL OR w.is_suspended = 1)`,
   ];
-  for (const query of blockerQueries) for (const row of sqlite.prepare(query).all(batchId) as Array<{ word_id: number }>) blockers.add(row.word_id);
-  const laterImports = sqlite.prepare(`SELECT DISTINCT original.word_id FROM import_rows original
+  for (const query of blockerQueries) for (const row of await sqlite.prepare(query).all(batchId) as Array<{ word_id: number }>) blockers.add(row.word_id);
+  const laterImports = await sqlite.prepare(`SELECT DISTINCT original.word_id FROM import_rows original
     JOIN import_rows later ON later.word_id = original.word_id AND later.import_batch_id <> original.import_batch_id
     JOIN import_batches later_batch ON later_batch.id = later.import_batch_id
     WHERE original.import_batch_id = ? AND original.status = 'IMPORTED' AND later_batch.status = 'COMMITTED' AND later_batch.created_at > ?`)
@@ -68,9 +68,9 @@ export function rollbackImportBatch(batchId: number) {
     });
   }
   const now = Date.now();
-  const deleted = sqlite.transaction(() => {
-    const result = sqlite.prepare(`DELETE FROM words WHERE id IN (SELECT word_id FROM import_rows WHERE import_batch_id = ? AND status = 'IMPORTED' AND word_id IS NOT NULL)`).run(batchId);
-    sqlite.prepare("UPDATE import_batches SET status = 'ROLLED_BACK', rolled_back_at = ? WHERE id = ?").run(now, batchId);
+  const deleted = await sqlite.transaction(async () => {
+    const result = await sqlite.prepare(`DELETE FROM words WHERE id IN (SELECT word_id FROM import_rows WHERE import_batch_id = ? AND status = 'IMPORTED' AND word_id IS NOT NULL)`).run(batchId);
+    await sqlite.prepare("UPDATE import_batches SET status = 'ROLLED_BACK', rolled_back_at = ? WHERE id = ?").run(now, batchId);
     return result.changes;
   }).immediate();
   return { batchId, deletedWords: deleted, status: "ROLLED_BACK" as const };

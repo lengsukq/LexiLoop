@@ -6,7 +6,7 @@ import { z } from "zod";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
-    return ok(confirmManualPreview(await request.json()));
+    return ok(await confirmManualPreview(await request.json()));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "预览令牌无效。", 400, error.issues);
     if (error instanceof ManualPreviewError) {

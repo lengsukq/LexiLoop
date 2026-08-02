@@ -22,11 +22,11 @@ function contentFieldStatus(row: Record<string, unknown> | undefined) {
 }
 
 export async function getJobDetails(jobId: number) {
-  const row = sqlite.prepare(`SELECT j.*, w.term, w.normalized_term, w.source_language, w.target_language
+  const row = await sqlite.prepare(`SELECT j.*, w.term, w.normalized_term, w.source_language, w.target_language
     FROM initialization_jobs j JOIN words w ON w.id = j.word_id WHERE j.id = ?`).get(jobId) as Record<string, unknown> | undefined;
   if (!row) return null;
-  const attempts = sqlite.prepare("SELECT * FROM provider_attempts WHERE initialization_job_id = ? ORDER BY created_at ASC").all(jobId) as Array<Record<string, unknown>>;
-  const wordContent = sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(row.word_id as number) as Record<string, unknown> | undefined;
+  const attempts = await sqlite.prepare("SELECT * FROM provider_attempts WHERE initialization_job_id = ? ORDER BY created_at ASC").all(jobId) as Array<Record<string, unknown>>;
+  const wordContent = await sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(row.word_id as number) as Record<string, unknown> | undefined;
   return {
     job: {
       id: row.id as number, wordId: row.word_id as number, taskType: row.task_type as AiTaskType,

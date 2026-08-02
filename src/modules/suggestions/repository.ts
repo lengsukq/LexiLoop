@@ -30,8 +30,8 @@ const EMPTY_CONTENT: SuggestionContent = {
   actions: [],
 };
 
-export function findCachedSuggestion(dateKey: string): DailyAiSuggestion | null {
-  const row = sqlite.prepare("SELECT * FROM daily_ai_suggestions WHERE date_key = ?")
+export async function findCachedSuggestion(dateKey: string): Promise<DailyAiSuggestion | null> {
+  const row = await sqlite.prepare("SELECT * FROM daily_ai_suggestions WHERE date_key = ?")
     .get(dateKey) as Record<string, unknown> | undefined;
   if (!row) return null;
   const content = parseJson<SuggestionContent>(row.content_json, EMPTY_CONTENT);
@@ -56,7 +56,7 @@ export function findCachedSuggestion(dateKey: string): DailyAiSuggestion | null 
   };
 }
 
-export function saveSuggestion(input: {
+export async function saveSuggestion(input: {
   dateKey: string;
   sourceDateKey: string;
   qualityScore: number | null;
@@ -68,9 +68,9 @@ export function saveSuggestion(input: {
   providerId: string | null;
   model: string | null;
   warning: string | null;
-}): DailyAiSuggestion {
+}): Promise<DailyAiSuggestion> {
   const generatedAt = Date.now();
-  sqlite.prepare(`INSERT INTO daily_ai_suggestions
+  await sqlite.prepare(`INSERT INTO daily_ai_suggestions
     (date_key, source_date_key, quality_score, metrics_json, content_json, recommended_items_json,
      generator, provider_id, model, generation_warning, generated_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -101,7 +101,7 @@ export function saveSuggestion(input: {
       generatedAt,
     );
 
-  const saved = findCachedSuggestion(input.dateKey);
+  const saved = await findCachedSuggestion(input.dateKey);
   if (!saved) throw new Error("DAILY_SUGGESTION_SAVE_FAILED");
   saved.configured = input.generator === "AI" || input.configuration.configured;
   return saved;

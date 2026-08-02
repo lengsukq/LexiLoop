@@ -12,7 +12,7 @@ const schema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json());
-    return ok(skipStudyItem(input.studySessionId, input.studySessionItemId, input.reason));
+    return ok(await skipStudyItem(input.studySessionId, input.studySessionItemId, input.reason));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "跳过参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "STUDY_ITEM_NOT_FOUND") return fail("STUDY_ITEM_NOT_FOUND", "学习题目不存在。", 404);

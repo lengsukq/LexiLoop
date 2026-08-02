@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const { index } = z.object({ index: z.number().int().nonnegative() }).strict().parse(body);
       return ok(await translateExample(id, index));
     }
-    return ok({ jobId: queueAiTask(id, "EXAMPLE_TRANSLATIONS"), queued: true });
+    return ok({ jobId: await queueAiTask(id, "EXAMPLE_TRANSLATIONS"), queued: true });
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "例句翻译参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "WORD_NOT_FOUND") return fail("WORD_NOT_FOUND", "词条不存在。", 404);

@@ -17,9 +17,9 @@ const generationInFlight = new Map<string, Promise<DailyAiSuggestion>>();
 
 async function generateSuggestion(now: number, dateKey: string): Promise<DailyAiSuggestion> {
   const sourceDateKey = previousSuggestionDateKey(now);
-  const { metrics, reviews } = collectSuggestionMetrics(now, sourceDateKey);
+  const { metrics, reviews } = await collectSuggestionMetrics(now, sourceDateKey);
   const qualityScore = calculateQualityScore(metrics);
-  const candidates = buildSuggestionCandidates(now, reviews);
+  const candidates = await buildSuggestionCandidates(now, reviews);
   const fallback = ruleBasedSuggestion(metrics, candidates);
   let ai: Awaited<ReturnType<typeof generateAiSuggestion>> = null;
   let warning: string | null = null;
@@ -69,7 +69,7 @@ export async function getTodaySuggestion(
   const now = options.now ?? Date.now();
   const dateKey = suggestionDateKey(now);
   if (!options.force) {
-    const cached = findCachedSuggestion(dateKey);
+    const cached = await findCachedSuggestion(dateKey);
     if (cached) {
       cached.configured = (await getSuggestionConfiguration()).configured;
       return cached;

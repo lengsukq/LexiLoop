@@ -7,8 +7,8 @@ export function boundedActiveDurationMs(value: number | null | undefined): numbe
   return Math.max(0, Math.min(MAX_ACTIVE_ANSWER_DURATION_MS, Math.round(value)));
 }
 
-export function sessionActiveDurationMs(sessionId: number): number {
-  const row = sqlite.prepare(`SELECT COALESCE(SUM(
+export async function sessionActiveDurationMs(sessionId: number): Promise<number> {
+  const row = await sqlite.prepare(`SELECT COALESCE(SUM(
       CASE
         WHEN duration_ms IS NULL OR duration_ms <= 0 THEN 0
         WHEN duration_ms > ? THEN ?
@@ -20,7 +20,7 @@ export function sessionActiveDurationMs(sessionId: number): number {
   return Math.max(0, Number(row.duration ?? 0));
 }
 
-export function closeStudySessionWithActiveDuration(sessionId: number, completedAt: number): void {
-  sqlite.prepare("UPDATE study_sessions SET completed_at = ?, duration_ms = ? WHERE id = ?")
-    .run(completedAt, sessionActiveDurationMs(sessionId), sessionId);
+export async function closeStudySessionWithActiveDuration(sessionId: number, completedAt: number): Promise<void> {
+  await sqlite.prepare("UPDATE study_sessions SET completed_at = ?, duration_ms = ? WHERE id = ?")
+    .run(completedAt, await sessionActiveDurationMs(sessionId), sessionId);
 }

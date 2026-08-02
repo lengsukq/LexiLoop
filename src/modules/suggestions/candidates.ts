@@ -101,8 +101,8 @@ function applyReviews(map: Map<number, CandidateAccumulator>, reviews: ReviewRow
     }
   }
 }
-function applyWrongWords(map: Map<number, CandidateAccumulator>): void {
-  const rows = sqlite.prepare(`SELECT word_id, wrong_count, hard_count FROM wrong_word_states
+async function applyWrongWords(map: Map<number, CandidateAccumulator>): Promise<void> {
+  const rows = await sqlite.prepare(`SELECT word_id, wrong_count, hard_count FROM wrong_word_states
     WHERE active = 1 ORDER BY updated_at ASC LIMIT 200`).all() as Array<{
       word_id: number;
       wrong_count: number;
@@ -115,8 +115,8 @@ function applyWrongWords(map: Map<number, CandidateAccumulator>): void {
     candidate.hardCount = row.hard_count;
   }
 }
-function applyDueCards(map: Map<number, CandidateAccumulator>, now: number): void {
-  const rows = sqlite.prepare(`SELECT word_id, due_at, difficulty, lapses FROM review_cards
+async function applyDueCards(map: Map<number, CandidateAccumulator>, now: number): Promise<void> {
+  const rows = await sqlite.prepare(`SELECT word_id, due_at, difficulty, lapses FROM review_cards
     WHERE due_at <= ? ORDER BY due_at ASC LIMIT 200`).all(now) as Array<{
       word_id: number;
       due_at: number;
@@ -138,20 +138,20 @@ function riskCandidate(candidate: CandidateAccumulator, now: number): boolean {
     || (candidate.dueAt !== null && candidate.dueAt <= now)
     || candidate.fallback;
 }
-function addFallbackCandidates(map: Map<number, CandidateAccumulator>): void {
-  const rows = sqlite.prepare(`SELECT w.id FROM words w
+async function addFallbackCandidates(map: Map<number, CandidateAccumulator>): Promise<void> {
+  const rows = await sqlite.prepare(`SELECT w.id FROM words w
     WHERE w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
     ORDER BY w.mastery_score ASC, COALESCE(w.source_created_at, w.created_at) ASC LIMIT 12`)
     .all() as Array<{ id: number }>;
   for (const row of rows) accumulator(map, row.id).fallback = true;
 }
-export function buildSuggestionCandidates(now: number, reviews: ReviewRow[]): SuggestionCandidate[] {
+export async function buildSuggestionCandidates(now: number, reviews: ReviewRow[]): Promise<SuggestionCandidate[]> {
   const candidates = new Map<number, CandidateAccumulator>();
   applyReviews(candidates, reviews);
-  applyWrongWords(candidates);
-  applyDueCards(candidates, now);
+  await applyWrongWords(candidates);
+  await applyDueCards(candidates, now);
   if (![...candidates.values()].some((candidate) => riskCandidate(candidate, now))) {
-    addFallbackCandidates(candidates);
+    await addFallbackCandidates(candidates);
   }
   const ranked = [...candidates.values()]
     .filter((candidate) => riskCandidate(candidate, now))
@@ -159,7 +159,7 @@ export function buildSuggestionCandidates(now: number, reviews: ReviewRow[]): Su
     .slice(0, 30);
   if (!ranked.length) return [];
   const placeholders = ranked.map(() => "?").join(",");
-  const rows = sqlite.prepare(`SELECT w.id, w.term, w.target_language, wc.definitions_json
+  const rows = await sqlite.prepare(`SELECT w.id, w.term, w.target_language, wc.definitions_json
     FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id
     WHERE w.id IN (${placeholders}) AND w.is_suspended = 0
       AND w.initialization_status IN ('READY','PARTIAL')`)

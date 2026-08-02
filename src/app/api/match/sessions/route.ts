@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json().catch(() => ({})));
-    return ok(startMatchingSession(input));
+    return ok(await startMatchingSession(input));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "配对游戏参数无效。", 400, error.issues);
     if (error instanceof Error && error.message === "NOT_ENOUGH_MATCHING_WORDS") {

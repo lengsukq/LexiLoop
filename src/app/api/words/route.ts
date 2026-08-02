@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const rawMastery = p.get("mastery");
     const rawSort = p.get("sort");
     const rawOrder = p.get("order");
-    return ok(listWords({
+    return ok(await listWords({
       query: p.get("q")?.trim() || undefined,
       status: rawStatus && INITIALIZATION_STATUSES.includes(rawStatus as InitializationStatus) ? rawStatus as InitializationStatus : undefined,
       mastery: rawMastery && MASTERY_LEVELS.includes(rawMastery as MasteryLevel) ? rawMastery as MasteryLevel : undefined,

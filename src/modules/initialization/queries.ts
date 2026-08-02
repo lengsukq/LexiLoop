@@ -1,21 +1,19 @@
-import { db, sqlite } from "@/db/client";
-import { initializationJobs, words, workerHeartbeats } from "@/db/schema";
+import { sqlite } from "@/db/client";
 import type { InitializationStatus } from "@/lib/types";
-import { sql } from "drizzle-orm";
 export { getJobDetails } from "./job-details";
 export { getInitializationOptions } from "./options";
 
 export async function getInitializationSummary() {
-  const counts = await db.select({ status: initializationJobs.status, count: sql<number>`count(*)` }).from(initializationJobs).groupBy(initializationJobs.status);
+  const counts = await sqlite.prepare("SELECT status, COUNT(*) AS count FROM initialization_jobs GROUP BY status").all() as Array<{ status: string; count: number }>;
   const result: Record<InitializationStatus, number> = { PENDING: 0, QUEUED: 0, RUNNING: 0, READY: 0, PARTIAL: 0, FAILED: 0, DISABLED: 0 };
-  for (const row of counts) result[row.status] = Number(row.count);
+  for (const row of counts) result[row.status as InitializationStatus] = Number(row.count);
   return result;
 }
 
 export async function getWordsSummary() {
-  const counts = await db.select({ status: words.initializationStatus, count: sql<number>`count(*)` }).from(words).groupBy(words.initializationStatus);
+  const counts = await sqlite.prepare("SELECT initialization_status AS status, COUNT(*) AS count FROM words GROUP BY initialization_status").all() as Array<{ status: string; count: number }>;
   const result: Record<InitializationStatus, number> = { PENDING: 0, QUEUED: 0, RUNNING: 0, READY: 0, PARTIAL: 0, FAILED: 0, DISABLED: 0 };
-  for (const row of counts) result[row.status] = Number(row.count);
+  for (const row of counts) result[row.status as InitializationStatus] = Number(row.count);
   return result;
 }
 
@@ -70,14 +68,14 @@ export async function listInitializationJobs(options: { page?: number; pageSize?
   const havingParams = statusFilter ? [statusFilter] : [];
   const from = `FROM initialization_jobs j INNER JOIN words w ON w.id = j.word_id WHERE ${where.join(" AND ")} GROUP BY w.id`;
 
-  const totalRow = sqlite.prepare(`
+  const totalRow = await sqlite.prepare(`
     SELECT COUNT(*) AS total FROM (
       SELECT w.id ${from} ${having}
     ) grouped
   `).get(...params, ...havingParams) as { total: number };
   const total = Number(totalRow.total ?? 0);
 
-  const rows = sqlite.prepare(`
+  const rows = await sqlite.prepare(`
     SELECT
       w.id AS word_id,
       w.term,
@@ -98,7 +96,7 @@ export async function listInitializationJobs(options: { page?: number; pageSize?
 
   const wordIds = rows.map((row) => Number(row.word_id));
   const taskRows = wordIds.length
-    ? sqlite.prepare(`SELECT id, word_id, task_type, status, mode, attempt_count, max_attempts,
+    ? await sqlite.prepare(`SELECT id, word_id, task_type, status, mode, attempt_count, max_attempts,
         last_error, last_error_code, created_at, updated_at, completed_at
         FROM initialization_jobs
         WHERE word_id IN (${wordIds.map(() => "?").join(",")})
@@ -148,5 +146,5 @@ export async function listInitializationJobs(options: { page?: number; pageSize?
 }
 
 export async function getWorkerHeartbeats() {
-  return db.select().from(workerHeartbeats).orderBy(sql`${workerHeartbeats.lastSeenAt} DESC`);
+  return await sqlite.prepare("SELECT * FROM worker_heartbeats ORDER BY last_seen_at DESC").all();
 }

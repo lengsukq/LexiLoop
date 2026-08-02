@@ -5,18 +5,15 @@ import { evaluateReviewAnswer } from "./answer-evaluation";
 import { cardFromRow, emptyCard, previewCard, scheduleCard } from "./fsrs";
 import { calculateMasteryScore, determineMasteryLevel } from "./mastery";
 import {
+  applyMasteryAndFinalize,
   assertIdempotencyContext,
   assertReviewableWord,
   buildIdempotentResult,
   claimStudyItem,
-  finalizeStudySession,
   findExistingReview,
   findReviewCard,
-  findReviewWord,
-  insertReviewLog,
-  loadReviewStatistics,
-  saveReviewCard,
-  updateWordMastery,
+  findReviewContext,
+  insertReviewCardAndLog,
   upsertWordReviewStats,
 } from "./repository";
 import type { AnswerInput } from "./types";
@@ -42,8 +39,8 @@ export interface ReviewAnswerResult {
  * Shared answer-processing pipeline. Must run inside a transaction so the whole
  * review, stats update, mastery and session bookkeeping stay atomic.
  */
-function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): ReviewAnswerResult {
-  const existing = findExistingReview(input.clientAnswerId);
+async function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Promise<ReviewAnswerResult> {
+  const existing = await findExistingReview(input.clientAnswerId);
   if (existing) {
     assertIdempotencyContext(existing, input);
     return buildIdempotentResult(existing);
@@ -51,17 +48,16 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
 
   const reviewedAt = new Date();
   const now = reviewedAt.getTime();
-  claimStudyItem(input, now);
+  await claimStudyItem(input, now);
 
-  const word = findReviewWord(input.wordId);
+  const context = await findReviewContext(input.wordId);
+  const word = context.word;
   assertReviewableWord(word);
   const evaluation = evaluateReviewAnswer(input, word);
-  const previousCard = findReviewCard(word.id);
-  const before = previousCard ? cardFromRow(previousCard) : emptyCard(reviewedAt);
+  const before = context.card ? cardFromRow(context.card) : emptyCard(reviewedAt);
   const after = scheduleCard(before, reviewedAt, evaluation.effectiveRating, settings.targetRetentionRate).card;
 
-  saveReviewCard(word.id, after, now);
-  const reviewLogId = insertReviewLog({
+  const reviewLogId = await insertReviewCardAndLog({
     answer: input,
     reviewedAt: now,
     rating: evaluation.effectiveRating,
@@ -70,8 +66,9 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
     isCorrect: evaluation.isCorrect,
     before,
     after,
+    now,
   });
-  upsertWordReviewStats({
+  const statistics = await upsertWordReviewStats({
     wordId: word.id,
     reviewedAt: now,
     rating: evaluation.effectiveRating,
@@ -79,8 +76,7 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
     durationMs: input.durationMs ?? null,
   });
 
-  const wrongState = updateWrongWordState(word.id, evaluation.effectiveRating, evaluation.isCorrect, now);
-  const statistics = loadReviewStatistics(word.id, now);
+  const wrongState = await updateWrongWordState(word.id, evaluation.effectiveRating, evaluation.isCorrect, now, context.wrongState);
   const masteryInput = {
     stability: after.stability,
     scheduledDays: after.scheduled_days,
@@ -94,8 +90,8 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
   };
   const masteryScore = calculateMasteryScore(masteryInput);
   const masteryLevel = determineMasteryLevel(masteryInput, masteryScore);
-  updateWordMastery(word.id, masteryScore, masteryLevel, now);
-  const adaptiveFollowUp = scheduleAdaptiveFollowUp({
+  await applyMasteryAndFinalize(word.id, masteryScore, masteryLevel, now, input.studySessionId!, evaluation.isCorrect);
+  const adaptiveFollowUp = await scheduleAdaptiveFollowUp({
     sessionId: input.studySessionId!,
     itemId: input.studySessionItemId!,
     wordId: word.id,
@@ -105,7 +101,7 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
     rating: evaluation.effectiveRating,
     now,
   });
-  finalizeStudySession(input.studySessionId!, evaluation.isCorrect, now);
+  await finalizeStudySession(input.studySessionId!, evaluation.isCorrect, now);
 
   return {
     idempotent: false,
@@ -124,20 +120,20 @@ function processReviewAnswerCore(input: AnswerInput, settings: AppSettings): Rev
 
 export async function processReviewAnswer(input: AnswerInput): Promise<ReviewAnswerResult> {
   const settings = await getSettings();
-  return sqlite.transaction(() => processReviewAnswerCore(input, settings)).immediate();
+  return await sqlite.transaction(() => processReviewAnswerCore(input, settings)).immediate();
 }
 
 /** Processes a batch of answers inside a single transaction (practice/game completion). */
-export function processReviewAnswersInTransaction(
+export async function processReviewAnswersInTransaction(
   inputs: readonly AnswerInput[],
   settings: AppSettings,
-): ReviewAnswerResult[] {
-  return sqlite.transaction(() => inputs.map((input) => processReviewAnswerCore(input, settings))).immediate();
+): Promise<ReviewAnswerResult[]> {
+  return await sqlite.transaction(() => Promise.all(inputs.map((input) => processReviewAnswerCore(input, settings)))).immediate();
 }
 
 export async function getReviewPreview(wordId: number) {
   const settings = await getSettings();
-  const row = findReviewCard(wordId);
+  const row = await findReviewCard(wordId);
   const card = row ? cardFromRow(row) : emptyCard(new Date());
   return previewCard(card, new Date(), settings.targetRetentionRate).map((item) => ({
     ...item,

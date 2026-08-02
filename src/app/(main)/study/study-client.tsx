@@ -251,7 +251,34 @@ export function StudyClient() {
       }) });
       setLastResult(result);
       await new Promise((resolve) => window.setTimeout(resolve, 650));
-      await reloadSession(sessionId);
+      if (result.adaptiveFollowUp) {
+        // A follow-up item may have been inserted mid-session; reload to pick it up.
+        await reloadSession(sessionId);
+      } else {
+        // No structural change to the session: advance locally instead of
+        // re-fetching the whole session (which would cost extra round trips).
+        setRevealed(false);
+        setUserAnswer("");
+        setLastResult(null);
+        setSelectedChoice(null);
+        setChoicesVisible(false);
+        setData((prev) => {
+          if (!prev) return prev;
+          const isLast = index >= prev.items.length - 1;
+          return {
+            ...prev,
+            session: {
+              ...prev.session,
+              completedCount: prev.session.completedCount + 1,
+              correctCount: prev.session.correctCount + (result.isCorrect ? 1 : 0),
+              wrongCount: prev.session.wrongCount + (result.isCorrect ? 0 : 1),
+              completedAt: isLast ? new Date().toISOString() : prev.session.completedAt,
+            },
+            items: prev.items.map((item, itemIndex) => itemIndex === index ? { ...item, status: "ANSWERED" } : item),
+          };
+        });
+        setIndex((value) => value + 1);
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "提交答案失败"); }
     finally { setSubmitting(false); }
   }

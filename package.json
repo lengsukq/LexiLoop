@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:init:pgsql": "tsx scripts/init-pgsql.ts",
     "check": "yarn typecheck && yarn lint && yarn test && yarn build",
     "migrations:generate": "tsx scripts/generate-migration-sources.ts",
     "prebuild": "yarn migrations:generate"
@@ -29,6 +30,7 @@
     "lucide-react": "^0.468.0",
     "node-edge-tts": "^1.2.10",
     "papaparse": "^5.5.3",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.5.1",
@@ -43,6 +45,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
     "@types/papaparse": "^5.3.16",
+    "@types/pg": "^8.20.3",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@types/ws": "^8.18.1",

@@ -135,12 +135,12 @@ function createGameItems(
   });
 }
 
-export function startGameSession(mode: GameMode): GameSessionPayload {
+export async function startGameSession(mode: GameMode): Promise<GameSessionPayload> {
   const now = Date.now();
   const config = GAME_CONFIGS[mode];
-  closeOpenPracticeSessions("GAME_%", now);
+  await closeOpenPracticeSessions("GAME_%", now);
 
-  const candidates = selectPracticeCandidates({
+  const candidates = await selectPracticeCandidates({
     count: config.itemCount,
     now,
     candidateFilter: mode === "WORD_BUILDER" ? isWordBuilderCandidate : undefined,
@@ -148,7 +148,7 @@ export function startGameSession(mode: GameMode): GameSessionPayload {
   if (candidates.length < MINIMUM_GAME_ITEMS) throw new Error("NOT_ENOUGH_GAME_WORDS");
 
   const sourceType = `GAME_${mode}`;
-  const session = createPracticeSession(candidates, {
+  const session = await createPracticeSession(candidates, {
     sourceType,
     sessionType: config.sessionType,
     questionType: config.questionType,

@@ -21,20 +21,20 @@ function questionAccuracy(reviews: ReviewRow[]): Record<string, number | null> {
   ]));
 }
 
-export function collectSuggestionMetrics(now: number, sourceDateKey: string): {
+export async function collectSuggestionMetrics(now: number, sourceDateKey: string): Promise<{
   metrics: DailySuggestionMetrics;
   reviews: ReviewRow[];
-} {
+}> {
   const since = now - 3 * DAY_MS;
-  const reviews = (sqlite.prepare(`SELECT word_id, reviewed_at, rating, question_type, is_correct,
+  const reviews = (await sqlite.prepare(`SELECT word_id, reviewed_at, rating, question_type, is_correct,
       duration_ms, study_session_id FROM review_logs WHERE reviewed_at >= ? ORDER BY reviewed_at ASC`)
     .all(since) as ReviewRow[])
     .filter((review) => suggestionDateKey(review.reviewed_at) === sourceDateKey);
-  const skips = (sqlite.prepare(`SELECT answered_at FROM study_session_items
+  const skips = (await sqlite.prepare(`SELECT answered_at FROM study_session_items
       WHERE status = 'SKIPPED' AND COALESCE(skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET')
         AND answered_at >= ?`).all(since) as Array<{ answered_at: number }>)
     .filter((row) => suggestionDateKey(row.answered_at) === sourceDateKey);
-  const sessions = (sqlite.prepare(`SELECT started_at, duration_ms, completed_count FROM study_sessions
+  const sessions = (await sqlite.prepare(`SELECT started_at, duration_ms, completed_count FROM study_sessions
       WHERE started_at >= ?`).all(since) as Array<{
         started_at: number;
         duration_ms: number | null;

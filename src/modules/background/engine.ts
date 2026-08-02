@@ -43,20 +43,20 @@ function state(): EngineState {
   }
   return globalEngine.__lexiloopBackgroundEngine;
 }
-function getConcurrencyFromSettings(): number | null {
+async function getConcurrencyFromSettings(): Promise<number | null> {
   try {
-    const row = sqlite.prepare("SELECT value_json FROM settings WHERE key = 'backgroundConcurrency'").get() as { value_json: string } | undefined;
+    const row = await sqlite.prepare("SELECT value_json FROM settings WHERE key = 'backgroundConcurrency'").get() as { value_json: string } | undefined;
     if (!row) return null;
     const value = Number(JSON.parse(row.value_json));
     return Number.isInteger(value) && value >= 1 && value <= 10 ? value : null;
   } catch { return null; }
 }
-function maybeRunMaintenance(engine: EngineState): void {
+async function maybeRunMaintenance(engine: EngineState): Promise<void> {
   const now = Date.now();
   if (now - engine.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) return;
   engine.lastMaintenanceAt = now;
   try {
-    const result = runMaintenance();
+    const result = await runMaintenance();
     const touched = result.expiredPreviews + result.decayedWrongWords + result.retriedJobs + result.expiredSessions + result.expiredBatches + result.purgedPreviews;
     if (touched > 0) console.log(`[BackgroundEngine] maintenance:`, result);
   } catch (error) {
@@ -109,13 +109,13 @@ async function runLoop(engine: EngineState): Promise<void> {
     concurrency: engine.concurrency,
     mode: "embedded",
   });
-  maybeRunMaintenance(engine);
+  await maybeRunMaintenance(engine);
   maybeGenerateDailySuggestion(engine);
   while (!engine.stopping) {
     try {
-      maybeRunMaintenance(engine);
+      await maybeRunMaintenance(engine);
       maybeGenerateDailySuggestion(engine);
-      const jobs = claimJobs(engine.workerId, getConcurrencyFromSettings() ?? engine.concurrency);
+      const jobs = await claimJobs(engine.workerId, (await getConcurrencyFromSettings()) ?? engine.concurrency);
       if (jobs.length === 0) {
         updateHeartbeat(engine.workerId, "IDLE", undefined, {
           pid: process.pid,

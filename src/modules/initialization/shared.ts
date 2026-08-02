@@ -16,9 +16,9 @@ export function uniqueOrdered<T extends string>(...groups: Array<readonly T[] | 
   return [...new Set(groups.flatMap((group) => group ?? []))];
 }
 
-export function maxAttemptsFromSettings(): number {
+export async function maxAttemptsFromSettings(): Promise<number> {
   try {
-    const row = sqlite.prepare("SELECT value_json FROM settings WHERE key = 'aiRetryCount'").get() as {
+    const row = await sqlite.prepare("SELECT value_json FROM settings WHERE key = 'aiRetryCount'").get() as {
       value_json: string;
     } | undefined;
     const retryCount = row ? Number(JSON.parse(row.value_json)) : 1;
@@ -28,16 +28,16 @@ export function maxAttemptsFromSettings(): number {
   }
 }
 
-function usableContentStatus(wordId: number): InitializationStatus | null {
-  const row = sqlite.prepare(`SELECT wc.*, w.content_type FROM word_contents wc
+async function usableContentStatus(wordId: number): Promise<InitializationStatus | null> {
+  const row = await sqlite.prepare(`SELECT wc.*, w.content_type FROM word_contents wc
     JOIN words w ON w.id = wc.word_id WHERE wc.word_id = ?`).get(wordId) as Record<string, unknown> | undefined;
   if (!row) return null;
   const status = contentStatus(dictionaryContentFromRow(row), String(row.content_type ?? "WORD") as import("@/lib/types").EntryType);
   return status === "FAILED" ? null : status;
 }
 
-export function setWordOperationalStatus(wordId: number, requestedStatus: InitializationStatus, now: number): void {
-  const fallback = usableContentStatus(wordId);
-  sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?")
+export async function setWordOperationalStatus(wordId: number, requestedStatus: InitializationStatus, now: number): Promise<void> {
+  const fallback = await usableContentStatus(wordId);
+  await sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?")
     .run(fallback ?? requestedStatus, now, wordId);
 }

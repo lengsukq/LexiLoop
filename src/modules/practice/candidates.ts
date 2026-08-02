@@ -44,13 +44,13 @@ function activeSessionExclusion(enabled: boolean): string {
   )`;
 }
 
-function loadCandidateRows(options: PracticeSelectionOptions): PracticeCandidateRow[] {
+async function loadCandidateRows(options: PracticeSelectionOptions): Promise<PracticeCandidateRow[]> {
   const { now, excludeWordsInActiveSessions = false } = options;
   const parameters: number[] = [];
   if (excludeWordsInActiveSessions) parameters.push(now - ACTIVE_SESSION_WINDOW_MS);
   parameters.push(now, CANDIDATE_QUERY_LIMIT);
 
-  return sqlite.prepare(`SELECT
+  return await sqlite.prepare(`SELECT
       w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type,
       c.definitions_json, c.pronunciations_json,
       COALESCE(x.active, 0) AS wrong_active,
@@ -84,12 +84,12 @@ function normalizedIdentity(value: string): string {
   return value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export function selectPracticeCandidates(options: PracticeSelectionOptions): PracticeCandidate[] {
+export async function selectPracticeCandidates(options: PracticeSelectionOptions): Promise<PracticeCandidate[]> {
   const selected: PracticeCandidate[] = [];
   const seenTerms = new Set<string>();
   const seenDefinitions = new Set<string>();
 
-  for (const candidate of loadCandidateRows(options)) {
+  for (const candidate of await loadCandidateRows(options)) {
     if (options.candidateFilter && !options.candidateFilter(candidate)) continue;
     const definition = extractPreferredDefinition(candidate.definitions_json, candidate.target_language);
     if (!definition) continue;

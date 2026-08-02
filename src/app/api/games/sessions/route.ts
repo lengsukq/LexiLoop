@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const { mode } = schema.parse(await request.json());
-    return ok(startGameSession(mode));
+    return ok(await startGameSession(mode));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "小游戏模式无效。", 400, error.issues);
     if (error instanceof Error && error.message === "NOT_ENOUGH_GAME_WORDS") {

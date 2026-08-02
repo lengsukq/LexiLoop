@@ -103,12 +103,12 @@ function challengeType(index: number): PhoneticChallengeType {
   return ["SOUND_TO_PHONETIC", "PHONETIC_TO_WORD", "WORD_TO_PHONETIC"][index % 3] as PhoneticChallengeType;
 }
 
-export function selectPhoneticCandidates(options: {
+export async function selectPhoneticCandidates(options: {
   count: number;
   accent: PhoneticAccent;
   now: number;
-}): PhoneticCandidate[] {
-  const candidates = selectPracticeCandidates({
+}): Promise<PhoneticCandidate[]> {
+  const candidates = await selectPracticeCandidates({
     count: CANDIDATE_POOL_SIZE,
     now: options.now,
     candidateFilter: (candidate) => hasPronunciation(candidate),

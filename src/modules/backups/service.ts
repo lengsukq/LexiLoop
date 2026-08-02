@@ -28,7 +28,7 @@ function backupDir(): string {
 export async function createSqliteBackup(): Promise<{ path: string; filename: string }> {
   const filename = `lexiloop-${new Date().toISOString().replace(/[:.]/g, "-")}.sqlite`;
   const destination = path.join(backupDir(), `.download-${crypto.randomUUID()}.sqlite`);
-  sqlite.pragma("wal_checkpoint(FULL)");
+  await sqlite.pragma("wal_checkpoint(FULL)");
   await sqlite.backup(destination);
   return { path: destination, filename };
 }
@@ -40,7 +40,7 @@ export function removeGeneratedBackup(filePath: string): void {
   fs.rmSync(resolved, { force: true });
 }
 
-export function createJsonBackup() {
+export async function createJsonBackup() {
   const latestMigration = MIGRATIONS.at(-1)?.name ?? null;
   const data: Record<string, unknown> = {
     format: "lexiloop-json-backup",
@@ -50,7 +50,7 @@ export function createJsonBackup() {
     migrations: MIGRATIONS.map((migration) => migration.name),
     exportedAt: new Date().toISOString(),
   };
-  for (const table of TABLES) data[table] = sqlite.prepare(`SELECT * FROM ${table}`).all();
+  for (const table of TABLES) data[table] = await sqlite.prepare(`SELECT * FROM ${table}`).all();
   return data;
 }
 

@@ -88,57 +88,57 @@ describe("multi-meaning review content", () => {
     }, word)).toMatchObject({ isCorrect: false, effectiveRating: "EASY" });
   });
 
-  it("puts all meanings into the generated meaning choice", () => {
+  it("puts all meanings into the generated meaning choice", async () => {
     const now = Date.now();
-    const wordId = Number(sqlite.prepare(`INSERT INTO words
+    const wordId = Number((await sqlite.prepare(`INSERT INTO words
       (term, normalized_term, source_language, target_language, entry_type, content_type,
        initialization_status, created_at, updated_at)
       VALUES ('run', 'run', 'en', 'zh-CN', 'WORD', 'WORD', 'READY', ?, ?)`)
-      .run(now, now).lastInsertRowid);
-    sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at)
+      .run(now, now)).lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at)
       VALUES (?, ?, ?)`)
       .run(wordId, JSON.stringify([
         { language: "zh-CN", text: "运行" },
         { language: "zh-CN", text: "奔跑" },
       ]), now);
-    const sessionId = Number(sqlite.prepare(`INSERT INTO study_sessions
+    const sessionId = Number((await sqlite.prepare(`INSERT INTO study_sessions
       (session_type, started_at, planned_count, created_at)
       VALUES ('DAILY', ?, 1, ?)`)
-      .run(now, now).lastInsertRowid);
-    sqlite.prepare(`INSERT INTO study_session_items
+      .run(now, now)).lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO study_session_items
       (study_session_id, position, word_id, task_type, question_type, created_at)
       VALUES (?, 0, ?, 'NEW', 'EN_TO_ZH_CHOICE', ?)`)
       .run(sessionId, wordId, now);
 
-    const session = getStudySession(sessionId);
+    const session = await getStudySession(sessionId);
 
     expect(session.items[0]?.choices).toContain("运行；奔跑");
   });
 
-  it("returns word choices with definitions for reverse choice questions", () => {
+  it("returns word choices with definitions for reverse choice questions", async () => {
     const now = Date.now();
-    const insertWord = (term: string, definition: string) => {
-      const wordId = Number(sqlite.prepare(`INSERT INTO words
+    const insertWord = async (term: string, definition: string) => {
+      const wordId = Number((await sqlite.prepare(`INSERT INTO words
         (term, normalized_term, source_language, target_language, entry_type, content_type,
          initialization_status, created_at, updated_at)
-        VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'WORD', 'READY', ?, ?)`).run(term, term.toLowerCase(), now, now).lastInsertRowid);
-      sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at) VALUES (?, ?, ?)`).run(
+        VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'WORD', 'READY', ?, ?)`).run(term, term.toLowerCase(), now, now)).lastInsertRowid);
+      await sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at) VALUES (?, ?, ?)`).run(
         wordId,
         JSON.stringify([{ language: "zh-CN", text: definition }]),
         now,
       );
       return wordId;
     };
-    const targetId = insertWord("run", "运行");
-    insertWord("walk", "走路");
-    insertWord("jump", "跳跃");
-    const sessionId = Number(sqlite.prepare(`INSERT INTO study_sessions
-      (session_type, started_at, planned_count, created_at) VALUES ('DAILY', ?, 1, ?)`).run(now, now).lastInsertRowid);
-    sqlite.prepare(`INSERT INTO study_session_items
+    const targetId = await insertWord("run", "运行");
+    await insertWord("walk", "走路");
+    await insertWord("jump", "跳跃");
+    const sessionId = Number((await sqlite.prepare(`INSERT INTO study_sessions
+      (session_type, started_at, planned_count, created_at) VALUES ('DAILY', ?, 1, ?)`).run(now, now)).lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO study_session_items
       (study_session_id, position, word_id, task_type, question_type, created_at)
       VALUES (?, 0, ?, 'REVIEW', 'ZH_TO_EN_CHOICE', ?)`).run(sessionId, targetId, now);
 
-    const item = getStudySession(sessionId).items[0];
+    const item = (await getStudySession(sessionId)).items[0];
 
     expect(item?.choices).toEqual(expect.arrayContaining(["run", "walk", "jump"]));
     expect(item?.choiceDefinitions).toMatchObject({ run: "运行", walk: "走路", jump: "跳跃" });

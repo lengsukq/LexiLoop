@@ -1,19 +1,20 @@
 import crypto from "node:crypto";
-import { db } from "@/db/client";
-import { importPreviews, words } from "@/db/schema";
+import { sqlite } from "@/db/client";
 import { IMPORT_PREVIEW_TTL_MS } from "@/lib/config";
 import { mapLanguage } from "@/lib/language";
 import type { ImportPreview, ImportPreviewRow } from "@/lib/types";
-import { and, eq, lt, sql } from "drizzle-orm";
 import { parseEasyDictCsv } from "./parser";
 import { detectEntryType, identityKey, normalizeTerm } from "./normalizer";
 
 export async function createImportPreview(content: string, filename: string): Promise<ImportPreview> {
   const parsed = parseEasyDictCsv(content);
   if (parsed.parseErrors.length > 0 && parsed.rows.length === 0) throw new Error(parsed.parseErrors.join("；"));
-  await db.delete(importPreviews).where(lt(importPreviews.expiresAt, new Date()));
-  const existingRows = await db.select({ normalizedTerm: words.normalizedTerm, sourceLanguage: words.sourceLanguage, targetLanguage: words.targetLanguage }).from(words);
-  const existing = new Set(existingRows.map((row) => identityKey(row.normalizedTerm, row.sourceLanguage, row.targetLanguage)));
+  const now = Date.now();
+  await sqlite.prepare("DELETE FROM import_previews WHERE expires_at < ?").run(now);
+  const existingRows = await sqlite.prepare(
+    "SELECT normalized_term, source_language, target_language FROM words",
+  ).all() as Array<{ normalized_term: string; source_language: string; target_language: string }>;
+  const existing = new Set(existingRows.map((row) => identityKey(row.normalized_term, row.source_language, row.target_language)));
   const seen = new Set<string>();
   const rows: ImportPreviewRow[] = parsed.rows.map((row) => {
     if (!row.data) return {
@@ -36,9 +37,10 @@ export async function createImportPreview(content: string, filename: string): Pr
     };
   });
   const token = crypto.randomUUID();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + IMPORT_PREVIEW_TTL_MS);
-  await db.insert(importPreviews).values({ token, filename, fileHash: crypto.createHash("sha256").update(content).digest("hex"), rowsJson: rows, expiresAt, createdAt: now });
+  const expiresAt = new Date(now + IMPORT_PREVIEW_TTL_MS);
+  await sqlite.prepare(
+    "INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+  ).run(token, filename, crypto.createHash("sha256").update(content).digest("hex"), JSON.stringify(rows), expiresAt.getTime(), now);
   const valid = rows.filter((row) => row.status !== "INVALID" && row.status !== "DUPLICATE");
   const languages: Record<string, number> = {};
   const entryTypes: Record<string, number> = {};
@@ -57,7 +59,8 @@ export async function createImportPreview(content: string, filename: string): Pr
 }
 
 export async function getImportPreview(token: string) {
-  const rows = await db.select().from(importPreviews)
-    .where(and(eq(importPreviews.token, token), sql`${importPreviews.expiresAt} > ${new Date()}`)).limit(1);
-  return rows[0] ?? null;
+  const row = await sqlite.prepare(
+    "SELECT * FROM import_previews WHERE token = ? AND expires_at > ? LIMIT 1",
+  ).get(token, Date.now());
+  return (row as { token: string; filename: string; file_hash: string; rows_json: string; expires_at: number; created_at: number } | undefined) ?? null;
 }

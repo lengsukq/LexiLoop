@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const { accent } = schema.parse(await request.json());
-    return ok(startPhoneticGame(accent));
+    return ok(await startPhoneticGame(accent));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return fail("VALIDATION_ERROR", "音标训练口音无效。", 400, error.issues);

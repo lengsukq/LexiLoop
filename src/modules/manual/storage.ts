@@ -8,8 +8,8 @@ export function fieldsReturned(content: DictionaryContent): string[] {
     : Boolean(value && typeof value === "object" && Object.values(value).some((item) => Array.isArray(item) ? item.length > 0 : Boolean(item)))).map(([key]) => key);
 }
 
-export function saveContent(wordId: number, content: DictionaryContent, attempts: ProviderAttempt[], now: number): void {
-  sqlite.prepare(`INSERT INTO word_contents
+export async function saveContent(wordId: number, content: DictionaryContent, attempts: ProviderAttempt[], now: number): Promise<void> {
+  await sqlite.prepare(`INSERT INTO word_contents
     (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json, synonyms_json, antonyms_json,
      word_family_json, confused_words_json, roots_json, affixes_json, summary_json, learning_json, sentence_analysis_json,
      tags_json, provider_metadata_json, content_version, initialized_at, updated_at)
@@ -24,11 +24,13 @@ export function saveContent(wordId: number, content: DictionaryContent, attempts
     .run(wordId, JSON.stringify(content.definitions), JSON.stringify(content.pronunciations), JSON.stringify(content.examples), JSON.stringify(content.phrases), JSON.stringify(content.forms), JSON.stringify(content.synonyms), JSON.stringify(content.antonyms), JSON.stringify(content.wordFamily), JSON.stringify(content.confusedWords), JSON.stringify(content.roots), JSON.stringify(content.affixes), JSON.stringify(content.summary), JSON.stringify(content.learning), JSON.stringify(content.sentenceAnalysis), JSON.stringify(content.tags), JSON.stringify(attempts), now, now);
 }
 
-export function saveAttempts(wordId: number, attempts: ProviderAttempt[], now: number): void {
+export async function saveAttempts(wordId: number, attempts: ProviderAttempt[], now: number): Promise<void> {
   const insert = sqlite.prepare(`INSERT INTO provider_attempts
     (initialization_job_id, word_id, provider_id, status, duration_ms, fields_returned_json, error_code, error_message, metadata_json, created_at)
     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  for (const attempt of attempts) insert.run(wordId, attempt.providerId, attempt.status, attempt.durationMs, JSON.stringify(attempt.fieldsReturned), attempt.errorCode ?? null, attempt.errorMessage ?? null, attempt.metadata ? JSON.stringify(attempt.metadata) : null, now);
+  for (const attempt of attempts) {
+    await insert.run(wordId, attempt.providerId, attempt.status, attempt.durationMs, JSON.stringify(attempt.fieldsReturned), attempt.errorCode ?? null, attempt.errorMessage ?? null, attempt.metadata ? JSON.stringify(attempt.metadata) : null, now);
+  }
 }
 
 export function rowToPreview(row: {

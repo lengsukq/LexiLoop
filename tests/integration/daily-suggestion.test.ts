@@ -9,13 +9,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function insertReadyWord(term: string, definition: string): number {
+async function insertReadyWord(term: string, definition: string): Promise<number> {
   const now = Date.now();
-  const result = sqlite.prepare(`INSERT INTO words
+  const result = await sqlite.prepare(`INSERT INTO words
     (term, normalized_term, source_language, target_language, entry_type, initialization_status, mastery_score, created_at, updated_at)
     VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'READY', 10, ?, ?)`).run(term, term.toLowerCase(), now, now);
   const wordId = Number(result.lastInsertRowid);
-  sqlite.prepare(`INSERT INTO word_contents
+  await sqlite.prepare(`INSERT INTO word_contents
     (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
      synonyms_json, antonyms_json, tags_json, provider_metadata_json, updated_at)
     VALUES (?, ?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`)
@@ -23,9 +23,9 @@ function insertReadyWord(term: string, definition: string): number {
   return wordId;
 }
 
-function insertYesterdayReview(wordId: number, options: { correct: boolean; rating: "AGAIN" | "HARD" | "GOOD" | "EASY"; questionType: string; offsetMs?: number }) {
+async function insertYesterdayReview(wordId: number, options: { correct: boolean; rating: "AGAIN" | "HARD" | "GOOD" | "EASY"; questionType: string; offsetMs?: number }) {
   const reviewedAt = Date.now() - 24 * 60 * 60 * 1000 + (options.offsetMs ?? 0);
-  sqlite.prepare(`INSERT INTO review_logs
+  await sqlite.prepare(`INSERT INTO review_logs
     (client_answer_id, word_id, reviewed_at, rating, question_type, is_correct, duration_ms, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 12000, ?)`)
     .run(crypto.randomUUID(), wordId, reviewedAt, options.rating, options.questionType, options.correct ? 1 : 0, reviewedAt);
@@ -79,12 +79,12 @@ describe("daily AI suggestion", () => {
   });
 
   it("reviews yesterday and prioritizes the weakest word without requiring AI configuration", async () => {
-    const weakId = insertReadyWord("fragile", "脆弱的");
-    const strongId = insertReadyWord("stable", "稳定的");
-    insertYesterdayReview(weakId, { correct: false, rating: "AGAIN", questionType: "ZH_TO_EN_SPELLING" });
-    insertYesterdayReview(strongId, { correct: true, rating: "GOOD", questionType: "EN_TO_ZH" });
+    const weakId = await insertReadyWord("fragile", "脆弱的");
+    const strongId = await insertReadyWord("stable", "稳定的");
+    await insertYesterdayReview(weakId, { correct: false, rating: "AGAIN", questionType: "ZH_TO_EN_SPELLING" });
+    await insertYesterdayReview(strongId, { correct: true, rating: "GOOD", questionType: "EN_TO_ZH" });
     const now = Date.now();
-    sqlite.prepare(`INSERT INTO wrong_word_states
+    await sqlite.prepare(`INSERT INTO wrong_word_states
       (word_id, active, wrong_count, hard_count, consecutive_correct, last_wrong_at, updated_at)
       VALUES (?, 1, 2, 0, 0, ?, ?)`).run(weakId, now - 24 * 60 * 60 * 1000, now);
 
@@ -98,14 +98,14 @@ describe("daily AI suggestion", () => {
       term: "fragile",
       questionType: "ZH_TO_EN_SPELLING",
     });
-    expect((sqlite.prepare("SELECT count(*) AS count FROM daily_ai_suggestions").get() as { count: number }).count).toBe(1);
+    expect((await sqlite.prepare("SELECT count(*) AS count FROM daily_ai_suggestions").get() as { count: number }).count).toBe(1);
   });
 
   it("creates a resumable AI recommended study session from the cached must-do list", async () => {
-    const weakId = insertReadyWord("hesitate", "犹豫");
-    insertYesterdayReview(weakId, { correct: false, rating: "HARD", questionType: "ZH_TO_EN_SPELLING" });
+    const weakId = await insertReadyWord("hesitate", "犹豫");
+    await insertYesterdayReview(weakId, { correct: false, rating: "HARD", questionType: "ZH_TO_EN_SPELLING" });
     const now = Date.now();
-    sqlite.prepare(`INSERT INTO wrong_word_states
+    await sqlite.prepare(`INSERT INTO wrong_word_states
       (word_id, active, wrong_count, hard_count, consecutive_correct, last_wrong_at, updated_at)
       VALUES (?, 1, 1, 1, 0, ?, ?)`).run(weakId, now - 24 * 60 * 60 * 1000, now);
     await getTodaySuggestion({ force: true });
@@ -114,7 +114,7 @@ describe("daily AI suggestion", () => {
     expect(session.session.sessionType).toBe("AI_RECOMMENDED");
     expect(session.items.map((item) => item.word.id)).toContain(weakId);
     expect(session.items[0]?.questionType).toBe("ZH_TO_EN_SPELLING");
-    const stored = sqlite.prepare("SELECT session_type, source_type FROM study_sessions WHERE id = ?").get(session.session.id) as {
+    const stored = await sqlite.prepare("SELECT session_type, source_type FROM study_sessions WHERE id = ?").get(session.session.id) as {
       session_type: string; source_type: string | null;
     };
     expect(stored).toEqual({ session_type: "WRONG_WORDS", source_type: "AI_RECOMMENDED" });

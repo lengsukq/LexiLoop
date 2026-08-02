@@ -28,27 +28,27 @@ function strongerInitializationMode(current: InitializationMode, requested: Init
   };
   return weight[requested] > weight[current] ? requested : current;
 }
-export function queueWordInitialization(
+export async function queueWordInitialization(
   wordId: number,
   mode: InitializationMode = "FILL_MISSING_FIELDS",
   priority = 100,
   options: InitializationTaskOptions = {},
-): number {
+): Promise<number> {
   return queueAiTask(wordId, "INITIALIZE", mode, priority, options);
 }
 
-export function queueAiTask(
+export async function queueAiTask(
   wordId: number,
   taskType: AiTaskType,
   mode: InitializationMode = "FILL_MISSING_FIELDS",
   priority = 100,
   options: InitializationTaskOptions = {},
-): number {
-  const word = sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId);
+): Promise<number> {
+  const word = await sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId);
   if (!word) throw new Error("WORD_NOT_FOUND");
   const now = Date.now();
-  const maxAttempts = maxAttemptsFromSettings();
-  const active = sqlite.prepare(`SELECT id, mode, requested_fields_json, requested_providers_json, provider_strategy
+  const maxAttempts = await maxAttemptsFromSettings();
+  const active = await sqlite.prepare(`SELECT id, mode, requested_fields_json, requested_providers_json, provider_strategy
     FROM initialization_jobs WHERE word_id = ? AND task_type = ? AND status IN ('QUEUED','RUNNING') LIMIT 1`)
     .get(wordId, taskType) as {
       id: number; mode: InitializationMode; requested_fields_json: string | null;
@@ -66,7 +66,7 @@ export function queueAiTask(
     const mergedProviders = taskType === "INITIALIZE"
       ? (!activeProviders.length || !requestedProviders.length ? [] : uniqueOrdered(activeProviders, requestedProviders))
       : activeProviders;
-    sqlite.prepare(`UPDATE initialization_jobs SET mode = ?, priority = MAX(priority, ?), max_attempts = MAX(max_attempts, ?),
+    await sqlite.prepare(`UPDATE initialization_jobs SET mode = ?, priority = GREATEST(priority, ?), max_attempts = GREATEST(max_attempts, ?),
       requested_fields_json = ?, requested_providers_json = ?, provider_strategy = ?, available_at = ?, updated_at = ? WHERE id = ?`)
       .run(
         strongerInitializationMode(active.mode, mode), priority, maxAttempts,
@@ -78,7 +78,7 @@ export function queueAiTask(
     return active.id;
   }
   const supplementalFields = taskType === "MNEMONIC" ? ["learning.mnemonic"] : taskType === "EXAMPLE_TRANSLATIONS" ? ["examples.translation"] : null;
-  const result = sqlite.prepare(`INSERT INTO initialization_jobs
+  const result = await sqlite.prepare(`INSERT INTO initialization_jobs
     (word_id, task_type, mode, requested_fields_json, requested_providers_json, provider_strategy,
      status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 'QUEUED', ?, 0, ?, ?, ?, ?)`)
@@ -88,7 +88,7 @@ export function queueAiTask(
       taskType === "INITIALIZE" && requestedProviders.length ? JSON.stringify(requestedProviders) : null,
       providerStrategy, priority, maxAttempts, now, now, now,
     );
-  if (taskType === "INITIALIZE") setWordOperationalStatus(wordId, "QUEUED", now);
+  if (taskType === "INITIALIZE") await setWordOperationalStatus(wordId, "QUEUED", now);
   return Number(result.lastInsertRowid);
 }
 
@@ -101,25 +101,25 @@ export interface QueueInitializationResult {
   mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE">;
 }
 
-export function queueSelectedInitialization(
+export async function queueSelectedInitialization(
   wordIds: number[],
   mode: Extract<InitializationMode, "FILL_MISSING_FIELDS" | "FORCE_OVERWRITE"> = "FILL_MISSING_FIELDS",
   options: InitializationTaskOptions = {},
-): QueueInitializationResult {
+): Promise<QueueInitializationResult> {
   const requestedIds = [...new Set(wordIds.filter((id) => Number.isInteger(id) && id > 0))];
   if (!requestedIds.length) return { requestedWords: 0, selectedWords: 0, skippedWords: 0, createdJobs: 0, updatedJobs: 0, mode };
 
   const placeholders = requestedIds.map(() => "?").join(", ");
-  const existingIds = new Set((sqlite.prepare(`SELECT id FROM words WHERE id IN (${placeholders})`).all(...requestedIds) as Array<{ id: number }>)
+  const existingIds = new Set((await sqlite.prepare(`SELECT id FROM words WHERE id IN (${placeholders})`).all(...requestedIds) as Array<{ id: number }>)
     .map((row) => row.id));
   let createdJobs = 0;
   let updatedJobs = 0;
 
-  sqlite.transaction(() => {
+  await sqlite.transaction(async () => {
     for (const wordId of existingIds) {
-      const before = sqlite.prepare(`SELECT id FROM initialization_jobs
+      const before = await sqlite.prepare(`SELECT id FROM initialization_jobs
         WHERE word_id = ? AND task_type = 'INITIALIZE' AND status IN ('QUEUED','RUNNING') LIMIT 1`).get(wordId) as { id: number } | undefined;
-      queueWordInitialization(wordId, mode, 90, options);
+      await queueWordInitialization(wordId, mode, 90, options);
       if (before) updatedJobs += 1;
       else createdJobs += 1;
     }

@@ -24,12 +24,12 @@ interface CompletionRow {
   definitions_json: string;
 }
 
-export function closeOpenPracticeSessions(sourceTypePattern: string, now = Date.now()): void {
-  const sessions = sqlite.prepare(`SELECT id FROM study_sessions
+export async function closeOpenPracticeSessions(sourceTypePattern: string, now = Date.now()): Promise<void> {
+  const sessions = await sqlite.prepare(`SELECT id FROM study_sessions
     WHERE source_type LIKE ? AND completed_at IS NULL`).all(sourceTypePattern) as Array<{ id: number }>;
   if (!sessions.length) return;
 
-  sqlite.transaction(() => {
+  await sqlite.transaction(async () => {
     const skipPendingItems = sqlite.prepare(`UPDATE study_session_items
       SET status = 'SKIPPED', answered_at = ?, skip_reason = 'SESSION_EXPIRED'
       WHERE study_session_id = ? AND status = 'PENDING'`);
@@ -37,9 +37,9 @@ export function closeOpenPracticeSessions(sourceTypePattern: string, now = Date.
       SET completed_count = completed_count + ?, skipped_count = skipped_count + ? WHERE id = ?`);
 
     for (const session of sessions) {
-      const skipped = skipPendingItems.run(now, session.id);
-      updateCounts.run(skipped.changes, skipped.changes, session.id);
-      closeStudySessionWithActiveDuration(session.id, now);
+      const skipped = await skipPendingItems.run(now, session.id);
+      await updateCounts.run(skipped.changes, skipped.changes, session.id);
+      await closeStudySessionWithActiveDuration(session.id, now);
     }
   }).immediate();
 }
@@ -50,13 +50,13 @@ function taskTypeFor(candidate: PracticeCandidate, config: PracticeSessionConfig
   return config.defaultTaskType;
 }
 
-export function createPracticeSession(
+export async function createPracticeSession(
   candidates: readonly PracticeCandidate[],
   config: PracticeSessionConfig,
   now = Date.now(),
-): { sessionId: number; items: PracticeSessionItemReference[] } {
-  const sessionId = sqlite.transaction(() => {
-    const session = sqlite.prepare(`INSERT INTO study_sessions
+): Promise<{ sessionId: number; items: PracticeSessionItemReference[] }> {
+  const sessionId = await sqlite.transaction(async () => {
+    const session = await sqlite.prepare(`INSERT INTO study_sessions
       (session_type, source_type, started_at, completed_at, planned_count, completed_count,
        correct_count, wrong_count, skipped_count, created_at)
       VALUES (?, ?, ?, NULL, ?, 0, 0, 0, 0, ?)`)
@@ -66,8 +66,8 @@ export function createPracticeSession(
       (study_session_id, position, word_id, task_type, question_type, status, created_at)
       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`);
 
-    candidates.forEach((candidate, index) => {
-      insertItem.run(
+    for (const [index, candidate] of candidates.entries()) {
+      await insertItem.run(
         id,
         index,
         candidate.id,
@@ -75,11 +75,11 @@ export function createPracticeSession(
         config.questionType,
         now,
       );
-    });
+    }
     return id;
   }).immediate();
 
-  const items = sqlite.prepare(`SELECT id, word_id FROM study_session_items
+  const items = await sqlite.prepare(`SELECT id, word_id FROM study_session_items
     WHERE study_session_id = ? ORDER BY position ASC`).all(sessionId) as Array<{
       id: number;
       word_id: number;
@@ -91,13 +91,13 @@ export function createPracticeSession(
   };
 }
 
-function loadCompletionRows(sessionId: number, sourceType: string): CompletionRow[] {
-  const session = sqlite.prepare(`SELECT source_type FROM study_sessions WHERE id = ?`).get(sessionId) as {
+async function loadCompletionRows(sessionId: number, sourceType: string): Promise<CompletionRow[]> {
+  const session = await sqlite.prepare(`SELECT source_type FROM study_sessions WHERE id = ?`).get(sessionId) as {
     source_type: string | null;
   } | undefined;
   if (!session || session.source_type !== sourceType) throw new Error("PRACTICE_SESSION_NOT_FOUND");
 
-  return sqlite.prepare(`SELECT i.id AS item_id, i.word_id, i.question_type, i.status,
+  return await sqlite.prepare(`SELECT i.id AS item_id, i.word_id, i.question_type, i.status,
       w.term, w.target_language, c.definitions_json
     FROM study_session_items i
     JOIN words w ON w.id = i.word_id
@@ -113,7 +113,7 @@ function correctAnswer(row: CompletionRow): string {
 export async function completePracticeSession(
   input: PracticeCompletionInput,
 ): Promise<PracticeCompletionSummary> {
-  const rows = loadCompletionRows(input.sessionId, input.sourceType);
+  const rows = await loadCompletionRows(input.sessionId, input.sourceType);
   const submitted = new Map(input.answers.map((answer) => [`${answer.itemId}:${answer.wordId}`, answer]));
   const averageDuration = boundedActiveDurationMs(input.elapsedMs / Math.max(1, rows.length)) ?? 0;
   let firstTryCorrect = 0;
@@ -144,7 +144,7 @@ export async function completePracticeSession(
 
   if (pendingAnswers.length > 0) {
     const settings = await getSettings();
-    processReviewAnswersInTransaction(pendingAnswers, settings);
+    await processReviewAnswersInTransaction(pendingAnswers, settings);
   }
 
   return {

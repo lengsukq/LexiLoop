@@ -1,5 +1,4 @@
-import { db, sqlite } from "@/db/client";
-import { settings } from "@/db/schema";
+import { sqlite } from "@/db/client";
 import { DEFAULT_SETTINGS } from "@/lib/config";
 import type { AppSettings, LlmPurposeId } from "@/lib/types";
 import { z } from "zod";
@@ -88,9 +87,9 @@ export function settingsForAiAttempt(
 
 export async function getSettings(): Promise<AppSettings> {
   if (settingsCache && Date.now() < settingsCache.expiresAt) return settingsCache.value;
-  const rows = await db.select().from(settings);
+  const rows = await sqlite.prepare("SELECT key, value_json FROM settings").all() as Array<{ key: string; value_json: string }>;
   const values: Record<string, unknown> = {};
-  for (const row of rows) values[row.key] = row.valueJson;
+  for (const row of rows) values[row.key] = JSON.parse(row.value_json) as unknown;
   // Migrate legacy single playbackSpeed into per-category speeds when the new
   // fields have never been saved individually.
   const legacySpeed = typeof values.playbackSpeed === "number" ? values.playbackSpeed : null;
@@ -111,8 +110,8 @@ export async function updateSettings(input: unknown): Promise<AppSettings> {
   const upsert = sqlite.prepare(`INSERT INTO settings(key, value_json, updated_at)
     VALUES (?, ?, ?)
     ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`);
-  sqlite.transaction(() => {
-    for (const [key, value] of Object.entries(values)) upsert.run(key, JSON.stringify(value), now);
+  await sqlite.transaction(async () => {
+    for (const [key, value] of Object.entries(values)) await upsert.run(key, JSON.stringify(value), now);
   })();
   invalidateSettingsCache();
   return getSettings();

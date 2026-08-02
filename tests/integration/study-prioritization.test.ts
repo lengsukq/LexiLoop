@@ -5,13 +5,13 @@ import { processReviewAnswer } from "@/modules/reviews/service";
 import { continuousCandidates, dailyProgress, selectCandidates } from "@/modules/study/candidates";
 import { skipStudyItem, startStudySession } from "@/modules/study/service";
 
-function insertReadyWord(term: string): number {
+async function insertReadyWord(term: string): Promise<number> {
   const now = Date.now();
-  const result = sqlite.prepare(`INSERT INTO words
+  const result = await sqlite.prepare(`INSERT INTO words
     (term, normalized_term, source_language, target_language, entry_type, initialization_status, created_at, updated_at)
     VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'READY', ?, ?)`).run(term, term, now, now);
   const wordId = Number(result.lastInsertRowid);
-  sqlite.prepare(`INSERT INTO word_contents
+  await sqlite.prepare(`INSERT INTO word_contents
     (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
      synonyms_json, antonyms_json, tags_json, provider_metadata_json, updated_at)
     VALUES (?, ?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`).run(
@@ -22,8 +22,8 @@ function insertReadyWord(term: string): number {
   return wordId;
 }
 
-function insertDueCard(wordId: number, now: number): void {
-  sqlite.prepare(`INSERT INTO review_cards
+async function insertDueCard(wordId: number, now: number): Promise<void> {
+  await sqlite.prepare(`INSERT INTO review_cards
     (word_id, due_at, stability, difficulty, elapsed_days, scheduled_days, reps, lapses,
      fsrs_state, learning_steps, last_review_at, created_at, updated_at)
     VALUES (?, ?, 1, 5, 1, 1, 1, 0, 2, 0, ?, ?, ?)`).run(wordId, now - 86_400_000, now - 172_800_000, now, now);
@@ -43,12 +43,12 @@ function seededRandom(seed: number) {
 
 describe("study prioritization", () => {
   it("moves recently failed due words ahead of equally overdue words", async () => {
-    const fragileId = insertReadyWord("fragile");
-    const steadyId = insertReadyWord("steady");
+    const fragileId = await insertReadyWord("fragile");
+    const steadyId = await insertReadyWord("steady");
     const now = Date.now();
-    insertDueCard(fragileId, now);
-    insertDueCard(steadyId, now);
-    sqlite.prepare(`INSERT INTO review_logs
+    await insertDueCard(fragileId, now);
+    await insertDueCard(steadyId, now);
+    await sqlite.prepare(`INSERT INTO review_logs
       (client_answer_id, word_id, reviewed_at, rating, question_type, is_correct, created_at)
       VALUES (?, ?, ?, 'AGAIN', 'EN_TO_ZH_CHOICE', 0, ?)`).run(crypto.randomUUID(), fragileId, now - 3_600_000, now - 3_600_000);
     await updateSettings({ dailyNewWords: 0, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
@@ -60,13 +60,13 @@ describe("study prioritization", () => {
   });
 
   it("allows a small daily overflow after the configured target is reached", async () => {
-    insertReadyWord("first");
-    insertReadyWord("second");
+    await insertReadyWord("first");
+    await insertReadyWord("second");
     await updateSettings({ dailyNewWords: 1, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
 
     const first = await startStudySession("DAILY", false);
     expect(first.items).toHaveLength(1);
-    skipStudyItem(first.session.id, first.items[0]!.itemId, "LATER");
+    await skipStudyItem(first.session.id, first.items[0]!.itemId, "LATER");
 
     const overflow = await startStudySession("DAILY", false);
 
@@ -75,8 +75,8 @@ describe("study prioritization", () => {
   });
 
   it("continues with unlearned words after the daily new-word limit is exhausted", async () => {
-    const firstId = insertReadyWord("first");
-    const secondId = insertReadyWord("second");
+    const firstId = await insertReadyWord("first");
+    const secondId = await insertReadyWord("second");
     await updateSettings({ dailyNewWords: 0, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
 
     const session = await startStudySession("DAILY", false, true);
@@ -86,21 +86,21 @@ describe("study prioritization", () => {
   });
 
   it("prioritizes due, wrong, and new words before cycling older reviews", async () => {
-    const dueId = insertReadyWord("due");
-    const wrongId = insertReadyWord("wrong");
-    const newId = insertReadyWord("new");
-    const oldId = insertReadyWord("old");
+    const dueId = await insertReadyWord("due");
+    const wrongId = await insertReadyWord("wrong");
+    const newId = await insertReadyWord("new");
+    const oldId = await insertReadyWord("old");
     const now = Date.now();
-    insertDueCard(dueId, now);
-    sqlite.prepare(`INSERT INTO wrong_word_states
+    await insertDueCard(dueId, now);
+    await sqlite.prepare(`INSERT INTO wrong_word_states
       (word_id, active, wrong_count, hard_count, consecutive_correct, updated_at)
       VALUES (?, 1, 2, 1, 0, ?)`).run(wrongId, now);
-    sqlite.prepare(`INSERT INTO review_cards
+    await sqlite.prepare(`INSERT INTO review_cards
       (word_id, due_at, stability, difficulty, elapsed_days, scheduled_days, reps, lapses,
        fsrs_state, learning_steps, last_review_at, created_at, updated_at)
       VALUES (?, ?, 10, 5, 1, 10, 2, 0, 2, 0, ?, ?, ?)`).run(oldId, now + 86_400_000, now - 30 * 86_400_000, now, now);
 
-    const candidates = continuousCandidates(4, now, "LEXICAL", () => 0);
+    const candidates = await continuousCandidates(4, now, "LEXICAL", () => 0);
 
     expect(candidates.map((item) => item.id)).toEqual([dueId, wrongId, newId, oldId]);
     expect(candidates.map((item) => item.continuousTaskType)).toEqual(["REVIEW", "WRONG", "NEW", "REVIEW"]);
@@ -124,21 +124,21 @@ describe("study prioritization", () => {
     expect(runs[0]).toHaveLength(20);
   });
 
-  it("counts game tasks in the daily category quotas", () => {
+  it("counts game tasks in the daily category quotas", async () => {
     const now = Date.now();
-    const wordId = insertReadyWord("game-review");
-    const sessionId = Number(sqlite.prepare(`INSERT INTO study_sessions
+    const wordId = await insertReadyWord("game-review");
+    const sessionId = Number((await sqlite.prepare(`INSERT INTO study_sessions
       (session_type, source_type, started_at, completed_at, planned_count, completed_count, created_at)
-      VALUES ('DAILY', 'GAME_MEANING_BLITZ', ?, ?, 1, 1, ?)`).run(now, now, now).lastInsertRowid);
-    sqlite.prepare(`INSERT INTO study_session_items
+      VALUES ('DAILY', 'GAME_MEANING_BLITZ', ?, ?, 1, 1, ?)`).run(now, now, now)).lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO study_session_items
       (study_session_id, position, word_id, task_type, question_type, status, answered_at, created_at)
       VALUES (?, 0, ?, 'REVIEW', 'EN_TO_ZH_CHOICE', 'ANSWERED', ?, ?)`).run(sessionId, wordId, now, now);
 
-    expect(dailyProgress(now)).toMatchObject({ due: 1, wrong: 0, fresh: 0 });
+    expect(await dailyProgress(now)).toMatchObject({ due: 1, wrong: 0, fresh: 0 });
   });
 
   it("cycles reviewed words in a later batch after all fresh words are processed", async () => {
-    const wordId = insertReadyWord("repeat");
+    const wordId = await insertReadyWord("repeat");
     await updateSettings({ dailyNewWords: 0, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
 
     const first = await startStudySession("DAILY", false, true);

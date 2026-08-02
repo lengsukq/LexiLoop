@@ -15,14 +15,14 @@ function findRelatedContent(content: DictionaryContent, term: string) {
     .find((item) => item.word.normalize("NFKC").trim().toLocaleLowerCase() === key) ?? null;
 }
 
-export function previewRelatedWord(parentWordId: number, rawTerm: string) {
-  const parent = sqlite.prepare(`SELECT w.*, wc.* FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id WHERE w.id = ?`)
+export async function previewRelatedWord(parentWordId: number, rawTerm: string) {
+  const parent = await sqlite.prepare(`SELECT w.*, wc.* FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id WHERE w.id = ?`)
     .get(parentWordId) as Record<string, unknown> | undefined;
   if (!parent) throw new Error("WORD_NOT_FOUND");
   const term = relatedWordSchema.shape.term.parse(rawTerm);
   const normalizedTerm = normalizeTerm(term, String(parent.source_language));
   if (normalizedTerm === String(parent.normalized_term)) throw new Error("RELATED_WORD_SAME_AS_PARENT");
-  const existing = sqlite.prepare(`SELECT id, term, initialization_status, mastery_level, mastery_score
+  const existing = await sqlite.prepare(`SELECT id, term, initialization_status, mastery_level, mastery_score
     FROM words WHERE normalized_term = ? AND source_language = ? AND target_language = ? LIMIT 1`)
     .get(normalizedTerm, parent.source_language, parent.target_language) as {
       id: number; term: string; initialization_status: string; mastery_level: string; mastery_score: number;
@@ -40,9 +40,9 @@ export function previewRelatedWord(parentWordId: number, rawTerm: string) {
   };
 }
 
-export function addRelatedWord(parentWordId: number, input: unknown) {
+export async function addRelatedWord(parentWordId: number, input: unknown) {
   const values = relatedWordSchema.parse(input);
-  const parent = sqlite.prepare(`SELECT id, normalized_term, source_language, target_language,
+  const parent = await sqlite.prepare(`SELECT id, normalized_term, source_language, target_language,
     source_language_name, target_language_name, content_type FROM words WHERE id = ?`).get(parentWordId) as {
       id: number; normalized_term: string; source_language: string; target_language: string;
       source_language_name: string | null; target_language_name: string | null; content_type: EntryType;
@@ -51,8 +51,8 @@ export function addRelatedWord(parentWordId: number, input: unknown) {
   const normalizedTerm = normalizeTerm(values.term, parent.source_language);
   if (normalizedTerm === parent.normalized_term) throw new Error("RELATED_WORD_SAME_AS_PARENT");
   const now = Date.now();
-  return sqlite.transaction(() => {
-    let word = sqlite.prepare(`SELECT id, term, initialization_status FROM words
+  return await sqlite.transaction(async () => {
+    let word = await sqlite.prepare(`SELECT id, term, initialization_status FROM words
       WHERE normalized_term = ? AND source_language = ? AND target_language = ? LIMIT 1`)
       .get(normalizedTerm, parent.source_language, parent.target_language) as {
         id: number; term: string; initialization_status: string;
@@ -60,7 +60,7 @@ export function addRelatedWord(parentWordId: number, input: unknown) {
     let created = false;
     if (!word) {
       const type = detectEntryType(values.term);
-      const inserted = sqlite.prepare(`INSERT INTO words
+      const inserted = await sqlite.prepare(`INSERT INTO words
         (term, normalized_term, source_language, target_language, source_language_name, target_language_name,
          entry_type, content_type, initialization_status, mastery_level, mastery_score, is_suspended, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 'NEW', 0, 0, ?, ?)`)
@@ -72,20 +72,20 @@ export function addRelatedWord(parentWordId: number, input: unknown) {
     const needsInitialization = !["READY", "PARTIAL"].includes(word.initialization_status);
     let jobId: number | null = null;
     if (needsInitialization) {
-      const active = sqlite.prepare(`SELECT id FROM initialization_jobs WHERE word_id = ? AND status IN ('QUEUED','RUNNING') LIMIT 1`)
+      const active = await sqlite.prepare(`SELECT id FROM initialization_jobs WHERE word_id = ? AND status IN ('QUEUED','RUNNING') LIMIT 1`)
         .get(word.id) as { id: number } | undefined;
       if (active) {
         jobId = active.id;
-        sqlite.prepare(`UPDATE initialization_jobs SET mode = 'FILL_MISSING_FIELDS', priority = MAX(priority, 80), available_at = ?, updated_at = ? WHERE id = ?`)
+        await sqlite.prepare(`UPDATE initialization_jobs SET mode = 'FILL_MISSING_FIELDS', priority = GREATEST(priority, 80), available_at = ?, updated_at = ? WHERE id = ?`)
           .run(now, now, active.id);
       } else {
-        const job = sqlite.prepare(`INSERT INTO initialization_jobs
+        const job = await sqlite.prepare(`INSERT INTO initialization_jobs
           (word_id, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
           VALUES (?, ?, 'QUEUED', 80, 0, 5, ?, ?, ?)`)
           .run(word.id, created ? "SKIP_INITIALIZED" : "FILL_MISSING_FIELDS", now, now, now);
         jobId = Number(job.lastInsertRowid);
       }
-      sqlite.prepare("UPDATE words SET initialization_status = 'QUEUED', updated_at = ? WHERE id = ?").run(now, word.id);
+      await sqlite.prepare("UPDATE words SET initialization_status = 'QUEUED', updated_at = ? WHERE id = ?").run(now, word.id);
     }
     return {
       wordId: word.id, term: word.term, created, queued: needsInitialization, jobId, relation: values.relation,
@@ -94,19 +94,19 @@ export function addRelatedWord(parentWordId: number, input: unknown) {
   }).immediate();
 }
 
-export function deleteWord(wordId: number, force = false): boolean {
-  if (!sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId)) return false;
+export async function deleteWord(wordId: number, force = false): Promise<boolean> {
+  if (!await sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId)) return false;
   if (!force) {
-    const history = sqlite.prepare(`SELECT EXISTS(SELECT 1 FROM review_logs WHERE word_id = ?) AS has_reviews,
+    const history = await sqlite.prepare(`SELECT EXISTS(SELECT 1 FROM review_logs WHERE word_id = ?) AS has_reviews,
       EXISTS(SELECT 1 FROM study_session_items WHERE word_id = ?) AS has_session_items`).get(wordId, wordId) as {
         has_reviews: number; has_session_items: number;
       };
     if (history.has_reviews || history.has_session_items) throw new Error("WORD_HAS_LEARNING_HISTORY");
   }
-  return sqlite.transaction(() => {
+  return await sqlite.transaction(async () => {
     if (force) for (const table of ["review_logs", "review_cards", "wrong_word_states", "study_session_items", "initialization_jobs", "provider_attempts"]) {
-      sqlite.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
+      await sqlite.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
     }
-    return sqlite.prepare("DELETE FROM words WHERE id = ?").run(wordId).changes === 1;
+    return (await sqlite.prepare("DELETE FROM words WHERE id = ?").run(wordId)).changes === 1;
   }).immediate();
 }

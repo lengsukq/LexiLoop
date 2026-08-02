@@ -9,7 +9,7 @@ const schema = z.union([
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json());
-    return ok({ retried: "jobIds" in input ? retryFailedJobs(input.jobIds) : retryFailedJobsForWords(input.wordIds) });
+    return ok({ retried: "jobIds" in input ? await retryFailedJobs(input.jobIds) : await retryFailedJobsForWords(input.wordIds) });
   }
   catch (error) { if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "任务 ID 无效。", 400, error.issues); return internalError(error, "重试初始化任务失败。"); }
 }

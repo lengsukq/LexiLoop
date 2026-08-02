@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { sqlite } from "@/db/client";
 import { getDailyStudyPlan, startStudySession } from "@/modules/study/service";
 
-function insertReadyEntry(options: {
+async function insertReadyEntry(options: {
   term: string;
   normalized: string;
   contentType: "WORD" | "SENTENCE";
   translation: string;
-}): number {
+}): Promise<number> {
   const now = Date.now();
   const legacyType = options.contentType === "SENTENCE" ? "PHRASE" : options.contentType;
-  const result = sqlite.prepare(`INSERT INTO words
+  const result = await sqlite.prepare(`INSERT INTO words
     (term, normalized_term, source_language, target_language, entry_type, content_type,
      initialization_status, created_at, updated_at)
     VALUES (?, ?, 'en', 'zh-CN', ?, ?, 'READY', ?, ?)`)
@@ -23,7 +23,7 @@ function insertReadyEntry(options: {
         variations: [{ sentence: "I have completed the work.", translation: "我已经完成工作了。" }],
       }
     : { grammarNotes: [], keyExpressions: [], variations: [] };
-  sqlite.prepare(`INSERT INTO word_contents
+  await sqlite.prepare(`INSERT INTO word_contents
     (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
      synonyms_json, antonyms_json, word_family_json, confused_words_json, roots_json, affixes_json,
      summary_json, learning_json, sentence_analysis_json, tags_json, provider_metadata_json, updated_at)
@@ -40,9 +40,9 @@ function insertReadyEntry(options: {
   return wordId;
 }
 
-function makeDue(wordId: number): void {
+async function makeDue(wordId: number): Promise<void> {
   const now = Date.now();
-  sqlite.prepare(`INSERT INTO review_cards
+  await sqlite.prepare(`INSERT INTO review_cards
     (word_id, due_at, stability, difficulty, elapsed_days, scheduled_days, reps, lapses,
      fsrs_state, learning_steps, last_review_at, created_at, updated_at)
     VALUES (?, ?, 1, 5, 1, 1, 1, 0, 2, 0, ?, ?, ?)`)
@@ -51,7 +51,7 @@ function makeDue(wordId: number): void {
 
 describe("sentence study mode", () => {
   it("creates a sentence-only fresh session with sentence analysis in the payload", async () => {
-    insertReadyEntry({
+    await insertReadyEntry({
       term: "I have finished the work.",
       normalized: "i have finished the work.",
       contentType: "SENTENCE",
@@ -68,13 +68,13 @@ describe("sentence study mode", () => {
   });
 
   it("uses reverse sentence reconstruction for due sentences", async () => {
-    const wordId = insertReadyEntry({
+    const wordId = await insertReadyEntry({
       term: "I have finished the work.",
       normalized: "i have finished the work.",
       contentType: "SENTENCE",
       translation: "我已经完成工作了。",
     });
-    makeDue(wordId);
+    await makeDue(wordId);
 
     const session = await startStudySession("SENTENCE_REVIEW", false);
 
@@ -83,8 +83,8 @@ describe("sentence study mode", () => {
   });
 
   it("keeps ordinary new-word sessions free of sentence entries", async () => {
-    insertReadyEntry({ term: "hello", normalized: "hello", contentType: "WORD", translation: "你好" });
-    insertReadyEntry({
+    await insertReadyEntry({ term: "hello", normalized: "hello", contentType: "WORD", translation: "你好" });
+    await insertReadyEntry({
       term: "How are you?",
       normalized: "how are you?",
       contentType: "SENTENCE",
@@ -99,7 +99,7 @@ describe("sentence study mode", () => {
   });
 
   it("reports sentence work separately from the ordinary daily queue", async () => {
-    insertReadyEntry({
+    await insertReadyEntry({
       term: "How are you?",
       normalized: "how are you?",
       contentType: "SENTENCE",

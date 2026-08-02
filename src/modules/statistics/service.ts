@@ -16,7 +16,7 @@ function lastDateKeys(days: number): string[] {
 export async function getDashboard() {
   const plan = await getDailyStudyPlan();
   const resumeCutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const resumable = sqlite.prepare(`SELECT s.id, s.session_type, s.source_type, s.started_at, s.planned_count,
+  const resumable = await sqlite.prepare(`SELECT s.id, s.session_type, s.source_type, s.started_at, s.planned_count,
       count(i.id) AS remaining_count
     FROM study_sessions s
     JOIN study_session_items i ON i.study_session_id = s.id AND i.status = 'PENDING'
@@ -28,15 +28,15 @@ export async function getDashboard() {
     LIMIT 1`).get(resumeCutoff) as {
       id: number; session_type: string; source_type: string | null; started_at: number; planned_count: number; remaining_count: number;
     } | undefined;
-  const totals = sqlite.prepare(`SELECT count(*) AS total,
+  const totals = await sqlite.prepare(`SELECT count(*) AS total,
     sum(CASE WHEN mastery_level = 'MASTERED' THEN 1 ELSE 0 END) AS mastered,
     sum(CASE WHEN initialization_status IN ('READY','PARTIAL') THEN 1 ELSE 0 END) AS initialized,
     sum(CASE WHEN initialization_status = 'FAILED' THEN 1 ELSE 0 END) AS failed
     FROM words`).get() as { total: number; mastered: number; initialized: number; failed: number };
   const today = dateKey(Date.now());
   const since = Date.now() - 48 * 60 * 60 * 1000;
-  const logs = sqlite.prepare("SELECT reviewed_at, is_correct FROM review_logs WHERE reviewed_at >= ?").all(since) as Array<{ reviewed_at: number; is_correct: number }>;
-  const skips = sqlite.prepare(`SELECT answered_at FROM study_session_items
+  const logs = await sqlite.prepare("SELECT reviewed_at, is_correct FROM review_logs WHERE reviewed_at >= ?").all(since) as Array<{ reviewed_at: number; is_correct: number }>;
+  const skips = await sqlite.prepare(`SELECT answered_at FROM study_session_items
     WHERE status = 'SKIPPED' AND COALESCE(skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND answered_at >= ?`).all(since) as Array<{ answered_at: number }>;
   const todayLogs = logs.filter((item) => dateKey(item.reviewed_at) === today);
   const todaySkipped = skips.filter((item) => dateKey(item.answered_at) === today).length;
@@ -64,13 +64,13 @@ export async function getDashboard() {
   };
 }
 
-export function getStatistics(days = 30) {
+export async function getStatistics(days = 30) {
   const since = Date.now() - (days + 1) * 24 * 60 * 60 * 1000;
-  const logs = sqlite.prepare(`SELECT reviewed_at, is_correct, rating, duration_ms, study_session_id
+  const logs = await sqlite.prepare(`SELECT reviewed_at, is_correct, rating, duration_ms, study_session_id
     FROM review_logs WHERE reviewed_at >= ? ORDER BY reviewed_at ASC`).all(since) as Array<{
       reviewed_at: number; is_correct: number; rating: string; duration_ms: number | null; study_session_id: number | null;
     }>;
-  const sessions = sqlite.prepare(`SELECT started_at, completed_count, correct_count, skipped_count, duration_ms
+  const sessions = await sqlite.prepare(`SELECT started_at, completed_count, correct_count, skipped_count, duration_ms
     FROM study_sessions WHERE started_at >= ?`).all(since) as Array<{
       started_at: number; completed_count: number; correct_count: number; skipped_count: number; duration_ms: number | null;
     }>;
@@ -92,7 +92,7 @@ export function getStatistics(days = 30) {
   }
   // Compute streak from SQL-level distinct active dates (not bounded by display range)
   const streakSince = Date.now() - 365 * 24 * 60 * 60 * 1000;
-  const activeDateRows = sqlite.prepare(
+  const activeDateRows = await sqlite.prepare(
     `SELECT DISTINCT reviewed_at AS ts FROM review_logs WHERE reviewed_at >= ?
      UNION SELECT DISTINCT started_at AS ts FROM study_sessions WHERE started_at >= ? AND completed_count > 0`,
   ).all(streakSince, streakSince) as Array<{ ts: number }>;
@@ -104,10 +104,10 @@ export function getStatistics(days = 30) {
     else if (offset === 0) continue;
     else break;
   }
-  const total = sqlite.prepare("SELECT count(*) AS count FROM review_logs").get() as { count: number };
-  const correct = sqlite.prepare("SELECT count(*) AS count FROM review_logs WHERE is_correct = 1").get() as { count: number };
-  const mastery = sqlite.prepare("SELECT mastery_level AS level, count(*) AS count FROM words GROUP BY mastery_level").all() as Array<{ level: string; count: number }>;
-  const wrong = sqlite.prepare("SELECT count(*) AS count FROM wrong_word_states WHERE active = 1").get() as { count: number };
+  const total = await sqlite.prepare("SELECT count(*) AS count FROM review_logs").get() as { count: number };
+  const correct = await sqlite.prepare("SELECT count(*) AS count FROM review_logs WHERE is_correct = 1").get() as { count: number };
+  const mastery = await sqlite.prepare("SELECT mastery_level AS level, count(*) AS count FROM words GROUP BY mastery_level").all() as Array<{ level: string; count: number }>;
+  const wrong = await sqlite.prepare("SELECT count(*) AS count FROM wrong_word_states WHERE active = 1").get() as { count: number };
   return {
     summary: {
       totalReviews: total.count,

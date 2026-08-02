@@ -6,7 +6,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ i
   try {
     const id = Number((await context.params).id);
     if (!Number.isInteger(id) || id <= 0) return fail("IMPORT_BATCH_ID_INVALID", "导入批次 ID 无效。");
-    return ok(rollbackImportBatch(id));
+    return ok(await rollbackImportBatch(id));
   } catch (error) {
     if (error instanceof ImportRollbackError) {
       const status = error.code === "IMPORT_BATCH_NOT_FOUND" ? 404 : 409;

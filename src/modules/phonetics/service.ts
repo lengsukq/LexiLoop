@@ -19,13 +19,13 @@ const GAME_ITEM_COUNT = 10;
 const GAME_DURATION_SECONDS = 75;
 const MINIMUM_ITEMS = 4;
 
-export function startPhoneticGame(accent: PhoneticAccent): PhoneticGameSession {
+export async function startPhoneticGame(accent: PhoneticAccent): Promise<PhoneticGameSession> {
   const now = Date.now();
-  closeOpenPracticeSessions(SESSION_SOURCE, now);
-  const candidates = selectPhoneticCandidates({ count: GAME_ITEM_COUNT, accent, now });
+  await closeOpenPracticeSessions(SESSION_SOURCE, now);
+  const candidates = await selectPhoneticCandidates({ count: GAME_ITEM_COUNT, accent, now });
   if (candidates.length < MINIMUM_ITEMS) throw new Error("NOT_ENOUGH_PHONETIC_WORDS");
 
-  const session = createPracticeSession(candidates, {
+  const session = await createPracticeSession(candidates, {
     sourceType: SESSION_SOURCE,
     sessionType: "LISTENING",
     questionType: "LISTENING_SPELLING",

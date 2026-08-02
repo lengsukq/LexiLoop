@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const input = schema.parse(await request.json());
     const content = normalizeDictionaryContent(input.content);
     const attempts = input.attempts as ProviderAttempt[];
-    const detail = applyYoudaoContent(id, content, input.mode, attempts, input.newTerm);
+    const detail = await applyYoudaoContent(id, content, input.mode, attempts, input.newTerm);
     if (!detail) return fail("WORD_NOT_FOUND", "词条不存在。", 404);
     return ok(detail);
   } catch (error) {

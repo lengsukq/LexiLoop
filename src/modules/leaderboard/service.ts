@@ -22,27 +22,27 @@ function toEntry(row: ScoreRow, current: { score: number; playedAt: number }): T
   };
 }
 
-export function recordScore(input: {
+export async function recordScore(input: {
   gameMode: string;
   score: number;
   maxCombo: number;
   accuracy: number;
   elapsedMs: number;
   playedAt?: number;
-}): LeaderboardSummary {
+}): Promise<LeaderboardSummary> {
   const playedAt = input.playedAt ?? Date.now();
   const score = Math.max(0, Math.round(input.score));
 
-  sqlite.prepare(`INSERT INTO game_high_scores
+  await sqlite.prepare(`INSERT INTO game_high_scores
     (game_mode, score, max_combo, accuracy, elapsed_ms, played_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .run(input.gameMode, score, Math.max(0, input.maxCombo), Math.max(0, input.accuracy), Math.max(0, input.elapsedMs), playedAt, playedAt);
 
-  const better = sqlite.prepare(`SELECT COUNT(*) AS c FROM game_high_scores
+  const better = await sqlite.prepare(`SELECT COUNT(*) AS c FROM game_high_scores
     WHERE game_mode = ? AND score > ?`).get(input.gameMode, score) as { c: number };
   const rank = better.c + 1;
 
-  const rows = sqlite.prepare(`SELECT score, max_combo, accuracy, elapsed_ms, played_at
+  const rows = await sqlite.prepare(`SELECT score, max_combo, accuracy, elapsed_ms, played_at
     FROM game_high_scores WHERE game_mode = ?
     ORDER BY score DESC, played_at ASC LIMIT ?`).all(input.gameMode, LEADERBOARD_LIMIT) as ScoreRow[];
 

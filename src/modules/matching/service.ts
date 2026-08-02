@@ -49,10 +49,10 @@ function toPracticeAnswer(result: MatchingResultInput): PracticeAnswer {
   };
 }
 
-export function startMatchingSession(options: {
+export async function startMatchingSession(options: {
   pairCount: number;
   durationSeconds: number;
-}): MatchingSessionPayload {
+}): Promise<MatchingSessionPayload> {
   const pairCount = boundedInteger(options.pairCount, MINIMUM_PAIR_COUNT, MAXIMUM_PAIR_COUNT);
   const durationSeconds = boundedInteger(
     options.durationSeconds,
@@ -60,16 +60,16 @@ export function startMatchingSession(options: {
     MAXIMUM_DURATION_SECONDS,
   );
   const now = Date.now();
-  closeOpenPracticeSessions("MATCH_GAME", now);
+  await closeOpenPracticeSessions("MATCH_GAME", now);
 
-  const candidates = selectPracticeCandidates({
+  const candidates = await selectPracticeCandidates({
     count: pairCount,
     now,
     excludeWordsInActiveSessions: true,
   });
   if (candidates.length < MINIMUM_PAIR_COUNT) throw new Error("NOT_ENOUGH_MATCHING_WORDS");
 
-  const session = createPracticeSession(candidates, {
+  const session = await createPracticeSession(candidates, {
     sourceType: "MATCH_GAME",
     sessionType: "WRONG_WORDS",
     questionType: "EN_TO_ZH_CHOICE",

@@ -44,6 +44,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
     sourceLanguage: source.code,
     targetLanguage: target.code,
     initializationMode: "FORCE_OVERWRITE",
+    requestedProviders: ["youdao"],
   }, settings);
   if (result.requiredProviderFailure) {
     throw new ManualPreviewError(

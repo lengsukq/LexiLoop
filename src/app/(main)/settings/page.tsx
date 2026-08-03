@@ -72,7 +72,6 @@ export default function SettingsPage() {
           )}
           {activeTab === "data" && (
             <DataSettingsTab
-              busy={data.busy}
               onRestore={data.restore}
             />
           )}

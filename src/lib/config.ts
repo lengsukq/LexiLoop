@@ -31,18 +31,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   phraseSpeed: 1,
   sentenceSpeed: 1,
   autoPlayPronunciation: true,
-  dictionaryApiEnabled: process.env.DICTIONARY_API_ENABLED !== "false",
-  myMemoryEnabled: process.env.MYMEMORY_ENABLED !== "false",
+  dictionaryApiEnabled: true,
+  myMemoryEnabled: true,
   merriamWebsterEnabled: false,
   merriamWebsterDictionaryKey: "",
   merriamWebsterThesaurusKey: "",
-  backgroundConcurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
+  backgroundConcurrency: 2,
   aiRetryCount: 1,
   tencentTranslateEnabled: false,
   tencentTranslateSecretId: "",
   tencentTranslateSecretKey: "",
   tencentTranslateProjectId: 0,
-  youdaoEnabled: process.env.YOUDO_API_ENABLED !== "false",
+  youdaoEnabled: true,
   translationProviderOrder: ["youdao", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "mymemory"] as InitializationProviderId[],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
@@ -50,4 +50,4 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export const IMPORT_PREVIEW_TTL_MS = 30 * 60 * 1000;
 export const MAX_CSV_BYTES = 10 * 1024 * 1024;
 export const MAX_CSV_ROWS = 20_000;
-export const WORKER_STALE_AFTER_MS = Number(process.env.WORKER_STALE_AFTER_MS ?? 30_000);
+export const WORKER_STALE_AFTER_MS = 30_000;

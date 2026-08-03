@@ -12,7 +12,6 @@ LexiLoop（词环）是单用户、自托管的 Next.js 词汇学习应用。核
 - OpenAI-compatible / Anthropic 结构化 AI 初始化；Edge TTS 发音
 - ts-fsrs
 - Vitest、Playwright
-- Docker Compose：app + worker
 
 ## 认证
 

@@ -31,9 +31,9 @@ function state(): EngineState {
     globalEngine.__lexiloopBackgroundEngine = {
       started: false,
       stopping: false,
-      workerId: process.env.BACKGROUND_ENGINE_ID ?? process.env.WORKER_ID ?? `lexiloop-app-${process.pid}`,
-      concurrency: Math.max(1, Math.min(10, Number(process.env.BACKGROUND_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? 2))),
-      pollIntervalMs: Math.max(250, Number(process.env.BACKGROUND_POLL_INTERVAL_MS ?? process.env.WORKER_POLL_INTERVAL_MS ?? 1_000)),
+      workerId: `lexiloop-app-${process.pid}`,
+      concurrency: 2,
+      pollIntervalMs: 1_000,
       loopPromise: null,
       lastMaintenanceAt: 0,
       lastSuggestionCheckAt: 0,
@@ -154,10 +154,6 @@ async function runLoop(engine: EngineState): Promise<void> {
   engine.loopPromise = null;
 }
 export function startBackgroundEngine(): void {
-  if (process.env.BACKGROUND_ENGINE_ENABLED === "false") {
-    console.log("[BackgroundEngine] disabled by BACKGROUND_ENGINE_ENABLED=false");
-    return;
-  }
   const engine = state();
   if (engine.started) return;
   engine.started = true;

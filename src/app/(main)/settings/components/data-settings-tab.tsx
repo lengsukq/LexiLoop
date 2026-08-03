@@ -1,12 +1,10 @@
 import { useRef } from "react";
-import { Download, HardDrive, Upload } from "lucide-react";
-import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Download, Upload } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 
 export function DataSettingsTab({
-  busy,
   onRestore,
 }: {
-  busy: string;
   onRestore: (file?: File) => Promise<void>;
 }) {
   const restoreInput = useRef<HTMLInputElement>(null);

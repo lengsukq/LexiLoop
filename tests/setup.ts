@@ -29,8 +29,6 @@ if (productionUrl) {
 
 const backupDir = path.join(os.tmpdir(), `lexiloop-backups-${process.pid}`);
 process.env.BACKUP_DIR = backupDir;
-process.env.DICTIONARY_API_ENABLED = "false";
-process.env.MYMEMORY_ENABLED = "false";
 
 const ALL_TABLES = [
   "provider_attempts",
@@ -56,6 +54,13 @@ const ALL_TABLES = [
 beforeEach(async () => {
   const { sqlite } = await import("@/db/client");
   for (const table of ALL_TABLES) await sqlite.exec(`DELETE FROM ${table}`);
+  // 默认禁用真实网络 provider（等价于原 DICTIONARY_API_ENABLED/MYMEMORY_ENABLED 环境变量默认值），
+  // 使测试不发起真实 HTTP 请求，并失效设置缓存以确保读取到最新值。
+  const { invalidateSettingsCache } = await import("@/modules/settings/service");
+  const now = Date.now();
+  await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run("dictionaryApiEnabled", JSON.stringify(false), now);
+  await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run("myMemoryEnabled", JSON.stringify(false), now);
+  invalidateSettingsCache();
 });
 
 afterAll(async () => {

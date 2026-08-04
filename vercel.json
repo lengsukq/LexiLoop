@@ -1,5 +1,5 @@
 {
   "crons": [
-    { "path": "/api/background/tick", "schedule": "*/10 * * * *" }
+    { "path": "/api/background/tick", "schedule": "0 0 * * *" }
   ]
 }

@@ -99,39 +99,47 @@ export interface BackgroundTickResult {
 }
 
 /**
- * 执行一轮后台任务处理：领取并处理最多 maxJobs 个初始化任务、运行一次幂等维护、
+ * 执行一轮后台任务处理：在时间预算内循环领取并处理初始化任务、运行一次幂等维护、
  * 按需生成每日建议，最后更新心跳。可在任意环境重复调用，无需常驻循环。
  */
 export async function runBackgroundTick(
-  options: { maxJobs?: number; workerId?: string } = {},
+  options: { maxJobs?: number; timeBudgetMs?: number; workerId?: string } = {},
 ): Promise<BackgroundTickResult> {
   const workerId = options.workerId ?? SERVERLESS_WORKER_ID;
   const maxJobs = Math.max(1, options.maxJobs ?? DEFAULT_MAX_JOBS);
+  const timeBudgetMs = Math.max(0, options.timeBudgetMs ?? 0);
   const startedAt = Date.now();
+  let totalClaimed = 0;
 
   await maybeRunMaintenance();
   maybeGenerateDailySuggestion();
 
-  const jobs = await claimJobs(workerId, maxJobs);
-  await Promise.allSettled(jobs.map(async (job) => {
-    updateHeartbeat(workerId, "WORKING", job.id, {
-      pid: process.pid,
-      wordId: job.wordId,
-      mode: "tick",
-    });
-    await processJob(job);
-  }));
+  for (;;) {
+    const jobs = await claimJobs(workerId, maxJobs);
+    if (jobs.length === 0) break;
+    await Promise.allSettled(jobs.map(async (job) => {
+      updateHeartbeat(workerId, "WORKING", job.id, {
+        pid: process.pid,
+        wordId: job.wordId,
+        mode: "tick",
+      });
+      await processJob(job);
+    }));
+    totalClaimed += jobs.length;
+    if (timeBudgetMs <= 0) break;
+    if (Date.now() - startedAt >= timeBudgetMs) break;
+  }
 
   updateHeartbeat(workerId, "IDLE", undefined, {
     pid: process.pid,
-    claimed: jobs.length,
+    claimed: totalClaimed,
     mode: "tick",
   });
 
   return {
     workerId,
-    claimed: jobs.length,
-    processed: jobs.length,
+    claimed: totalClaimed,
+    processed: totalClaimed,
     elapsedMs: Date.now() - startedAt,
   };
 }

@@ -5,6 +5,7 @@ import { runBackgroundTick } from "@/modules/background/tick";
 import { commitImport } from "@/modules/imports/service";
 import { z } from "zod";
 const schema = z.object({ previewToken: z.string().uuid(), mode: z.enum(IMPORT_MODES), resetLearningProgress: z.boolean().default(false) });
+export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   try {
     const input = schema.parse(await request.json());

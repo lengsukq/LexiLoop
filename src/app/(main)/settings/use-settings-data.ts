@@ -54,7 +54,7 @@ export function useSettingsData() {
       });
       setSettings(saved);
       configureTtsSpeeds({ word: saved.wordSpeed, phrase: saved.phraseSpeed, sentence: saved.sentenceSpeed });
-      setMessage("学习设置已保存。新会话和内置后台引擎会使用最新配置。");
+      setMessage("学习设置已保存。新会话会使用最新配置。");
     } catch (reason) {
       setError(errorMessage(reason, "保存失败"));
     } finally {

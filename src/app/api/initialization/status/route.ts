@@ -2,6 +2,8 @@ import { ok, internalError } from "@/lib/api";
 import { getInitializationSummary, getWordsSummary, getWorkerHeartbeats } from "@/modules/initialization/service";
 import { runBackgroundTick } from "@/modules/background/tick";
 export const dynamic = "force-dynamic";
+// AI 初始化单个任务可能超过 Hobby 计划默认 10 秒超时，放宽以免任务处理到一半被冻结。
+export const maxDuration = 60;
 export async function GET() {
   try {
     // 该接口被初始化页面每 3 秒轮询；在返回前顺带处理一批任务，

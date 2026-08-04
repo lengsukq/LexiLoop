@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, Plus, RefreshCw, RotateCcw, Server, Sparkles, XCircle } from "lucide-react";
-import { apiFetch, formatDate as formatClientDate } from "@/lib/client-api";
+import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, Play, Plus, RefreshCw, RotateCcw, Sparkles, XCircle } from "lucide-react";
+import { apiFetch } from "@/lib/client-api";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, EmptyState, PageHeader, Pagination, Progress } from "@/components/ui";
 import { InitializationBadge } from "@/components/status-badges";
 import { InitializationConfigurator } from "./initialization-configurator";
 
-interface StatusData { summary: Record<string, number>; wordSummary: Record<string, number>; workers: Array<{ workerId: string; status: string; currentJobId: number | null; lastSeenAt: string; startedAt: string }>; }
+interface StatusData { summary: Record<string, number>; wordSummary: Record<string, number>; }
 interface InitializationTask {
   id: number;
   taskType: string;
@@ -98,10 +98,6 @@ function formatTs(ts: number | string | null | undefined): string {
   return d.toLocaleString("zh-CN");
 }
 
-function formatDate(value: string | number): string {
-  return formatClientDate(typeof value === "number" ? new Date(value).toISOString() : value);
-}
-
 function durationText(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
@@ -139,6 +135,8 @@ export default function InitializePage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [runMessage, setRunMessage] = useState("");
   const [retryingWordId, setRetryingWordId] = useState<number | null>(null);
   const [selectedWordIds, setSelectedWordIds] = useState<Set<number>>(new Set());
   const [configuratorOpen, setConfiguratorOpen] = useState(false);
@@ -192,6 +190,20 @@ export default function InitializePage() {
     setPage(1);
   }
 
+  async function runNow() {
+    setRunning(true);
+    setError("");
+    setRunMessage("");
+    try {
+      const result = await apiFetch<{ claimed: number; elapsedMs: number }>("/api/initialization/run", { method: "POST" });
+      setRunMessage(result.claimed > 0 ? `本轮已处理 ${result.claimed} 个任务（耗时 ${Math.round(result.elapsedMs / 1000)}s）` : "当前没有待处理的任务。");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "启动处理失败");
+    } finally {
+      setRunning(false);
+    }
+  }
   async function retryFailed() {
     const wordIds = words.filter((word) => word.failedTaskCount > 0).map((word) => word.wordId);
     if (!wordIds.length) return;
@@ -275,7 +287,7 @@ export default function InitializePage() {
     finally { setDetailQueueing(false); }
   }
 
-  return <div className="space-y-5 pb-20 sm:pb-4"><PageHeader title="词条初始化" description="为词条补齐释义、音标、例句等学习内容；选择范围后创建后台任务。" action={<div className="flex items-center gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button><Button onClick={() => openConfigurator()}><Plus className="size-4" />创建任务</Button></div>} />
+  return <div className="space-y-5 pb-20 sm:pb-4"><PageHeader title="词条初始化" description="为词条补齐释义、音标、例句等学习内容；选择范围后创建后台任务。" action={<div className="flex items-center gap-2"><Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button><Button variant="outline" onClick={() => void runNow()} disabled={running}>{running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}{running ? "处理中..." : "立即处理"}</Button><Button onClick={() => openConfigurator()}><Plus className="size-4" />创建任务</Button></div>} />
     {status && <Card>
       <CardContent className="pt-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.4fr)] lg:items-center">
@@ -295,16 +307,8 @@ export default function InitializePage() {
             ].map((item) => <div key={item.label} className="flex items-center gap-3 rounded-[14px] bg-black/[0.025] p-3 dark:bg-white/[0.035]"><span className={`grid size-9 shrink-0 place-items-center rounded-[11px] ${item.className}`}><item.icon className={`size-4 ${item.label === "处理中" && item.value > 0 ? "animate-spin" : ""}`} /></span><div><b className="block text-lg leading-none">{item.value}</b><span className="mt-1 block text-xs text-[#8e8e93]">{item.label}</span></div></div>)}
           </div>
         </div>
-        <details className="group mt-4 border-t border-black/[0.05] pt-3 dark:border-white/[0.07]">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm">
-            <span className="flex items-center gap-2"><Server className="size-4 text-[#8e8e93]" /><b>后台引擎</b><Badge tone={status.workers.some((worker) => worker.status === "ERROR") ? "red" : status.workers.length ? "green" : "amber"}>{status.workers.length ? `${status.workers.length} 个在线` : "未检测到"}</Badge></span>
-            <span className="text-xs text-[#8e8e93] group-open:hidden">展开详情</span>
-          </summary>
-          <div className="mt-3">
-            {status.workers.length ? <div className="grid gap-2 sm:grid-cols-2">{status.workers.map((worker) => <div key={worker.workerId} className="flex items-center justify-between gap-3 rounded-[14px] bg-black/[0.025] p-3 text-sm dark:bg-white/[0.035]"><div className="min-w-0"><b className="block truncate">{worker.workerId}</b><p className="mt-1 text-xs text-[#8e8e93]">最后心跳：{formatDate(worker.lastSeenAt)}{worker.currentJobId ? ` · 任务 #${worker.currentJobId}` : ""}</p></div><Badge tone={worker.status === "ERROR" ? "red" : worker.status === "WORKING" ? "blue" : "green"}>{worker.status}</Badge></div>)}</div> : <p className="rounded-[14px] bg-[#ff9500]/[0.06] p-3 text-sm text-[#c93400] dark:text-[#ff9f0a]">主程序启动后会自动运行后台引擎；若持续无心跳，请检查配置和服务日志。</p>}
-            {words.some((word) => word.failedTaskCount > 0) && <Button className="mt-3" variant="outline" size="sm" onClick={() => void retryFailed()} disabled={retrying}>{retrying ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}重试当前失败词条</Button>}
-          </div>
-        </details>
+        {runMessage && <p className="mt-3 text-xs text-[#007aff] dark:text-[#0a84ff]">{runMessage}</p>}
+        {words.some((word) => word.failedTaskCount > 0) && <Button className="mt-4" variant="outline" size="sm" onClick={() => void retryFailed()} disabled={retrying}>{retrying ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}重试当前失败词条</Button>}
       </CardContent>
     </Card>}
     {words.length > 0 && <Pagination sticky page={page} totalPages={totalPages} total={totalCount} onChange={setPage} />}

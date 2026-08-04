@@ -19,7 +19,7 @@ LexiLoop 是一个私人向、单用户、自托管的词汇复习应用。它�
 - **有道词典集成**：详情页有道内容预览、一键应用（FILL_MISSING_FIELDS / FORCE_OVERWRITE），支持修改词条文本后重新初始化并自动归一化
 - **编辑词条对话框**：直接在单词详情或列表修改词条，通过有道重新初始化新内容
 - **词典数据源**：有道、DictionaryAPI.dev、MyMemory，可选用腾讯翻译与 Merriam-Webster；Edge TTS 独立负责免费发音
-- **内置后台引擎**：任务锁、真实心跳、超时自动恢复、退避重试与失败重试；每日 AI 建议与周期维护随应用自动运行
+- **后台任务驱动**：任务锁、真实心跳、超时自动恢复、退避重试与失败重试；初始化任务与每日 AI 建议由请求内按需触发和定时 Cron 推进，无需常驻 Worker 进程
 - **FSRS 间隔重复**：稳定答案幂等、同题防重复、跨日错词强化、熟练度与掌握状态（NEW / LEARNING / FAMILIAR / PROFICIENT / MASTERED）
 - **每日学习队列**：到期复习、错词、新词交错去重，专项听力/拼写/句子复习；24 小时会话恢复、稍后再学、过期会话自动释放
 - **学习游戏**：单词拼建（WORD_BUILDER）、听力选择、释义速答、打地鼠、单词堆叠、单词俄罗斯方块，以及配对（Match）与音标（Phonetics）练习，成绩计入排行榜
@@ -40,7 +40,7 @@ yarn db:migrate   # 应用数据库迁移
 yarn dev
 ```
 
-后台引擎（初始化 Worker、每日 AI 建议、周期维护）通过 Next.js `instrumentation` 随应用自动启动，无需单独进程，也无需配置。
+后台任务（初始化、每日 AI 建议、周期维护）由请求内按需触发推进：打开「词条初始化」页面会每 3 秒自动处理一批任务，CSV 导入提交后也会立即触发处理，无需单独进程或常驻引擎。
 
 质量检查：
 
@@ -67,7 +67,7 @@ npx tsx scripts/migrate-sqlite-to-pg.ts /path/to/backup.sqlite
 
 ## Vercel 部署（Serverless）
 
-LexiLoop 的后台引擎默认以常驻进程（`instrumentation`）运行，适合自托管。Vercel 的 serverless 函数在请求结束后会被冻结，常驻循环无法持续，因此部署到 Vercel 时会自动切换到 **tick 驱动模式**：初始化任务由定时 Cron 与请求内按需触发推进，无需单独 Worker 进程。
+LexiLoop 采用 **tick 驱动模式**：没有常驻 Worker 进程，初始化任务由定时 Cron 与请求内按需触发推进，兼容 Vercel serverless 与本地自托管。
 
 ### 环境变量
 
@@ -89,10 +89,11 @@ LexiLoop 的后台引擎默认以常驻进程（`instrumentation`）运行，适
 
 ### 初始化任务的驱动方式
 
-- **按需触发（主要）**：初始化状态接口 `/api/initialization/status` 在返回前会顺带处理一批任务；在「词条初始化」页面（每 3 秒轮询）即可实时推进队列。CSV 导入提交 `/api/imports/commit` 后也会立即触发一轮处理。
+- **手动处理（推荐）**：「词条初始化」页面顶部有「立即处理」按钮，点击后服务端在约 50 秒内循环处理队列中的任务，用于快速消化积压或手动推进。
+- **按需触发（自动）**：初始化状态接口 `/api/initialization/status` 在返回前会顺带处理一批任务；在「词条初始化」页面（每 3 秒轮询）即可持续推进队列。CSV 导入提交 `/api/imports/commit` 后也会立即触发一轮处理。
 - **定时 Cron（兜底）**：`/api/background/tick` 按 `vercel.json` 中的计划执行。注意 Cron 频率受套餐限制：Hobby 计划每天最多触发 1 次，Pro 计划可到每分钟（本项目配置为每 10 分钟一次）。
 
-单次 tick 默认最多处理 3 个任务，避免超出 serverless 函数执行时长限制；任务量大时可在「设置」中临时调低 `backgroundConcurrency`。
+单次 tick 默认每批最多处理 3 个任务，相关接口已放宽函数超时到 60 秒（Hobby 计划上限），避免单个 AI 初始化任务因默认 10 秒超时被冻结。
 
 ### 其他注意
 
@@ -107,7 +108,7 @@ LexiLoop 的后台引擎默认以常驻进程（`instrumentation`）运行，适
 | `APP_TIMEZONE` | 应用时区 | `Asia/Shanghai` |
 | `LEXILOOP_PASSWORD` | 登录密码；留空不启用认证 | — |
 
-> 说明：词典数据源开关（DictionaryAPI.dev / MyMemory / 有道）、初始化并行数、AI 重试次数等均可在「设置」页面配置，不再提供环境变量；后台引擎始终随应用自动启动。代码中已不再使用 SQLite 相关环境变量（`DATABASE_PATH`、`ECDICT_DATABASE_PATH`、`ECDICT_ENABLED` 等）。
+> 说明：词典数据源开关（DictionaryAPI.dev / MyMemory / 有道）、初始化并行数、AI 重试次数等均可在「设置」页面配置，不再提供环境变量；后台任务由请求内按需触发与定时 Cron 推进。代码中已不再使用 SQLite 相关环境变量（`DATABASE_PATH`、`ECDICT_DATABASE_PATH`、`ECDICT_ENABLED` 等）。
 
 ## 认证
 

@@ -1,7 +1,7 @@
-import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization/service";
-import { runMaintenance } from "@/modules/background/maintenance";
-import { getTodaySuggestion, suggestionDateKey } from "@/modules/suggestions/service";
 import { sqlite } from "@/db/client";
+import { updateHeartbeat } from "@/modules/initialization/service";
+import { runBackgroundTick } from "@/modules/background/tick";
+
 type EngineState = {
   started: boolean;
   stopping: boolean;
@@ -9,23 +9,17 @@ type EngineState = {
   concurrency: number;
   pollIntervalMs: number;
   loopPromise: Promise<void> | null;
-  lastMaintenanceAt: number;
-  lastSuggestionCheckAt: number;
-  lastSuggestionDateKey: string | null;
-  suggestionPromise: Promise<void> | null;
 };
-const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const SUGGESTION_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
-const SUGGESTION_GENERATION_HOUR = 0;
-const SUGGESTION_GENERATION_MINUTE = 5;
-const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
+
 const globalEngine = globalThis as typeof globalThis & { __lexiloopBackgroundEngine?: EngineState };
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(resolve, ms);
     timer.unref?.();
   });
 }
+
 function state(): EngineState {
   if (!globalEngine.__lexiloopBackgroundEngine) {
     globalEngine.__lexiloopBackgroundEngine = {
@@ -35,14 +29,11 @@ function state(): EngineState {
       concurrency: 2,
       pollIntervalMs: 1_000,
       loopPromise: null,
-      lastMaintenanceAt: 0,
-      lastSuggestionCheckAt: 0,
-      lastSuggestionDateKey: null,
-      suggestionPromise: null,
     };
   }
   return globalEngine.__lexiloopBackgroundEngine;
 }
+
 async function getConcurrencyFromSettings(): Promise<number | null> {
   try {
     const row = await sqlite.prepare("SELECT value_json FROM settings WHERE key = 'backgroundConcurrency'").get() as { value_json: string } | undefined;
@@ -51,57 +42,7 @@ async function getConcurrencyFromSettings(): Promise<number | null> {
     return Number.isInteger(value) && value >= 1 && value <= 10 ? value : null;
   } catch { return null; }
 }
-async function maybeRunMaintenance(engine: EngineState): Promise<void> {
-  const now = Date.now();
-  if (now - engine.lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) return;
-  engine.lastMaintenanceAt = now;
-  try {
-    const result = await runMaintenance();
-    const touched = result.expiredPreviews + result.decayedWrongWords + result.retriedJobs + result.expiredSessions + result.expiredBatches + result.purgedPreviews;
-    if (touched > 0) console.log(`[BackgroundEngine] maintenance:`, result);
-  } catch (error) {
-    console.error("[BackgroundEngine] maintenance error", error);
-  }
-}
-function localClock(timestamp: number): { hour: number; minute: number } {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: APP_TIMEZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(timestamp));
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return { hour: Number(value.hour ?? 0), minute: Number(value.minute ?? 0) };
-}
-function maybeGenerateDailySuggestion(engine: EngineState): void {
-  const now = Date.now();
-  if (now - engine.lastSuggestionCheckAt < SUGGESTION_CHECK_INTERVAL_MS) return;
-  engine.lastSuggestionCheckAt = now;
-  let clock: { hour: number; minute: number };
-  let dateKey: string;
-  try {
-    clock = localClock(now);
-    dateKey = suggestionDateKey(now);
-  } catch (error) {
-    console.error(`[BackgroundEngine] invalid APP_TIMEZONE=${APP_TIMEZONE}`, error);
-    return;
-  }
-  const afterScheduledTime = clock.hour > SUGGESTION_GENERATION_HOUR
-    || (clock.hour === SUGGESTION_GENERATION_HOUR && clock.minute >= SUGGESTION_GENERATION_MINUTE);
-  if (!afterScheduledTime) return;
-  if (engine.lastSuggestionDateKey === dateKey || engine.suggestionPromise) return;
-  engine.suggestionPromise = getTodaySuggestion({ now })
-    .then((suggestion) => {
-      engine.lastSuggestionDateKey = dateKey;
-      console.log(`[BackgroundEngine] daily suggestion ready: ${suggestion.dateKey}, generator=${suggestion.generator}`);
-    })
-    .catch((error) => {
-      console.error("[BackgroundEngine] daily suggestion error", error);
-    })
-    .finally(() => {
-      engine.suggestionPromise = null;
-    });
-}
+
 async function runLoop(engine: EngineState): Promise<void> {
   console.log(`[BackgroundEngine] ${engine.workerId} started, concurrency=${engine.concurrency}`);
   updateHeartbeat(engine.workerId, "STARTING", undefined, {
@@ -109,36 +50,13 @@ async function runLoop(engine: EngineState): Promise<void> {
     concurrency: engine.concurrency,
     mode: "embedded",
   });
-  await maybeRunMaintenance(engine);
-  maybeGenerateDailySuggestion(engine);
   while (!engine.stopping) {
     try {
-      await maybeRunMaintenance(engine);
-      maybeGenerateDailySuggestion(engine);
-      const jobs = await claimJobs(engine.workerId, (await getConcurrencyFromSettings()) ?? engine.concurrency);
-      if (jobs.length === 0) {
-        updateHeartbeat(engine.workerId, "IDLE", undefined, {
-          pid: process.pid,
-          concurrency: engine.concurrency,
-          mode: "embedded",
-        });
-        await sleep(engine.pollIntervalMs);
-        continue;
-      }
-      updateHeartbeat(engine.workerId, "WORKING", jobs[0]?.id, {
-        pid: process.pid,
-        concurrency: engine.concurrency,
-        claimed: jobs.length,
-        mode: "embedded",
+      await runBackgroundTick({
+        workerId: engine.workerId,
+        maxJobs: (await getConcurrencyFromSettings()) ?? engine.concurrency,
       });
-      await Promise.allSettled(jobs.map(async (job) => {
-        updateHeartbeat(engine.workerId, "WORKING", job.id, {
-          pid: process.pid,
-          wordId: job.wordId,
-          mode: "embedded",
-        });
-        await processJob(job);
-      }));
+      await sleep(engine.pollIntervalMs);
     } catch (error) {
       console.error("[BackgroundEngine] loop error", error);
       updateHeartbeat(engine.workerId, "ERROR", undefined, {
@@ -153,7 +71,12 @@ async function runLoop(engine: EngineState): Promise<void> {
   engine.started = false;
   engine.loopPromise = null;
 }
+
 export function startBackgroundEngine(): void {
+  if (process.env.VERCEL === "1") {
+    console.log("[BackgroundEngine] skipped on Vercel; initialization is driven by /api/background/tick and on-demand triggers");
+    return;
+  }
   const engine = state();
   if (engine.started) return;
   engine.started = true;
@@ -165,10 +88,12 @@ export function startBackgroundEngine(): void {
     engine.loopPromise = null;
   });
 }
+
 export function stopBackgroundEngine(): void {
   const engine = state();
   engine.stopping = true;
 }
+
 export function getBackgroundEngineState() {
   const engine = state();
   return {

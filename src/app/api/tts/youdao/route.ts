@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { fetchYoudaoAudio } from "@/modules/tts/service";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const word = request.nextUrl.searchParams.get("word");

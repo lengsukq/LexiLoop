@@ -65,6 +65,40 @@ npx tsx scripts/migrate-sqlite-to-pg.ts /path/to/backup.sqlite
 
 脚本会清空目标库后按外键顺序批量导入全部表、修复孤立引用、重置自增序列并逐表校验行数。
 
+## Vercel 部署（Serverless）
+
+LexiLoop 的后台引擎默认以常驻进程（`instrumentation`）运行，适合自托管。Vercel 的 serverless 函数在请求结束后会被冻结，常驻循环无法持续，因此部署到 Vercel 时会自动切换到 **tick 驱动模式**：初始化任务由定时 Cron 与请求内按需触发推进，无需单独 Worker 进程。
+
+### 环境变量
+
+在 Vercel 项目 **Settings → Environment Variables** 中配置：
+
+| 变量 | 说明 |
+| --- | --- |
+| `DATABASE_URL` | 公网可达的 PostgreSQL 连接串（如 Neon / Supabase 免费层），不能是 localhost |
+| `LEXILOOP_PASSWORD` | 可选，登录密码 |
+| `CRON_SECRET` | 可选，访问 `/api/background/tick` 的 Bearer 密钥（非 Vercel Cron 触发时要求） |
+| `APP_TIMEZONE` | 可选，默认 `Asia/Shanghai` |
+
+### 首次部署
+
+首次部署后数据库 schema 可能为空。两种方式初始化：
+
+1. 推荐：部署前在本地对线上库执行一次迁移：`DATABASE_URL=<线上连接串> yarn db:migrate`
+2. 兜底：应用首次访问时 `src/db/client.ts` 会自动应用所有待执行迁移（表数量较少，通常可在一个请求内完成）
+
+### 初始化任务的驱动方式
+
+- **按需触发（主要）**：初始化状态接口 `/api/initialization/status` 在返回前会顺带处理一批任务；在「词条初始化」页面（每 3 秒轮询）即可实时推进队列。CSV 导入提交 `/api/imports/commit` 后也会立即触发一轮处理。
+- **定时 Cron（兜底）**：`/api/background/tick` 按 `vercel.json` 中的计划执行。注意 Cron 频率受套餐限制：Hobby 计划每天最多触发 1 次，Pro 计划可到每分钟（本项目配置为每 10 分钟一次）。
+
+单次 tick 默认最多处理 3 个任务，避免超出 serverless 函数执行时长限制；任务量大时可在「设置」中临时调低 `backgroundConcurrency`。
+
+### 其他注意
+
+- Edge TTS 发音通过 WebSocket 合成（最长 15 秒），TTS 相关接口已放宽函数超时到 60 秒（Hobby 计划上限）。
+- 健康检查 `/api/health` 的 `backgroundEngine` 在 Vercel 上显示的是最近一次 tick 的心跳，不代表常驻 Worker 存在。
+
 ## 环境变量
 
 | 变量 | 说明 | 默认 |

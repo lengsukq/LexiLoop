@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { generateTtsAudio } from "@/modules/tts/service";
 
 export const dynamic = "force-dynamic";
+// Edge TTS 通过 WebSocket 合成音频，最长等待 15 秒；放宽函数超时避免被 Hobby 计划 10 秒限制截断。
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const word = request.nextUrl.searchParams.get("word");

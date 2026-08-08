@@ -52,11 +52,27 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
       result.requiredProviderFailure.errorMessage,
     );
   }
-  const content = normalizeDictionaryContent(result.content);
+  let content = normalizeDictionaryContent(result.content);
+  let attempts = result.attempts;
+  if (contentStatus(content, contentType) === "FAILED") {
+    // 有道识别不出短语/句子时，用腾讯翻译 + AI 兜底；两者都未配置时
+    // lookupDictionary 会自动跳过，这里保持原有的"无可识别内容"报错。
+    const fallback = await lookupDictionary({
+      term: values.text,
+      normalizedTerm,
+      entryType: contentType,
+      sourceLanguage: source.code,
+      targetLanguage: target.code,
+      initializationMode: "FORCE_OVERWRITE",
+      requestedProviders: ["tencent-translate", "ai"],
+    }, settings);
+    content = normalizeDictionaryContent(fallback.content);
+    attempts = [...attempts, ...fallback.attempts];
+  }
   if (contentStatus(content, contentType) === "FAILED") {
     throw new ManualPreviewError("DICTIONARY_PREVIEW_EMPTY", "词典没有返回可用释义，请调整输入或稍后重试。");
   }
-  const attempts = result.attempts.map((attempt) => ({
+  const attemptsWithFields = attempts.map((attempt) => ({
     ...attempt,
     fieldsReturned: attempt.fieldsReturned.length ? attempt.fieldsReturned : fieldsReturned(content),
   }));
@@ -72,7 +88,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PREVIEW', ?, ?)`)
       .run(
         token, values.text, normalizedTerm, source.code, target.code, source.name, target.name,
-        contentType, JSON.stringify(content), JSON.stringify(attempts), existing?.id ?? null, expiresAt, now,
+        contentType, JSON.stringify(content), JSON.stringify(attemptsWithFields), existing?.id ?? null, expiresAt, now,
       );
   }).immediate();
 
@@ -86,7 +102,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
     targetLanguageName: target.name,
     contentType,
     content,
-    providerAttempts: attempts,
+    providerAttempts: attemptsWithFields,
     existingWordId: existing?.id ?? null,
     expiresAt: new Date(expiresAt).toISOString(),
   };

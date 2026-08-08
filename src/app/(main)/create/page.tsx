@@ -147,7 +147,7 @@ export default function CreatePage() {
           <label className="space-y-2"><span className="text-sm font-medium">目标语言</span><Select className="w-full" value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}><option value="zh-CN">简体中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></Select></label>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[#aeaeb2]">生成预览会按行查询有道词典网页版，但不会创建正式词条。</p>
+          <p className="text-xs text-[#aeaeb2]">生成预览会先查询有道词典，识别不出短语或句子时自动用腾讯翻译 / AI 兜底，不会创建正式词条。</p>
           <Button size="lg" onClick={() => void generatePreviews()} disabled={lineCount === 0 || busy !== ""}>{busy === "preview" ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}{batch ? "重新生成预览" : "生成预览"}</Button>
         </div>
       </CardContent>

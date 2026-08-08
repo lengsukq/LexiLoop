@@ -15,7 +15,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    return ok(previewConfiguredInitialization(schema.parse(await request.json())));
+    return ok(await previewConfiguredInitialization(schema.parse(await request.json())));
   } catch (error) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "初始化预览参数无效。", 400, error.issues);
     return internalError(error, "计算初始化范围失败。");

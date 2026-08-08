@@ -133,7 +133,7 @@ export async function completeMatchingSession(input: {
       ...summary,
       durationSeconds: input.durationSeconds,
     });
-    const leaderboard = recordScore({
+    const leaderboard = await recordScore({
       gameMode: "MATCH",
       score,
       maxCombo: summary.maxCombo,

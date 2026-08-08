@@ -23,7 +23,7 @@ async function cancelPendingStudyItemsForWord(wordId: number, now: number): Prom
   for (const session of sessions) {
     await sqlite.prepare("UPDATE study_sessions SET completed_count = completed_count + ? WHERE id = ?").run(session.count, session.session_id);
     const pending = await sqlite.prepare("SELECT count(*) AS count FROM study_session_items WHERE study_session_id = ? AND status = 'PENDING'").get(session.session_id) as { count: number };
-    if (pending.count === 0) closeStudySessionWithActiveDuration(session.session_id, now);
+    if (pending.count === 0) await closeStudySessionWithActiveDuration(session.session_id, now);
   }
 }
 
@@ -89,7 +89,7 @@ export async function commitImport(previewToken: string, mode: ImportMode, reset
         wordId = Number(inserted.lastInsertRowid); createdWords += 1; isNew = true;
       }
       if (resetLearningProgress && !isNew) {
-        cancelPendingStudyItemsForWord(wordId, now);
+        await cancelPendingStudyItemsForWord(wordId, now);
         for (const table of ["review_logs", "review_cards", "wrong_word_states"]) await sqlite.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
         await sqlite.prepare("UPDATE words SET mastery_level = 'NEW', mastery_score = 0, updated_at = ? WHERE id = ?").run(now, wordId);
       }

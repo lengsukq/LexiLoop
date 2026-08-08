@@ -97,7 +97,7 @@ export async function expireStaleSessions(): Promise<number> {
       await sqlite.prepare(`UPDATE study_sessions SET completed_count = completed_count + ?,
         skipped_count = skipped_count + ? WHERE id = ?`)
         .run(result.changes, result.changes, session.id);
-      closeStudySessionWithActiveDuration(session.id, now);
+      await closeStudySessionWithActiveDuration(session.id, now);
     }
     return expiredItems;
   }).immediate();

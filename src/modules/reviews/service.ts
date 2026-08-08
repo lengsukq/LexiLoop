@@ -90,7 +90,10 @@ async function processReviewAnswerCore(input: AnswerInput, settings: AppSettings
   };
   const masteryScore = calculateMasteryScore(masteryInput);
   const masteryLevel = determineMasteryLevel(masteryInput, masteryScore);
-  await applyMasteryAndFinalize(word.id, masteryScore, masteryLevel, now, input.studySessionId!, evaluation.isCorrect);
+  // Insert the adaptive follow-up BEFORE finalizing the session: finalization
+  // stamps `completed_at` when no PENDING item remains, and a completed session
+  // is skipped by scheduleAdaptiveFollowUp. Reordering keeps the session open
+  // so a word answered wrong as the very last item still gets its follow-up.
   const adaptiveFollowUp = await scheduleAdaptiveFollowUp({
     sessionId: input.studySessionId!,
     itemId: input.studySessionItemId!,
@@ -101,6 +104,7 @@ async function processReviewAnswerCore(input: AnswerInput, settings: AppSettings
     rating: evaluation.effectiveRating,
     now,
   });
+  await applyMasteryAndFinalize(word.id, masteryScore, masteryLevel, now, input.studySessionId!, evaluation.isCorrect);
 
   return {
     idempotent: false,

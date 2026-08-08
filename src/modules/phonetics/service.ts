@@ -74,7 +74,7 @@ export async function completePhoneticGame(input: {
       failureAnswer: "__PHONETIC_MISTAKE__",
     });
     const score = calculateScore(summary);
-    const leaderboard = recordScore({
+    const leaderboard = await recordScore({
       gameMode: "PHONETICS",
       score,
       maxCombo: summary.maxCombo,

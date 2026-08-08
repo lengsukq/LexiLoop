@@ -11,10 +11,10 @@ describe("initialization locking", () => {
     const wordId = Number((await sqlite.prepare("SELECT id FROM words").get() as { id: number }).id);
     await sqlite.prepare(`INSERT INTO initialization_jobs(word_id, mode, status, priority, attempt_count, max_attempts, available_at, created_at, updated_at)
       VALUES (?, 'SKIP_INITIALIZED', 'QUEUED', 0, 0, 5, ?, ?, ?)`).run(wordId, now, now, now);
-    expect(claimJobs("worker-a", 2)).toHaveLength(1);
-    expect(claimJobs("worker-b", 2)).toHaveLength(0);
+    expect(await claimJobs("worker-a", 2)).toHaveLength(1);
+    expect(await claimJobs("worker-b", 2)).toHaveLength(0);
     await sqlite.prepare("UPDATE initialization_jobs SET locked_at = ? WHERE word_id = ?").run(now - 11 * 60_000, wordId);
-    expect(recoverStaleJobs()).toBe(1);
+    expect(await recoverStaleJobs()).toBe(1);
     expect((await sqlite.prepare("SELECT status FROM initialization_jobs WHERE word_id = ?").get(wordId) as { status: string }).status).toBe("QUEUED");
   });
 });

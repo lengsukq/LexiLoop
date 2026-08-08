@@ -17,7 +17,7 @@ export async function completeGameSession(input: {
       failureAnswer: "__GAME_MISTAKE__",
     });
     const score = calculateGameScore(summary);
-    const leaderboard = recordScore({ gameMode: input.mode, score, maxCombo: summary.maxCombo, accuracy: summary.accuracy, elapsedMs: summary.elapsedMs });
+    const leaderboard = await recordScore({ gameMode: input.mode, score, maxCombo: summary.maxCombo, accuracy: summary.accuracy, elapsedMs: summary.elapsedMs });
     return { ...summary, mode: input.mode, score, leaderboard };
   } catch (error) {
     if (error instanceof Error && error.message === "PRACTICE_SESSION_NOT_FOUND") throw new Error("GAME_SESSION_NOT_FOUND");

@@ -26,7 +26,7 @@ export async function retryFailedJobs(jobIds: number[]): Promise<number> {
       const job = await sqlite.prepare("SELECT word_id, task_type FROM initialization_jobs WHERE id = ?").get(id) as { word_id: number; task_type: AiTaskType } | undefined;
       const result = await statement.run(now, now, id);
       changed += result.changes;
-      if (result.changes && job?.task_type === "INITIALIZE") setWordOperationalStatus(job.word_id, "QUEUED", now);
+      if (result.changes && job?.task_type === "INITIALIZE") await setWordOperationalStatus(job.word_id, "QUEUED", now);
     }
   })();
   return changed;

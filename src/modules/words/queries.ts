@@ -29,7 +29,7 @@ function buildFilters(filters: WordListFilters) {
   const conditions = ["1 = 1"];
   const params: Array<string | number> = [];
   if (filters.query) {
-    conditions.push("(w.term LIKE ? ESCAPE '\\' OR w.normalized_term LIKE ? ESCAPE '\\' OR COALESCE(w.user_note, '') LIKE ? ESCAPE '\\')");
+    conditions.push("(w.term ILIKE ? ESCAPE '\\' OR w.normalized_term ILIKE ? ESCAPE '\\' OR COALESCE(w.user_note, '') ILIKE ? ESCAPE '\\')");
     const escaped = filters.query.replace(/[\\%_]/g, "\\$&");
     params.push(`%${escaped}%`, `%${escaped}%`, `%${escaped}%`);
   }

@@ -60,7 +60,7 @@ export async function listInitializationJobs(options: { page?: number; pageSize?
   const where: string[] = ["1 = 1"];
   const params: Array<string | number> = [];
   if (search) {
-    where.push("(w.term LIKE ? ESCAPE '\\' OR w.normalized_term LIKE ? ESCAPE '\\')");
+    where.push("(w.term ILIKE ? ESCAPE '\\' OR w.normalized_term ILIKE ? ESCAPE '\\')");
     const escaped = search.replace(/[\\%_]/g, "\\$&");
     params.push(`%${escaped}%`, `%${escaped}%`);
   }

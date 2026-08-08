@@ -57,14 +57,11 @@ export function rewriteSql(sql: string): string {
       while (i < length) {
         const c = sql[i];
         output += c;
-        if (c === "\\") {
-          i += 1;
-          if (i < length) {
-            output += sql[i];
-            i += 1;
-          }
-          continue;
-        }
+        // NOTE: no backslash-escape handling here. Both PostgreSQL
+        // (standard_conforming_strings=on) and SQLite use doubled quotes to
+        // escape a quote inside a string literal; backslash is an ordinary
+        // character. Treating `\` as an escape here corrupted literals such
+        // as `ESCAPE '\'` (rewrote them to `ESCAPE ''`).
         if (c === quote) {
           i += 1;
           break;

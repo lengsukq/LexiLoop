@@ -9,6 +9,15 @@ export function normalizeTerm(term: string, languageCode: string): string {
     : normalized;
 }
 
+/**
+ * 展示用词条文本：仅对单词（WORD）且属于小写语言族的词条做全小写；
+ * 短语（PHRASE）与句子（SENTENCE）保持原始大小写，避免破坏专有名词或句子语义。
+ */
+export function displayTerm(term: string, languageCode: string, entryType: EntryType): string {
+  if (entryType !== "WORD" || !LOWERCASE_LANGUAGES.has(languageCode)) return term;
+  return term.normalize("NFKC").toLocaleLowerCase(languageCode === "en" ? "en-US" : languageCode);
+}
+
 export function detectEntryType(term: string): EntryType {
   const trimmed = term.normalize("NFKC").trim().replace(/\s+/g, " ");
   const tokens = trimmed.split(" ").filter(Boolean);

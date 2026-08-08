@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectEntryType, normalizeTerm } from "@/modules/imports/normalizer";
+import { detectEntryType, displayTerm, normalizeTerm } from "@/modules/imports/normalizer";
 import { parseEasyDictCsv } from "@/modules/imports/parser";
 
 describe("EasyDict parser and normalization", () => {
@@ -16,6 +16,15 @@ describe("EasyDict parser and normalization", () => {
     expect(detectEntryType("She wants to learn English")).toBe("SENTENCE");
     expect(detectEntryType("in front of")).toBe("PHRASE");
     expect(detectEntryType("as soon as possible")).toBe("PHRASE");
+  });
+
+  it("lowercases only single words, keeping phrases and sentences untouched", () => {
+    expect(displayTerm("BROCHURE", "en", "WORD")).toBe("brochure");
+    expect(displayTerm("well-known", "en", "WORD")).toBe("well-known");
+    expect(displayTerm("Take Care", "en", "PHRASE")).toBe("Take Care");
+    expect(displayTerm("I Love You", "en", "SENTENCE")).toBe("I Love You");
+    expect(displayTerm("Apple", "de", "WORD")).toBe("apple");
+    expect(displayTerm("苹果", "zh-CN", "WORD")).toBe("苹果");
   });
 
   it("requires EasyDict headers", () => {

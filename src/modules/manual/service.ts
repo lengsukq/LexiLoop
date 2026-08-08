@@ -5,7 +5,7 @@ import { mapLanguage } from "@/lib/language";
 import { ENTRY_TYPES, type EntryType, type ManualContentPreview, type ProviderAttempt } from "@/lib/types";
 import { contentStatus, dictionaryContentFromRow, mergeDictionaryContent, normalizeDictionaryContent } from "@/modules/dictionary/content";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
-import { detectEntryType, legacyEntryType, normalizeTerm } from "@/modules/imports/normalizer";
+import { detectEntryType, displayTerm, legacyEntryType, normalizeTerm } from "@/modules/imports/normalizer";
 import { getSettings } from "@/modules/settings/service";
 import { z } from "zod";
 import { fieldsReturned, rowToPreview, saveAttempts, saveContent } from "./storage";
@@ -130,7 +130,7 @@ export async function confirmManualPreview(input: unknown) {
          source_created_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', 0, 0, ?, ?, ?)`)
         .run(
-          row.input_text, row.normalized_term, row.source_language, row.target_language,
+          displayTerm(row.input_text, row.source_language, row.content_type), row.normalized_term, row.source_language, row.target_language,
           row.source_language_name, row.target_language_name, legacyEntryType(row.content_type), row.content_type,
           status, now, now, now,
         );

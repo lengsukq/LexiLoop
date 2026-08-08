@@ -1,7 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { DictionaryContent, EntryType } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
-import { detectEntryType, legacyEntryType, normalizeTerm } from "@/modules/imports/normalizer";
+import { detectEntryType, displayTerm, legacyEntryType, normalizeTerm } from "@/modules/imports/normalizer";
 import { z } from "zod";
 
 const relatedWordSchema = z.object({
@@ -60,13 +60,14 @@ export async function addRelatedWord(parentWordId: number, input: unknown) {
     let created = false;
     if (!word) {
       const type = detectEntryType(values.term);
+      const display = displayTerm(values.term, parent.source_language, type);
       const inserted = await sqlite.prepare(`INSERT INTO words
         (term, normalized_term, source_language, target_language, source_language_name, target_language_name,
          entry_type, content_type, initialization_status, mastery_level, mastery_score, is_suspended, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 'NEW', 0, 0, ?, ?)`)
-        .run(values.term, normalizedTerm, parent.source_language, parent.target_language,
+        .run(display, normalizedTerm, parent.source_language, parent.target_language,
           parent.source_language_name, parent.target_language_name, legacyEntryType(type), type, now, now);
-      word = { id: Number(inserted.lastInsertRowid), term: values.term, initialization_status: "QUEUED" };
+      word = { id: Number(inserted.lastInsertRowid), term: display, initialization_status: "QUEUED" };
       created = true;
     }
     const needsInitialization = !["READY", "PARTIAL"].includes(word.initialization_status);

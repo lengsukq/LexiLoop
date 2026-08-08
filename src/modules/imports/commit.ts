@@ -1,7 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { ImportMode, ImportPreviewRow, InitializationMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
-import { legacyEntryType } from "./normalizer";
+import { legacyEntryType, displayTerm } from "./normalizer";
 
 function queueModeForImport(mode: ImportMode, isNew: boolean): InitializationMode | null {
   if (isNew) return "SKIP_INITIALIZED";
@@ -84,7 +84,7 @@ export async function commitImport(previewToken: string, mode: ImportMode, reset
           (term, normalized_term, source_language, target_language, source_language_name, target_language_name,
            entry_type, content_type, source_created_at, initialization_status, mastery_level, mastery_score, is_suspended, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'NEW', 0, 0, ?, ?)`).run(
-            row.term, row.normalizedTerm, row.sourceLanguage, row.targetLanguage, row.sourceLanguageName, row.targetLanguageName,
+            displayTerm(row.term, row.sourceLanguage, row.entryType), row.normalizedTerm, row.sourceLanguage, row.targetLanguage, row.sourceLanguageName, row.targetLanguageName,
             legacyEntryType(row.entryType), row.entryType, row.sourceCreatedAt ? new Date(row.sourceCreatedAt).getTime() : null, now, now);
         wordId = Number(inserted.lastInsertRowid); createdWords += 1; isNew = true;
       }

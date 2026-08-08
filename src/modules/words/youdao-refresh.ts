@@ -3,7 +3,7 @@ import type { DictionaryContent, EntryType, ProviderAttempt } from "@/lib/types"
 import { contentStatus, dictionaryContentFromRow, emptyDictionaryContent, mergeDictionaryContent } from "@/modules/dictionary/content";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
 import { hasAnyContent } from "@/modules/dictionary/providers/youdao-parser";
-import { normalizeTerm } from "@/modules/imports/normalizer";
+import { displayTerm, normalizeTerm } from "@/modules/imports/normalizer";
 import { getSettings } from "@/modules/settings/service";
 import { getWordDetail } from "./queries";
 
@@ -62,7 +62,7 @@ export async function applyYoudaoContent(
   let term = row.term;
   let normalizedTerm = row.normalized_term;
   if (newTerm !== undefined) {
-    term = newTerm.trim();
+    term = displayTerm(newTerm.trim(), row.source_language, row.content_type);
     if (!term) throw new Error("TERM_REQUIRED");
     if (term.length > 300) throw new Error("TERM_TOO_LONG");
     normalizedTerm = normalizeTerm(term, row.source_language);

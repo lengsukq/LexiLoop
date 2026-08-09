@@ -51,6 +51,11 @@ describe("study prioritization", () => {
     await sqlite.prepare(`INSERT INTO review_logs
       (client_answer_id, word_id, reviewed_at, rating, question_type, is_correct, created_at)
       VALUES (?, ?, ?, 'AGAIN', 'EN_TO_ZH_CHOICE', 0, ?)`).run(crypto.randomUUID(), fragileId, now - 3_600_000, now - 3_600_000);
+    await sqlite.prepare(`INSERT INTO word_review_stats
+      (word_id, total_reviews, correct_reviews, recent_again_30d, recent_again_14d,
+       recent_wrong_14d, recent_hard_14d, total_duration_ms, duration_count,
+       last_reviewed_at, updated_at)
+      VALUES (?, 1, 0, 0, 0, 1, 0, 0, 0, ?, ?)`).run(fragileId, now - 3_600_000, now - 3_600_000);
     await updateSettings({ dailyNewWords: 0, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
 
     const session = await startStudySession("DAILY", false);
@@ -122,6 +127,28 @@ describe("study prioritization", () => {
     expect(freshInFirstNine).toBeGreaterThan(40);
     expect(runs.every((items) => items.length === 20)).toBe(true);
     expect(runs[0]).toHaveLength(20);
+  });
+
+  it("excludes words without a usable definition from study sessions", async () => {
+    await insertReadyWord("with-meaning");
+    const now = Date.now();
+    const missing = await sqlite.prepare(`INSERT INTO words
+      (term, normalized_term, source_language, target_language, entry_type, initialization_status, created_at, updated_at)
+      VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'READY', ?, ?)`).run("no-definition", "no-definition", now, now);
+    const missingId = Number(missing.lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at)
+      VALUES (?, '[]', ?)`).run(missingId, now);
+    const emptyText = await sqlite.prepare(`INSERT INTO words
+      (term, normalized_term, source_language, target_language, entry_type, initialization_status, created_at, updated_at)
+      VALUES (?, ?, 'en', 'zh-CN', 'WORD', 'READY', ?, ?)`).run("empty-text", "empty-text", now, now);
+    const emptyTextId = Number(emptyText.lastInsertRowid);
+    await sqlite.prepare(`INSERT INTO word_contents (word_id, definitions_json, updated_at)
+      VALUES (?, ?, ?)`).run(emptyTextId, JSON.stringify([{ language: "zh-CN", text: "", source: "test" }]), now);
+    await updateSettings({ dailyNewWords: 10, dailyWrongWordLimit: 0, dailyDueReviewLimit: 1 });
+
+    const session = await startStudySession("NEW_WORDS", false);
+
+    expect(session.items.map((item) => item.word.term)).toEqual(["with-meaning"]);
   });
 
   it("counts game tasks in the daily category quotas", async () => {

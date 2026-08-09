@@ -7,6 +7,13 @@ import type {
   ReviewRow,
   SuggestionCandidate,
 } from "./types";
+
+/** Words without a usable definition must not be recommended or studied. */
+function hasDefinitionSql(): string {
+  return sqlite.mode === "postgres"
+    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.definitions_json::json) = 'array' AND EXISTS (SELECT 1 FROM json_array_elements(wc.definitions_json::json) d WHERE btrim(d->>'text') <> ''))`
+    : `EXISTS (SELECT 1 FROM word_contents wc, json_each(wc.definitions_json) d WHERE wc.word_id = w.id AND json_valid(wc.definitions_json) AND trim(json_extract(d.value, '$.text')) <> '')`;
+}
 const VALID_QUESTION_TYPES = new Set<QuestionType>([
   "EN_TO_ZH",
   "EN_TO_ZH_CHOICE",
@@ -141,6 +148,7 @@ function riskCandidate(candidate: CandidateAccumulator, now: number): boolean {
 async function addFallbackCandidates(map: Map<number, CandidateAccumulator>): Promise<void> {
   const rows = await sqlite.prepare(`SELECT w.id FROM words w
     WHERE w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL')
+    AND ${hasDefinitionSql()}
     ORDER BY w.mastery_score ASC, COALESCE(w.source_created_at, w.created_at) ASC LIMIT 12`)
     .all() as Array<{ id: number }>;
   for (const row of rows) accumulator(map, row.id).fallback = true;
@@ -162,7 +170,8 @@ export async function buildSuggestionCandidates(now: number, reviews: ReviewRow[
   const rows = await sqlite.prepare(`SELECT w.id, w.term, w.target_language, wc.definitions_json
     FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id
     WHERE w.id IN (${placeholders}) AND w.is_suspended = 0
-      AND w.initialization_status IN ('READY','PARTIAL')`)
+      AND w.initialization_status IN ('READY','PARTIAL')
+      AND ${hasDefinitionSql()}`)
     .all(...ranked.map((candidate) => candidate.wordId)) as Array<{
       id: number;
       term: string;

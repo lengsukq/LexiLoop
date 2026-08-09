@@ -146,4 +146,39 @@ describe("YoudaoProvider fallback", () => {
     expect(sentence?.summary?.translation).toBe("我累了");
     expect(sentence?.examples?.[0]).toEqual(expect.objectContaining({ sentence: "I am tired", translation: "我累了" }));
   });
+
+  it("falls back to the network definition for phrases without a translation block", () => {
+    const inline = parseYoudaoHtml(html("网络释义", "The proportion of …的比例", "双语例句"), {
+      term: "The proportion of", entryType: "PHRASE", targetLanguage: "zh-CN",
+    });
+    const separate = parseYoudaoHtml(html("网络释义", "The proportion of", "…的比例", "双语例句"), {
+      term: "The proportion of", entryType: "PHRASE", targetLanguage: "zh-CN",
+    });
+
+    expect(inline?.definitions).toEqual([
+      expect.objectContaining({ language: "zh-CN", partOfSpeech: null, text: "…的比例", source: "youdao:network", isUserEdited: false }),
+    ]);
+    expect(separate?.definitions).toEqual([
+      expect.objectContaining({ language: "zh-CN", partOfSpeech: null, text: "…的比例", source: "youdao:network", isUserEdited: false }),
+    ]);
+  });
+
+  it("prefers the direct translation over the network definition for phrases", () => {
+    const result = parseYoudaoHtml(html("有道翻译", "The proportion of", "…的比例", "以上为机器翻译", "网络释义", "The proportion of 比例"), {
+      term: "The proportion of", entryType: "PHRASE", targetLanguage: "zh-CN",
+    });
+
+    expect(result?.definitions).toEqual([
+      expect.objectContaining({ text: "…的比例", source: "youdao:translation" }),
+    ]);
+  });
+
+  it("keeps sentences without a translation block free of invented definitions", () => {
+    const result = parseYoudaoHtml(html("双语例句", "1", "How are you?", "你好吗？"), {
+      term: "How are you?", entryType: "SENTENCE", targetLanguage: "zh-CN",
+    });
+
+    expect(result?.definitions ?? []).toHaveLength(0);
+    expect(result?.summary).toBeUndefined();
+  });
 });

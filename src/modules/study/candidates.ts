@@ -17,12 +17,33 @@ const DAILY_NEW_WORD_RATIO = 1 / 3;
 const CATEGORY_LOOKAHEAD = 6;
 
 function scopeSql(scope: CandidateScope): string { return scope === "SENTENCE" ? "AND COALESCE(w.content_type, w.entry_type) = 'SENTENCE'" : scope === "LEXICAL" ? "AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE'" : ""; }
+
+/**
+ * Only words with a usable meaning may enter study sessions: a word whose
+ * definitions are missing or contain only empty text produces a question
+ * without choices. Sentences may also carry their meaning in
+ * `summary.translation` (e.g. AI/translation providers).
+ */
+function hasMeaningSql(scope: CandidateScope): string {
+  const postgres = sqlite.mode === "postgres";
+  // json_typeof guards against rows where the payload is valid JSON but not
+  // an array (e.g. an object from a legacy import), which would otherwise make
+  // the whole candidate query fail on PostgreSQL.
+  const definitionMeaning = postgres
+    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.definitions_json::json) = 'array' AND EXISTS (SELECT 1 FROM json_array_elements(wc.definitions_json::json) d WHERE btrim(d->>'text') <> ''))`
+    : `EXISTS (SELECT 1 FROM word_contents wc, json_each(wc.definitions_json) d WHERE wc.word_id = w.id AND json_valid(wc.definitions_json) AND trim(json_extract(d.value, '$.text')) <> '')`;
+  if (scope !== "SENTENCE") return `AND ${definitionMeaning}`;
+  const translationMeaning = postgres
+    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.summary_json::json) = 'object' AND btrim(wc.summary_json::json->>'translation') <> '')`
+    : `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_valid(wc.summary_json) AND trim(json_extract(wc.summary_json, '$.translation')) <> '')`;
+  return `AND (${definitionMeaning} OR ${translationMeaning})`;
+}
 function availabilitySql(): string { return `NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items active_item JOIN study_sessions active_session ON active_session.id = active_item.study_session_id WHERE active_item.word_id = w.id AND active_item.status = 'PENDING' AND active_session.completed_at IS NULL AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME' AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%' AND active_session.started_at >= ?)`; }
 const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type";
 async function dueCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> {
   return await sqlite.prepare(`SELECT ${selectColumns} FROM review_cards c JOIN words w ON w.id = c.word_id
     LEFT JOIN word_review_stats performance ON performance.word_id = w.id
-    WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()}
+    WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} ${hasMeaningSql(scope)} AND ${availabilitySql()}
     ORDER BY
       LEAST((CAST(? - c.due_at AS REAL) / 86400000.0), 10) * (1.0 + c.difficulty * 0.15)
       + COALESCE(performance.recent_wrong_14d, 0) * 1.2
@@ -38,14 +59,14 @@ async function dueCandidates(limit: number, now: number, scope: CandidateScope):
 }
 async function wrongCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> {
   return await sqlite.prepare(`SELECT ${selectColumns} FROM wrong_word_states x JOIN words w ON w.id = x.word_id
-    WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()}
+    WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} ${hasMeaningSql(scope)} AND ${availabilitySql()}
     ORDER BY x.wrong_count DESC, x.hard_count DESC, COALESCE(x.last_wrong_at, x.updated_at) DESC LIMIT ?`).all(
     now - SKIP_COOLDOWN_MS,
     now - SESSION_RESUME_TTL_MS,
     limit,
   ) as StudyCandidate[];
 }
-async function newCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> { return await sqlite.prepare(`SELECT ${selectColumns} FROM words w LEFT JOIN review_cards c ON c.word_id = w.id WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} AND ${availabilitySql()} ORDER BY COALESCE(w.source_created_at, w.created_at) ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as StudyCandidate[]; }
+async function newCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> { return await sqlite.prepare(`SELECT ${selectColumns} FROM words w LEFT JOIN review_cards c ON c.word_id = w.id WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${scopeSql(scope)} ${hasMeaningSql(scope)} AND ${availabilitySql()} ORDER BY COALESCE(w.source_created_at, w.created_at) ASC LIMIT ?`).all(now - SKIP_COOLDOWN_MS, now - SESSION_RESUME_TTL_MS, limit) as StudyCandidate[]; }
 
 async function leastRecentlyReviewedCandidates(limit: number, now: number, scope: CandidateScope, excludedIds: number[]): Promise<StudyCandidate[]> {
   const exclusion = excludedIds.length ? `AND w.id NOT IN (${excludedIds.map(() => "?").join(",")})` : "";
@@ -56,6 +77,7 @@ async function leastRecentlyReviewedCandidates(limit: number, now: number, scope
     WHERE w.is_suspended = 0
       AND w.initialization_status IN ('READY','PARTIAL')
       ${scopeSql(scope)}
+      ${hasMeaningSql(scope)}
       AND ${availabilitySql()}
       ${exclusion}
     ORDER BY last_reviewed_at ASC, w.id ASC
@@ -157,7 +179,7 @@ export async function continuousCandidates(limit: number, now: number, scope: Ca
 
 export async function aiRecommendedCandidates(now: number): Promise<RecommendedCandidate[]> {
   const recommendations = await getTodayRecommendedItems(); if (!recommendations.length) return [];
-  const ids = recommendations.map((item) => item.wordId); const rows = await sqlite.prepare(`SELECT ${selectColumns} FROM words w WHERE w.id IN (${ids.map(() => "?").join(",")}) AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') AND NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items done JOIN study_sessions ds ON ds.id = done.study_session_id WHERE done.word_id = w.id AND ds.source_type = 'AI_RECOMMENDED' AND ds.started_at >= ? AND done.status IN ('ANSWERED', 'SKIPPED') AND COALESCE(done.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET'))`).all(...ids, now - SKIP_COOLDOWN_MS, startOfLocalDay(now)) as StudyCandidate[];
+  const ids = recommendations.map((item) => item.wordId); const rows = await sqlite.prepare(`SELECT ${selectColumns} FROM words w WHERE w.id IN (${ids.map(() => "?").join(",")}) AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${hasMeaningSql("ALL")} AND NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items done JOIN study_sessions ds ON ds.id = done.study_session_id WHERE done.word_id = w.id AND ds.source_type = 'AI_RECOMMENDED' AND ds.started_at >= ? AND done.status IN ('ANSWERED', 'SKIPPED') AND COALESCE(done.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET'))`).all(...ids, now - SKIP_COOLDOWN_MS, startOfLocalDay(now)) as StudyCandidate[];
   const byId = new Map(rows.map((row) => [row.id, row])); return recommendations.flatMap((item) => { const candidate = byId.get(item.wordId); return candidate ? [{ ...candidate, recommendedQuestionType: item.questionType }] : []; });
 }
 function interleave(groups: Array<{ items: StudyCandidate[]; take: number }>): StudyCandidate[] { const indexes = groups.map(() => 0); const result: StudyCandidate[] = []; const seen = new Set<number>(); while (groups.some((group, index) => indexes[index]! < group.items.length)) groups.forEach((group, index) => { for (let count = 0; count < group.take && indexes[index]! < group.items.length; count++) { const item = group.items[indexes[index]!]!; indexes[index]! += 1; if (!seen.has(item.id)) { seen.add(item.id); result.push(item); } } }); return result; }
@@ -209,4 +231,4 @@ export async function loadPools(now: number, scope: CandidateScope = "LEXICAL", 
   const buffer = configured.due + configured.wrong + configured.fresh;
   return { due: await dueCandidates(limits.due + buffer, now, scope), wrong: await wrongCandidates(limits.wrong + buffer, now, scope), fresh: await newCandidates(limits.fresh + buffer, now, scope), limits };
 }
-export async function countAvailableCandidates(now: number, scope: CandidateScope = "LEXICAL") { const skipped = now - SKIP_COOLDOWN_MS; const available = async (sql: string, params: number[]) => Number((await sqlite.prepare(sql).get(...params) as { count: number }).count); const suffix = `${scopeSql(scope)} AND ${availabilitySql()}`; return { due: await available(`SELECT count(*) AS count FROM review_cards c JOIN words w ON w.id = c.word_id WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [now, skipped, now - SESSION_RESUME_TTL_MS]), wrong: await available(`SELECT count(*) AS count FROM wrong_word_states x JOIN words w ON w.id = x.word_id WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [skipped, now - SESSION_RESUME_TTL_MS]), fresh: await available(`SELECT count(*) AS count FROM words w LEFT JOIN review_cards c ON c.word_id = w.id WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [skipped, now - SESSION_RESUME_TTL_MS]) }; }
+export async function countAvailableCandidates(now: number, scope: CandidateScope = "LEXICAL") { const skipped = now - SKIP_COOLDOWN_MS; const available = async (sql: string, params: number[]) => Number((await sqlite.prepare(sql).get(...params) as { count: number }).count); const suffix = `${scopeSql(scope)} ${hasMeaningSql(scope)} AND ${availabilitySql()}`; return { due: await available(`SELECT count(*) AS count FROM review_cards c JOIN words w ON w.id = c.word_id WHERE c.due_at <= ? AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [now, skipped, now - SESSION_RESUME_TTL_MS]), wrong: await available(`SELECT count(*) AS count FROM wrong_word_states x JOIN words w ON w.id = x.word_id WHERE x.active = 1 AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [skipped, now - SESSION_RESUME_TTL_MS]), fresh: await available(`SELECT count(*) AS count FROM words w LEFT JOIN review_cards c ON c.word_id = w.id WHERE c.word_id IS NULL AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') ${suffix}`, [skipped, now - SESSION_RESUME_TTL_MS]) }; }

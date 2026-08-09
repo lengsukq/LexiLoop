@@ -143,6 +143,63 @@ export function parsePhrases(lines: string[]): DictionaryContent["phrases"] {
   return result;
 }
 
+/**
+ * Extracts the translation of a phrase from the "网络释义" / "词典短语" sections
+ * when the page has no dedicated "有道翻译" block. Dictionary pages for phrases
+ * usually do not include POS-prefixed lines, so `parseDefinitions` finds
+ * nothing; the network-definition entries (e.g. "The proportion of …的比例")
+ * are the only usable meaning.
+ */
+export function parsePhraseDefinition(
+  lines: string[],
+  term: string,
+  language = "zh-CN",
+): { text: string; source: string } | null {
+  const normalizedTerm = term.trim().toLocaleLowerCase();
+  if (!normalizedTerm) return null;
+  const readTranslation = (line: string, next: string): string => {
+    // "…" (U+2026) is not in the CJK block, so allow a leading ellipsis on the
+    // meaning side ("The proportion of …的比例").
+    const inline = line.match(/^(.+?)([…⋯]*[\u3400-\u9fff].+)$/);
+    const raw = (inline?.[2] ?? (/^[…⋯]*[\u3400-\u9fff]/.test(next) ? next : "")).replace(/^[；;，,、：:\s]+/, "").trim();
+    if (!raw) return "";
+    // The meaning must be on the correct side of the language boundary.
+    const containsCjk = /[\u3400-\u9fff]/.test(raw);
+    if (language.toLowerCase().startsWith("zh") ? !containsCjk : containsCjk) return "";
+    return raw;
+  };
+  const scan = (allowExtension: boolean): { text: string; source: string } | null => {
+    let source: string | null = null;
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]!.trim();
+      if (line === "网络释义") { source = networkPhraseSource; continue; }
+      if (line === "短语" || line === "词典短语") { source = phraseSource; continue; }
+      if (source && (line === "双语例句" || line === "原声例句" || line === "权威例句" || line === "同近义词" || line === "同根词" || line === "百科")) source = null;
+      if (!source || !line || /^\d+$/.test(line) || isSectionHeading(line)) continue;
+      const phrase = line
+        .replace(/^\d+[.、]?\s*/, "")
+        .replace(/^[-•]\s*/, "")
+        .match(/^([a-zA-Z][a-zA-Z\s'-]*)/)?.[1]?.trim()
+        ?? "";
+      if (!phrase) continue;
+      const normalizedPhrase = phrase.toLocaleLowerCase();
+      const exact = normalizedPhrase === normalizedTerm;
+      // Only accept entries that extend the term ("the proportion of sth" for
+      // "the proportion of"); the reverse direction could match a shorter
+      // entry ("put up") and claim its meaning for a longer phrase.
+      const extension = allowExtension
+        && normalizedTerm.includes(" ")
+        && normalizedPhrase.startsWith(`${normalizedTerm} `);
+      if (!exact && !extension) continue;
+      const text = readTranslation(line, lines[index + 1]?.trim() ?? "");
+      if (!text) continue;
+      return { text, source: source ?? networkPhraseSource };
+    }
+    return null;
+  };
+  return scan(false) ?? scan(true);
+}
+
 export function parseTranslation(lines: string[], term: string, language = "zh-CN"): { translation: string; source: string } | null {
   const marker = lines.findIndex((line) => line === "有道翻译" || line.includes("有道翻译"));
   if (marker < 0) return null;

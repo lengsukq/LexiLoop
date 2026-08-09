@@ -1,5 +1,5 @@
 import type { DictionaryContent, EntryType } from "@/lib/types";
-import { parseDefinitions, parseExamples, parsePhrases, parsePhonetics, parseTranslation, parseWordForms } from "./youdao-fields";
+import { parseDefinitions, parseExamples, parsePhonetics, parsePhraseDefinition, parsePhrases, parseTranslation, parseWordForms } from "./youdao-fields";
 
 export interface YoudaoParseOptions {
   term: string;
@@ -95,6 +95,17 @@ export function parseYoudaoHtml(html: string, optionsOrTerm: YoudaoParseOptions 
           ...(content.phrases ?? []),
         ];
       }
+    }
+  } else if (options.entryType === "PHRASE" && !content.definitions?.length) {
+    // Phrase pages rarely carry POS-prefixed definitions or a dedicated
+    // "有道翻译" block; fall back to the network-definition entry for the term
+    // so the phrase still gets a learnable meaning (and study choices).
+    const phraseDefinition = parsePhraseDefinition(lines, options.term, options.targetLanguage);
+    if (phraseDefinition) {
+      content.definitions = [
+        { language: options.targetLanguage, partOfSpeech: null, text: phraseDefinition.text, source: phraseDefinition.source, isUserEdited: false },
+        ...(content.definitions ?? []),
+      ];
     }
   }
 

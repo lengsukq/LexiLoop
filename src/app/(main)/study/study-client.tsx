@@ -36,9 +36,12 @@ const MODE_LABELS: Record<StudyMode, string> = { DAILY: "今日学习", NEW_WORD
 
 function targetDefinitions(item: Item): string[] {
   const target = item.word.content.definitions.filter((definition) => definition.language === item.word.targetLanguage);
-  return (target.length ? target : item.word.content.definitions)
+  const definitions = (target.length ? target : item.word.content.definitions)
     .map((definition) => definition.text.trim())
     .filter(Boolean);
+  if (definitions.length) return definitions;
+  const translation = item.word.content.summary.translation?.trim();
+  return translation ? [translation] : [];
 }
 async function playWord(item: Item): Promise<boolean> {
   return playEntryTts(item.word.term, item.word.entryType);
@@ -213,6 +216,9 @@ export function StudyClient() {
 
   const definitions = current ? targetDefinitions(current) : [];
   const definitionText = definitions.join("；");
+  // A question without choices (legacy session items whose word has no
+  // definition) cannot be answered; only "稍后再学" makes sense.
+  const hasChoices = Boolean(current?.choices?.length);
   const exactLocal = current && current.questionType === "EN_TO_ZH_CHOICE"
     ? (selectedChoice ? selectedChoice === definitionText : null)
     : current && current.questionType === "ZH_TO_EN_CHOICE"
@@ -319,8 +325,8 @@ export function StudyClient() {
           <div className="glass-inner mt-3 w-full max-w-xl rounded-[16px] border border-[#007aff]/10 bg-[#007aff]/[0.045] px-4 py-3 text-left shadow-[0_12px_36px_rgba(0,122,255,0.06)] sm:px-6 sm:py-4">
             <DefinitionBlock definitions={definitions} className="text-lg font-bold leading-snug sm:text-xl" />
           </div>
-          {!revealed && <p className="mt-3 text-[13px] text-[#8e8e93]">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
-          {choicesVisible ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
+          {!revealed && hasChoices && <p className="mt-3 text-[13px] text-[#8e8e93]">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
             {(current.choices ?? []).map((choice) => {
               const isCorrect = normalizeChoiceAnswer(choice) === normalizeChoiceAnswer(current.word.term);
               const isSelected = choice === selectedChoice;
@@ -341,12 +347,12 @@ export function StudyClient() {
                 {revealed && <span className="mt-1.5 block text-[13px] font-normal leading-relaxed text-[#6e6e73] dark:text-[#98989d]">{choiceDefinition ?? "暂无释义"}</span>}
               </button>;
             })}
-          </div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆释义，选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#ff3b30]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><AlertCircle className="size-4 text-[#ff3b30]" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆释义，选项即将出现</div>}
         </> : current.questionType === "EN_TO_ZH_CHOICE" ? <>
           <p className="text-[13px] text-[#8e8e93]">选择正确的释义</p>
           <h1 className={`break-words font-bold tracking-tight ${revealed ? "mt-2 text-xl sm:text-2xl" : "mt-3 text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>
           {!revealed && <Pronunciation item={current} />}
-          {choicesVisible ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
+          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
             {(current.choices ?? []).map((choice) => {
               const isCorrect = choice === definitionText;
               const isSelected = choice === selectedChoice;
@@ -359,7 +365,7 @@ export function StudyClient() {
                 void reveal();
               }} className={`ios-press break-words rounded-[16px] border-[1.5px] px-4 py-2.5 text-left text-[15px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-[#34c759] bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-[#30d158]" : "border-[#ff3b30] bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-[#ff453a]") : isSelected ? "border-[#007aff]/55 bg-[#007aff]/[0.08] text-[#005ecb] shadow-[0_8px_28px_rgba(0,122,255,0.12)] dark:text-[#0a84ff]" : "glass-inner border-white/50 hover:border-[#007aff]/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>{choice}</button>;
             })}
-          </div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆单词含义，释义选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#ff3b30]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><AlertCircle className="size-4 text-[#ff3b30]" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#007aff]/20 px-4 py-4 text-sm text-[#6e6e73] dark:text-[#98989d]"><Clock3 className="size-4 text-[#007aff]" />先回忆单词含义，释义选项即将出现</div>}
         </> : current.questionType === "EN_TO_ZH" ? <>
           {!revealed && <p className="text-[13px] text-[#8e8e93]">{current.word.entryType === "SENTENCE" ? "理解句意、语法和关键表达" : "回忆它的含义"}</p>}
           {!revealed && <h1 className={`mt-3 break-words font-bold tracking-tight ${current.word.entryType === "SENTENCE" ? "max-w-2xl text-xl leading-snug sm:text-3xl" : "text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>}
@@ -423,7 +429,7 @@ export function StudyClient() {
         </div>
       </div>
       <div className="shrink-0 pt-1.5 sm:pt-3">
-      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[12px] text-[#aeaeb2] sm:text-[13px]">{choicesVisible ? "点击上方选项作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[12px] text-[#aeaeb2] sm:text-[13px]">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记</Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className="border-t border-black/[0.06] pt-2 sm:pt-3 dark:border-white/[0.06]">
+      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[12px] text-[#aeaeb2] sm:text-[13px]">{hasChoices ? (choicesVisible ? "点击上方选项作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><div className="self-center text-center text-[12px] text-[#aeaeb2] sm:text-[13px]">{hasChoices ? (choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-[#ff3b30]/20 text-[#ff3b30] hover:bg-[#ff3b30]/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记</Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学</Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案</Button></div>) : <div className="border-t border-black/[0.06] pt-2 sm:pt-3 dark:border-white/[0.06]">
         {current.questionType === "ZH_TO_EN_CHOICE" && <p className="mb-1.5 text-center text-[11px] text-[#8e8e93] sm:mb-2 sm:text-xs">已按“{exactLocal === true ? "认识" : "忘记"}”记录，选择熟悉度直接进入下一题</p>}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-[#ff3b30]/25 text-[#d70015] shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-[#ff453a]", HARD: "glass-inner border-[#ff9500]/25 text-[#c93400] shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-[#ff9f0a]", GOOD: "glass-inner border-[#007aff]/25 text-[#0040dd] shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-[#34c759]/25 text-[#248a3d] shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-[#30d158]" } as const; return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press min-h-10 rounded-[12px] border-[1.5px] px-1.5 py-1.5 text-center transition-all duration-200 disabled:opacity-40 sm:min-h-12 sm:rounded-[14px] sm:p-3 ${styles[rating]}`}><b className="block text-[13px] sm:text-[15px]">{labels[rating]}</b><span className="mt-0.5 block text-[10px] opacity-60 sm:mt-1 sm:text-[11px]">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div></div>}
       </div>

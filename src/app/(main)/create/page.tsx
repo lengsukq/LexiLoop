@@ -9,9 +9,29 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, PageHeader, Se
 
 type TypeChoice = "AUTO" | EntryType;
 
-const MAX_ROWS = 20;
+const MAX_ROWS = 100;
 const MAX_CHARS_PER_LINE = 1200;
-const MAX_TOTAL_CHARS = 5000;
+const MAX_TOTAL_CHARS = 24000;
+// 预览请求并发上限：Vercel Hobby 并发上限为 30,000，取 5 保守并发，
+// 既避免 100 行瞬时打满请求，也避免对有道词典造成瞬时压力。
+const PREVIEW_CONCURRENCY = 5;
+
+/**
+ * 以受控并发执行任务：始终最多 limit 个任务同时进行，
+ * 每个任务收到 (item, index)，index 与输入数组下标一一对应。
+ */
+async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T, index: number) => Promise<void>): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(limit, items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await task(items[index]!, index);
+    }
+  });
+  await Promise.all(workers);
+}
 
 const TYPE_META: Record<EntryType, { label: string; description: string }> = {
   WORD: { label: "单词", description: "词条释义、音标、词形与短语搭配" },
@@ -53,13 +73,13 @@ export default function CreatePage() {
     setBusy("preview");
     setError("");
     setExpandedIndex(null);
-    for (let index = 0; index < lines.length; index++) {
+    await runWithConcurrency(lines, PREVIEW_CONCURRENCY, async (term, index) => {
       try {
         const data = await apiFetch<ManualContentPreview>("/api/manual/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: lines[index],
+            text: term,
             sourceLanguage,
             targetLanguage,
             ...(typeChoice === "AUTO" ? {} : { contentType: typeChoice }),
@@ -69,7 +89,7 @@ export default function CreatePage() {
       } catch (reason) {
         setBatch((previous) => previous?.map((row, i) => i === index ? { ...row, error: reason instanceof Error ? reason.message : "生成预览失败" } : row) ?? null);
       }
-    }
+    });
     setBusy("");
     setExpandedIndex(lines.length === 1 ? 0 : null);
   }

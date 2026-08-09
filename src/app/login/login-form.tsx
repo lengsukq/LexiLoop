@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { BookOpen, KeyRound, LoaderCircle, LockKeyhole } from "lucide-react";
+import { KeyRound, LoaderCircle, LockKeyhole } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
   const [password, setPassword] = useState("");
@@ -42,15 +43,7 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
       <section className="animate-scale-in relative w-full max-w-[430px]">
         <div className="liquid-glass-elevated liquid-glass-specular liquid-glass-edge overflow-hidden rounded-[34px] p-7 shadow-[0_30px_100px_rgba(0,0,0,0.14)] sm:p-10">
           <div className="relative z-10">
-            <div className="mb-8 flex items-center gap-3">
-              <div className="grid size-14 place-items-center rounded-[19px] bg-gradient-to-br from-[#0a84ff] to-[#5856d6] text-white shadow-[0_10px_30px_rgba(0,122,255,0.34),inset_0_1px_0_rgba(255,255,255,0.35)]">
-                <BookOpen className="size-6" strokeWidth={2.2} />
-              </div>
-              <div>
-                <div className="text-[21px] font-bold tracking-[-0.03em]">LexiLoop</div>
-                <div className="text-[12px] font-medium text-[#8e8e93] dark:text-[#98989d]">词环 · 循环记忆</div>
-              </div>
-            </div>
+            <Logo size="lg" className="mb-8" />
 
             <div className="mb-7">
               <div className="mb-2 flex items-center gap-2 text-[#007aff] dark:text-[#0a84ff]">

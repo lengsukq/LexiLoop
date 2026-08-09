@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, BookMarked, BookOpen, Home, Import, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
+import { BarChart3, BookMarked, Home, Import, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Logo } from "./logo";
 
 const navigation = [
   { label: "今日", href: "/", icon: Home },
@@ -36,15 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#f2f2f7] text-[#1c1c1e] dark:bg-black dark:text-[#f5f5f7]">
       {/* Desktop Sidebar — Liquid Glass */}
       <aside className="liquid-glass liquid-glass-specular liquid-glass-edge fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col p-6 lg:flex">
-        <Link href="/" className="ios-press relative z-10 flex items-center gap-3.5 rounded-[18px] px-3 py-3">
-          <span className="grid size-12 place-items-center rounded-[16px] bg-gradient-to-br from-[#0a84ff] to-[#5856d6] text-white shadow-[0_6px_20px_rgba(0,122,255,0.4),inset_0_1px_0_rgba(255,255,255,0.3)]">
-            <BookOpen className="size-5" />
-          </span>
-          <div>
-            <div className="text-[18px] font-bold tracking-tight">LexiLoop</div>
-            <div className="text-[11px] font-medium text-[#8e8e93] dark:text-[#636366]">词环 · 循环记忆</div>
-          </div>
-        </Link>
+        <Logo href="/" />
 
         <nav className="relative z-10 mt-8 flex-1 space-y-1.5">
           {navigation.map((item) => {

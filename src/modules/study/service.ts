@@ -1,10 +1,9 @@
 import { sqlite } from "@/db/client";
 import type { QuestionType, StudyMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
-import { aiRecommendedCandidates, continuousCandidates, loadPools, questionFor, selectCandidates, taskFor, type CandidateScope, type StudyCandidate } from "./candidates";
+import { aiRecommendedCandidates, continuousCandidates, loadPools, questionFor, selectCandidates, SESSION_RESUME_TTL_MS, taskFor, type CandidateScope, type StudyCandidate } from "./candidates";
 import { getStudySession } from "./view";
 
-const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
 export { getDailyStudyPlan } from "./plan";
 export { getStudySession } from "./view";
 

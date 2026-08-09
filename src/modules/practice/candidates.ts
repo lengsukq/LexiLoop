@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { DAY_MS } from "@/lib/time";
 import type {
   PracticeCandidate,
   PracticeCandidateRow,
@@ -6,7 +7,7 @@ import type {
   PracticeSelectionOptions,
 } from "@/modules/practice/types";
 
-const ACTIVE_SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ACTIVE_SESSION_WINDOW_MS = DAY_MS;
 const CANDIDATE_QUERY_LIMIT = 160;
 
 export function extractPreferredDefinition(definitionsJson: string, targetLanguage: string): string | null {

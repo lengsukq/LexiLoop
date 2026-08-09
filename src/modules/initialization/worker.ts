@@ -20,6 +20,7 @@ import {
   requestedFieldStatusForLanguages,
 } from "@/modules/dictionary/selection";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
+import { MINUTE_MS, SECOND_MS } from "@/lib/time";
 import { parseStringArray, setWordOperationalStatus } from "./shared";
 import { queueAiTask } from "./queue";
 import type { ClaimedJob } from "./types";
@@ -27,8 +28,8 @@ import type { ClaimedJob } from "./types";
 export type { ClaimedJob } from "./types";
 
 function retryDelayMs(attemptCount: number): number {
-  return [5_000, 30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000][Math.max(0, attemptCount - 1)]
-    ?? 30 * 60_000;
+  return [5 * SECOND_MS, 30 * SECOND_MS, 2 * MINUTE_MS, 10 * MINUTE_MS, 30 * MINUTE_MS][Math.max(0, attemptCount - 1)]
+    ?? 30 * MINUTE_MS;
 }
 
 function preserveUserContent(existing: DictionaryContent, refreshed: DictionaryContent): DictionaryContent {
@@ -37,7 +38,7 @@ function preserveUserContent(existing: DictionaryContent, refreshed: DictionaryC
     examples: existing.examples.filter((item) => item.isUserAdded),
   }, refreshed);
 }
-export async function recoverStaleJobs(staleAfterMs = 10 * 60_000): Promise<number> {
+export async function recoverStaleJobs(staleAfterMs = 10 * MINUTE_MS): Promise<number> {
   const now = Date.now();
   const result = await sqlite.prepare(`UPDATE initialization_jobs
     SET status = 'QUEUED', locked_at = NULL, locked_by = NULL, available_at = ?,

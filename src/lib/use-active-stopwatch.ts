@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { SECOND_MS } from "@/lib/time";
 
-export const ACTIVE_IDLE_TIMEOUT_MS = 45_000;
+export const ACTIVE_IDLE_TIMEOUT_MS = 45 * SECOND_MS;
 
 /**
  * Tracks foreground interaction time instead of wall-clock time.

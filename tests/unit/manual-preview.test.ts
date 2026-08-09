@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sqlite } from "@/db/client";
+import type { DictionaryContent } from "@/lib/types";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 
@@ -9,7 +10,7 @@ vi.mock("@/modules/dictionary/pipeline", () => ({
 
 import { createManualPreview } from "@/modules/manual/service";
 
-const emptyContent = {
+const emptyContent: DictionaryContent = {
   definitions: [],
   pronunciations: [],
   examples: [],
@@ -22,10 +23,16 @@ const emptyContent = {
   roots: [],
   affixes: [],
   tags: [],
-  summary: {},
-  learning: {},
-  sentenceAnalysis: {},
-  userEdits: [],
+  summary: { shortDefinition: null, translation: null, cefrLevel: null, frequency: null },
+  learning: { pronunciationTip: null, mnemonic: null, commonMistakes: [] },
+  sentenceAnalysis: {
+    grammarPattern: null,
+    grammarExplanation: null,
+    grammarNotes: [],
+    keyExpressions: [],
+    similarExamples: [],
+    variations: [],
+  },
 };
 
 function result(content: typeof emptyContent, attempts: unknown[]) {

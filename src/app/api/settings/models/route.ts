@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { fail, internalError, ok } from "@/lib/api";
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
+import { SECOND_MS } from "@/lib/time";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const input = inputSchema.parse(await request.json());
     const response = await fetch(`${normalizeBaseUrl(input.baseUrl)}/models`, {
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(15 * SECOND_MS),
       headers: input.apiType === "anthropic"
         ? { "x-api-key": input.apiKey, "anthropic-version": "2023-06-01" }
         : { authorization: `Bearer ${input.apiKey}` },

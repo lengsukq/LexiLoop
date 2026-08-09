@@ -1,5 +1,6 @@
 import { sqlite } from "@/db/client";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
+import { DAY_MS, HOUR_MS, WEEK_MS } from "@/lib/time";
 
 /**
  * Periodic maintenance tasks executed by the Background Engine.
@@ -7,8 +8,8 @@ import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration"
  */
 
 const WRONG_WORD_DECAY_DAYS = 30;
-const IMPORT_BATCH_EXPIRY_MS = 24 * 60 * 60 * 1000;
-const FAILED_RETRY_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour between auto-retries
+const IMPORT_BATCH_EXPIRY_MS = DAY_MS;
+const FAILED_RETRY_COOLDOWN_MS = HOUR_MS; // 1 hour between auto-retries
 
 /** Mark expired manual_previews as EXPIRED and delete expired import_previews. */
 export async function cleanupExpiredPreviews(): Promise<number> {
@@ -25,7 +26,7 @@ export async function cleanupExpiredPreviews(): Promise<number> {
 /** Deactivate wrong words that haven't been answered wrong in N days (decay). */
 export async function decayStaleWrongWords(): Promise<number> {
   const now = Date.now();
-  const cutoff = now - WRONG_WORD_DECAY_DAYS * 24 * 60 * 60 * 1000;
+  const cutoff = now - WRONG_WORD_DECAY_DAYS * DAY_MS;
   const result = await sqlite.prepare(`UPDATE wrong_word_states
     SET active = 0, resolved_at = ?, updated_at = ?
     WHERE active = 1 AND last_wrong_at IS NOT NULL AND last_wrong_at < ?
@@ -84,7 +85,7 @@ export async function autoRetryFailedJobs(): Promise<number> {
 /** Expire study sessions that have been pending for too long (24h). */
 export async function expireStaleSessions(): Promise<number> {
   const now = Date.now();
-  const staleBefore = now - 24 * 60 * 60 * 1000;
+  const staleBefore = now - DAY_MS;
   return await sqlite.transaction(async () => {
     const stale = await sqlite.prepare(`SELECT id FROM study_sessions
       WHERE completed_at IS NULL AND started_at < ?`).all(staleBefore) as Array<{ id: number }>;
@@ -114,7 +115,7 @@ export async function expireStaleBatches(): Promise<number> {
 
 /** Delete old expired manual_previews rows (already EXPIRED for over 7 days) to reclaim space. */
 export async function purgeOldExpiredPreviews(): Promise<number> {
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - WEEK_MS;
   return (await sqlite.prepare("DELETE FROM manual_previews WHERE status = 'EXPIRED' AND expires_at < ?").run(cutoff)).changes;
 }
 

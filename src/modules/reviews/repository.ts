@@ -1,6 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { MasteryLevel, ReviewRating } from "@/lib/types";
 import type { Card } from "ts-fsrs";
+import { DAY_MS } from "@/lib/time";
 import type {
   AnswerInput,
   ExistingReviewLog,
@@ -10,8 +11,8 @@ import type {
 } from "./types";
 import { boundedActiveDurationMs, MAX_ACTIVE_ANSWER_DURATION_MS } from "./duration";
 
-const MASTERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-const PERFORMANCE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const MASTERY_WINDOW_MS = 30 * DAY_MS;
+const PERFORMANCE_WINDOW_MS = 14 * DAY_MS;
 
 export async function findExistingReview(clientAnswerId: string): Promise<ExistingReviewLog | undefined> {
   return await sqlite.prepare(`SELECT id, word_id, study_session_id, study_session_item_id,

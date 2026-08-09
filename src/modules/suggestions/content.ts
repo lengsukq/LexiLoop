@@ -5,6 +5,7 @@ import type {
   SuggestionCandidate,
   SuggestionContent,
 } from "./types";
+import { SECOND_MS } from "@/lib/time";
 
 export const RECOMMENDATION_LIMIT = 8;
 
@@ -58,7 +59,7 @@ export function ruleBasedSuggestion(
 
   const accuracy = metrics.accuracy ?? 0;
   const completion = metrics.completionRate ?? 0;
-  const slow = metrics.averageDurationMs !== null && metrics.averageDurationMs > 15_000;
+  const slow = metrics.averageDurationMs !== null && metrics.averageDurationMs > 15 * SECOND_MS;
   const weakQuestion = weakestQuestion(metrics);
   const lowAccuracy = accuracy < 75 || metrics.againCount > 0;
   const overloaded = metrics.skippedCount > Math.max(3, metrics.reviewCount * 0.25);

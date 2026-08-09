@@ -1,4 +1,5 @@
 import type { AppSettings, InitializationProviderId, LlmConfig } from "@/lib/types";
+import { MINUTE_MS } from "@/lib/time";
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
   providers: [
@@ -47,7 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 
-export const IMPORT_PREVIEW_TTL_MS = 30 * 60 * 1000;
+export const IMPORT_PREVIEW_TTL_MS = 30 * MINUTE_MS;
 export const MAX_CSV_BYTES = 10 * 1024 * 1024;
 export const MAX_CSV_ROWS = 20_000;
 export const WORKER_STALE_AFTER_MS = 30_000;

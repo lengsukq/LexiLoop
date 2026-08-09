@@ -1,9 +1,10 @@
 import { claimJobs, processJob, updateHeartbeat } from "@/modules/initialization/service";
 import { runMaintenance } from "@/modules/background/maintenance";
 import { getTodaySuggestion, suggestionDateKey } from "@/modules/suggestions/service";
+import { MINUTE_MS } from "@/lib/time";
 
-const MAINTENANCE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const SUGGESTION_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
+const MAINTENANCE_INTERVAL_MS = 10 * MINUTE_MS; // 10 minutes
+const SUGGESTION_CHECK_INTERVAL_MS = MINUTE_MS; // 1 minute
 const SUGGESTION_GENERATION_HOUR = 0;
 const SUGGESTION_GENERATION_MINUTE = 5;
 const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";

@@ -1,15 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { ReviewRating } from "@/lib/types";
 import type { WrongStateResult } from "./types";
-
-const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
-const DAY_MS = 86_400_000;
-const dayFormatter = new Intl.DateTimeFormat("en-US", {
-  timeZone: APP_TIMEZONE,
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-});
+import { localDayOrdinal } from "@/lib/date-key";
 
 export interface WrongStateRow {
   active: number;
@@ -18,14 +10,6 @@ export interface WrongStateRow {
   consecutive_correct: number;
   last_wrong_at: number | null;
   last_correct_at: number | null;
-}
-
-function localDayOrdinal(timestamp: number): number {
-  const parts = dayFormatter.formatToParts(new Date(timestamp));
-  const year = Number(parts.find((part) => part.type === "year")?.value ?? 0);
-  const month = Number(parts.find((part) => part.type === "month")?.value ?? 1);
-  const day = Number(parts.find((part) => part.type === "day")?.value ?? 1);
-  return Math.floor(Date.UTC(year, month - 1, day) / DAY_MS);
 }
 
 async function recordWrong(wordId: number, now: number): Promise<WrongStateResult> {

@@ -1,7 +1,6 @@
 import { sqlite } from "@/db/client";
-import { countAvailableCandidates, loadPools, selectCandidates } from "./candidates";
+import { countAvailableCandidates, loadPools, selectCandidates, SESSION_RESUME_TTL_MS } from "./candidates";
 
-const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
 async function activePendingPlan(now: number) {
   const rows = await sqlite.prepare(`SELECT CASE WHEN c.due_at IS NOT NULL AND c.due_at <= ? THEN 'REVIEW' WHEN COALESCE(x.active, 0) = 1 THEN 'WRONG' ELSE 'NEW' END AS category, count(*) AS count FROM study_session_items i JOIN study_sessions s ON s.id = i.study_session_id JOIN words w ON w.id = i.word_id LEFT JOIN review_cards c ON c.word_id = w.id LEFT JOIN wrong_word_states x ON x.word_id = w.id WHERE i.status = 'PENDING' AND s.completed_at IS NULL AND s.started_at >= ? AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE' AND COALESCE(s.source_type, '') <> 'MATCH_GAME' AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%' GROUP BY category`).all(now, now - SESSION_RESUME_TTL_MS) as Array<{ category: "REVIEW" | "WRONG" | "NEW"; count: number }>;
   const result = { REVIEW: 0, WRONG: 0, NEW: 0 }; for (const row of rows) result[row.category] = Number(row.count); return result;

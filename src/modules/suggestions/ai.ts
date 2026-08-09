@@ -1,6 +1,7 @@
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { z } from "zod";
+import { MINUTE_MS } from "@/lib/time";
 import { RECOMMENDATION_LIMIT } from "./content";
 import { extractJson } from "@/lib/json";
 import type {
@@ -104,7 +105,7 @@ export async function generateAiSuggestion(
 
   const baseUrl = provider.baseUrl.trim().replace(/\/+$/, "");
   const prompt = buildPrompt(metrics, qualityScore, candidates);
-  const timeout = purpose.timeoutMs ?? 60_000;
+  const timeout = purpose.timeoutMs ?? MINUTE_MS;
   const response = provider.apiType === "anthropic"
     ? await fetch(`${baseUrl}/messages`, {
         method: "POST",

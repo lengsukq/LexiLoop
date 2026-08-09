@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { fail, internalError, ok } from "@/lib/api";
+import { SECOND_MS } from "@/lib/time";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ async function testOpenAi(baseUrl: string, apiKey: string, model: string) {
   const endpoint = `${normalizeBaseUrl(baseUrl)}/chat/completions`;
   const response = await fetch(endpoint, {
     method: "POST",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(15 * SECOND_MS),
     headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
@@ -50,7 +51,7 @@ async function testAnthropic(baseUrl: string, apiKey: string, model: string) {
   const endpoint = `${normalizeBaseUrl(baseUrl)}/messages`;
   const response = await fetch(endpoint, {
     method: "POST",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(15 * SECOND_MS),
     headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model,

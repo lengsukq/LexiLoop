@@ -40,20 +40,83 @@ function normalizePronunciations(value: unknown): PronunciationItem[] {
   });
 }
 
+type KeyExpression = { expression: string; meaning: string; note: string | null };
+type SimilarExample = { sentence: string; translation: string; focus: string | null };
+type SentenceVariation = { sentence: string; translation: string | null };
+
+function normalizeKeyExpressions(value: unknown): KeyExpression[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): KeyExpression[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const expression = cleanText(record.expression);
+    const meaning = cleanText(record.meaning);
+    return expression && meaning ? [{ expression, meaning, note: cleanText(record.note) || null }] : [];
+  });
+}
+
+function normalizeSimilarExamples(value: unknown): SimilarExample[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): SimilarExample[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const sentence = cleanText(record.sentence);
+    const translation = cleanText(record.translation);
+    return sentence && translation ? [{ sentence, translation, focus: cleanText(record.focus) || null }] : [];
+  });
+}
+
+function normalizeSentenceVariations(value: unknown): SentenceVariation[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): SentenceVariation[] => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const sentence = cleanText(record.sentence);
+    return sentence ? [{ sentence, translation: cleanText(record.translation) || null }] : [];
+  });
+}
+
+function normalizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(cleanText).filter(Boolean) : [];
+}
+
+function normalizeSentenceAnalysis(value: unknown): SentenceAnalysis {
+  const sentence = parseJson<Partial<SentenceAnalysis>>(value, {});
+  return {
+    grammarPattern: cleanText(sentence.grammarPattern) || null,
+    grammarExplanation: cleanText(sentence.grammarExplanation) || null,
+    grammarNotes: normalizeStringList(sentence.grammarNotes),
+    keyExpressions: normalizeKeyExpressions(sentence.keyExpressions),
+    similarExamples: normalizeSimilarExamples(sentence.similarExamples),
+    variations: normalizeSentenceVariations(sentence.variations),
+  };
+}
+
 export function emptyDictionaryContent(): DictionaryContent {
   return { definitions: [], pronunciations: [], examples: [], phrases: [], forms: [], synonyms: [], antonyms: [], wordFamily: [], confusedWords: [], roots: [], affixes: [], summary: { ...EMPTY_SUMMARY }, learning: { ...EMPTY_LEARNING, commonMistakes: [] }, sentenceAnalysis: { ...EMPTY_SENTENCE_ANALYSIS, grammarNotes: [], keyExpressions: [], similarExamples: [], variations: [] }, tags: [] };
 }
 
 export function normalizeDictionaryContent(content: Partial<DictionaryContent> | Record<string, unknown> | null | undefined): DictionaryContent {
   if (!content) return emptyDictionaryContent();
-  const source = content as Record<string, unknown>; const summary = parseJson<Partial<LexicalSummary>>(source.summary, {}); const learning = parseJson<Partial<LearningContent>>(source.learning, {}); const sentence = parseJson<Partial<SentenceAnalysis>>(source.sentenceAnalysis, {});
+  const source = content as Record<string, unknown>;
+  const summary = parseJson<Partial<LexicalSummary>>(source.summary, {});
+  const learning = parseJson<Partial<LearningContent>>(source.learning, {});
   return {
-    definitions: parseJson(source.definitions, []), pronunciations: normalizePronunciations(source.pronunciations), examples: parseJson(source.examples, []), phrases: parseJson(source.phrases, []), forms: parseJson(source.forms, []),
-    synonyms: normalizeRelatedItems(source.synonyms, "SYNONYM"), antonyms: normalizeRelatedItems(source.antonyms, "ANTONYM"), wordFamily: normalizeRelatedItems(source.wordFamily, "WORD_FAMILY"), confusedWords: normalizeRelatedItems(source.confusedWords, "CONFUSED_WITH"), roots: normalizeRoots(source.roots), affixes: normalizeAffixes(source.affixes),
+    definitions: parseJson(source.definitions, []),
+    pronunciations: normalizePronunciations(source.pronunciations),
+    examples: parseJson(source.examples, []),
+    phrases: parseJson(source.phrases, []),
+    forms: parseJson(source.forms, []),
+    synonyms: normalizeRelatedItems(source.synonyms, "SYNONYM"),
+    antonyms: normalizeRelatedItems(source.antonyms, "ANTONYM"),
+    wordFamily: normalizeRelatedItems(source.wordFamily, "WORD_FAMILY"),
+    confusedWords: normalizeRelatedItems(source.confusedWords, "CONFUSED_WITH"),
+    roots: normalizeRoots(source.roots),
+    affixes: normalizeAffixes(source.affixes),
     summary: { shortDefinition: cleanText(summary.shortDefinition) || null, translation: cleanText(summary.translation) || null, cefrLevel: summary.cefrLevel ?? null, frequency: summary.frequency ?? null },
-    learning: { pronunciationTip: cleanText(learning.pronunciationTip) || null, mnemonic: cleanText(learning.mnemonic) || null, commonMistakes: Array.isArray(learning.commonMistakes) ? learning.commonMistakes.map(cleanText).filter(Boolean) : [] },
-    sentenceAnalysis: { grammarPattern: cleanText(sentence.grammarPattern) || null, grammarExplanation: cleanText(sentence.grammarExplanation) || null, grammarNotes: Array.isArray(sentence.grammarNotes) ? sentence.grammarNotes.map(cleanText).filter(Boolean) : [], keyExpressions: Array.isArray(sentence.keyExpressions) ? sentence.keyExpressions.flatMap((item) => { if (!item || typeof item !== "object") return []; const r = item as unknown as Record<string, unknown>; const expression = cleanText(r.expression); const meaning = cleanText(r.meaning); return expression && meaning ? [{ expression, meaning, note: cleanText(r.note) || null }] : []; }) : [], similarExamples: Array.isArray(sentence.similarExamples) ? sentence.similarExamples.flatMap((item) => { if (!item || typeof item !== "object") return []; const r = item as unknown as Record<string, unknown>; const value = cleanText(r.sentence); const translation = cleanText(r.translation); return value && translation ? [{ sentence: value, translation, focus: cleanText(r.focus) || null }] : []; }) : [], variations: Array.isArray(sentence.variations) ? sentence.variations.flatMap((item) => { if (!item || typeof item !== "object") return []; const r = item as unknown as Record<string, unknown>; const value = cleanText(r.sentence); return value ? [{ sentence: value, translation: cleanText(r.translation) || null }] : []; }) : [] },
-    tags: parseJson<string[]>(source.tags, []).map(cleanText).filter(Boolean),
+    learning: { pronunciationTip: cleanText(learning.pronunciationTip) || null, mnemonic: cleanText(learning.mnemonic) || null, commonMistakes: normalizeStringList(learning.commonMistakes) },
+    sentenceAnalysis: normalizeSentenceAnalysis(source.sentenceAnalysis),
+    tags: normalizeStringList(source.tags),
   };
 }
 

@@ -2,19 +2,19 @@ import { sqlite } from "@/db/client";
 import type { EntryType, QuestionType, StudyMode } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { getTodayRecommendedItems } from "@/modules/suggestions/service";
+import { DAY_MS, HOUR_MS } from "@/lib/time";
+import { startOfLocalDay } from "@/lib/date-key";
 
 export interface StudyCandidate { id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType; continuousTaskType?: "REVIEW" | "WRONG" | "NEW"; }
 export type CandidateScope = "LEXICAL" | "SENTENCE" | "ALL";
 type RecommendedCandidate = StudyCandidate & { recommendedQuestionType: QuestionType };
 type Pools = { due: StudyCandidate[]; wrong: StudyCandidate[]; fresh: StudyCandidate[]; limits: { due: number; wrong: number; fresh: number } };
 export type CandidateRandom = () => number;
-const SKIP_COOLDOWN_MS = 12 * 60 * 60 * 1000;
-const SESSION_RESUME_TTL_MS = 24 * 60 * 60 * 1000;
+const SKIP_COOLDOWN_MS = 12 * HOUR_MS;
+export const SESSION_RESUME_TTL_MS = DAY_MS;
 const DAILY_QUOTA_GRACE_RATIO = 0.2;
 const DAILY_NEW_WORD_RATIO = 1 / 3;
 const CATEGORY_LOOKAHEAD = 6;
-const timezone = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
-const todayFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" });
 
 function scopeSql(scope: CandidateScope): string { return scope === "SENTENCE" ? "AND COALESCE(w.content_type, w.entry_type) = 'SENTENCE'" : scope === "LEXICAL" ? "AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE'" : ""; }
 function availabilitySql(): string { return `NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items active_item JOIN study_sessions active_session ON active_session.id = active_item.study_session_id WHERE active_item.word_id = w.id AND active_item.status = 'PENDING' AND active_session.completed_at IS NULL AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME' AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%' AND active_session.started_at >= ?)`; }
@@ -155,10 +155,9 @@ export async function continuousCandidates(limit: number, now: number, scope: Ca
   return [...selected, ...fallbackSelected];
 }
 
-function startOfToday(now: number): number { const parts = todayFormatter.formatToParts(new Date(now)); const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "01"; return new Date(`${value("year")}-${value("month")}-${value("day")}T00:00:00.000`).getTime(); }
 export async function aiRecommendedCandidates(now: number): Promise<RecommendedCandidate[]> {
   const recommendations = await getTodayRecommendedItems(); if (!recommendations.length) return [];
-  const ids = recommendations.map((item) => item.wordId); const rows = await sqlite.prepare(`SELECT ${selectColumns} FROM words w WHERE w.id IN (${ids.map(() => "?").join(",")}) AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') AND NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items done JOIN study_sessions ds ON ds.id = done.study_session_id WHERE done.word_id = w.id AND ds.source_type = 'AI_RECOMMENDED' AND ds.started_at >= ? AND done.status IN ('ANSWERED', 'SKIPPED') AND COALESCE(done.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET'))`).all(...ids, now - SKIP_COOLDOWN_MS, startOfToday(now)) as StudyCandidate[];
+  const ids = recommendations.map((item) => item.wordId); const rows = await sqlite.prepare(`SELECT ${selectColumns} FROM words w WHERE w.id IN (${ids.map(() => "?").join(",")}) AND w.is_suspended = 0 AND w.initialization_status IN ('READY','PARTIAL') AND NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items done JOIN study_sessions ds ON ds.id = done.study_session_id WHERE done.word_id = w.id AND ds.source_type = 'AI_RECOMMENDED' AND ds.started_at >= ? AND done.status IN ('ANSWERED', 'SKIPPED') AND COALESCE(done.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET'))`).all(...ids, now - SKIP_COOLDOWN_MS, startOfLocalDay(now)) as StudyCandidate[];
   const byId = new Map(rows.map((row) => [row.id, row])); return recommendations.flatMap((item) => { const candidate = byId.get(item.wordId); return candidate ? [{ ...candidate, recommendedQuestionType: item.questionType }] : []; });
 }
 function interleave(groups: Array<{ items: StudyCandidate[]; take: number }>): StudyCandidate[] { const indexes = groups.map(() => 0); const result: StudyCandidate[] = []; const seen = new Set<number>(); while (groups.some((group, index) => indexes[index]! < group.items.length)) groups.forEach((group, index) => { for (let count = 0; count < group.take && indexes[index]! < group.items.length; count++) { const item = group.items[indexes[index]!]!; indexes[index]! += 1; if (!seen.has(item.id)) { seen.add(item.id); result.push(item); } } }); return result; }
@@ -181,7 +180,7 @@ function dailySoftLimit(target: number, used: number): number {
 }
 
 export async function dailyProgress(now: number): Promise<PoolLimits> {
-  const today = startOfToday(now);
+  const today = startOfLocalDay(now);
   const rows = await sqlite.prepare(`SELECT i.task_type, count(*) AS count
     FROM study_session_items i JOIN study_sessions s ON s.id = i.study_session_id
     WHERE s.session_type = 'DAILY'

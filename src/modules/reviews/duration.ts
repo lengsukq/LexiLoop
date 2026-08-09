@@ -1,6 +1,7 @@
 import { sqlite } from "@/db/client";
+import { MINUTE_MS } from "@/lib/time";
 
-export const MAX_ACTIVE_ANSWER_DURATION_MS = 10 * 60 * 1000;
+export const MAX_ACTIVE_ANSWER_DURATION_MS = 10 * MINUTE_MS;
 
 export function boundedActiveDurationMs(value: number | null | undefined): number | null {
   if (value === null || value === undefined || !Number.isFinite(value)) return null;

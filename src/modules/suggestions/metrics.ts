@@ -1,6 +1,7 @@
 import { sqlite } from "@/db/client";
 import { boundedActiveDurationMs } from "@/modules/reviews/duration";
 import { DAY_MS, suggestionDateKey } from "./date";
+import { MINUTE_MS, SECOND_MS } from "@/lib/time";
 import type { DailySuggestionMetrics, ReviewRow } from "./types";
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -61,7 +62,7 @@ export async function collectSuggestionMetrics(now: number, sourceDateKey: strin
       averageDurationMs: timedReviews.length
         ? Math.round(activeDuration / timedReviews.length)
         : null,
-      studyMinutes: Math.round(activeDuration / 60_000),
+      studyMinutes: Math.round(activeDuration / MINUTE_MS),
       completionRate: reviews.length + skips.length
         ? Math.round(reviews.length / (reviews.length + skips.length) * 100)
         : null,
@@ -76,7 +77,7 @@ export function calculateQualityScore(metrics: DailySuggestionMetrics): number |
   const stability = clamp(100 - challengePenalty * 55, 0, 100);
   const speed = metrics.averageDurationMs === null
     ? 70
-    : clamp(100 - Math.max(0, metrics.averageDurationMs - 5_000) / 180, 35, 100);
+    : clamp(100 - Math.max(0, metrics.averageDurationMs - 5 * SECOND_MS) / 180, 35, 100);
   const completion = metrics.completionRate ?? 70;
   return Math.round(metrics.accuracy * 0.58 + stability * 0.2 + speed * 0.08 + completion * 0.14);
 }

@@ -1,21 +1,19 @@
 import { sqlite } from "@/db/client";
 import { getDailyStudyPlan } from "@/modules/study/service";
 import { boundedActiveDurationMs } from "@/modules/reviews/duration";
+import { DAY_MS, MINUTE_MS } from "@/lib/time";
+import { dateKey } from "@/lib/date-key";
 
-const timezone = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
-function dateKey(timestamp: number): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(timestamp));
-}
 function lastDateKeys(days: number): string[] {
   const result: string[] = [];
   const now = Date.now();
-  for (let offset = days - 1; offset >= 0; offset -= 1) result.push(dateKey(now - offset * 24 * 60 * 60 * 1000));
+  for (let offset = days - 1; offset >= 0; offset -= 1) result.push(dateKey(now - offset * DAY_MS));
   return result;
 }
 
 export async function getDashboard() {
   const plan = await getDailyStudyPlan();
-  const resumeCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const resumeCutoff = Date.now() - DAY_MS;
   const resumable = await sqlite.prepare(`SELECT s.id, s.session_type, s.source_type, s.started_at, s.planned_count,
       count(i.id) AS remaining_count
     FROM study_sessions s
@@ -34,7 +32,7 @@ export async function getDashboard() {
     sum(CASE WHEN initialization_status = 'FAILED' THEN 1 ELSE 0 END) AS failed
     FROM words`).get() as { total: number; mastered: number; initialized: number; failed: number };
   const today = dateKey(Date.now());
-  const since = Date.now() - 48 * 60 * 60 * 1000;
+  const since = Date.now() - 2 * DAY_MS;
   const logs = await sqlite.prepare("SELECT reviewed_at, is_correct FROM review_logs WHERE reviewed_at >= ?").all(since) as Array<{ reviewed_at: number; is_correct: number }>;
   const skips = await sqlite.prepare(`SELECT answered_at FROM study_session_items
     WHERE status = 'SKIPPED' AND COALESCE(skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND answered_at >= ?`).all(since) as Array<{ answered_at: number }>;
@@ -65,7 +63,7 @@ export async function getDashboard() {
 }
 
 export async function getStatistics(days = 30) {
-  const since = Date.now() - (days + 1) * 24 * 60 * 60 * 1000;
+  const since = Date.now() - (days + 1) * DAY_MS;
   const logs = await sqlite.prepare(`SELECT reviewed_at, is_correct, rating, duration_ms, study_session_id
     FROM review_logs WHERE reviewed_at >= ? ORDER BY reviewed_at ASC`).all(since) as Array<{
       reviewed_at: number; is_correct: number; rating: string; duration_ms: number | null; study_session_id: number | null;
@@ -82,7 +80,7 @@ export async function getStatistics(days = 30) {
     item.reviews += 1;
     item.correct += log.is_correct ? 1 : 0;
     item.again += log.rating === "AGAIN" ? 1 : 0;
-    item.minutes += (boundedActiveDurationMs(log.duration_ms) ?? 0) / 60_000;
+    item.minutes += (boundedActiveDurationMs(log.duration_ms) ?? 0) / MINUTE_MS;
   }
   for (const session of sessions) {
     const item = daily.get(dateKey(session.started_at));
@@ -91,7 +89,7 @@ export async function getStatistics(days = 30) {
     item.skipped += session.skipped_count ?? 0;
   }
   // Compute streak from SQL-level distinct active dates (not bounded by display range)
-  const streakSince = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const streakSince = Date.now() - 365 * DAY_MS;
   const activeDateRows = await sqlite.prepare(
     `SELECT DISTINCT reviewed_at AS ts FROM review_logs WHERE reviewed_at >= ?
      UNION SELECT DISTINCT started_at AS ts FROM study_sessions WHERE started_at >= ? AND completed_count > 0`,
@@ -99,7 +97,7 @@ export async function getStatistics(days = 30) {
   const activeDates = new Set(activeDateRows.map((row) => dateKey(row.ts)));
   let streak = 0;
   for (let offset = 0; offset < 3650; offset += 1) {
-    const key = dateKey(Date.now() - offset * 24 * 60 * 60 * 1000);
+    const key = dateKey(Date.now() - offset * DAY_MS);
     if (activeDates.has(key)) streak += 1;
     else if (offset === 0) continue;
     else break;

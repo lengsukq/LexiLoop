@@ -5,6 +5,7 @@ import { useState } from "react";
 import { BarChart3, BookMarked, Home, Import, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Logo } from "./logo";
+import { BackgroundKeepalive } from "@/components/background-keepalive";
 
 const navigation = [
   { label: "今日", href: "/", icon: Home },
@@ -35,6 +36,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] text-[#1c1c1e] dark:bg-black dark:text-[#f5f5f7]">
+      {/* 全局常驻后台保活：跨页面切换持续推进初始化队列 */}
+      <BackgroundKeepalive />
       {/* Desktop Sidebar — Liquid Glass */}
       <aside className="liquid-glass liquid-glass-specular liquid-glass-edge fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col p-6 lg:flex">
         <Logo href="/" />

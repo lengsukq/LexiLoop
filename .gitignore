@@ -24,4 +24,7 @@ data/reference/*
 # Test artifacts
 test-screenshots/
 
+# Local coding-agent artifacts
+.zcode/
+
 .DS_Store

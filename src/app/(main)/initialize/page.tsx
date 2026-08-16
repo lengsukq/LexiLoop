@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, ChevronDown, ChevronRight, Clock3, ExternalLink, Loader2, Play, Plus, RefreshCw, RotateCcw, Sparkles, XCircle } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
+import { BACKGROUND_TICK_EVENT } from "@/components/background-keepalive";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, EmptyState, PageHeader, Pagination, Progress } from "@/components/ui";
 import { InitializationBadge } from "@/components/status-badges";
 import { InitializationConfigurator } from "./initialization-configurator";
@@ -170,10 +171,19 @@ export default function InitializePage() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "加载失败"); }
   }, [filter, searchQuery, page]);
 
+  // 数据刷新由全局 BackgroundKeepalive 的 tick 事件驱动（忙碌时约 3 秒一次、空闲 60 秒），
+  // 不再自行轮询，避免与全局保活重复触发后台任务。
   useEffect(() => {
     const initial = window.setTimeout(() => void load(), 0);
-    const timer = window.setInterval(() => void load(), 3000);
-    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+    const onTick = () => void load();
+    const onVisibilityChange = () => { if (!document.hidden) void load(); };
+    window.addEventListener(BACKGROUND_TICK_EVENT, onTick);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearTimeout(initial);
+      window.removeEventListener(BACKGROUND_TICK_EVENT, onTick);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [load]);
 
   const wordTotal = useMemo(() => status ? Object.values(status.wordSummary).reduce((sum, value) => sum + value, 0) : 0, [status]);

@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { translateMissingWordContent } from "@/modules/translations/service";
@@ -24,12 +25,12 @@ function responseText(payload: unknown, apiType: "openai" | "anthropic"): string
 
 export async function generateChineseMnemonic(wordId: number, attemptCount = 1): Promise<void> {
   const word = await sqlite.prepare("SELECT term, source_language, target_language FROM words WHERE id = ?").get(wordId) as Record<string, unknown> | undefined;
-  if (!word) throw new Error("WORD_NOT_FOUND");
+  if (!word) throw new ApiError("WORD_NOT_FOUND");
   const settings = settingsForAiAttempt(await getSettings(), attemptCount);
   const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
-  if (!purpose.enabled) throw new Error("AI_DISABLED");
+  if (!purpose.enabled) throw new ApiError("AI_DISABLED");
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
-  if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) throw new Error("AI_CONFIG_INCOMPLETE");
+  if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) throw new ApiError("AI_CONFIG_INCOMPLETE");
 
   const term = String(word.term);
   const prompt = `你是一个语言学习助记生成器。为以下单词创作一个有趣、易记的中文助记方法，帮助英文基础较弱的中文母语者记住这个单词。\n\n单词: ${term}\n语言: ${String(word.source_language)} → ${String(word.target_language)}\n\n要求：\n- 助记要简短有趣，4-150 个汉字\n- 必须用简体中文叙述；目标英文词或必要词根可以出现，但不得输出英文完整句子、英文释义或纯英文拆词说明\n- 优先使用中文谐音、中文画面、中文故事或中文词义联想\n- 只输出助记本身，不要前缀、引号或 Markdown`;
@@ -39,17 +40,17 @@ export async function generateChineseMnemonic(wordId: number, attemptCount = 1):
       ? await fetch(`${baseUrl}/messages`, { method: "POST", signal: AbortSignal.timeout(purpose.timeoutMs ?? 30_000), headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: purpose.model, max_tokens: 300, temperature: 0.7, system: "只能用简体中文讲解；不得输出英文完整句子或英文释义。", messages: [{ role: "user", content: `${prompt}${correction}` }] }) })
       : await fetch(`${baseUrl}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(purpose.timeoutMs ?? 30_000), headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` }, body: JSON.stringify({ model: purpose.model, messages: [{ role: "system", content: "只能用简体中文讲解；不得输出英文完整句子或英文释义。" }, { role: "user", content: `${prompt}${correction}` }], temperature: 0.7, max_tokens: 300 }) });
     const raw = await response.text().catch(() => "");
-    if (!response.ok) throw new Error(`AI_REQUEST_FAILED: ${formatAiProviderError(response.status, raw)}`);
+    if (!response.ok) throw new ApiError("AI_REQUEST_FAILED", `AI 服务请求失败：${formatAiProviderError(response.status, raw)}`, 502);
     let body: unknown = null;
     try { body = JSON.parse(raw); } catch { /* handled below */ }
     const mnemonic = responseText(body, provider.apiType);
-    if (!mnemonic) throw new Error("AI_EMPTY_RESPONSE");
+    if (!mnemonic) throw new ApiError("AI_EMPTY_RESPONSE");
     return mnemonic;
   };
 
   let mnemonic = await request();
   if (!isChineseMnemonic(mnemonic)) mnemonic = await request("\n\n上一版没有按要求使用中文。请完全重写：只保留目标英文词本身，其他叙述必须是简体中文。");
-  if (!isChineseMnemonic(mnemonic)) throw new Error("AI_MNEMONIC_LANGUAGE_INVALID");
+  if (!isChineseMnemonic(mnemonic)) throw new ApiError("AI_MNEMONIC_LANGUAGE_INVALID");
 
   const row = await sqlite.prepare("SELECT learning_json FROM word_contents WHERE word_id = ?").get(wordId) as { learning_json: string | null } | undefined;
   const learning = row?.learning_json ? JSON.parse(row.learning_json) : { pronunciationTip: null, mnemonic: null, commonMistakes: [] };

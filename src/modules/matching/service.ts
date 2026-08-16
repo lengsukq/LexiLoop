@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api";
 import { recordScore } from "@/modules/leaderboard/service";
 import { selectPracticeCandidates } from "@/modules/practice/candidates";
 import {
@@ -67,7 +68,7 @@ export async function startMatchingSession(options: {
     now,
     excludeWordsInActiveSessions: true,
   });
-  if (candidates.length < MINIMUM_PAIR_COUNT) throw new Error("NOT_ENOUGH_MATCHING_WORDS");
+  if (candidates.length < MINIMUM_PAIR_COUNT) throw new ApiError("NOT_ENOUGH_MATCHING_WORDS");
 
   const session = await createPracticeSession(candidates, {
     sourceType: "MATCH_GAME",
@@ -146,8 +147,8 @@ export async function completeMatchingSession(input: {
       leaderboard,
     };
   } catch (error) {
-    if (error instanceof Error && error.message === "PRACTICE_SESSION_NOT_FOUND") {
-      throw new Error("MATCH_SESSION_NOT_FOUND");
+    if (error instanceof ApiError && error.code === "PRACTICE_SESSION_NOT_FOUND") {
+      throw new ApiError("MATCH_SESSION_NOT_FOUND");
     }
     throw error;
   }

@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { DictionaryContent, EntryType } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 import { detectEntryType, displayTerm, legacyEntryType, normalizeTerm } from "@/modules/imports/normalizer";
@@ -18,10 +19,10 @@ function findRelatedContent(content: DictionaryContent, term: string) {
 export async function previewRelatedWord(parentWordId: number, rawTerm: string) {
   const parent = await sqlite.prepare(`SELECT w.*, wc.* FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id WHERE w.id = ?`)
     .get(parentWordId) as Record<string, unknown> | undefined;
-  if (!parent) throw new Error("WORD_NOT_FOUND");
+  if (!parent) throw new ApiError("WORD_NOT_FOUND");
   const term = relatedWordSchema.shape.term.parse(rawTerm);
   const normalizedTerm = normalizeTerm(term, String(parent.source_language));
-  if (normalizedTerm === String(parent.normalized_term)) throw new Error("RELATED_WORD_SAME_AS_PARENT");
+  if (normalizedTerm === String(parent.normalized_term)) throw new ApiError("RELATED_WORD_SAME_AS_PARENT");
   const existing = await sqlite.prepare(`SELECT id, term, initialization_status, mastery_level, mastery_score
     FROM words WHERE normalized_term = ? AND source_language = ? AND target_language = ? LIMIT 1`)
     .get(normalizedTerm, parent.source_language, parent.target_language) as {
@@ -47,9 +48,9 @@ export async function addRelatedWord(parentWordId: number, input: unknown) {
       id: number; normalized_term: string; source_language: string; target_language: string;
       source_language_name: string | null; target_language_name: string | null; content_type: EntryType;
     } | undefined;
-  if (!parent) throw new Error("WORD_NOT_FOUND");
+  if (!parent) throw new ApiError("WORD_NOT_FOUND");
   const normalizedTerm = normalizeTerm(values.term, parent.source_language);
-  if (normalizedTerm === parent.normalized_term) throw new Error("RELATED_WORD_SAME_AS_PARENT");
+  if (normalizedTerm === parent.normalized_term) throw new ApiError("RELATED_WORD_SAME_AS_PARENT");
   const now = Date.now();
   return await sqlite.transaction(async () => {
     let word = await sqlite.prepare(`SELECT id, term, initialization_status FROM words
@@ -102,7 +103,7 @@ export async function deleteWord(wordId: number, force = false): Promise<boolean
       EXISTS(SELECT 1 FROM study_session_items WHERE word_id = ?) AS has_session_items`).get(wordId, wordId) as {
         has_reviews: number; has_session_items: number;
       };
-    if (history.has_reviews || history.has_session_items) throw new Error("WORD_HAS_LEARNING_HISTORY");
+    if (history.has_reviews || history.has_session_items) throw new ApiError("WORD_HAS_LEARNING_HISTORY");
   }
   return await sqlite.transaction(async () => {
     if (force) for (const table of ["review_logs", "review_cards", "wrong_word_states", "study_session_items", "initialization_jobs", "provider_attempts"]) {

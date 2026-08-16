@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import { parseJson } from "@/lib/json";
 import type {
   DailyAiSuggestion,
@@ -102,7 +103,7 @@ export async function saveSuggestion(input: {
     );
 
   const saved = await findCachedSuggestion(input.dateKey);
-  if (!saved) throw new Error("DAILY_SUGGESTION_SAVE_FAILED");
+  if (!saved) throw new ApiError("DAILY_SUGGESTION_SAVE_FAILED");
   saved.configured = input.generator === "AI" || input.configuration.configured;
   return saved;
 }

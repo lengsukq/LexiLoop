@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { DictionaryContent, EntryType, QuestionType, StudyItemView } from "@/lib/types";
 import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 
@@ -47,7 +48,7 @@ async function takeDistractorRows(excludedWordIds: ReadonlySet<number>, count: n
 
 export async function getStudySession(sessionId: number, resumed = false) {
   const session = await sqlite.prepare("SELECT * FROM study_sessions WHERE id = ?").get(sessionId) as Record<string, unknown> | undefined;
-  if (!session) throw new Error("STUDY_SESSION_NOT_FOUND");
+  if (!session) throw new ApiError("SESSION_NOT_FOUND");
   const rows = await sqlite.prepare(`SELECT i.id AS item_id, i.position, i.task_type, i.question_type, i.status, i.skip_reason, w.id AS word_id, w.term, w.source_language, w.target_language, w.content_type, c.definitions_json, c.pronunciations_json, c.examples_json, c.phrases_json, c.forms_json, c.synonyms_json, c.antonyms_json, c.word_family_json, c.confused_words_json, c.roots_json, c.affixes_json, c.summary_json, c.learning_json, c.sentence_analysis_json, c.tags_json FROM study_session_items i JOIN words w ON w.id = i.word_id LEFT JOIN word_contents c ON c.word_id = w.id WHERE i.study_session_id = ? ORDER BY i.position ASC`).all(sessionId) as Array<Record<string, unknown>>;
   const items = await Promise.all(rows.map(async (row) => {
     const questionType = row.question_type as QuestionType; const content = row.definitions_json === null ? emptyDictionaryContent() : dictionaryContentFromRow(row);

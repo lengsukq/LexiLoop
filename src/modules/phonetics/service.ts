@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api";
 import { recordScore } from "@/modules/leaderboard/service";
 import { createPhoneticItems, selectPhoneticCandidates } from "@/modules/phonetics/selection";
 import type {
@@ -23,7 +24,7 @@ export async function startPhoneticGame(accent: PhoneticAccent): Promise<Phoneti
   const now = Date.now();
   await closeOpenPracticeSessions(SESSION_SOURCE, now);
   const candidates = await selectPhoneticCandidates({ count: GAME_ITEM_COUNT, accent, now });
-  if (candidates.length < MINIMUM_ITEMS) throw new Error("NOT_ENOUGH_PHONETIC_WORDS");
+  if (candidates.length < MINIMUM_ITEMS) throw new ApiError("NOT_ENOUGH_PHONETIC_WORDS");
 
   const session = await createPracticeSession(candidates, {
     sourceType: SESSION_SOURCE,
@@ -83,8 +84,8 @@ export async function completePhoneticGame(input: {
     });
     return { ...summary, score, leaderboard };
   } catch (error) {
-    if (error instanceof Error && error.message === "PRACTICE_SESSION_NOT_FOUND") {
-      throw new Error("PHONETIC_SESSION_NOT_FOUND");
+    if (error instanceof ApiError && error.code === "PRACTICE_SESSION_NOT_FOUND") {
+      throw new ApiError("PHONETIC_SESSION_NOT_FOUND");
     }
     throw error;
   }

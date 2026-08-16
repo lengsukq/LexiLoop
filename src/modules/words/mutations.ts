@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import { z } from "zod";
 import type { DictionaryContent, EntryType } from "@/lib/types";
 import { contentStatus, dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
@@ -26,7 +27,7 @@ const updateSchema = z.object({
 
 export async function updateWord(wordId: number, input: unknown) {
   const values = updateSchema.parse(input);
-  if (!await sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId)) throw new Error("WORD_NOT_FOUND");
+  if (!await sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId)) throw new ApiError("WORD_NOT_FOUND");
   const updates: string[] = [];
   const params: Array<string | number | null> = [];
   if (values.userNote !== undefined) { updates.push("user_note = ?"); params.push(values.userNote); }
@@ -50,7 +51,7 @@ export async function updateManualDefinition(wordId: number, input: unknown) {
   const word = await sqlite.prepare("SELECT id, target_language, content_type FROM words WHERE id = ?").get(wordId) as {
     id: number; target_language: string; content_type: EntryType;
   } | undefined;
-  if (!word) throw new Error("WORD_NOT_FOUND");
+  if (!word) throw new ApiError("WORD_NOT_FOUND");
   const row = await sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(wordId) as Record<string, unknown> | undefined;
   const content: DictionaryContent = row ? dictionaryContentFromRow(row) : emptyDictionaryContent();
   content.definitions = content.definitions.filter((item) => !(item.source === "user" && item.isUserEdited));
@@ -76,9 +77,9 @@ const exampleIndexSchema = z.object({ index: z.number().int().nonnegative() }).s
 export async function deleteExample(wordId: number, input: unknown) {
   const { index } = exampleIndexSchema.parse(input);
   const row = await sqlite.prepare("SELECT * FROM word_contents WHERE word_id = ?").get(wordId) as Record<string, unknown> | undefined;
-  if (!row) throw new Error("EXAMPLE_NOT_FOUND");
+  if (!row) throw new ApiError("EXAMPLE_NOT_FOUND");
   const content = dictionaryContentFromRow(row);
-  if (!content.examples[index]) throw new Error("EXAMPLE_NOT_FOUND");
+  if (!content.examples[index]) throw new ApiError("EXAMPLE_NOT_FOUND");
   content.examples.splice(index, 1);
   await sqlite.prepare("UPDATE word_contents SET examples_json = ?, content_version = content_version + 1, updated_at = ? WHERE word_id = ?")
     .run(JSON.stringify(content.examples), Date.now(), wordId);

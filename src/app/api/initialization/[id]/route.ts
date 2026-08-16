@@ -1,18 +1,15 @@
 import { NextRequest } from "next/server";
-import { internalError, ok } from "@/lib/api";
+import { fail, handleRouteError, ok, requireRouteId } from "@/lib/api";
 import { getJobDetails } from "@/modules/initialization/service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
-    const jobId = Number(id);
-    if (!Number.isFinite(jobId)) return new Response("Invalid job ID", { status: 400 });
+    const jobId = requireRouteId((await params).id, "JOB_ID_INVALID", "任务 ID 无效。");
     const details = await getJobDetails(jobId);
-    if (!details) return new Response("Job not found", { status: 404 });
-    return ok(details);
+    return details ? ok(details) : fail("JOB_NOT_FOUND", "任务不存在。", 404);
   } catch (error) {
-    return internalError(error, "获取任务详情失败。");
+    return handleRouteError(error, { fallbackMessage: "获取任务详情失败。" });
   }
 }

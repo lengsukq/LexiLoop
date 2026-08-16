@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { DictionaryContent, EntryType, ProviderAttempt } from "@/lib/types";
 import { contentStatus, dictionaryContentFromRow, emptyDictionaryContent, mergeDictionaryContent } from "@/modules/dictionary/content";
 import { lookupDictionary } from "@/modules/dictionary/pipeline";
@@ -17,7 +18,7 @@ async function wordRowOrThrow(wordId: number) {
   const row = await sqlite.prepare("SELECT id, term, normalized_term, source_language, target_language, content_type FROM words WHERE id = ?").get(wordId) as {
     id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType;
   } | undefined;
-  if (!row) throw new Error("WORD_NOT_FOUND");
+  if (!row) throw new ApiError("WORD_NOT_FOUND");
   return row;
 }
 
@@ -63,13 +64,13 @@ export async function applyYoudaoContent(
   let normalizedTerm = row.normalized_term;
   if (newTerm !== undefined) {
     term = displayTerm(newTerm.trim(), row.source_language, row.content_type);
-    if (!term) throw new Error("TERM_REQUIRED");
-    if (term.length > 300) throw new Error("TERM_TOO_LONG");
+    if (!term) throw new ApiError("TERM_REQUIRED");
+    if (term.length > 300) throw new ApiError("TERM_TOO_LONG");
     normalizedTerm = normalizeTerm(term, row.source_language);
     const duplicate = await sqlite.prepare(`SELECT id FROM words
       WHERE normalized_term = ? AND source_language = ? AND target_language = ? AND id != ? LIMIT 1`)
       .get(normalizedTerm, row.source_language, row.target_language, wordId);
-    if (duplicate) throw new Error("TERM_ALREADY_EXISTS");
+    if (duplicate) throw new ApiError("TERM_ALREADY_EXISTS");
   }
 
   const merged = mode === "FORCE_OVERWRITE"

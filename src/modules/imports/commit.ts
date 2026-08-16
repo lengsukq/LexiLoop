@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { ImportMode, ImportPreviewRow, InitializationMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
 import { legacyEntryType, displayTerm } from "./normalizer";
@@ -54,8 +55,8 @@ export async function commitImport(previewToken: string, mode: ImportMode, reset
     const preview = await sqlite.prepare("SELECT * FROM import_previews WHERE token = ?").get(previewToken) as {
       filename: string; file_hash: string; rows_json: string; expires_at: number;
     } | undefined;
-    if (!preview || preview.expires_at < now) throw new Error("IMPORT_PREVIEW_EXPIRED");
-    if ((await sqlite.prepare("DELETE FROM import_previews WHERE token = ?").run(previewToken)).changes !== 1) throw new Error("IMPORT_PREVIEW_EXPIRED");
+    if (!preview || preview.expires_at < now) throw new ApiError("IMPORT_PREVIEW_EXPIRED");
+    if ((await sqlite.prepare("DELETE FROM import_previews WHERE token = ?").run(previewToken)).changes !== 1) throw new ApiError("IMPORT_PREVIEW_EXPIRED");
     const rows = JSON.parse(preview.rows_json) as ImportPreviewRow[];
     const batch = await sqlite.prepare(`INSERT INTO import_batches
       (filename, file_hash, import_mode, reset_learning_progress, total_rows, valid_rows, invalid_rows, duplicate_rows, status, created_at)

@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { MasteryLevel, ReviewRating } from "@/lib/types";
 import type { Card } from "ts-fsrs";
 import { DAY_MS } from "@/lib/time";
@@ -24,7 +25,7 @@ export function assertIdempotencyContext(existing: ExistingReviewLog, input: Ans
   const conflict = existing.word_id !== input.wordId
     || (existing.study_session_id ?? undefined) !== input.studySessionId
     || (existing.study_session_item_id ?? undefined) !== input.studySessionItemId;
-  if (conflict) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+  if (conflict) throw new ApiError("IDEMPOTENCY_KEY_CONFLICT");
 }
 
 export async function buildIdempotentResult(existing: ExistingReviewLog) {
@@ -58,7 +59,7 @@ export async function buildIdempotentResult(existing: ExistingReviewLog) {
 export async function claimStudyItem(input: AnswerInput, now: number): Promise<void> {
   const hasSessionId = input.studySessionId !== undefined;
   const hasItemId = input.studySessionItemId !== undefined;
-  if (hasSessionId !== hasItemId || !hasSessionId || !hasItemId) throw new Error("INVALID_STUDY_CONTEXT");
+  if (hasSessionId !== hasItemId || !hasSessionId || !hasItemId) throw new ApiError("INVALID_STUDY_CONTEXT");
 
   // Single statement claims the item: all validity checks are folded into the
   // WHERE clause so the common success path needs only one round trip.
@@ -82,10 +83,10 @@ export async function claimStudyItem(input: AnswerInput, now: number): Promise<v
       status: string;
       completed_at: number | null;
     } | undefined;
-  if (!item) throw new Error("STUDY_ITEM_NOT_FOUND");
-  if (item.word_id !== input.wordId) throw new Error("STUDY_ITEM_WORD_MISMATCH");
-  if (item.question_type !== input.questionType) throw new Error("STUDY_ITEM_QUESTION_MISMATCH");
-  if (item.completed_at !== null || item.status !== "PENDING") throw new Error("STUDY_ITEM_ALREADY_PROCESSED");
+  if (!item) throw new ApiError("STUDY_ITEM_NOT_FOUND");
+  if (item.word_id !== input.wordId) throw new ApiError("STUDY_ITEM_WORD_MISMATCH");
+  if (item.question_type !== input.questionType) throw new ApiError("STUDY_ITEM_QUESTION_MISMATCH");
+  if (item.completed_at !== null || item.status !== "PENDING") throw new ApiError("STUDY_ITEM_ALREADY_PROCESSED");
 }
 
 export async function findReviewWord(wordId: number): Promise<ReviewWordRow | undefined> {
@@ -96,9 +97,9 @@ export async function findReviewWord(wordId: number): Promise<ReviewWordRow | un
 }
 
 export function assertReviewableWord(word: ReviewWordRow | undefined): asserts word is ReviewWordRow {
-  if (!word) throw new Error("WORD_NOT_FOUND");
-  if (!["READY", "PARTIAL"].includes(word.initialization_status)) throw new Error("WORD_NOT_READY");
-  if (word.is_suspended) throw new Error("WORD_SUSPENDED");
+  if (!word) throw new ApiError("WORD_NOT_FOUND");
+  if (!["READY", "PARTIAL"].includes(word.initialization_status)) throw new ApiError("WORD_NOT_READY");
+  if (word.is_suspended) throw new ApiError("WORD_SUSPENDED");
 }
 
 export async function findReviewCard(wordId: number): Promise<ReviewCardRow | undefined> {

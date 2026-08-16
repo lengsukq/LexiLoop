@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type { QuestionType, StudyMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
 import { aiRecommendedCandidates, continuousCandidates, loadPools, questionFor, selectCandidates, SESSION_RESUME_TTL_MS, taskFor, type CandidateScope, type StudyCandidate } from "./candidates";
@@ -41,7 +42,7 @@ export async function startStudySession(mode: StudyMode, resume = true, continuo
   if (resume) { const resumableId = await findResumableSession(mode, now); if (resumableId) return getStudySession(resumableId, true); }
   const scope: CandidateScope = mode === "SENTENCE_REVIEW" ? "SENTENCE" : mode === "AI_RECOMMENDED" ? "ALL" : "LEXICAL";
   const pools = await loadPools(now, scope, { applyDailySoftQuota: mode === "DAILY" }); const recommended = mode === "AI_RECOMMENDED" ? await aiRecommendedCandidates(now) : null;
-  if (mode === "AI_RECOMMENDED" && !recommended?.length) throw new Error("AI_RECOMMENDED_ALL_DONE");
+  if (mode === "AI_RECOMMENDED" && !recommended?.length) throw new ApiError("AI_RECOMMENDED_ALL_DONE");
   let selected: StudyCandidate[] = recommended ?? selectCandidates(mode, pools);
   if (mode === "DAILY" && continuous && selected.length === 0) selected = await continuousCandidates(10, now);
   const due = new Set(pools.due.map((item) => item.id)); const wrong = new Set(pools.wrong.map((item) => item.id));
@@ -59,9 +60,9 @@ export async function skipStudyItem(sessionId: number, itemId: number, reason = 
   const now = Date.now();
   await sqlite.transaction(async () => {
     const item = await sqlite.prepare("SELECT i.status, s.completed_at FROM study_session_items i JOIN study_sessions s ON s.id = i.study_session_id WHERE i.id = ? AND i.study_session_id = ?").get(itemId, sessionId) as { status: string; completed_at: number | null } | undefined;
-    if (!item) throw new Error("STUDY_ITEM_NOT_FOUND"); if (item.completed_at !== null || item.status !== "PENDING") throw new Error("STUDY_ITEM_ALREADY_PROCESSED");
+    if (!item) throw new ApiError("STUDY_ITEM_NOT_FOUND"); if (item.completed_at !== null || item.status !== "PENDING") throw new ApiError("STUDY_ITEM_ALREADY_PROCESSED");
     const updated = await sqlite.prepare("UPDATE study_session_items SET status = 'SKIPPED', answered_at = ?, skip_reason = ? WHERE id = ? AND study_session_id = ? AND status = 'PENDING'").run(now, reason, itemId, sessionId);
-    if (updated.changes !== 1) throw new Error("STUDY_ITEM_ALREADY_PROCESSED");
+    if (updated.changes !== 1) throw new ApiError("STUDY_ITEM_ALREADY_PROCESSED");
     await sqlite.prepare("UPDATE study_sessions SET completed_count = completed_count + 1, skipped_count = skipped_count + 1 WHERE id = ?").run(sessionId);
     const pending = await sqlite.prepare("SELECT count(*) AS count FROM study_session_items WHERE study_session_id = ? AND status = 'PENDING'").get(sessionId) as { count: number }; if (pending.count === 0) await closeStudySessionWithActiveDuration(sessionId, now);
   }).immediate();

@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import { extractPreferredDefinition } from "@/modules/practice/candidates";
 import type {
   PracticeCandidate,
@@ -95,7 +96,7 @@ async function loadCompletionRows(sessionId: number, sourceType: string): Promis
   const session = await sqlite.prepare(`SELECT source_type FROM study_sessions WHERE id = ?`).get(sessionId) as {
     source_type: string | null;
   } | undefined;
-  if (!session || session.source_type !== sourceType) throw new Error("PRACTICE_SESSION_NOT_FOUND");
+  if (!session || session.source_type !== sourceType) throw new ApiError("PRACTICE_SESSION_NOT_FOUND");
 
   return await sqlite.prepare(`SELECT i.id AS item_id, i.word_id, i.question_type, i.status,
       w.term, w.target_language, c.definitions_json

@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api";
 import type { QuestionType } from "@/lib/types";
 import { selectPracticeCandidates } from "@/modules/practice/candidates";
 import { createChoicePool, shuffle } from "@/modules/practice/random";
@@ -145,7 +146,7 @@ export async function startGameSession(mode: GameMode): Promise<GameSessionPaylo
     now,
     candidateFilter: mode === "WORD_BUILDER" ? isWordBuilderCandidate : undefined,
   });
-  if (candidates.length < MINIMUM_GAME_ITEMS) throw new Error("NOT_ENOUGH_GAME_WORDS");
+  if (candidates.length < MINIMUM_GAME_ITEMS) throw new ApiError("NOT_ENOUGH_GAME_WORDS");
 
   const sourceType = `GAME_${mode}`;
   const session = await createPracticeSession(candidates, {

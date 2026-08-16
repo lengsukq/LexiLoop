@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api";
 import { recordScore } from "@/modules/leaderboard/service";
 import { completePracticeSession } from "@/modules/practice/sessions";
 import type { PracticeAnswer } from "@/modules/practice/types";
@@ -20,7 +21,7 @@ export async function completeGameSession(input: {
     const leaderboard = await recordScore({ gameMode: input.mode, score, maxCombo: summary.maxCombo, accuracy: summary.accuracy, elapsedMs: summary.elapsedMs });
     return { ...summary, mode: input.mode, score, leaderboard };
   } catch (error) {
-    if (error instanceof Error && error.message === "PRACTICE_SESSION_NOT_FOUND") throw new Error("GAME_SESSION_NOT_FOUND");
+    if (error instanceof ApiError && error.code === "PRACTICE_SESSION_NOT_FOUND") throw new ApiError("GAME_SESSION_NOT_FOUND");
     throw error;
   }
 }

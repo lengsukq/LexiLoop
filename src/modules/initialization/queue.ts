@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { ApiError } from "@/lib/api";
 import type {
   AiTaskType,
   InitializationField,
@@ -45,7 +46,7 @@ export async function queueAiTask(
   options: InitializationTaskOptions = {},
 ): Promise<number> {
   const word = await sqlite.prepare("SELECT id FROM words WHERE id = ?").get(wordId);
-  if (!word) throw new Error("WORD_NOT_FOUND");
+  if (!word) throw new ApiError("WORD_NOT_FOUND");
   const now = Date.now();
   const maxAttempts = await maxAttemptsFromSettings();
   const active = await sqlite.prepare(`SELECT id, mode, requested_fields_json, requested_providers_json, provider_strategy

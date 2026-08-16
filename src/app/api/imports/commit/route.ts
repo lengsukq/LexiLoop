@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { fail, internalError, ok } from "@/lib/api";
+import { handleRouteError, ok } from "@/lib/api";
 import { IMPORT_MODES } from "@/lib/types";
 import { runBackgroundTick } from "@/modules/background/tick";
 import { commitImport } from "@/modules/imports/service";
@@ -15,8 +15,6 @@ export async function POST(request: NextRequest) {
     return ok(result);
   }
   catch (error) {
-    if (error instanceof Error && error.message === "IMPORT_PREVIEW_EXPIRED") return fail("IMPORT_PREVIEW_EXPIRED", "导入预览已过期，请重新上传。", 409);
-    if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "导入参数无效。", 400, error.issues);
-    return internalError(error, "提交导入失败。");
+    return handleRouteError(error, { validationMessage: "导入参数无效。", fallbackMessage: "提交导入失败。" });
   }
 }

@@ -1,26 +1,11 @@
 import { sqlite } from "@/db/client";
 import { ApiError } from "@/lib/api";
-import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
+import { callLlm } from "@/modules/llm/client";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { translateMissingWordContent } from "@/modules/translations/service";
 
 function isChineseMnemonic(value: string): boolean {
   return (value.match(/[\u3400-\u9fff]/g)?.length ?? 0) >= 4;
-}
-
-function responseText(payload: unknown, apiType: "openai" | "anthropic"): string {
-  if (!payload || typeof payload !== "object") return "";
-  const body = payload as Record<string, unknown>;
-  if (apiType === "anthropic") {
-    const content = Array.isArray(body.content) ? body.content : [];
-    return content.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "").join("").trim();
-  }
-  const choices = Array.isArray(body.choices) ? body.choices as Array<Record<string, unknown>> : [];
-  const message = choices[0]?.message;
-  const content = message && typeof message === "object" ? (message as Record<string, unknown>).content : null;
-  if (typeof content === "string") return content.trim();
-  if (Array.isArray(content)) return content.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "").join("").trim();
-  return "";
 }
 
 export async function generateChineseMnemonic(wordId: number, attemptCount = 1): Promise<void> {
@@ -36,14 +21,11 @@ export async function generateChineseMnemonic(wordId: number, attemptCount = 1):
   const prompt = `你是一个语言学习助记生成器。为以下单词创作一个有趣、易记的中文助记方法，帮助英文基础较弱的中文母语者记住这个单词。\n\n单词: ${term}\n语言: ${String(word.source_language)} → ${String(word.target_language)}\n\n要求：\n- 助记要简短有趣，4-150 个汉字\n- 必须用简体中文叙述；目标英文词或必要词根可以出现，但不得输出英文完整句子、英文释义或纯英文拆词说明\n- 优先使用中文谐音、中文画面、中文故事或中文词义联想\n- 只输出助记本身，不要前缀、引号或 Markdown`;
   const baseUrl = provider.baseUrl.trim().replace(/\/+$/, "");
   const request = async (correction = ""): Promise<string> => {
-    const response = provider.apiType === "anthropic"
-      ? await fetch(`${baseUrl}/messages`, { method: "POST", signal: AbortSignal.timeout(purpose.timeoutMs ?? 30_000), headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: purpose.model, max_tokens: 300, temperature: 0.7, system: "只能用简体中文讲解；不得输出英文完整句子或英文释义。", messages: [{ role: "user", content: `${prompt}${correction}` }] }) })
-      : await fetch(`${baseUrl}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(purpose.timeoutMs ?? 30_000), headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` }, body: JSON.stringify({ model: purpose.model, messages: [{ role: "system", content: "只能用简体中文讲解；不得输出英文完整句子或英文释义。" }, { role: "user", content: `${prompt}${correction}` }], temperature: 0.7, max_tokens: 300 }) });
-    const raw = await response.text().catch(() => "");
-    if (!response.ok) throw new ApiError("AI_REQUEST_FAILED", `AI 服务请求失败：${formatAiProviderError(response.status, raw)}`, 502);
-    let body: unknown = null;
-    try { body = JSON.parse(raw); } catch { /* handled below */ }
-    const mnemonic = responseText(body, provider.apiType);
+    const mnemonic = await callLlm(
+      { apiType: provider.apiType, baseUrl, apiKey: provider.apiKey, model: purpose.model, timeoutMs: purpose.timeoutMs ?? 30_000 },
+      `${prompt}${correction}`,
+      { systemPrompt: "只能用简体中文讲解；不得输出英文完整句子或英文释义。", maxOutputTokens: 300, temperature: 0.7 },
+    );
     if (!mnemonic) throw new ApiError("AI_EMPTY_RESPONSE");
     return mnemonic;
   };

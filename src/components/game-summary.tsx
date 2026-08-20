@@ -15,18 +15,18 @@ export interface SummaryItem {
 const STATUS_META: Record<SummaryStatus, { label: string; icon: React.ReactNode; tone: string }> = {
   correct: {
     label: "一次答对",
-    icon: <CheckCircle2 className="size-4 text-[#34c759]" />,
-    tone: "text-[#248a3d] dark:text-[#30d158]",
+    icon: <CheckCircle2 className="size-4 text-success" />,
+    tone: "text-success-deep",
   },
   recovered: {
     label: "纠正后答对",
-    icon: <Flame className="size-4 text-[#ff9500]" />,
-    tone: "text-[#c93400] dark:text-[#ff9f0a]",
+    icon: <Flame className="size-4 text-warning" />,
+    tone: "text-warning-deep",
   },
   missed: {
     label: "未完成",
-    icon: <XCircle className="size-4 text-[#ff3b30]" />,
-    tone: "text-[#d70015] dark:text-[#ff453a]",
+    icon: <XCircle className="size-4 text-danger" />,
+    tone: "text-danger-deep",
   },
 };
 
@@ -37,12 +37,12 @@ function SummaryRow({ item }: { item: SummaryItem }) {
     <span className="min-w-0 flex-1">
       <span className="flex flex-wrap items-baseline gap-x-2">
         <b className="break-words text-[15px]">{item.term}</b>
-        {item.phonetic && <small className="font-mono text-xs text-[#8e8e93]">{item.phonetic}</small>}
+        {item.phonetic && <small className="font-mono text-xs text-quaternary-label">{item.phonetic}</small>}
         <small className={`text-[11px] font-semibold ${meta.tone}`}>{meta.label}</small>
       </span>
-      <small className="mt-0.5 line-clamp-2 block text-xs leading-snug text-[#8e8e93]">{item.definition}</small>
+      <small className="mt-0.5 line-clamp-2 block text-xs leading-snug text-quaternary-label">{item.definition}</small>
     </span>
-    <button type="button" onClick={() => void playCachedTts(item.term, "US")} className="ios-press grid size-9 shrink-0 place-items-center rounded-full bg-[#007aff]/10 text-[#007aff] dark:text-[#0a84ff]"><Volume2 className="size-4" /></button>
+    <button type="button" onClick={() => void playCachedTts(item.term, "US")} className="ios-press grid size-9 shrink-0 place-items-center rounded-full bg-accent/10 text-accent"><Volume2 className="size-4" /></button>
   </li>;
 }
 
@@ -52,15 +52,15 @@ export function GameSummary({ items }: { items: SummaryItem[] }) {
   const correct = items.filter((item) => item.status === "correct");
 
   return <div className="space-y-3 rounded-[18px] border border-white/40 bg-white/40 p-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
-    <div className="flex items-center gap-2"><ListChecks className="size-4 text-[#007aff]" /><b className="text-[15px]">本轮词条总结</b><small className="text-xs text-[#8e8e93]">共 {items.length} 条</small></div>
+    <div className="flex items-center gap-2"><ListChecks className="size-4 text-accent" /><b className="text-[15px]">本轮词条总结</b><small className="text-xs text-quaternary-label">共 {items.length} 条</small></div>
     {needWork.length > 0 && <div>
-      <p className="mb-2 text-xs font-semibold text-[#c93400] dark:text-[#ff9f0a]">需加强 · {needWork.length} 条</p>
+      <p className="mb-2 text-xs font-semibold text-warning-deep">需加强 · {needWork.length} 条</p>
       <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
         {needWork.map((item) => <SummaryRow key={`${item.term}-${item.status}`} item={item} />)}
       </ul>
     </div>}
     {correct.length > 0 && <div>
-      <p className="mb-2 text-xs font-semibold text-[#248a3d] dark:text-[#30d158]">已答对 · {correct.length} 条</p>
+      <p className="mb-2 text-xs font-semibold text-success-deep">已答对 · {correct.length} 条</p>
       <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
         {correct.map((item) => <SummaryRow key={`${item.term}-${item.status}`} item={item} />)}
       </ul>

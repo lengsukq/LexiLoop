@@ -68,7 +68,7 @@ export function WhackAMole({ item, onSolved, onMistake, onFailed }: {
   const moleByHole = new Map(moles.map((mole) => [mole.hole, mole]));
 
   return <div className="text-center">
-    <p className="text-[13px] text-[#8e8e93]">看释义，锤出正确的单词地鼠</p>
+    <p className="text-[13px] text-quaternary-label">看释义，锤出正确的单词地鼠</p>
     <h1 className="mx-auto mt-3 max-w-xl text-xl font-bold leading-relaxed sm:text-2xl">{item.definition}</h1>
     <div key={item.itemId} className="mx-auto mt-7 grid max-w-lg grid-cols-3 gap-x-3 gap-y-5 sm:gap-x-5">
       {Array.from({ length: HOLE_COUNT }, (_, hole) => {
@@ -93,6 +93,6 @@ export function WhackAMole({ item, onSolved, onMistake, onFailed }: {
         </div>;
       })}
     </div>
-    <p className="mt-5 text-xs text-[#aeaeb2]">地鼠缩回前锤中正确单词 · 锤错会记一次失误</p>
+    <p className="mt-5 text-xs text-tertiary-label">地鼠缩回前锤中正确单词 · 锤错会记一次失误</p>
   </div>;
 }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { errorMessage } from "@/lib/format";
 import { fail, internalError, ok } from "@/lib/api";
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { SECOND_MS } from "@/lib/time";
@@ -61,6 +62,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "Provider 配置不完整，无法读取模型。", 400, error.issues);
     const timeout = error instanceof DOMException && error.name === "TimeoutError";
     if (timeout) return fail("TIMEOUT", "Models 接口连接超时（15秒）。", 504);
-    return internalError(error, error instanceof Error ? error.message : "读取模型失败。");
+    return internalError(error, errorMessage(error, "读取模型失败。"));
   }
 }

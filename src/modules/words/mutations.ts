@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { DictionaryContent, EntryType } from "@/lib/types";
 import { contentStatus, dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
+import { saveWordContent } from "./save-content";
 import { getWordDetail } from "./queries";
 
 async function cancelPendingStudyItemsForSuspend(wordId: number, now: number): Promise<void> {
@@ -59,14 +60,7 @@ export async function updateManualDefinition(wordId: number, input: unknown) {
   const status = contentStatus(content, word.content_type);
   const now = Date.now();
   await sqlite.transaction(async () => {
-    await sqlite.prepare(`INSERT INTO word_contents
-      (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json, synonyms_json, antonyms_json,
-       word_family_json, confused_words_json, roots_json, affixes_json, summary_json, learning_json, sentence_analysis_json,
-       tags_json, provider_metadata_json, content_version, initialized_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', 1, ?, ?)
-      ON CONFLICT(word_id) DO UPDATE SET definitions_json = excluded.definitions_json,
-      content_version = word_contents.content_version + 1, initialized_at = excluded.initialized_at, updated_at = excluded.updated_at`)
-      .run(wordId, JSON.stringify(content.definitions), JSON.stringify(content.pronunciations), JSON.stringify(content.examples), JSON.stringify(content.phrases), JSON.stringify(content.forms), JSON.stringify(content.synonyms), JSON.stringify(content.antonyms), JSON.stringify(content.wordFamily), JSON.stringify(content.confusedWords), JSON.stringify(content.roots), JSON.stringify(content.affixes), JSON.stringify(content.summary), JSON.stringify(content.learning), JSON.stringify(content.sentenceAnalysis), JSON.stringify(content.tags), now, now);
+    await saveWordContent(wordId, content);
     await sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?").run(status, now, wordId);
   }).immediate();
   return getWordDetail(wordId);

@@ -1,8 +1,7 @@
 import { ApiError } from "@/lib/api";
-import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
+import { callLlm } from "@/modules/llm/client";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { tencentTranslateBatch, TencentTranslateError, type TencentTranslateConfig } from "@/lib/tencent-translate-client";
-import { normalizeBaseUrl } from "@/lib/url";
 import { z } from "zod";
 
 export class TranslationServiceError extends ApiError { constructor(code: string, message: string, status: number) { super(code, message, status); } }
@@ -14,10 +13,7 @@ async function getProvider(attemptCount: number): Promise<ProviderConfig> { cons
 async function getTencent(): Promise<TencentTranslateConfig | null> { const settings = await getSettings(); if (!settings.tencentTranslateEnabled || !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim()) return null; return { secretId: settings.tencentTranslateSecretId.trim(), secretKey: settings.tencentTranslateSecretKey.trim(), projectId: settings.tencentTranslateProjectId }; }
 async function requestAi(provider: ProviderConfig, targetLanguage: string, items: TranslationItem[]): Promise<Map<number, string>> {
   const prompt = `你是严谨的语言学习翻译助手。把下面每条源语言内容翻译成 ${targetLanguage}。\n要求：翻译自然、准确、适合背单词；只输出 JSON：{"translations":[{"index":0,"translation":"翻译"}]}。\n${JSON.stringify(items)}`;
-  const response = provider.apiType === "anthropic" ? await fetch(`${normalizeBaseUrl(provider.baseUrl)}/messages`, { method: "POST", signal: AbortSignal.timeout(provider.timeoutMs), headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: provider.model, max_tokens: 2000, temperature: 0.2, system: "Return only one valid JSON object. Do not use Markdown.", messages: [{ role: "user", content: prompt }] }) }) : await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(provider.timeoutMs), headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` }, body: JSON.stringify({ model: provider.model, messages: [{ role: "system", content: "Return only one valid JSON object. Do not use Markdown." }, { role: "user", content: prompt }], temperature: 0.2, max_tokens: 2000 }) });
-  const raw = await response.text().catch(() => ""); let body: Record<string, unknown> | null = null; try { body = JSON.parse(raw) as Record<string, unknown>; } catch { /* handled below */ }
-  if (!response.ok) { const message = body && typeof body.error === "object" && body.error ? String((body.error as Record<string, unknown>).message ?? `HTTP ${response.status}`) : formatAiProviderError(response.status, raw); throw new TranslationServiceError("AI_REQUEST_FAILED", message, 502); }
-  const text = provider.apiType === "anthropic" ? (Array.isArray(body?.content) ? body.content.map((item) => typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "").join("") : "") : (() => { const choices = Array.isArray(body?.choices) ? body.choices as Array<Record<string, unknown>> : []; const message = choices[0]?.message; return message && typeof message === "object" ? String((message as Record<string, unknown>).content ?? "") : ""; })();
+  const text = await callLlm(provider, prompt, { systemPrompt: "Return only one valid JSON object. Do not use Markdown.", maxOutputTokens: 2000, temperature: 0.2 });
   if (!text.trim()) throw new TranslationServiceError("AI_EMPTY_RESPONSE", "AI 没有返回翻译内容。", 422);
   let parsed: z.infer<typeof outputSchema>; try { parsed = outputSchema.parse(JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""))); } catch { throw new TranslationServiceError("AI_RESPONSE_INVALID", "AI 返回的翻译格式无效，请重试或更换模型。", 422); }
   const allowed = new Set(items.map((item) => item.index)); return new Map(parsed.translations.filter((item) => allowed.has(item.index)).map((item) => [item.index, item.translation]));

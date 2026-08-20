@@ -66,7 +66,6 @@ describe("AI lexical pipeline", () => {
       targetLanguage: "zh-CN",
     }, settingsWithAiEnabled());
 
-    expect(result.requiredProviderFailure).toBeNull();
     // 所有词典来源禁用 → 无释义 → 降级尝试 AI（配置不完整时安全失败）
     expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["ai:openai:gpt-4o-mini"]);
     expect(result.attempts[0]?.errorCode).toBe("AI_CONFIG_INCOMPLETE");
@@ -88,7 +87,6 @@ describe("AI lexical pipeline", () => {
 
     expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["youdao"]);
     expect(result.content.definitions[0]).toEqual(expect.objectContaining({ source: "youdao", text: "你好" }));
-    expect(result.requiredProviderFailure).toBeNull();
   });
 
   it("keeps an explicit Youdao selection strict when the dictionary returns no content", async () => {

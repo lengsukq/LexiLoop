@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { errorMessage } from "@/lib/format";
 import { fail, internalError, ok } from "@/lib/api";
 import { SECOND_MS } from "@/lib/time";
 import { z } from "zod";
@@ -89,6 +90,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "参数无效", 400, error.issues);
     const timeout = error instanceof DOMException && error.name === "TimeoutError";
     if (timeout) return fail("TIMEOUT", "连接超时（15秒）", 504);
-    return internalError(error, error instanceof Error ? error.message : "连接失败");
+    return internalError(error, errorMessage(error, "连接失败"));
   }
 }

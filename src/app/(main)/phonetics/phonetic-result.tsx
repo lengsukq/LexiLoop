@@ -17,7 +17,7 @@ export function PhoneticResult({ result, accent, items, onRestart, onExit }: {
 }) {
   return <div className="mx-auto max-w-2xl space-y-5 py-5">
     <Card className="overflow-hidden">
-      <GameResultHero gradient="bg-gradient-to-br from-[#00c7be] via-[#007aff] to-[#5856d6]" label={`${accent === "US" ? "美式" : "英式"}音标训练得分`} score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} heroPadding="py-10" labelTone="text-white/75" />
+      <GameResultHero gradient="bg-gradient-to-br from-[#00c7be] via-accent to-[#5856d6]" label={`${accent === "US" ? "美式" : "英式"}音标训练得分`} score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} heroPadding="py-10" labelTone="text-white/75" />
       <CardContent className="space-y-5 py-6 sm:px-8">
         <GameResultStats firstTryCorrect={result.firstTryCorrect} recovered={result.recovered} missed={result.missed} missedLabel="超时或跳过" />
         <GameResultAccuracy accuracy={result.accuracy} />

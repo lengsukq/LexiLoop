@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
+import { errorMessage } from "@/lib/format";
 import { apiFetch } from "@/lib/client-api";
 import type { AppSettings, LlmProviderConfig, LlmPurposeId } from "@/lib/types";
 import { parseModels, type ModelPickerState, type ProviderOperationState } from "./settings-shared";
@@ -113,7 +114,7 @@ export function useLlmSettings(settings: AppSettings | null, setSettings: Settin
       });
       setProviderTests((current) => ({ ...current, [index]: operation("success", `${result.model} 响应正常（${result.durationMs}ms）`) }));
     } catch (reason) {
-      setProviderTests((current) => ({ ...current, [index]: operation("error", reason instanceof Error ? reason.message : "连接失败") }));
+      setProviderTests((current) => ({ ...current, [index]: operation("error", errorMessage(reason, "连接失败")) }));
     }
   }
 
@@ -136,7 +137,7 @@ export function useLlmSettings(settings: AppSettings | null, setSettings: Settin
       setModelFilter("");
       setProviderModels((current) => ({ ...current, [index]: operation("success", `已读取 ${result.models.length} 个模型，请选择后加入。`) }));
     } catch (reason) {
-      setProviderModels((current) => ({ ...current, [index]: operation("error", reason instanceof Error ? reason.message : "读取模型失败") }));
+      setProviderModels((current) => ({ ...current, [index]: operation("error", errorMessage(reason, "读取模型失败")) }));
     }
   }
 

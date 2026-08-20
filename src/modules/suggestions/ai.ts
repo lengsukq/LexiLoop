@@ -1,9 +1,9 @@
-import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { getSettings, settingsForAiAttempt } from "@/modules/settings/service";
 import { z } from "zod";
 import { MINUTE_MS } from "@/lib/time";
 import { RECOMMENDATION_LIMIT } from "./content";
 import { extractJson } from "@/lib/json";
+import { callLlm } from "@/modules/llm/client";
 import type {
   AiSuggestionOutput,
   DailySuggestionMetrics,
@@ -23,34 +23,6 @@ const aiOutputSchema = z.object({
     reason: z.string().trim().min(1).max(160),
   })).max(10),
 }).passthrough();
-
-function responseText(payload: unknown, apiType: "openai" | "anthropic"): string {
-  if (!payload || typeof payload !== "object") return "";
-  const body = payload as Record<string, unknown>;
-  if (apiType === "anthropic") {
-    const content = Array.isArray(body.content) ? body.content : [];
-    return content
-      .map((item) => typeof item === "object" && item
-        ? String((item as Record<string, unknown>).text ?? "")
-        : "")
-      .join("")
-      .trim();
-  }
-
-  const choices = Array.isArray(body.choices) ? body.choices as Array<Record<string, unknown>> : [];
-  const message = choices[0]?.message;
-  const content = message && typeof message === "object"
-    ? (message as Record<string, unknown>).content
-    : null;
-  if (typeof content === "string") return content.trim();
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((item) => typeof item === "object" && item
-      ? String((item as Record<string, unknown>).text ?? "")
-      : "")
-    .join("")
-    .trim();
-}
 
 function candidatePayload(candidates: SuggestionCandidate[]) {
   return candidates.slice(0, 15).map((candidate) => ({
@@ -105,51 +77,11 @@ export async function generateAiSuggestion(
 
   const baseUrl = provider.baseUrl.trim().replace(/\/+$/, "");
   const prompt = buildPrompt(metrics, qualityScore, candidates);
-  const timeout = purpose.timeoutMs ?? MINUTE_MS;
-  const response = provider.apiType === "anthropic"
-    ? await fetch(`${baseUrl}/messages`, {
-        method: "POST",
-        signal: AbortSignal.timeout(timeout),
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": provider.apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: purpose.model,
-          max_tokens: purpose.maxOutputTokens ?? 2000,
-          temperature: purpose.temperature ?? 0.2,
-          system: "只输出有效 JSON。",
-          messages: [{ role: "user", content: prompt }],
-        }),
-      })
-    : await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        signal: AbortSignal.timeout(timeout),
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${provider.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: purpose.model,
-          messages: [
-            { role: "system", content: "只输出有效 JSON。" },
-            { role: "user", content: prompt },
-          ],
-          temperature: purpose.temperature ?? 0.2,
-          max_tokens: purpose.maxOutputTokens ?? 2000,
-        }),
-      });
-
-  const raw = await response.text().catch(() => "");
-  if (!response.ok) throw new Error(formatAiProviderError(response.status, raw));
-  let payload: unknown;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    throw new Error("AI 响应不是有效 JSON 包装");
-  }
-  const text = responseText(payload, provider.apiType);
+  const text = await callLlm(
+    { apiType: provider.apiType, baseUrl, apiKey: provider.apiKey, model: purpose.model, timeoutMs: purpose.timeoutMs ?? MINUTE_MS },
+    prompt,
+    { systemPrompt: "只输出有效 JSON。", maxOutputTokens: purpose.maxOutputTokens ?? 2000, temperature: purpose.temperature ?? 0.2 },
+  );
   if (!text) throw new Error("AI 没有返回建议内容");
   return {
     output: aiOutputSchema.parse(extractJson(text)) as AiSuggestionOutput,

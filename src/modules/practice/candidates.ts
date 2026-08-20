@@ -1,5 +1,6 @@
 import { sqlite } from "@/db/client";
 import { DAY_MS } from "@/lib/time";
+import { targetDefinitionTexts } from "@/modules/dictionary/content";
 import type {
   PracticeCandidate,
   PracticeCandidateRow,
@@ -11,19 +12,7 @@ const ACTIVE_SESSION_WINDOW_MS = DAY_MS;
 const CANDIDATE_QUERY_LIMIT = 160;
 
 export function extractPreferredDefinition(definitionsJson: string, targetLanguage: string): string | null {
-  try {
-    const definitions = JSON.parse(definitionsJson) as Array<{ language?: string; text?: string }>;
-    const targetDefinitions = definitions
-      .filter((definition) => definition.language === targetLanguage && definition.text?.trim())
-      .map((definition) => definition.text!.trim());
-    const fallbackDefinitions = definitions
-      .filter((definition) => definition.text?.trim())
-      .map((definition) => definition.text!.trim());
-    const selectedDefinitions = targetDefinitions.length ? targetDefinitions : fallbackDefinitions;
-    return selectedDefinitions.join("；") || null;
-  } catch {
-    return null;
-  }
+  return targetDefinitionTexts(definitionsJson, targetLanguage) || null;
 }
 
 export function practicePriority(candidate: PracticeCandidateRow, now: number): PracticePriority {

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { errorMessage } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, AudioLines, Blocks, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Hammer, Headphones, Layers, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
@@ -35,7 +36,7 @@ export default function HomePage() {
     try {
       setData(await apiFetch<Dashboard>("/api/dashboard"));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "加载失败");
+      setError(errorMessage(reason, "加载失败"));
     }
   }, []);
 
@@ -48,8 +49,8 @@ export default function HomePage() {
     return (
       <div className="grid min-h-[70vh] place-items-center">
         <div className="animate-scale-in text-center">
-          <Loader2 className="mx-auto size-10 animate-spin text-[#007aff]" />
-          <p className="mt-3 text-[15px] text-[#8e8e93]">正在加载…</p>
+          <Loader2 className="mx-auto size-10 animate-spin text-accent" />
+          <p className="mt-3 text-[15px] text-quaternary-label">正在加载…</p>
         </div>
       </div>
     );
@@ -58,7 +59,7 @@ export default function HomePage() {
   if (error) {
     return (
       <EmptyState
-        icon={<AlertCircle className="size-10 text-[#ff3b30]" />}
+        icon={<AlertCircle className="size-10 text-danger" />}
         title="首页数据加载失败"
         description={error}
         action={<button className={buttonClass("outline")} onClick={() => void load()}><RefreshCw className="size-4" />重试</button>}
@@ -73,7 +74,7 @@ export default function HomePage() {
       <div className="mx-auto max-w-3xl py-12">
         <EmptyState
           icon={
-            <div className="grid size-20 place-items-center rounded-[24px] bg-gradient-to-br from-[#007aff] to-[#5856d6] text-white shadow-[0_8px_24px_rgba(0,122,255,0.3)]">
+            <div className="grid size-20 place-items-center rounded-[24px] bg-gradient-to-br from-accent to-[#5856d6] text-white shadow-[0_8px_24px_rgba(0,122,255,0.3)]">
               <BookOpen className="size-10" />
             </div>
           }
@@ -91,7 +92,7 @@ export default function HomePage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Hero Card */}
-      <section className="animate-fade-up relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#0a84ff] via-[#5856d6] to-[#af52de] p-5 text-white shadow-[0_16px_56px_rgba(0,122,255,0.3),0_4px_16px_rgba(0,0,0,0.1),inset_0_2px_0_rgba(255,255,255,0.2)] sm:rounded-[28px] sm:p-10">
+      <section className="animate-fade-up relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#0a84ff] via-[#5856d6] to-purple p-5 text-white shadow-[0_16px_56px_rgba(0,122,255,0.3),0_4px_16px_rgba(0,0,0,0.1),inset_0_2px_0_rgba(255,255,255,0.2)] sm:rounded-[28px] sm:p-10">
         <div className="absolute -right-20 -top-20 size-56 rounded-full bg-white/[0.08] blur-3xl" />
         <div className="absolute -bottom-16 -left-16 size-44 rounded-full bg-white/[0.06] blur-2xl" />
         <div className="absolute right-1/4 top-0 size-32 rounded-full bg-white/[0.04] blur-xl" />
@@ -107,7 +108,7 @@ export default function HomePage() {
           </div>
           <Link
             href="/study?mode=DAILY"
-            className="ios-press inline-flex h-12 w-full shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-white/95 px-6 text-[16px] font-bold text-[#007aff] shadow-[0_6px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-sm sm:h-[54px] sm:w-auto sm:px-8 sm:text-[17px]"
+            className="ios-press inline-flex h-12 w-full shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-white/95 px-6 text-[16px] font-bold text-accent shadow-[0_6px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-sm sm:h-[54px] sm:w-auto sm:px-8 sm:text-[17px]"
           >
             <Sparkles className="size-5" />
             开始学习
@@ -130,9 +131,9 @@ export default function HomePage() {
 
       {data.resumeSession && (
         <Link href={`/study?mode=${encodeURIComponent(data.resumeSession.sessionType)}`} className="ios-press glass-inner flex items-center gap-3 rounded-[18px] p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(0,122,255,0.12)] sm:rounded-[20px] sm:p-5">
-          <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-[#007aff]/12 text-[#007aff] dark:text-[#0a84ff]"><Clock3 className="size-5" /></span>
-          <span className="min-w-0 flex-1"><b className="block text-[15px]">继续上次学习</b><small className="mt-0.5 block text-[13px] text-[#6e6e73] dark:text-[#98989d]">{sessionLabel(data.resumeSession.sessionType)} · 还剩 {data.resumeSession.remainingCount} 题</small></span>
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#007aff] dark:text-[#0a84ff]">继续<ArrowRight className="size-4" /></span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-[14px] bg-accent/12 text-accent"><Clock3 className="size-5" /></span>
+          <span className="min-w-0 flex-1"><b className="block text-[15px]">继续上次学习</b><small className="mt-0.5 block text-[13px] text-secondary-label">{sessionLabel(data.resumeSession.sessionType)} · 还剩 {data.resumeSession.remainingCount} 题</small></span>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-accent">继续<ArrowRight className="size-4" /></span>
         </Link>
       )}
 
@@ -143,19 +144,19 @@ export default function HomePage() {
         <Card className="animate-fade-up stagger-3">
           <CardHeader><CardTitle>今日队列</CardTitle></CardHeader>
           <CardContent className="grid gap-2.5 sm:grid-cols-3 sm:gap-3">
-            <QueueCard icon={<RotateCcw className="size-5" />} label="到期复习" count={data.plan.dueReviewCount} planned={data.plan.plannedDueReviewCount} href="/study?mode=DUE_REVIEW" gradient="from-[#007aff] to-[#5ac8fa]" />
-            <QueueCard icon={<AlertCircle className="size-5" />} label="错词强化" count={data.plan.wrongWordCount} planned={data.plan.plannedWrongWordCount} href="/study?mode=WRONG_WORDS" gradient="from-[#ff3b30] to-[#ff6961]" />
-            <QueueCard icon={<Sparkles className="size-5" />} label="新词学习" count={data.plan.newWordCount} planned={data.plan.plannedNewWordCount} href="/study?mode=NEW_WORDS" gradient="from-[#af52de] to-[#bf5af2]" />
+            <QueueCard icon={<RotateCcw className="size-5" />} label="到期复习" count={data.plan.dueReviewCount} planned={data.plan.plannedDueReviewCount} href="/study?mode=DUE_REVIEW" gradient="from-accent to-[#5ac8fa]" />
+            <QueueCard icon={<AlertCircle className="size-5" />} label="错词强化" count={data.plan.wrongWordCount} planned={data.plan.plannedWrongWordCount} href="/study?mode=WRONG_WORDS" gradient="from-danger to-[#ff6961]" />
+            <QueueCard icon={<Sparkles className="size-5" />} label="新词学习" count={data.plan.newWordCount} planned={data.plan.plannedNewWordCount} href="/study?mode=NEW_WORDS" gradient="from-purple to-purple" />
           </CardContent>
         </Card>
 
         {/* Stats move directly below today's queue for a clearer daily overview. */}
         <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {[
-            { label: "总词数", value: data.totalWords, detail: `${data.initializedWords} 个可学习`, icon: BookOpen, gradient: "from-[#007aff] to-[#5ac8fa]" },
-            { label: "已掌握", value: data.masteredWords, detail: `${Math.round((data.masteredWords / Math.max(1, data.totalWords)) * 100)}% 掌握率`, icon: CheckCircle2, gradient: "from-[#34c759] to-[#30d158]" },
-            { label: "今日已处理", value: data.todayProcessed, detail: data.todayAccuracy === null ? `${data.todaySkipped} 个稍后再学` : `${data.todayAccuracy}% 正确率`, icon: Brain, gradient: "from-[#af52de] to-[#bf5af2]" },
-            { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-[#ff3b30] to-[#ff6961]" : "from-[#8e8e93] to-[#aeaeb2]" },
+            { label: "总词数", value: data.totalWords, detail: `${data.initializedWords} 个可学习`, icon: BookOpen, gradient: "from-accent to-[#5ac8fa]" },
+            { label: "已掌握", value: data.masteredWords, detail: `${Math.round((data.masteredWords / Math.max(1, data.totalWords)) * 100)}% 掌握率`, icon: CheckCircle2, gradient: "from-success to-success" },
+            { label: "今日已处理", value: data.todayProcessed, detail: data.todayAccuracy === null ? `${data.todaySkipped} 个稍后再学` : `${data.todayAccuracy}% 正确率`, icon: Brain, gradient: "from-purple to-purple" },
+            { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-danger to-[#ff6961]" : "from-quaternary-label to-tertiary-label" },
           ].map((item, index) => (
             <Card key={item.label} className={`ios-lift animate-fade-up stagger-${index + 1}`}>
               <CardContent className="flex items-center gap-3 pt-4 sm:gap-4 sm:pt-5">
@@ -163,9 +164,9 @@ export default function HomePage() {
                   <item.icon className="size-5 sm:size-6" />
                 </div>
                 <div>
-                  <p className="text-[12px] font-medium text-[#8e8e93] dark:text-[#636366] sm:text-[13px]">{item.label}</p>
+                  <p className="text-[12px] font-medium text-quaternary-label dark:text-[#636366] sm:text-[13px]">{item.label}</p>
                   <p className="text-[22px] font-bold tracking-tight sm:text-[26px]">{item.value}</p>
-                  <p className="hidden text-xs text-[#aeaeb2] dark:text-[#48484a] sm:block">{item.detail}</p>
+                  <p className="hidden text-xs text-tertiary-label dark:text-[#48484a] sm:block">{item.detail}</p>
                 </div>
               </CardContent>
             </Card>
@@ -180,21 +181,21 @@ export default function HomePage() {
               icon={<Headphones className="size-5" />}
               title="听力拼写"
               subtitle="听发音后输入词条"
-              gradient="from-[#5ac8fa] to-[#007aff]"
+              gradient="from-[#5ac8fa] to-accent"
             />
             <PracticeLink
               href="/study?mode=SPELLING"
               icon={<PenLine className="size-5" />}
               title="中文拼写"
               subtitle="根据释义回忆英文"
-              gradient="from-[#ff9500] to-[#ff6961]"
+              gradient="from-warning to-[#ff6961]"
             />
             <PracticeLink
               href="/study?mode=SENTENCE_REVIEW"
               icon={<MessageSquareText className="size-5" />}
               title="句子复习"
               subtitle={`理解与还原完整句子 · ${data.plan.sentenceReviewCount} 个待练`}
-              gradient="from-[#5856d6] to-[#af52de]"
+              gradient="from-[#5856d6] to-purple"
             />
           </CardContent>
         </Card>
@@ -202,17 +203,17 @@ export default function HomePage() {
 
       <Card className="animate-fade-up stagger-5">
         <CardHeader className="flex-row items-center justify-between gap-3">
-          <div><CardTitle>趣味训练</CardTitle><p className="mt-1 text-xs text-[#8e8e93]">独立游戏模式，不占用今日复习队列</p></div>
+          <div><CardTitle>趣味训练</CardTitle><p className="mt-1 text-xs text-quaternary-label">独立游戏模式，不占用今日复习队列</p></div>
         </CardHeader>
         <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
-          <PracticeLink href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-[#af52de] to-[#5856d6]" />
-          <PracticeLink href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-[#007aff]" />
-          <PracticeLink href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-[#ff9500] to-[#ff6961]" />
-          <PracticeLink href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-[#007aff]" />
-          <PracticeLink href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-[#34c759] to-[#007aff]" />
-          <PracticeLink href="/games?mode=WHACK_A_MOLE" icon={<Hammer className="size-5" />} title="词汇地鼠" subtitle="锤出正确单词" gradient="from-[#34c759] to-[#00c7be]" />
-          <PracticeLink href="/games?mode=WORD_STACK" icon={<Layers className="size-5" />} title="单词堆堆乐" subtitle="点词块搭高塔" gradient="from-[#ff2d55] to-[#ff9500]" />
-          <PracticeLink href="/games?mode=WORD_TETRIS" icon={<Blocks className="size-5" />} title="词汇俄罗斯方块" subtitle="点中下落的正确单词" gradient="from-[#5856d6] to-[#af52de]" />
+          <PracticeLink href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-purple to-[#5856d6]" />
+          <PracticeLink href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-accent" />
+          <PracticeLink href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-warning to-[#ff6961]" />
+          <PracticeLink href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-accent" />
+          <PracticeLink href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-success to-accent" />
+          <PracticeLink href="/games?mode=WHACK_A_MOLE" icon={<Hammer className="size-5" />} title="词汇地鼠" subtitle="锤出正确单词" gradient="from-success to-[#00c7be]" />
+          <PracticeLink href="/games?mode=WORD_STACK" icon={<Layers className="size-5" />} title="单词堆堆乐" subtitle="点词块搭高塔" gradient="from-[#ff2d55] to-warning" />
+          <PracticeLink href="/games?mode=WORD_TETRIS" icon={<Blocks className="size-5" />} title="词汇俄罗斯方块" subtitle="点中下落的正确单词" gradient="from-[#5856d6] to-purple" />
         </CardContent>
       </Card>
     </div>
@@ -228,7 +229,7 @@ function QueueCard({ icon, label, count, planned, href, gradient }: {
         <span className={`grid size-10 place-items-center rounded-[14px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)]`}>{icon}</span>
         <ArrowRight className="hidden size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 sm:block dark:text-[#38383a]" />
       </div>
-      <div className="min-w-0 flex-1 sm:mt-5"><p className="text-[23px] font-bold leading-none tracking-tight sm:text-[30px]">{planned}</p><p className="mt-1 text-[13px] font-semibold text-[#6e6e73] dark:text-[#98989d]">{label}</p><p className="mt-0.5 text-xs text-[#aeaeb2] dark:text-[#48484a]">共 {count} 个待处理</p></div>
+      <div className="min-w-0 flex-1 sm:mt-5"><p className="text-[23px] font-bold leading-none tracking-tight sm:text-[30px]">{planned}</p><p className="mt-1 text-[13px] font-semibold text-secondary-label">{label}</p><p className="mt-0.5 text-xs text-tertiary-label dark:text-[#48484a]">共 {count} 个待处理</p></div>
       <ArrowRight className="size-4 shrink-0 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 sm:hidden dark:text-[#38383a]" />
     </Link>
   );
@@ -243,7 +244,7 @@ function PracticeLink({ href, icon, title, subtitle, gradient }: {
         <span className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)] sm:size-11 sm:rounded-[14px]`}>{icon}</span>
         <span>
           <b className="block text-[15px] font-semibold">{title}</b>
-          <small className="text-[13px] text-[#8e8e93] dark:text-[#636366]">{subtitle}</small>
+          <small className="text-[13px] text-quaternary-label dark:text-[#636366]">{subtitle}</small>
         </span>
       </span>
       <ArrowRight className="size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 dark:text-[#38383a]" />

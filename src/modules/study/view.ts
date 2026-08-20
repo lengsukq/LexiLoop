@@ -1,7 +1,7 @@
 import { sqlite } from "@/db/client";
 import { ApiError } from "@/lib/api";
 import type { DictionaryContent, EntryType, QuestionType, StudyItemView } from "@/lib/types";
-import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
+import { dictionaryContentFromRow, emptyDictionaryContent, preferredDefinitionText, targetDefinitionTexts } from "@/modules/dictionary/content";
 
 const DISTRACTOR_POOL_SIZE = 80;
 const DISTRACTOR_TAKE_SIZE = 12;
@@ -65,21 +65,6 @@ export async function getStudySession(sessionId: number, resumed = false) {
   return { resumed, resumeIndex: resumeIndex === -1 ? items.length : resumeIndex, session: { id: Number(session.id), sessionType: session.source_type === "AI_RECOMMENDED" || session.source_type === "SENTENCE_REVIEW" ? String(session.source_type) : String(session.session_type), startedAt: new Date(Number(session.started_at)).toISOString(), completedAt: session.completed_at ? new Date(Number(session.completed_at)).toISOString() : null, plannedCount: Number(session.planned_count), completedCount: Number(session.completed_count), correctCount: Number(session.correct_count), wrongCount: Number(session.wrong_count), skippedCount: Number(session.skipped_count ?? 0), durationMs: session.duration_ms === null ? null : Number(session.duration_ms) }, items };
 }
 
-function definitionTexts(raw: string, targetLanguage: string): string[] {
-  try {
-    const definitions = JSON.parse(raw) as Array<{ language?: string; text?: string }>;
-    const target = definitions.filter((item) => item.language === targetLanguage).map((item) => item.text?.trim() ?? "").filter(Boolean);
-    return target.length ? target : definitions.map((item) => item.text?.trim() ?? "").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function targetDefinitionTexts(content: DictionaryContent, targetLanguage: string): string[] {
-  const targetDefinitions = content.definitions.filter((item) => item.language === targetLanguage).map((item) => item.text.trim()).filter(Boolean);
-  return targetDefinitions.length ? targetDefinitions : content.definitions.map((item) => item.text.trim()).filter(Boolean);
-}
-
 function shuffle<T>(items: T[]): T[] {
   for (let index = items.length - 1; index > 0; index--) {
     const other = Math.floor(Math.random() * (index + 1));
@@ -89,30 +74,30 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 async function generateMeaningChoices(wordId: number, targetLanguage: string, content: DictionaryContent): Promise<string[]> {
-  const definitions = targetDefinitionTexts(content, targetLanguage);
-  const correct = definitions.join("；"); if (!correct) return [];
+  const definitions = targetDefinitionTexts(content.definitions, targetLanguage);
+  const correct = definitions; if (!correct) return [];
   const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
   const distractors: string[] = []; const seen = new Set([correct.toLocaleLowerCase()]);
-  for (const row of rows) { if (distractors.length >= 3) break; const text = definitionTexts(row.definitions_json, targetLanguage)[0]; if (text && !seen.has(text.toLocaleLowerCase())) { seen.add(text.toLocaleLowerCase()); distractors.push(text); } }
+  for (const row of rows) { if (distractors.length >= 3) break; const text = preferredDefinitionText(row.definitions_json, targetLanguage); if (text && !seen.has(text.toLocaleLowerCase())) { seen.add(text.toLocaleLowerCase()); distractors.push(text); } }
   return shuffle([correct, ...distractors]);
 }
 
 async function generateWordChoices(wordId: number, term: string, targetLanguage: string, content: DictionaryContent): Promise<{ choices: string[]; choiceDefinitions: Record<string, string> }> {
-  const correctDefinitions = targetDefinitionTexts(content, targetLanguage);
-  if (!correctDefinitions.length) return { choices: [], choiceDefinitions: {} };
+  const correctDefinitions = targetDefinitionTexts(content.definitions, targetLanguage);
+  if (!correctDefinitions) return { choices: [], choiceDefinitions: {} };
   const correct = term.trim();
   const choices = [correct];
-  const choiceDefinitions: Record<string, string> = { [correct]: correctDefinitions.join("；") };
+  const choiceDefinitions: Record<string, string> = { [correct]: correctDefinitions };
   const seen = new Set([correct.toLocaleLowerCase()]);
   const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
   for (const row of rows) {
     if (choices.length >= 4) break;
     const candidateTerm = row.term.trim();
-    const candidateDefinitions = definitionTexts(row.definitions_json, targetLanguage);
-    if (!candidateTerm || !candidateDefinitions.length || seen.has(candidateTerm.toLocaleLowerCase())) continue;
+    const candidateDefinitions = targetDefinitionTexts(row.definitions_json, targetLanguage);
+    if (!candidateTerm || !candidateDefinitions || seen.has(candidateTerm.toLocaleLowerCase())) continue;
     seen.add(candidateTerm.toLocaleLowerCase());
     choices.push(candidateTerm);
-    choiceDefinitions[candidateTerm] = candidateDefinitions.join("；");
+    choiceDefinitions[candidateTerm] = candidateDefinitions;
   }
   return { choices: shuffle(choices), choiceDefinitions };
 }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { errorMessage } from "@/lib/format";
 import { fail, internalError, ok } from "@/lib/api";
 import { tencentTranslateText, TencentTranslateError } from "@/lib/tencent-translate-client";
 import { z } from "zod";
@@ -28,6 +29,6 @@ export async function POST(request: NextRequest) {
     }
     const timeout = error instanceof DOMException && error.name === "TimeoutError";
     if (timeout) return fail("TIMEOUT", "连接超时（8秒）", 504);
-    return internalError(error, error instanceof Error ? error.message : "连接失败");
+    return internalError(error, errorMessage(error, "连接失败"));
   }
 }

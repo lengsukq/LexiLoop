@@ -1,5 +1,4 @@
-import { NextRequest } from "next/server";
-import { handleRouteError, ok, requireRouteId } from "@/lib/api";
+import { createCompleteHandler } from "@/lib/route-factory";
 import { completeGameSession, GAME_MODES } from "@/modules/games/service";
 import { MAX_ACTIVE_ANSWER_DURATION_MS } from "@/modules/reviews/duration";
 import { HOUR_MS } from "@/lib/time";
@@ -20,13 +19,10 @@ const schema = z.object({
 });
 
 export const dynamic = "force-dynamic";
-
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const sessionId = requireRouteId((await context.params).id, "VALIDATION_ERROR", "小游戏会话 ID 无效。");
-    const input = schema.parse(await request.json());
-    return ok(await completeGameSession({ sessionId, ...input }));
-  } catch (error) {
-    return handleRouteError(error, { validationMessage: "小游戏结果参数无效。", fallbackMessage: "保存小游戏结果失败。" });
-  }
-}
+export const POST = createCompleteHandler({
+  schema,
+  complete: completeGameSession,
+  idErrorMessage: "小游戏会话 ID 无效。",
+  validationMessage: "小游戏结果参数无效。",
+  fallbackMessage: "保存小游戏结果失败。",
+});

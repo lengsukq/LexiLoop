@@ -10,6 +10,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { Badge, Button, Card, Progress, buttonClass } from "@/components/ui";
+import { entryTypeLabel } from "@/lib/entry-type-label";
 import { InitializationBadge, MasteryBadge } from "@/components/status-badges";
 import type { WordDetail } from "../word-detail-types";
 
@@ -60,7 +61,7 @@ export function WordHeader({
     </div>
 
     <Card className="overflow-hidden">
-      <div className="bg-gradient-to-br from-[#007aff] to-[#5856d6] p-5 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
+      <div className="bg-gradient-to-br from-accent to-[#5856d6] p-5 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <WordBadges word={word} />
@@ -131,10 +132,4 @@ function PronunciationControls({ accent, phonetic, tip, onAccentChange, onPlay }
     <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void onPlay()}><Volume2 className="size-4" />播放发音</button>
     {tip && <p className="w-full text-xs text-amber-300">{tip}</p>}
   </div>;
-}
-
-function entryTypeLabel(entryType: string): string {
-  if (entryType === "WORD") return "单词";
-  if (entryType === "SENTENCE") return "句子";
-  return "短语";
 }

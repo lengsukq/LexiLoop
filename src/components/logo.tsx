@@ -8,14 +8,14 @@ const sizes = {
     icon: "size-5",
     shadow: "shadow-[0_6px_20px_rgba(0,122,255,0.4),inset_0_1px_0_rgba(255,255,255,0.3)]",
     title: "text-[18px] tracking-tight",
-    subtitle: "text-[11px] text-[#8e8e93] dark:text-[#636366]",
+    subtitle: "text-[11px] text-quaternary-label dark:text-[#636366]",
   },
   lg: {
     box: "size-14 rounded-[19px]",
     icon: "size-6",
     shadow: "shadow-[0_10px_30px_rgba(0,122,255,0.34),inset_0_1px_0_rgba(255,255,255,0.35)]",
     title: "text-[21px] tracking-[-0.03em]",
-    subtitle: "text-[12px] text-[#8e8e93] dark:text-[#98989d]",
+    subtitle: "text-[12px] text-quaternary-label dark:text-secondary-label",
   },
 } as const;
 

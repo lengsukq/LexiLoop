@@ -38,12 +38,12 @@ export default function PhoneticsPage() {
     <GamePlayHeader remainingMs={game.remainingMs} combo={game.combo} exit={<button type="button" className={buttonClass("ghost", "sm")} onClick={game.exit}><ArrowLeft className="size-4" />退出</button>} />
 
     <div className="space-y-2">
-      <div className="flex justify-between text-xs text-[#8e8e93]"><span>音标训练 · 第 {game.index + 1}/{game.session.items.length} 题</span><span>错答 {game.mistakeCount}</span></div>
+      <div className="flex justify-between text-xs text-quaternary-label"><span>音标训练 · 第 {game.index + 1}/{game.session.items.length} 题</span><span>错答 {game.mistakeCount}</span></div>
       <Progress value={progress} />
     </div>
 
     <Card className="overflow-hidden">
-      <div className="bg-gradient-to-r from-[#00c7be] via-[#007aff] to-[#5856d6] px-5 py-4 text-white sm:px-7">
+      <div className="bg-gradient-to-r from-[#00c7be] via-accent to-[#5856d6] px-5 py-4 text-white sm:px-7">
         <div className="flex items-center justify-between gap-3">
           <div><b className="block text-[16px]">音标辨音训练营</b><small className="text-white/75">{game.accent === "US" ? "美式发音" : "英式发音"} · 声音、音标和拼写联动</small></div>
           <Badge tone="glass">{game.accent}</Badge>

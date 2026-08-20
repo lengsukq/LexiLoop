@@ -9,11 +9,11 @@ const FALL_MIN_MS = 4200;
 const FALL_SPREAD_MS = 1800;
 
 const STACK_COLORS = [
-  "from-[#5856d6] to-[#af52de]",
-  "from-[#007aff] to-[#5ac8fa]",
-  "from-[#ff2d55] to-[#ff9500]",
-  "from-[#34c759] to-[#00c7be]",
-  "from-[#ff9500] to-[#ff6961]",
+  "from-[#5856d6] to-purple",
+  "from-accent to-[#5ac8fa]",
+  "from-[#ff2d55] to-warning",
+  "from-success to-[#00c7be]",
+  "from-warning to-[#ff6961]",
 ];
 
 type BlockState = "falling" | "shaking" | "smashed" | "landed";
@@ -85,9 +85,9 @@ export function WordTetris({ item, danger, dangerCap, onSolved, onMistake, onLan
   const urgent = danger >= dangerCap - 1;
 
   return <div className="text-center">
-    <p className="text-[13px] text-[#8e8e93]">看释义，点中正在下落的正确单词</p>
+    <p className="text-[13px] text-quaternary-label">看释义，点中正在下落的正确单词</p>
     <h1 className="mx-auto mt-3 max-w-xl text-xl font-bold leading-relaxed sm:text-2xl">{item.definition}</h1>
-    <div className="relative mx-auto mt-6 h-[420px] max-w-lg overflow-hidden rounded-[18px] border border-[#5856d6]/15 bg-gradient-to-b from-[#5856d6]/[0.05] to-[#af52de]/[0.08]">
+    <div className="relative mx-auto mt-6 h-[420px] max-w-lg overflow-hidden rounded-[18px] border border-[#5856d6]/15 bg-gradient-to-b from-[#5856d6]/[0.05] to-purple/[0.08]">
       {blocks.map((block) => {
         const innerClass = block.state === "smashed"
           ? "animate-[tetris-smash_0.42s_ease-out_forwards]"
@@ -120,6 +120,6 @@ export function WordTetris({ item, danger, dangerCap, onSolved, onMistake, onLan
         })}
       </div>
     </div>
-    <p className={`mt-4 text-xs ${urgent ? "font-bold text-[#ff3b30] dark:text-[#ff453a]" : "text-[#aeaeb2]"}`}>堆叠 {danger}/{dangerCap} · 点错会记一次失误 · 堆满结束本轮</p>
+    <p className={`mt-4 text-xs ${urgent ? "font-bold text-danger dark:text-danger" : "text-tertiary-label"}`}>堆叠 {danger}/{dangerCap} · 点错会记一次失误 · 堆满结束本轮</p>
   </div>;
 }

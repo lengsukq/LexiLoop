@@ -1,32 +1,13 @@
 import type { ReviewRating } from "@/lib/types";
 import { normalizeTerm } from "@/modules/imports/normalizer";
+import { targetDefinitions, type DefinitionValue } from "@/modules/dictionary/content";
 import type { AnswerInput, ReviewWordRow } from "./types";
-
-interface DefinitionValue {
-  language: string;
-  text: string;
-}
 
 export interface AnswerEvaluation {
   isCorrect: boolean;
   effectiveRating: ReviewRating;
   expectedAnswer: string;
   presentedPrompt: string;
-}
-
-function parseDefinitions(raw: string | null): DefinitionValue[] {
-  if (!raw) return [];
-  try {
-    return (JSON.parse(raw) as DefinitionValue[]).filter((item) => typeof item.text === "string");
-  } catch {
-    return [];
-  }
-}
-
-function targetDefinitions(word: ReviewWordRow): DefinitionValue[] {
-  const definitions = parseDefinitions(word.definitions_json);
-  const target = definitions.filter((definition) => definition.language === word.target_language);
-  return target.length ? target : definitions;
 }
 
 function normalizeSentenceAnswer(value: string): string {
@@ -66,7 +47,7 @@ function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definitions: D
 }
 
 export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): AnswerEvaluation {
-  const definitions = targetDefinitions(word);
+  const definitions = targetDefinitions(word.definitions_json, word.target_language);
   const isCorrect = isAnswerCorrect(input, word, definitions);
   const objectivelyScored = input.questionType === "ZH_TO_EN_SPELLING"
     || input.questionType === "LISTENING_SPELLING"

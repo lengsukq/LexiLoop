@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui";
 
 /**
  * Gradient hero at the top of a result screen. `gradient` is the full background
- * class (e.g. "bg-gradient-to-br from-[#34c759] via-[#0a84ff] to-[#5856d6]").
+ * class (e.g. "bg-gradient-to-br from-success via-[#0a84ff] to-[#5856d6]").
  * `heroPadding`/`labelTone` keep per-game spacing/opacity differences intact.
  */
 export function GameResultHero({ gradient, label, score, elapsedMs, maxCombo, heroPadding = "py-9", labelTone = "text-white/70" }: {
@@ -36,24 +36,24 @@ export function GameResultStats({ firstTryCorrect, recovered, missed, firstLabel
   missedLabel?: string;
 }) {
   return <div className="grid grid-cols-3 gap-3 text-center">
-    <div className="rounded-[16px] bg-[#34c759]/[0.08] p-3"><p className="text-2xl font-bold text-[#248a3d] dark:text-[#30d158]">{firstTryCorrect}</p><p className="text-xs text-[#8e8e93]">{firstLabel}</p></div>
-    <div className="rounded-[16px] bg-[#ff9500]/[0.08] p-3"><p className="text-2xl font-bold text-[#c93400] dark:text-[#ff9f0a]">{recovered}</p><p className="text-xs text-[#8e8e93]">{recoveredLabel}</p></div>
-    <div className="rounded-[16px] bg-[#ff3b30]/[0.08] p-3"><p className="text-2xl font-bold text-[#d70015] dark:text-[#ff453a]">{missed}</p><p className="text-xs text-[#8e8e93]">{missedLabel}</p></div>
+    <div className="rounded-[16px] bg-success/[0.08] p-3"><p className="text-2xl font-bold text-success-deep">{firstTryCorrect}</p><p className="text-xs text-quaternary-label">{firstLabel}</p></div>
+    <div className="rounded-[16px] bg-warning/[0.08] p-3"><p className="text-2xl font-bold text-warning-deep">{recovered}</p><p className="text-xs text-quaternary-label">{recoveredLabel}</p></div>
+    <div className="rounded-[16px] bg-danger/[0.08] p-3"><p className="text-2xl font-bold text-danger-deep">{missed}</p><p className="text-xs text-quaternary-label">{missedLabel}</p></div>
   </div>;
 }
 
 /** First-try accuracy row with a progress bar. */
 export function GameResultAccuracy({ accuracy, label = "首次正确率" }: { accuracy: number; label?: string }) {
   return <div>
-    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-[#6e6e73] dark:text-[#98989d]">{label}</span><b>{accuracy}%</b></div>
+    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-secondary-label">{label}</span><b>{accuracy}%</b></div>
     <Progress value={accuracy} />
   </div>;
 }
 
 /** Orange callout reminding that mistaken/missed words were recorded. */
 export function GameMistakeCallout({ children }: { children: ReactNode }) {
-  return <div className="flex items-start gap-3 rounded-[16px] bg-[#ff9500]/[0.08] p-4">
-    <Flame className="mt-0.5 size-5 shrink-0 text-[#ff9500]" />
-    <p className="text-sm leading-relaxed text-[#8a3b00] dark:text-[#ff9f0a]">{children}</p>
+  return <div className="flex items-start gap-3 rounded-[16px] bg-warning/[0.08] p-4">
+    <Flame className="mt-0.5 size-5 shrink-0 text-warning" />
+    <p className="text-sm leading-relaxed text-[#8a3b00] dark:text-warning">{children}</p>
   </div>;
 }

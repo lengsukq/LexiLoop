@@ -34,7 +34,7 @@ export function ProviderCard({
         <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ProviderTextField label="名称" value={provider.name} placeholder="例如: 我的 OpenAI" onChange={(value) => onUpdateField(index, "name", value)} />
           <label className="space-y-1.5">
-            <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">API 类型</span>
+            <span className="text-xs font-medium text-secondary-label">API 类型</span>
             <Select className="w-full" value={provider.apiType} onChange={(event) => onUpdateField(index, "apiType", event.target.value)}>
               <option value="openai">OpenAI 兼容</option>
               <option value="anthropic">Anthropic</option>
@@ -48,17 +48,17 @@ export function ProviderCard({
           />
           <ProviderTextField label="API Key" value={provider.apiKey} placeholder="sk-..." type="password" onChange={(value) => onUpdateField(index, "apiKey", value)} />
         </div>
-        <Button variant="ghost" size="sm" className="shrink-0 text-[#ff3b30]" onClick={() => onRemove(index)} aria-label="移除 Provider"><Trash2 className="size-4" /></Button>
+        <Button variant="ghost" size="sm" className="shrink-0 text-danger" onClick={() => onRemove(index)} aria-label="移除 Provider"><Trash2 className="size-4" /></Button>
       </div>
 
       <label className="mt-3 block space-y-1.5">
-        <span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">可保存模型</span>
+        <span className="text-xs font-medium text-secondary-label">可保存模型</span>
         <Input value={(provider.models ?? []).join(", ")} onChange={(event) => onUpdateModels(index, event.target.value)} placeholder="从 Models 接口获取，或手动输入（用逗号分隔）" />
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" type="button" onClick={() => void onFetchModels(index)} disabled={modelState?.state === "loading"}>
             {modelState?.state === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}从 Models 接口获取
           </Button>
-          <span className="text-xs text-[#aeaeb2]">读取当前 Provider 的 `/models` 并加入清单。</span>
+          <span className="text-xs text-tertiary-label">读取当前 Provider 的 `/models` 并加入清单。</span>
           <OperationMessage operation={modelState} />
         </div>
       </label>
@@ -84,10 +84,10 @@ function ProviderTextField({ label, value, placeholder, type = "text", onChange 
   type?: "text" | "password";
   onChange: (value: string) => void;
 }) {
-  return <label className="space-y-1.5"><span className="text-xs font-medium text-[#6e6e73] dark:text-[#98989d]">{label}</span><Input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></label>;
+  return <label className="space-y-1.5"><span className="text-xs font-medium text-secondary-label">{label}</span><Input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></label>;
 }
 
 function OperationMessage({ operation }: { operation?: ProviderOperationState }) {
   if (!operation || operation.state === "idle" || operation.state === "loading" || operation.state === "testing") return null;
-  return <span className={`text-xs ${operation.state === "success" ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{operation.message}</span>;
+  return <span className={`text-xs ${operation.state === "success" ? "text-success" : "text-danger"}`}>{operation.message}</span>;
 }

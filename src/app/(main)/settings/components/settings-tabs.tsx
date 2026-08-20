@@ -11,7 +11,7 @@ export function SettingsTabs({ active, onChange }: { active: SettingsTab; onChan
           className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
             active === tab.id
               ? "bg-white text-[#1c1c1e] shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:bg-white/[0.12] dark:text-white"
-              : "text-[#6e6e73] hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white"
+              : "text-secondary-label hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:text-white"
           }`}
         >
           {tab.label}

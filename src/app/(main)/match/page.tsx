@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { errorMessage } from "@/lib/format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, CheckCircle2, Gamepad2, Loader2, RotateCcw,
@@ -121,7 +122,7 @@ export default function MatchPage() {
       setResult(saved);
       setPhase("result");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存配对结果失败");
+      setError(errorMessage(reason, "保存配对结果失败"));
       setPhase("save-error");
       finishingRef.current = false;
     }
@@ -160,7 +161,7 @@ export default function MatchPage() {
       setSummaryItems([]);
       setPhase("playing");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "创建配对游戏失败");
+      setError(errorMessage(reason, "创建配对游戏失败"));
       setPhase("setup");
     }
   }
@@ -208,7 +209,7 @@ export default function MatchPage() {
         <Badge tone="purple"><Gamepad2 className="size-3.5" />趣味练习</Badge>
       </div>
       <Card className="overflow-hidden">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#af52de] via-[#5856d6] to-[#007aff] px-5 py-8 text-white sm:px-10 sm:py-11">
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-[#5856d6] to-accent px-5 py-8 text-white sm:px-10 sm:py-11">
           <div className="absolute -right-12 -top-12 size-40 rounded-full bg-white/10 blur-3xl" />
           <div className="relative text-center">
             <span className="mx-auto grid size-16 place-items-center rounded-[20px] bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl"><Zap className="size-8" /></span>
@@ -220,17 +221,17 @@ export default function MatchPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             {PRESETS.map((item) => {
               const active = presetId === item.id;
-              return <button key={item.id} type="button" onClick={() => setPresetId(item.id)} className={`ios-press rounded-[18px] border p-4 text-left transition-all ${active ? "border-[#007aff]/45 bg-[#007aff]/[0.08] shadow-[0_8px_30px_rgba(0,122,255,0.12)]" : "glass-inner border-white/40 hover:border-[#007aff]/25 dark:border-white/[0.08]"}`}>
-                <div className="flex items-center justify-between"><b className="text-[15px]">{item.name}</b>{active && <CheckCircle2 className="size-4 text-[#007aff]" />}</div>
-                <p className="mt-2 text-xs text-[#8e8e93]">{item.pairs} 组 · {item.seconds} 秒</p>
-                <p className="mt-1 text-xs text-[#aeaeb2]">{item.desc}</p>
+              return <button key={item.id} type="button" onClick={() => setPresetId(item.id)} className={`ios-press rounded-[18px] border p-4 text-left transition-all ${active ? "border-accent/45 bg-accent/[0.08] shadow-[0_8px_30px_rgba(0,122,255,0.12)]" : "glass-inner border-white/40 hover:border-accent/25 dark:border-white/[0.08]"}`}>
+                <div className="flex items-center justify-between"><b className="text-[15px]">{item.name}</b>{active && <CheckCircle2 className="size-4 text-accent" />}</div>
+                <p className="mt-2 text-xs text-quaternary-label">{item.pairs} 组 · {item.seconds} 秒</p>
+                <p className="mt-1 text-xs text-tertiary-label">{item.desc}</p>
               </button>;
             })}
           </div>
           <div className="grid grid-cols-3 gap-2 rounded-[16px] bg-black/[0.025] p-3 text-center dark:bg-white/[0.035]">
-            <div><p className="text-lg font-bold">{preset.pairs}</p><p className="text-xs text-[#8e8e93]">词汇组数</p></div>
-            <div><p className="text-lg font-bold">{preset.seconds}s</p><p className="text-xs text-[#8e8e93]">限时时间</p></div>
-            <div><p className="text-lg font-bold text-[#ff3b30]">优先</p><p className="text-xs text-[#8e8e93]">错词加入</p></div>
+            <div><p className="text-lg font-bold">{preset.pairs}</p><p className="text-xs text-quaternary-label">词汇组数</p></div>
+            <div><p className="text-lg font-bold">{preset.seconds}s</p><p className="text-xs text-quaternary-label">限时时间</p></div>
+            <div><p className="text-lg font-bold text-danger">优先</p><p className="text-xs text-quaternary-label">错词加入</p></div>
           </div>
           <GameErrorBanner error={error} />
           <Button size="lg" className="w-full" onClick={() => void startGame()} disabled={phase === "loading"}>
@@ -245,7 +246,7 @@ export default function MatchPage() {
   if (phase === "result" && result) {
     return <div className="mx-auto max-w-2xl space-y-5 py-6">
       <Card className="overflow-hidden">
-        <GameResultHero gradient="bg-gradient-to-br from-[#34c759] via-[#0a84ff] to-[#5856d6]" label="本轮得分" score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} />
+        <GameResultHero gradient="bg-gradient-to-br from-success via-[#0a84ff] to-[#5856d6]" label="本轮得分" score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} />
         <CardContent className="space-y-5 py-6 sm:px-8">
           <GameResultStats firstTryCorrect={result.firstTryCorrect} recovered={result.recovered} missed={result.missed} firstLabel="一次配对" missedLabel="未完成" />
           <GameResultAccuracy accuracy={result.accuracy} label="首次配对正确率" />
@@ -267,7 +268,7 @@ export default function MatchPage() {
   return <div className="mx-auto max-w-4xl space-y-3 pb-3 sm:space-y-5 sm:py-4">
     <GamePlayHeader remainingMs={remainingMs} combo={combo} exit={<Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link>} />
     <div className="space-y-2">
-      <div className="flex justify-between text-xs text-[#8e8e93]"><span>已配对 {matched.size}/{session.pairCount}</span><span>错配 {mistakeCount}</span></div>
+      <div className="flex justify-between text-xs text-quaternary-label"><span>已配对 {matched.size}/{session.pairCount}</span><span>错配 {mistakeCount}</span></div>
       <Progress value={progress} />
     </div>
 
@@ -298,9 +299,9 @@ function MatchCard({ side, item, selected, matched, wrong, onClick }: {
 }) {
   const active = selected?.side === side && selected.itemId === item.itemId;
   const priority = side === "word" && item.priority !== "NORMAL";
-  return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[58px] w-full items-center rounded-[15px] border px-3 py-2.5 text-left transition-all duration-200 sm:min-h-[68px] sm:rounded-[18px] sm:px-4 ${matched ? "pointer-events-none scale-95 border-[#34c759]/20 bg-[#34c759]/[0.08] opacity-0" : wrong ? "animate-[shake_0.35s_ease-in-out] border-[#ff3b30] bg-[#ff3b30]/10 text-[#d70015] dark:text-[#ff453a]" : active ? "border-[#007aff] bg-[#007aff]/10 shadow-[0_6px_24px_rgba(0,122,255,0.18)]" : "glass-inner border-white/45 hover:border-[#007aff]/35 dark:border-white/[0.08]"}`}>
-    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] sm:text-[17px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-[#ff3b30]">重点复习</small>}</span> : <span className="line-clamp-4 break-words text-[13px] leading-snug sm:text-[14px]">{item.definition}</span>}
-    {active && <span className="absolute right-2 top-2 size-2 rounded-full bg-[#007aff]" />}
-    {wrong && <XCircle className="absolute right-2 top-2 size-4 text-[#ff3b30]" />}
+  return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[58px] w-full items-center rounded-[15px] border px-3 py-2.5 text-left transition-all duration-200 sm:min-h-[68px] sm:rounded-[18px] sm:px-4 ${matched ? "pointer-events-none scale-95 border-success/20 bg-success/[0.08] opacity-0" : wrong ? "animate-[shake_0.35s_ease-in-out] border-danger bg-danger/10 text-danger-deep" : active ? "border-accent bg-accent/10 shadow-[0_6px_24px_rgba(0,122,255,0.18)]" : "glass-inner border-white/45 hover:border-accent/35 dark:border-white/[0.08]"}`}>
+    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] sm:text-[17px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-danger">重点复习</small>}</span> : <span className="line-clamp-4 break-words text-[13px] leading-snug sm:text-[14px]">{item.definition}</span>}
+    {active && <span className="absolute right-2 top-2 size-2 rounded-full bg-accent" />}
+    {wrong && <XCircle className="absolute right-2 top-2 size-4 text-danger" />}
   </button>;
 }

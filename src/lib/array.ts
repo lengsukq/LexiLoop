@@ -7,3 +7,11 @@ export function shuffle<T>(items: readonly T[]): T[] {
   }
   return output;
 }
+
+/** Return a new Set with the value toggled (removed if present, added otherwise). */
+export function toggleSetValue<T>(current: ReadonlySet<T>, value: T): Set<T> {
+  const next = new Set(current);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}

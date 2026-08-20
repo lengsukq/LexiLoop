@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sqlite } from "@/db/client";
 import { emptyDictionaryContent } from "@/modules/dictionary/content";
+import { updateSettings } from "@/modules/settings/service";
 import { applyYoudaoContent, previewYoudaoContent } from "@/modules/words/youdao-refresh";
 
 const now = Date.now();
@@ -45,7 +46,7 @@ describe("applyYoudaoContent with newTerm", () => {
     await insertWord("hello");
     const targetId = await insertWord("there");
     await expect(applyYoudaoContent(targetId, contentWithDefinition("那里"), "FILL_MISSING_FIELDS", [], "Hello"))
-      .rejects.toThrow("TERM_ALREADY_EXISTS");
+      .rejects.toMatchObject({ code: "TERM_ALREADY_EXISTS" });
   });
 
   it("allows keeping the same term as a no-op term change", async () => {
@@ -59,7 +60,7 @@ describe("applyYoudaoContent with newTerm", () => {
   it("throws TERM_REQUIRED for a blank new term", async () => {
     const wordId = await insertWord("hello");
     await expect(applyYoudaoContent(wordId, contentWithDefinition("你好"), "FILL_MISSING_FIELDS", [], "   "))
-      .rejects.toThrow("TERM_REQUIRED");
+      .rejects.toMatchObject({ code: "TERM_REQUIRED" });
   });
 
   it("leaves the term unchanged when newTerm is omitted", async () => {
@@ -78,6 +79,7 @@ describe("previewYoudaoContent termOverride", () => {
       { status: 200 },
     ));
     vi.stubGlobal("fetch", fetchMock);
+    await updateSettings({ youdaoEnabled: true });
 
     const result = await previewYoudaoContent(wordId, "world");
 
@@ -93,6 +95,7 @@ describe("previewYoudaoContent termOverride", () => {
       { status: 200 },
     ));
     vi.stubGlobal("fetch", fetchMock);
+    await updateSettings({ youdaoEnabled: true });
 
     const result = await previewYoudaoContent(wordId);
 

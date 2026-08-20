@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeEach, vi } from "vitest";
 
 // Load .env and .env.local so DATABASE_URL is available even when the test runner
 // does not apply Next.js-style environment file loading.
@@ -58,9 +58,15 @@ beforeEach(async () => {
   // 使测试不发起真实 HTTP 请求，并失效设置缓存以确保读取到最新值。
   const { invalidateSettingsCache } = await import("@/modules/settings/service");
   const now = Date.now();
-  await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run("dictionaryApiEnabled", JSON.stringify(false), now);
-  await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run("myMemoryEnabled", JSON.stringify(false), now);
+  // 默认禁用一切真实网络 provider，确保测试不发起真实 HTTP 请求。
+  for (const key of ["dictionaryApiEnabled", "myMemoryEnabled", "merriamWebsterEnabled", "youdaoEnabled", "tencentTranslateEnabled"]) {
+    await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run(key, JSON.stringify(false), now);
+  }
   invalidateSettingsCache();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 afterAll(async () => {

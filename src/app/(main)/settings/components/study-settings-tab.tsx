@@ -92,7 +92,7 @@ export function StudySettingsTab({
         <CardHeader><CardTitle>语音与词典</CardTitle></CardHeader>
         <CardContent className="space-y-6">
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">发音设置</h3>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary-label">发音设置</h3>
             <div className="flex flex-wrap gap-4">
               <label className="min-w-36 space-y-1.5">
                 <span className="text-xs font-medium">默认口音</span>
@@ -125,8 +125,8 @@ export function StudySettingsTab({
           <hr className="border-black/[0.06] dark:border-white/[0.08]" />
 
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">数据来源与执行顺序</h3>
-            <p className="mb-3 text-xs text-[#aeaeb2]">拖动调整翻译/词典查询优先级，排在上方的来源会先被执行。未启用的数据源不会出现在列表中。</p>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary-label">数据来源与执行顺序</h3>
+            <p className="mb-3 text-xs text-tertiary-label">拖动调整翻译/词典查询优先级，排在上方的来源会先被执行。未启用的数据源不会出现在列表中。</p>
             <div className="space-y-1.5">
               {visibleProviders.map((id, visibleIndex) => (
                 <div
@@ -138,12 +138,12 @@ export function StudySettingsTab({
                   onDragEnd={handleDragEnd}
                   className={`flex cursor-grab items-center gap-3 rounded-[12px] border px-3 py-2.5 transition-all active:cursor-grabbing ${
                     dragOverIndex === visibleIndex
-                      ? "border-[#007aff]/40 bg-[#007aff]/[0.06]"
+                      ? "border-accent/40 bg-accent/[0.06]"
                       : "border-black/[0.06] bg-white/[0.6] dark:border-white/[0.08] dark:bg-white/[0.04]"
                   }`}
                 >
-                  <GripVertical className="size-4 shrink-0 text-[#aeaeb2]" />
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#007aff]/[0.08] text-[10px] font-bold text-[#007aff]">{visibleIndex + 1}</span>
+                  <GripVertical className="size-4 shrink-0 text-tertiary-label" />
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/[0.08] text-[10px] font-bold text-accent">{visibleIndex + 1}</span>
                   <span className="text-sm font-medium">{PROVIDER_LABELS[id] ?? id}</span>
                 </div>
               ))}
@@ -153,7 +153,7 @@ export function StudySettingsTab({
           <hr className="border-black/[0.06] dark:border-white/[0.08]" />
 
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">在线词典来源</h3>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary-label">在线词典来源</h3>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <Toggle label="DictionaryAPI.dev" checked={settings.dictionaryApiEnabled} onChange={(value) => update("dictionaryApiEnabled", value)} />
               <Toggle label="MyMemory 翻译" checked={settings.myMemoryEnabled} onChange={(value) => update("myMemoryEnabled", value)} />
@@ -163,9 +163,9 @@ export function StudySettingsTab({
           </section>
 
           <section>
-            <button type="button" onClick={() => setMwKeysExpanded((expanded) => !expanded)} className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
+            <button type="button" onClick={() => setMwKeysExpanded((expanded) => !expanded)} className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-secondary-label transition-colors hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:text-white">
               {mwKeysExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-              Merriam-Webster API 密钥 <span className="text-xs font-normal text-[#aeaeb2]">（可选）</span>
+              Merriam-Webster API 密钥 <span className="text-xs font-normal text-tertiary-label">（可选）</span>
             </button>
             {mwKeysExpanded && (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -178,18 +178,18 @@ export function StudySettingsTab({
           <hr className="border-black/[0.06] dark:border-white/[0.08]" />
 
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">腾讯翻译</h3>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary-label">腾讯翻译</h3>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <Toggle label="启用腾讯翻译" checked={settings.tencentTranslateEnabled} onChange={(value) => update("tencentTranslateEnabled", value)} />
               <Button variant="outline" size="sm" onClick={() => void onTestTencentTranslate()} disabled={tencentTestState === "testing" || !settings.tencentTranslateSecretId || !settings.tencentTranslateSecretKey}>
                 {tencentTestState === "testing" ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}测试连接
               </Button>
-              <span className="text-xs text-[#aeaeb2]">腾讯云机器翻译提供 500 万字符/月免费额度</span>
+              <span className="text-xs text-tertiary-label">腾讯云机器翻译提供 500 万字符/月免费额度</span>
             </div>
             {tencentTestState !== "idle" && tencentTestMessage && (
-              <p className={`mt-2 text-xs ${tencentTestState === "success" ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{tencentTestMessage}</p>
+              <p className={`mt-2 text-xs ${tencentTestState === "success" ? "text-success" : "text-danger"}`}>{tencentTestMessage}</p>
             )}
-            <button type="button" onClick={() => setTencentKeysExpanded((expanded) => !expanded)} className="mt-3 flex min-h-11 items-center gap-1.5 text-sm font-medium text-[#6e6e73] transition-colors hover:text-[#1c1c1e] dark:text-[#98989d] dark:hover:text-white">
+            <button type="button" onClick={() => setTencentKeysExpanded((expanded) => !expanded)} className="mt-3 flex min-h-11 items-center gap-1.5 text-sm font-medium text-secondary-label transition-colors hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:text-white">
               {tencentKeysExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
               腾讯翻译 API 密钥
             </button>
@@ -205,17 +205,17 @@ export function StudySettingsTab({
           <hr className="border-black/[0.06] dark:border-white/[0.08]" />
 
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#6e6e73] dark:text-[#98989d]">语音合成 (TTS)</h3>
-            <p className="mb-3 text-sm text-[#6e6e73] dark:text-[#98989d]">发音功能使用 <strong>Microsoft Edge TTS</strong>，无需配置 API Key 或模型。</p>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-secondary-label">语音合成 (TTS)</h3>
+            <p className="mb-3 text-sm text-secondary-label">发音功能使用 <strong>Microsoft Edge TTS</strong>，无需配置 API Key 或模型。</p>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-[14px] border border-[#34c759]/15 bg-[#34c759]/[0.08] px-4 py-2 text-sm text-[#248a3d] dark:text-[#30d158]"><CheckCircle2 className="size-4" />免费 - 无需额外配置</div>
-              <div className="flex items-center gap-2 rounded-[14px] border border-[#007aff]/15 bg-[#007aff]/[0.08] px-4 py-2 text-sm text-[#007aff] dark:text-[#0a84ff]"><Volume2 className="size-4" />支持美音 / 英音</div>
+              <div className="flex items-center gap-2 rounded-[14px] border border-success/15 bg-success/[0.08] px-4 py-2 text-sm text-success-deep"><CheckCircle2 className="size-4" />免费 - 无需额外配置</div>
+              <div className="flex items-center gap-2 rounded-[14px] border border-accent/15 bg-accent/[0.08] px-4 py-2 text-sm text-accent"><Volume2 className="size-4" />支持美音 / 英音</div>
             </div>
             <div className="mt-3 flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={() => void onTestTts()} disabled={ttsState === "testing"}>
                 {ttsState === "testing" ? <Loader2 className="size-4 animate-spin" /> : <Volume2 className="size-4" />}试听发音
               </Button>
-              {ttsState !== "idle" && <span className={`text-xs ${ttsState === "success" ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{ttsMessage}</span>}
+              {ttsState !== "idle" && <span className={`text-xs ${ttsState === "success" ? "text-success" : "text-danger"}`}>{ttsMessage}</span>}
             </div>
           </section>
         </CardContent>

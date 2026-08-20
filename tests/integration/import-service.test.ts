@@ -15,7 +15,7 @@ describe("import service", () => {
     expect(result.createdWords).toBe(3);
     expect(result.queuedInitializations).toBe(3);
     expect((await sqlite.prepare("SELECT count(*) AS count FROM words").get() as { count: number }).count).toBe(3);
-    await expect(commitImport(preview.previewToken, "FILL_MISSING", false)).rejects.toThrow("IMPORT_PREVIEW_EXPIRED");
+    await expect(commitImport(preview.previewToken, "FILL_MISSING", false)).rejects.toMatchObject({ code: "IMPORT_PREVIEW_EXPIRED" });
   });
 
   it("upgrades existing active jobs for fill-missing imports", async () => {

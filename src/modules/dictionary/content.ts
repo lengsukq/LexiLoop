@@ -126,3 +126,52 @@ export function dictionaryContentFromRow(row: Record<string, unknown> | undefine
 }
 
 export { contentStatus, mergeDictionaryContent } from "./merge";
+
+export interface DefinitionValue {
+  language: string;
+  text: string;
+  partOfSpeech?: string | null;
+  source?: string;
+  isUserEdited?: boolean;
+}
+
+/** 把 `definitions_json` 解析为 `DefinitionValue[]`，解析失败或空返回 `[]`（过滤空文本）。 */
+export function parseDefinitionsJson(raw: string | null | undefined): DefinitionValue[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<Partial<DefinitionValue> & { language?: unknown; text?: unknown }>;
+    return parsed
+      .filter((item) => typeof item.text === "string" && item.text.trim() !== "")
+      .map((item) => ({
+        language: typeof item.language === "string" ? item.language : "",
+        text: item.text as string,
+        partOfSpeech: typeof item.partOfSpeech === "string" ? item.partOfSpeech : null,
+        source: typeof item.source === "string" ? item.source : undefined,
+        isUserEdited: Boolean(item.isUserEdited),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 目标语言释义优先，回退到全部释义。统一替换各模块里「取目标语言释义文本」的重复逻辑。
+ * 接受原始 `definitions_json` 字符串或已解析的 `DefinitionValue[]`。
+ */
+export function targetDefinitions(definitions: DefinitionValue[] | string | null | undefined, targetLanguage: string): DefinitionValue[] {
+  const list = typeof definitions === "string" || definitions == null ? parseDefinitionsJson(definitions) : definitions;
+  const target = list.filter((item) => item.language === targetLanguage);
+  return target.length ? target : list;
+}
+
+/** 目标语言释义文本（用 `separator` 连接），回退到全部释义。 */
+export function targetDefinitionTexts(definitions: DefinitionValue[] | string | null | undefined, targetLanguage: string, separator = "；"): string {
+  return targetDefinitions(definitions, targetLanguage).map((item) => item.text.trim()).filter(Boolean).join(separator);
+}
+
+/** 首选释义文本：目标语言第一条，否则第一条任意释义；无则返回 `null`。 */
+export function preferredDefinitionText(definitions: DefinitionValue[] | string | null | undefined, targetLanguage: string): string | null {
+  const list = typeof definitions === "string" || definitions == null ? parseDefinitionsJson(definitions) : definitions;
+  const preferred = list.find((item) => item.language === targetLanguage) ?? list[0];
+  return preferred?.text ?? null;
+}

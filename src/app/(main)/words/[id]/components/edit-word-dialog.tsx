@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { errorMessage } from "@/lib/format";
 import { AlertCircle, BookText, Check, Loader2, Sparkles } from "lucide-react";
-import { Button, Dialog, Input } from "@/components/ui";
+import { Alert, Button, Dialog, Input } from "@/components/ui";
 import { apiFetch } from "@/lib/client-api";
+import { entryTypeLabel } from "@/lib/entry-type-label";
 import type { YoudaoPreviewData } from "../word-detail-types";
 import { PreviewContent } from "./youdao-preview-dialog";
 
@@ -49,7 +51,7 @@ export function EditWordDialog({
         body: JSON.stringify({ term: term.trim() }),
       }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "有道词典获取失败");
+      setError(errorMessage(reason, "有道词典获取失败"));
     } finally {
       setBusy(false);
     }
@@ -73,7 +75,7 @@ export function EditWordDialog({
       onSaved();
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存词条失败");
+      setError(errorMessage(reason, "保存词条失败"));
     } finally {
       setApplying(false);
     }
@@ -90,19 +92,17 @@ export function EditWordDialog({
           maxLength={300}
           disabled={busy || applying}
         />
-        <p className="text-xs text-[#6e6e73] dark:text-[#98989d]">
+        <p className="text-xs text-secondary-label">
           {sourceLanguage} → {targetLanguage} · {entryTypeLabel(entryType)}
           {termChanged ? "（已修改，需重新初始化内容）" : "（文本未变化，可重新获取内容）"}
         </p>
       </div>
 
-      <div className="rounded-[16px] border border-[#007aff]/10 bg-[#007aff]/[0.06] p-3 text-xs leading-5 text-[#6e6e73] dark:text-[#98989d]">
+      <div className="rounded-[16px] border border-accent/10 bg-accent/[0.06] p-3 text-xs leading-5 text-secondary-label">
         修改词条后需点击「有道词典初始化」获取新内容并确认应用，成功后才保存词条文本；未初始化前词条不会发生变化。
       </div>
 
-      {error && <div className="flex items-start gap-2 rounded-[14px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.06] p-3 text-sm text-[#d70015] dark:text-[#ff453a]">
-        <AlertCircle className="mt-0.5 size-4 shrink-0" />{error}
-      </div>}
+      {error && <Alert icon={<AlertCircle className="size-4" />}>{error}</Alert>}
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="ghost" onClick={onClose} disabled={busy || applying}>取消</Button>
@@ -112,9 +112,9 @@ export function EditWordDialog({
       </div>
 
       {preview && !preview.hasContent && !busy && <div className="space-y-4 py-4 text-center">
-        <BookText className="mx-auto size-10 text-[#aeaeb2]" />
-        <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">有道词典未返回该词条的有效内容，暂不能保存修改。</p>
-        {preview.attempts.filter((attempt) => attempt.errorMessage).map((attempt, index) => <p key={index} className="text-xs text-[#aeaeb2]">{attempt.errorMessage}</p>)}
+        <BookText className="mx-auto size-10 text-tertiary-label" />
+        <p className="text-sm text-secondary-label">有道词典未返回该词条的有效内容，暂不能保存修改。</p>
+        {preview.attempts.filter((attempt) => attempt.errorMessage).map((attempt, index) => <p key={index} className="text-xs text-tertiary-label">{attempt.errorMessage}</p>)}
       </div>}
 
       {preview && preview.hasContent && !busy && <div className="space-y-5">
@@ -123,12 +123,12 @@ export function EditWordDialog({
         <div className="space-y-3 rounded-[18px] border border-white/50 bg-white/40 p-4 dark:border-white/[0.06] dark:bg-white/[0.04]">
           <p className="text-sm font-semibold">应用方式</p>
           <label className="flex cursor-pointer items-start gap-3">
-            <input type="radio" name="edit-mode" className="mt-1 accent-[#007aff]" checked={mode === "FILL_MISSING_FIELDS"} onChange={() => setMode("FILL_MISSING_FIELDS")} />
-            <span><span className="text-sm font-medium">仅补全缺失字段</span><span className="mt-0.5 block text-xs text-[#6e6e73] dark:text-[#98989d]">保留现有内容，只用有道结果填充空缺部分。</span></span>
+            <input type="radio" name="edit-mode" className="mt-1 accent-accent" checked={mode === "FILL_MISSING_FIELDS"} onChange={() => setMode("FILL_MISSING_FIELDS")} />
+            <span><span className="text-sm font-medium">仅补全缺失字段</span><span className="mt-0.5 block text-xs text-secondary-label">保留现有内容，只用有道结果填充空缺部分。</span></span>
           </label>
           <label className="flex cursor-pointer items-start gap-3">
-            <input type="radio" name="edit-mode" className="mt-1 accent-[#007aff]" checked={mode === "FORCE_OVERWRITE"} onChange={() => setMode("FORCE_OVERWRITE")} />
-            <span><span className="text-sm font-medium">覆盖替换</span><span className="mt-0.5 block text-xs text-[#6e6e73] dark:text-[#98989d]">用有道结果替换现有内容，但保留手动编辑的释义和手动添加的例句。</span></span>
+            <input type="radio" name="edit-mode" className="mt-1 accent-accent" checked={mode === "FORCE_OVERWRITE"} onChange={() => setMode("FORCE_OVERWRITE")} />
+            <span><span className="text-sm font-medium">覆盖替换</span><span className="mt-0.5 block text-xs text-secondary-label">用有道结果替换现有内容，但保留手动编辑的释义和手动添加的例句。</span></span>
           </label>
         </div>
 
@@ -141,10 +141,4 @@ export function EditWordDialog({
       </div>}
     </div>
   </Dialog>;
-}
-
-function entryTypeLabel(entryType: string): string {
-  if (entryType === "WORD") return "单词";
-  if (entryType === "SENTENCE") return "句子";
-  return "短语";
 }

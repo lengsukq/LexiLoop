@@ -23,13 +23,13 @@ export default function WordDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
 
   if (!detail.word && !detail.error) {
-    return <div className="grid min-h-[70vh] place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>;
+    return <div className="grid min-h-[70vh] place-items-center"><Loader2 className="size-8 animate-spin text-accent" /></div>;
   }
   if (!detail.word) {
     return <div className="py-20 text-center">
-      <AlertCircle className="mx-auto size-12 text-[#ff3b30]" />
+      <AlertCircle className="mx-auto size-12 text-danger" />
       <h1 className="mt-4 text-xl font-bold">词条加载失败</h1>
-      <p className="mt-2 text-sm text-[#6e6e73] dark:text-[#98989d]">{detail.error}</p>
+      <p className="mt-2 text-sm text-secondary-label">{detail.error}</p>
       <Link href="/words" className={`${buttonClass("outline")} mt-6`}><ArrowLeft className="size-4" />返回单词本</Link>
     </div>;
   }
@@ -51,7 +51,7 @@ export default function WordDetailPage() {
       onTranslateSummary={detail.translateSummary}
     />
 
-    {detail.error && <div className="rounded-[18px] border border-[#ff3b30]/15 bg-[#ff3b30]/[0.08] p-3 text-sm text-[#d70015] dark:text-[#ff453a]">{detail.error}</div>}
+    {detail.error && <div className="rounded-[18px] border border-danger/15 bg-danger/[0.08] p-3 text-sm text-danger-deep">{detail.error}</div>}
 
     <div className="grid min-w-0 gap-5 lg:grid-cols-[1.4fr_.6fr]">
       <div className="min-w-0 space-y-5">

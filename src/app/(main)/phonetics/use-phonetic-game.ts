@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errorMessage } from "@/lib/format";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
@@ -15,13 +16,10 @@ import type {
   PhoneticGameSession,
   PhoneticPhase,
 } from "./types";
+import { correctChoice } from "./choice";
 
 const CORRECT_FEEDBACK_MS = 1_050;
 const WRONG_FEEDBACK_MS = 520;
-
-function expectedChoice(item: PhoneticGameItem): string {
-  return item.challengeType === "PHONETIC_TO_WORD" ? item.term : item.phonetic;
-}
 
 export function usePhoneticGame() {
   const [accent, setAccent] = useState<PhoneticAccent>("US");
@@ -103,7 +101,7 @@ export function usePhoneticGame() {
       setResult(saved);
       setPhase("result");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "保存音标训练结果失败");
+      setError(errorMessage(reason, "保存音标训练结果失败"));
       setPhase("save-error");
       finishingRef.current = false;
       lockedRef.current = false;
@@ -137,7 +135,7 @@ export function usePhoneticGame() {
   const choose = useCallback((choice: string) => {
     const item = sessionRef.current?.items[index];
     if (!item || lockedRef.current || wrongChoice || correctFeedback) return;
-    if (choice !== expectedChoice(item)) {
+    if (choice !== correctChoice(item)) {
       recordMistake(item.itemId);
       setWrongChoice(choice);
       if (item.challengeType === "SOUND_TO_PHONETIC") void playCurrent();
@@ -185,7 +183,7 @@ export function usePhoneticGame() {
       setSummaryItems([]);
       setPhase("playing");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "创建音标训练失败");
+      setError(errorMessage(reason, "创建音标训练失败"));
       setPhase("setup");
     }
   }, [accent, resetScoring, startCountdown]);

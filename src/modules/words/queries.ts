@@ -2,7 +2,7 @@ import { sqlite } from "@/db/client";
 import { parseJson } from "@/lib/json";
 import type { DictionaryContent, InitializationStatus, MasteryLevel } from "@/lib/types";
 import { INITIALIZATION_STATUSES, MASTERY_LEVELS } from "@/lib/types";
-import { dictionaryContentFromRow, emptyDictionaryContent } from "@/modules/dictionary/content";
+import { dictionaryContentFromRow, emptyDictionaryContent, preferredDefinitionText } from "@/modules/dictionary/content";
 
 export interface WordListFilters {
   query?: string;
@@ -54,8 +54,7 @@ function buildFilters(filters: WordListFilters) {
 }
 
 function mapWordRow(row: Record<string, unknown>) {
-  const definitions = parseJson<Array<{ language: string; text: string }>>(row.definitions_json, []);
-  const preferred = definitions.find((item) => item.language === row.target_language) ?? definitions[0];
+  const definition = preferredDefinitionText(row.definitions_json as string | null, String(row.target_language));
   return {
     id: Number(row.id),
     term: String(row.term),
@@ -72,7 +71,7 @@ function mapWordRow(row: Record<string, unknown>) {
     dueAt: row.due_at ? new Date(Number(row.due_at)).toISOString() : null,
     reps: Number(row.reps ?? 0),
     wrongWordActive: Boolean(row.wrong_active),
-    definition: preferred?.text ?? null,
+    definition,
     hasPronunciation: parseJson<unknown[]>(row.pronunciations_json, []).length > 0,
   };
 }

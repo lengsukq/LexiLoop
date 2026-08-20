@@ -4,6 +4,7 @@ import { getSettings } from "@/modules/settings/service";
 import { getTodayRecommendedItems } from "@/modules/suggestions/service";
 import { DAY_MS, HOUR_MS } from "@/lib/time";
 import { startOfLocalDay } from "@/lib/date-key";
+import { definitionMeaningSql, summaryTranslationSql } from "@/modules/dictionary/availability";
 
 export interface StudyCandidate { id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType; continuousTaskType?: "REVIEW" | "WRONG" | "NEW"; }
 export type CandidateScope = "LEXICAL" | "SENTENCE" | "ALL";
@@ -25,18 +26,12 @@ function scopeSql(scope: CandidateScope): string { return scope === "SENTENCE" ?
  * `summary.translation` (e.g. AI/translation providers).
  */
 function hasMeaningSql(scope: CandidateScope): string {
-  const postgres = sqlite.mode === "postgres";
   // json_typeof guards against rows where the payload is valid JSON but not
   // an array (e.g. an object from a legacy import), which would otherwise make
   // the whole candidate query fail on PostgreSQL.
-  const definitionMeaning = postgres
-    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.definitions_json::json) = 'array' AND EXISTS (SELECT 1 FROM json_array_elements(wc.definitions_json::json) d WHERE btrim(d->>'text') <> ''))`
-    : `EXISTS (SELECT 1 FROM word_contents wc, json_each(wc.definitions_json) d WHERE wc.word_id = w.id AND json_valid(wc.definitions_json) AND trim(json_extract(d.value, '$.text')) <> '')`;
+  const definitionMeaning = definitionMeaningSql();
   if (scope !== "SENTENCE") return `AND ${definitionMeaning}`;
-  const translationMeaning = postgres
-    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.summary_json::json) = 'object' AND btrim(wc.summary_json::json->>'translation') <> '')`
-    : `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_valid(wc.summary_json) AND trim(json_extract(wc.summary_json, '$.translation')) <> '')`;
-  return `AND (${definitionMeaning} OR ${translationMeaning})`;
+  return `AND (${definitionMeaning} OR ${summaryTranslationSql()})`;
 }
 function availabilitySql(): string { return `NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items active_item JOIN study_sessions active_session ON active_session.id = active_item.study_session_id WHERE active_item.word_id = w.id AND active_item.status = 'PENDING' AND active_session.completed_at IS NULL AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME' AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%' AND active_session.started_at >= ?)`; }
 const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type";

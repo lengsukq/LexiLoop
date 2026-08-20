@@ -5,10 +5,10 @@ import { playCachedTts } from "@/lib/tts-client";
 import type { GameItem } from "./types";
 
 const TOWER_COLORS = [
-  "from-[#ff9500] to-[#ff6961]",
-  "from-[#5ac8fa] to-[#007aff]",
-  "from-[#af52de] to-[#5856d6]",
-  "from-[#34c759] to-[#00c7be]",
+  "from-warning to-[#ff6961]",
+  "from-[#5ac8fa] to-accent",
+  "from-purple to-[#5856d6]",
+  "from-success to-[#00c7be]",
 ];
 
 export function WordStack({ item, solvedTerms, onSolved, onMistake }: {
@@ -66,7 +66,7 @@ export function WordStack({ item, solvedTerms, onSolved, onMistake }: {
   }
 
   return <div className="text-center">
-    <p className="text-[13px] text-[#8e8e93]">看释义，点选滚动词块堆高塔</p>
+    <p className="text-[13px] text-quaternary-label">看释义，点选滚动词块堆高塔</p>
     <h1 className="mx-auto mt-3 max-w-xl text-xl font-bold leading-relaxed sm:text-2xl">{item.definition}</h1>
 
     <div key={item.itemId} className="mx-auto mt-7 max-w-xl space-y-3 rounded-[18px] border border-[#ff2d55]/15 bg-[#ff2d55]/[0.04] px-2 py-4">
@@ -82,8 +82,8 @@ export function WordStack({ item, solvedTerms, onSolved, onMistake }: {
           <span className="line-clamp-1">{term}</span>
         </div>;
       })}
-      {tower.length === 0 && <p className="mt-8 text-xs text-[#aeaeb2]">点对词块，塔会越堆越高</p>}
+      {tower.length === 0 && <p className="mt-8 text-xs text-tertiary-label">点对词块，塔会越堆越高</p>}
     </div>
-    <p className="mt-2 text-xs text-[#aeaeb2]">已堆 {solvedTerms.length} 层 · 点错会记一次失误</p>
+    <p className="mt-2 text-xs text-tertiary-label">已堆 {solvedTerms.length} 层 · 点错会记一次失误</p>
   </div>;
 }

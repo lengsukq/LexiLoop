@@ -13,7 +13,7 @@ export function StudyPlanSettings({ settings, update }: { settings: AppSettings;
       <NumberField label="到期复习上限" value={settings.dailyDueReviewLimit} min={1} max={500} onChange={(value) => update("dailyDueReviewLimit", value)} />
       <div className="space-y-1.5">
         <NumberField label="选择题选项延迟（秒）" value={settings.choiceRevealDelaySeconds} min={0} max={60} onChange={(value) => update("choiceRevealDelaySeconds", value)} />
-        <p className="text-xs leading-tight text-[#aeaeb2]">两种选择题均适用；0 秒立即显示，默认 2 秒。</p>
+        <p className="text-xs leading-tight text-tertiary-label">两种选择题均适用；0 秒立即显示，默认 2 秒。</p>
       </div>
       <label className="space-y-1.5">
         <span className="text-sm font-medium leading-none">目标记忆率</span>
@@ -27,7 +27,7 @@ export function StudyPlanSettings({ settings, update }: { settings: AppSettings;
       <NumberField label="初始化并行数" value={settings.backgroundConcurrency} min={1} max={10} onChange={(value) => update("backgroundConcurrency", value)} />
       <div className="space-y-1.5">
         <NumberField label="AI 失败重试次数" value={settings.aiRetryCount} min={0} max={5} onChange={(value) => update("aiRetryCount", value)} />
-        <p className="text-xs leading-tight text-[#aeaeb2]">默认 1 次：每个 AI 任务最多尝试 2 次。</p>
+        <p className="text-xs leading-tight text-tertiary-label">默认 1 次：每个 AI 任务最多尝试 2 次。</p>
       </div>
     </div>
   </CardContent>

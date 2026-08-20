@@ -1,6 +1,7 @@
 import { sqlite } from "@/db/client";
 import type { DictionaryContent, EntryType, ManualContentPreview, ProviderAttempt } from "@/lib/types";
 import { normalizeDictionaryContent } from "@/modules/dictionary/content";
+import { saveWordContent } from "@/modules/words/save-content";
 
 export function fieldsReturned(content: DictionaryContent): string[] {
   return Object.entries(content).filter(([, value]) => Array.isArray(value)
@@ -9,19 +10,7 @@ export function fieldsReturned(content: DictionaryContent): string[] {
 }
 
 export async function saveContent(wordId: number, content: DictionaryContent, attempts: ProviderAttempt[], now: number): Promise<void> {
-  await sqlite.prepare(`INSERT INTO word_contents
-    (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json, synonyms_json, antonyms_json,
-     word_family_json, confused_words_json, roots_json, affixes_json, summary_json, learning_json, sentence_analysis_json,
-     tags_json, provider_metadata_json, content_version, initialized_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-    ON CONFLICT(word_id) DO UPDATE SET definitions_json = excluded.definitions_json, pronunciations_json = excluded.pronunciations_json,
-      examples_json = excluded.examples_json, phrases_json = excluded.phrases_json, forms_json = excluded.forms_json,
-      synonyms_json = excluded.synonyms_json, antonyms_json = excluded.antonyms_json, word_family_json = excluded.word_family_json,
-      confused_words_json = excluded.confused_words_json, roots_json = excluded.roots_json, affixes_json = excluded.affixes_json,
-      summary_json = excluded.summary_json, learning_json = excluded.learning_json, sentence_analysis_json = excluded.sentence_analysis_json,
-      tags_json = excluded.tags_json, provider_metadata_json = excluded.provider_metadata_json,
-      content_version = word_contents.content_version + 1, initialized_at = excluded.initialized_at, updated_at = excluded.updated_at`)
-    .run(wordId, JSON.stringify(content.definitions), JSON.stringify(content.pronunciations), JSON.stringify(content.examples), JSON.stringify(content.phrases), JSON.stringify(content.forms), JSON.stringify(content.synonyms), JSON.stringify(content.antonyms), JSON.stringify(content.wordFamily), JSON.stringify(content.confusedWords), JSON.stringify(content.roots), JSON.stringify(content.affixes), JSON.stringify(content.summary), JSON.stringify(content.learning), JSON.stringify(content.sentenceAnalysis), JSON.stringify(content.tags), JSON.stringify(attempts), now, now);
+  await saveWordContent(wordId, content, { providerMetadata: attempts, now });
 }
 
 export async function saveAttempts(wordId: number, attempts: ProviderAttempt[], now: number): Promise<void> {

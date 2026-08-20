@@ -14,12 +14,12 @@ export function DataSettingsTab({
       <Card>
         <CardHeader><CardTitle>备份与还原</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">将学习数据导出为 JSON 格式进行备份。</p>
+          <p className="text-sm text-secondary-label">将学习数据导出为 JSON 格式进行备份。</p>
           <div className="flex flex-wrap gap-2">
             <BackupLink href="/api/backups/json" icon={<Download className="size-4" />} label="下载 JSON 备份" />
           </div>
           <hr className="border-black/[0.06] dark:border-white/[0.08]" />
-          <p className="text-sm text-[#6e6e73] dark:text-[#98989d]">从备份文件恢复。恢复操作将覆盖全部现有数据。</p>
+          <p className="text-sm text-secondary-label">从备份文件恢复。恢复操作将覆盖全部现有数据。</p>
           <FileAction inputRef={restoreInput} accept=".json" label="上传备份文件并恢复" onChange={(file) => void onRestore(file)} />
         </CardContent>
       </Card>

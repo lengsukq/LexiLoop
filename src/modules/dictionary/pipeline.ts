@@ -117,7 +117,6 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
   attempts: ProviderAttempt[];
   hasTransientFailure: boolean;
   contentSource: "AI_ONLY" | "MIXED" | "DICTIONARY_ONLY";
-  requiredProviderFailure: null | { transient: boolean; errorCode: string; errorMessage: string };
 }> {
   const requestedFields = normalizeRequestedFields(input.requestedFields);
   const providers = providersFor(settings, input.requestedProviders)
@@ -167,6 +166,5 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
     attempts: settled.map((item) => item.attempt),
     hasTransientFailure: settled.some((item) => item.transient),
     contentSource,
-    requiredProviderFailure: null,
   };
 }

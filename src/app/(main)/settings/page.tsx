@@ -37,7 +37,7 @@ export default function SettingsPage() {
 
       {data.error && <FeedbackBanner type="error" message={data.error} />}
       {data.message && <FeedbackBanner type="success" message={data.message} />}
-      {!data.settings && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-[#007aff]" /></div>}
+      {!data.settings && <div className="grid min-h-64 place-items-center"><Loader2 className="size-8 animate-spin text-accent" /></div>}
 
       {data.settings && (
         <>

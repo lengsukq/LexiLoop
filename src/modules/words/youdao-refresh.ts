@@ -6,6 +6,7 @@ import { lookupDictionary } from "@/modules/dictionary/pipeline";
 import { hasAnyContent } from "@/modules/dictionary/providers/youdao-parser";
 import { displayTerm, normalizeTerm } from "@/modules/imports/normalizer";
 import { getSettings } from "@/modules/settings/service";
+import { saveWordContent } from "./save-content";
 import { getWordDetail } from "./queries";
 
 export interface YoudaoPreviewResult {
@@ -85,41 +86,7 @@ export async function applyYoudaoContent(
       await sqlite.prepare("UPDATE words SET term = ?, normalized_term = ?, updated_at = ? WHERE id = ?")
         .run(term, normalizedTerm, now, wordId);
     }
-    await sqlite.prepare(`INSERT INTO word_contents
-      (word_id, definitions_json, pronunciations_json, examples_json, phrases_json, forms_json,
-       synonyms_json, antonyms_json, word_family_json, confused_words_json, roots_json, affixes_json,
-       summary_json, learning_json, sentence_analysis_json, tags_json, provider_metadata_json, content_source, content_version, initialized_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DICTIONARY_ONLY', 1, ?, ?)
-      ON CONFLICT(word_id) DO UPDATE SET
-        definitions_json = excluded.definitions_json,
-        pronunciations_json = excluded.pronunciations_json,
-        examples_json = excluded.examples_json,
-        phrases_json = excluded.phrases_json,
-        forms_json = excluded.forms_json,
-        synonyms_json = excluded.synonyms_json,
-        antonyms_json = excluded.antonyms_json,
-        word_family_json = excluded.word_family_json,
-        confused_words_json = excluded.confused_words_json,
-        roots_json = excluded.roots_json,
-        affixes_json = excluded.affixes_json,
-        summary_json = excluded.summary_json,
-        learning_json = excluded.learning_json,
-        sentence_analysis_json = excluded.sentence_analysis_json,
-        tags_json = excluded.tags_json,
-        provider_metadata_json = excluded.provider_metadata_json,
-        content_source = excluded.content_source,
-        content_version = word_contents.content_version + 1,
-        initialized_at = excluded.initialized_at,
-        updated_at = excluded.updated_at`)
-      .run(
-        wordId,
-        JSON.stringify(merged.definitions), JSON.stringify(merged.pronunciations), JSON.stringify(merged.examples),
-        JSON.stringify(merged.phrases), JSON.stringify(merged.forms), JSON.stringify(merged.synonyms),
-        JSON.stringify(merged.antonyms), JSON.stringify(merged.wordFamily), JSON.stringify(merged.confusedWords),
-        JSON.stringify(merged.roots), JSON.stringify(merged.affixes), JSON.stringify(merged.summary),
-        JSON.stringify(merged.learning), JSON.stringify(merged.sentenceAnalysis), JSON.stringify(merged.tags),
-        JSON.stringify(attempts), now, now,
-      );
+    await saveWordContent(wordId, merged, { providerMetadata: attempts, contentSource: "DICTIONARY_ONLY" });
     await sqlite.prepare("UPDATE words SET initialization_status = ?, updated_at = ? WHERE id = ?").run(status, now, wordId);
     const insert = sqlite.prepare(`INSERT INTO provider_attempts
       (initialization_job_id, word_id, provider_id, status, duration_ms, fields_returned_json, error_code, error_message, metadata_json, created_at)

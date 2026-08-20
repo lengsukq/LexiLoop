@@ -46,12 +46,6 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
     initializationMode: "FORCE_OVERWRITE",
     requestedProviders: ["youdao"],
   }, settings);
-  if (result.requiredProviderFailure) {
-    throw new ManualPreviewError(
-      result.requiredProviderFailure.errorCode,
-      result.requiredProviderFailure.errorMessage,
-    );
-  }
   let content = normalizeDictionaryContent(result.content);
   let attempts = result.attempts;
   if (contentStatus(content, contentType) === "FAILED") {

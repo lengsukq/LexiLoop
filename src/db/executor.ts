@@ -200,6 +200,9 @@ export function createPgFacade(
       }
     };
     const wrapper = ((...args: TArgs) => run(args)) as SqliteLikeTransaction<TArgs, TResult>;
+    // Postgres 没有 SQLite 的 deferred/exclusive 事务语义，三者当前都走同一条
+    // BEGIN/COMMIT 路径（见上方 run）。保留这三个别名仅为兼容调用方接口，不要误以为
+    // 它们对应不同的隔离级别。
     wrapper.immediate = (...args: TArgs) => run(args);
     wrapper.deferred = (...args: TArgs) => run(args);
     wrapper.exclusive = (...args: TArgs) => run(args);

@@ -1,7 +1,9 @@
 import { sqlite } from "@/db/client";
 import type { QuestionType } from "@/lib/types";
 import { DAY_MS } from "./date";
-import { parseJson } from "@/lib/json";
+import { preferredDefinitionText } from "@/modules/dictionary/content";
+import { definitionMeaningSql } from "@/modules/dictionary/availability";
+import { SUGGESTION_SCORE_WEIGHTS as W } from "./constants";
 import type {
   CandidateAccumulator,
   ReviewRow,
@@ -10,9 +12,7 @@ import type {
 
 /** Words without a usable definition must not be recommended or studied. */
 function hasDefinitionSql(): string {
-  return sqlite.mode === "postgres"
-    ? `EXISTS (SELECT 1 FROM word_contents wc WHERE wc.word_id = w.id AND json_typeof(wc.definitions_json::json) = 'array' AND EXISTS (SELECT 1 FROM json_array_elements(wc.definitions_json::json) d WHERE btrim(d->>'text') <> ''))`
-    : `EXISTS (SELECT 1 FROM word_contents wc, json_each(wc.definitions_json) d WHERE wc.word_id = w.id AND json_valid(wc.definitions_json) AND trim(json_extract(d.value, '$.text')) <> '')`;
+  return `AND ${definitionMeaningSql()}`;
 }
 const VALID_QUESTION_TYPES = new Set<QuestionType>([
   "EN_TO_ZH",
@@ -69,25 +69,19 @@ function score(candidate: CandidateAccumulator, now: number): number {
     ? Math.max(0, (now - candidate.dueAt) / DAY_MS)
     : 0;
   return Math.round(
-    candidate.incorrect * 120
-    + candidate.again * 75
-    + candidate.hard * 38
-    + (candidate.wrongActive ? 55 : 0)
-    + candidate.wrongCount * 7
-    + candidate.hardCount * 4
-    + Math.min(45, Math.max(0, averageDuration - 7_000) / 300)
-    + (candidate.dueAt !== null && candidate.dueAt <= now ? 22 : 0)
-    + Math.min(35, overdueDays * 4)
-    + candidate.difficulty * 2
-    + candidate.lapses * 5
-    + (candidate.fallback ? 1 : 0),
+    candidate.incorrect * W.incorrect
+    + candidate.again * W.again
+    + candidate.hard * W.hard
+    + (candidate.wrongActive ? W.wrongActive : 0)
+    + candidate.wrongCount * W.wrongCount
+    + candidate.hardCount * W.hardCount
+    + Math.min(W.durationMax, Math.max(0, averageDuration - W.durationBaselineMs) / W.durationStepMs)
+    + (candidate.dueAt !== null && candidate.dueAt <= now ? W.dueToday : 0)
+    + Math.min(W.overdueMax, overdueDays * W.overduePerDay)
+    + candidate.difficulty * W.difficulty
+    + candidate.lapses * W.lapses
+    + (candidate.fallback ? W.fallback : 0),
   );
-}
-function preferredDefinition(raw: string | null, targetLanguage: string): string | null {
-  const definitions = parseJson<Array<{ language?: string; text?: string }>>(raw, []);
-  return definitions.find((item) => item.language === targetLanguage)?.text
-    ?? definitions.find((item) => item.text)?.text
-    ?? null;
 }
 function applyReviews(map: Map<number, CandidateAccumulator>, reviews: ReviewRow[]): void {
   for (const review of reviews) {
@@ -185,7 +179,7 @@ export async function buildSuggestionCandidates(now: number, reviews: ReviewRow[
     return [{
       wordId: candidate.wordId,
       term: word.term,
-      definition: preferredDefinition(word.definitions_json, word.target_language),
+      definition: preferredDefinitionText(word.definitions_json, word.target_language),
       reason: reason(candidate, now),
       questionType: mostUsefulQuestion(candidate),
       score: score(candidate, now),

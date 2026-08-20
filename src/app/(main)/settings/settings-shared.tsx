@@ -88,7 +88,7 @@ export function Toggle({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="size-4 accent-[#007aff]"
+        className="size-4 accent-accent"
       />
     </label>
   );
@@ -99,8 +99,8 @@ export function FeedbackBanner({ type, message }: { type: "error" | "success"; m
   return (
     <div className={`flex items-center gap-2 rounded-[18px] border p-4 text-sm backdrop-blur-xl ${
       error
-        ? "border-[#ff3b30]/15 bg-[#ff3b30]/[0.08] text-[#d70015] shadow-[0_8px_32px_rgba(255,59,48,0.08)] dark:text-[#ff453a]"
-        : "border-[#34c759]/15 bg-[#34c759]/[0.08] text-[#248a3d] shadow-[0_8px_32px_rgba(52,199,89,0.08)] dark:text-[#30d158]"
+        ? "border-danger/15 bg-danger/[0.08] text-danger-deep shadow-[0_8px_32px_rgba(255,59,48,0.08)] dark:text-danger"
+        : "border-success/15 bg-success/[0.08] text-success-deep shadow-[0_8px_32px_rgba(52,199,89,0.08)] dark:text-success"
     }`}>
       {error ? <AlertCircle className="size-4 shrink-0" /> : <CheckCircle2 className="size-4 shrink-0" />}
       {message}

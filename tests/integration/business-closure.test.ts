@@ -70,7 +70,7 @@ describe("study session closure", () => {
       studySessionItemId: item.itemId,
       rating: "GOOD",
       questionType: item.questionType,
-    })).rejects.toThrow("STUDY_ITEM_ALREADY_PROCESSED");
+    })).rejects.toMatchObject({ code: "STUDY_ITEM_ALREADY_PROCESSED" });
     expect((await sqlite.prepare("SELECT count(*) AS count FROM review_logs").get() as { count: number }).count).toBe(1);
   });
 

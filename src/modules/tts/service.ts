@@ -1,4 +1,5 @@
 import { WebSocket } from "ws";
+import { errorMessage } from "@/lib/format";
 import {
   generateSecMsGecToken,
   TRUSTED_CLIENT_TOKEN,
@@ -178,7 +179,7 @@ export async function generateTtsAudio(options: TtsOptions): Promise<TtsResult> 
     ttsCacheSet(cacheKey, arrayBuffer);
     return { ok: true, audio: arrayBuffer };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Edge TTS 请求失败";
+    const message = errorMessage(err, "Edge TTS 请求失败");
     return { ok: false, error: message };
   }
 }
@@ -211,7 +212,7 @@ export async function fetchYoudaoAudio(options: TtsOptions): Promise<TtsResult> 
     ttsCacheSet(cacheKey, arrayBuffer);
     return { ok: true, audio: arrayBuffer };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "有道发音请求失败";
+    const message = errorMessage(err, "有道发音请求失败");
     return { ok: false, error: message };
   }
 }

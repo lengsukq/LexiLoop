@@ -50,7 +50,11 @@ export async function startStudySession(mode: StudyMode, resume = true, continuo
   const sessionId = await sqlite.transaction(async () => {
     const session = await sqlite.prepare("INSERT INTO study_sessions (session_type, source_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?)").run(persistedMode, sourceType, now, selected.length === 0 ? now : null, selected.length, now);
     const id = Number(session.lastInsertRowid); const insert = sqlite.prepare("INSERT INTO study_session_items (study_session_id, position, word_id, task_type, question_type, status, created_at) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)");
-    for (const [index, candidate] of selected.entries()) { const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong }); const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType; await insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index), now); }
+    for (const [index, candidate] of selected.entries()) {
+      const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong });
+      const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType;
+      await insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index, candidate.mastery_score ?? undefined), now);
+    }
     return id;
   }).immediate();
   return getStudySession(sessionId, false);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-api";
 import { configureTtsSpeeds } from "@/lib/tts-client";
 import type { AppSettings } from "@/lib/types";
+import { toast } from "@/components/ui";
 import type { TestState } from "./settings-shared";
 
 function errorMessage(reason: unknown, fallback: string): string {
@@ -55,8 +56,11 @@ export function useSettingsData() {
       setSettings(saved);
       configureTtsSpeeds({ word: saved.wordSpeed, phrase: saved.phraseSpeed, sentence: saved.sentenceSpeed });
       setMessage("学习设置已保存。新会话会使用最新配置。");
+      toast.success("学习设置已保存", "保存成功");
     } catch (reason) {
-      setError(errorMessage(reason, "保存失败"));
+      const err = errorMessage(reason, "保存失败");
+      setError(err);
+      toast.error(err, "保存失败");
     } finally {
       setBusy("");
     }
@@ -71,8 +75,11 @@ export function useSettingsData() {
       form.append("file", file);
       const result = await apiFetch<{ message: string }>("/api/backups/restore", { method: "POST", body: form });
       setMessage(result.message);
+      toast.success(result.message, "备份恢复成功");
     } catch (reason) {
-      setError(errorMessage(reason, "恢复失败"));
+      const err = errorMessage(reason, "恢复失败");
+      setError(err);
+      toast.error(err, "恢复失败");
     } finally {
       setBusy("");
     }

@@ -98,12 +98,19 @@ export default function HomePage() {
         <div className="absolute right-1/4 top-0 size-32 rounded-full bg-white/[0.04] blur-xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-7">
           <div>
-            <Badge tone="glass">今日学习</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="glass">今日学习</Badge>
+              {completedToday >= (data.todayGoalTotal || 1) && data.todayGoalTotal > 0 && (
+                <Badge tone="glass" className="bg-success/25 text-white border-success/40">今日目标已达成 🎉</Badge>
+              )}
+            </div>
             <h1 className="mt-3 text-[25px] font-bold leading-tight tracking-tight sm:mt-5 sm:text-[32px]">
               保持词汇循环，不让记忆掉队
             </h1>
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/70">
-              今天还剩 {data.plan.plannedTotal} 个任务，预计 {data.plan.estimatedMinutes} 分钟。
+              {completedToday >= data.todayGoalTotal && data.todayGoalTotal > 0
+                ? `今日计划任务已全部完成！已处理 ${completedToday} 个任务，继续保持。`
+                : `今天还剩 ${data.plan.plannedTotal} 个任务，预计 ${data.plan.estimatedMinutes} 分钟。`}
             </p>
           </div>
           <Link
@@ -111,14 +118,14 @@ export default function HomePage() {
             className="ios-press inline-flex h-12 w-full shrink-0 items-center justify-center gap-2.5 rounded-2xl bg-white/95 px-6 text-[16px] font-bold text-accent shadow-[0_6px_24px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,1)] backdrop-blur-sm sm:h-[54px] sm:w-auto sm:px-8 sm:text-[17px]"
           >
             <Sparkles className="size-5" />
-            开始学习
+            {completedToday >= data.todayGoalTotal && data.todayGoalTotal > 0 ? "继续无限学习" : "开始学习"}
             <ArrowRight className="size-5" />
           </Link>
         </div>
         <div className="relative mt-6 sm:mt-8">
           <div className="mb-2.5 flex justify-between text-xs font-medium text-white/60">
             <span>今日完成度</span>
-            <span>{completedToday}/{data.todayGoalTotal}</span>
+            <span>{completedToday}/{data.todayGoalTotal} ({Math.round(planProgress)}%)</span>
           </div>
           <div className="h-[7px] overflow-hidden rounded-full bg-white/[0.15] shadow-[inset_0_1px_3px_rgba(0,0,0,0.1)]">
             <div
@@ -205,15 +212,15 @@ export default function HomePage() {
         <CardHeader className="flex-row items-center justify-between gap-3">
           <div><CardTitle>趣味训练</CardTitle><p className="mt-1 text-xs text-quaternary-label">独立游戏模式，不占用今日复习队列</p></div>
         </CardHeader>
-        <CardContent className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-3">
-          <PracticeLink href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-purple to-[#5856d6]" />
-          <PracticeLink href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-accent" />
-          <PracticeLink href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-warning to-[#ff6961]" />
-          <PracticeLink href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-accent" />
-          <PracticeLink href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-success to-accent" />
-          <PracticeLink href="/games?mode=WHACK_A_MOLE" icon={<Hammer className="size-5" />} title="词汇地鼠" subtitle="锤出正确单词" gradient="from-success to-[#00c7be]" />
-          <PracticeLink href="/games?mode=WORD_STACK" icon={<Layers className="size-5" />} title="单词堆堆乐" subtitle="点词块搭高塔" gradient="from-[#ff2d55] to-warning" />
-          <PracticeLink href="/games?mode=WORD_TETRIS" icon={<Blocks className="size-5" />} title="词汇俄罗斯方块" subtitle="点中下落的正确单词" gradient="from-[#5856d6] to-purple" />
+        <CardContent className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+          <PracticeLink dense href="/match" icon={<Gamepad2 className="size-5" />} title="限时词汇配对" subtitle="英文与释义组队" gradient="from-purple to-[#5856d6]" />
+          <PracticeLink dense href="/phonetics" icon={<AudioLines className="size-5" />} title="音标辨音训练" subtitle="听音、音标与拼写" gradient="from-[#00c7be] to-accent" />
+          <PracticeLink dense href="/games?mode=WORD_BUILDER" icon={<Puzzle className="size-5" />} title="单词拼图" subtitle="点击字母完成拼写" gradient="from-warning to-[#ff6961]" />
+          <PracticeLink dense href="/games?mode=LISTENING_PICK" icon={<Headphones className="size-5" />} title="听音辨词" subtitle="听发音快速选词" gradient="from-[#5ac8fa] to-accent" />
+          <PracticeLink dense href="/games?mode=MEANING_BLITZ" icon={<Brain className="size-5" />} title="词义冲刺" subtitle="限时选择正确释义" gradient="from-success to-accent" />
+          <PracticeLink dense href="/games?mode=WHACK_A_MOLE" icon={<Hammer className="size-5" />} title="词汇地鼠" subtitle="锤出正确单词" gradient="from-success to-[#00c7be]" />
+          <PracticeLink dense href="/games?mode=WORD_STACK" icon={<Layers className="size-5" />} title="单词堆堆乐" subtitle="点词块搭高塔" gradient="from-[#ff2d55] to-warning" />
+          <PracticeLink dense href="/games?mode=WORD_TETRIS" icon={<Blocks className="size-5" />} title="词汇俄罗斯方块" subtitle="点中下落的正确单词" gradient="from-[#5856d6] to-purple" />
         </CardContent>
       </Card>
     </div>
@@ -235,19 +242,19 @@ function QueueCard({ icon, label, count, planned, href, gradient }: {
   );
 }
 
-function PracticeLink({ href, icon, title, subtitle, gradient }: {
-  href: string; icon: React.ReactNode; title: string; subtitle: string; gradient: string;
+function PracticeLink({ href, icon, title, subtitle, gradient, dense = false }: {
+  href: string; icon: React.ReactNode; title: string; subtitle: string; gradient: string; dense?: boolean;
 }) {
   return (
-    <Link href={href} className="ios-press group glass-inner flex items-center justify-between rounded-[16px] p-3.5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-5">
-      <span className="flex items-center gap-3.5">
-        <span className={`grid size-10 place-items-center rounded-[12px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)] sm:size-11 sm:rounded-[14px]`}>{icon}</span>
-        <span>
-          <b className="block text-[15px] font-semibold">{title}</b>
-          <small className="text-[13px] text-quaternary-label dark:text-[#636366]">{subtitle}</small>
+    <Link href={href} className={`ios-press group glass-inner flex items-center justify-between rounded-[16px] p-3.5 transition-all duration-300 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.9)] dark:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] sm:rounded-[20px] sm:p-5 ${dense ? "max-sm:flex-col max-sm:items-start max-sm:gap-2.5" : ""}`}>
+      <span className={`flex items-center gap-3.5 ${dense ? "min-w-0 max-sm:w-full" : ""}`}>
+        <span className={`grid size-10 shrink-0 place-items-center rounded-[12px] bg-gradient-to-br ${gradient} text-white shadow-[0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.3)] sm:size-11 sm:rounded-[14px]`}>{icon}</span>
+        <span className="min-w-0">
+          <b className="block truncate text-[15px] font-semibold">{title}</b>
+          <small className="block truncate text-[13px] text-quaternary-label dark:text-[#636366]">{subtitle}</small>
         </span>
       </span>
-      <ArrowRight className="size-4 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 dark:text-[#38383a]" />
+      <ArrowRight className={`size-4 shrink-0 text-[#c7c7cc] transition-transform duration-300 group-hover:translate-x-1 dark:text-[#38383a] ${dense ? "max-sm:hidden" : ""}`} />
     </Link>
   );
 }

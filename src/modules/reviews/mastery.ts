@@ -14,6 +14,20 @@ export interface MasteryInput {
   activeWrongWord: boolean;
   recentAgain: number;
   avgDurationMs?: number;
+  elapsedDays?: number;
+}
+
+const FSRS_DECAY_FACTOR = 1 / 9; // Standard FSRS decay coefficient where R(S) = 1 / (1 + 1/9) = 0.90
+
+/**
+ * Calculates real-time memory retrievability R(t) in [0.05, 1.0] based on FSRS power forgetting curve.
+ * - At t = 0 (just reviewed): R = 1.0
+ * - At t = S (on due date): R = 0.90
+ * - As t grows overdue: R decays smoothly, reflecting actual brain memory retrievability
+ */
+export function calculateRetrievability(elapsedDays: number, stability: number): number {
+  if (stability <= 0 || elapsedDays <= 0) return 1.0;
+  return Math.max(0.05, Math.min(1.0, 1 / (1 + (FSRS_DECAY_FACTOR * elapsedDays) / stability)));
 }
 
 /** Weight of each score component (out of 100; penalty is subtracted). */
@@ -67,8 +81,9 @@ const MASTERY_THRESHOLDS = {
  * - Experience (7): total review repetitions
  * - Speed bonus (10): faster correct recalls score higher
  * - Penalty (-25 max): lapses, recent AGAIN ratings, active wrong words
+ * - Retrievability decay: smoothly modulates score when cards are overdue
  */
-export function calculateMasteryScore(input: MasteryInput): number {
+export function calculateMasteryScore(input: MasteryInput, elapsedDays?: number): number {
   if (input.reps === 0) return 0;
   const stability = Math.min(MASTERY_WEIGHTS.stability, Math.log1p(Math.max(0, input.stability)) / Math.log1p(MASTERY_SCALES.stabilityFullDays) * MASTERY_WEIGHTS.stability);
   const accuracy = Math.max(0, Math.min(1, input.accuracy)) * MASTERY_WEIGHTS.accuracy;
@@ -79,7 +94,16 @@ export function calculateMasteryScore(input: MasteryInput): number {
     ? Math.min(MASTERY_WEIGHTS.speed, Math.max(0, (1 - input.avgDurationMs / MASTERY_SCALES.speedBaselineMs)) * MASTERY_WEIGHTS.speed)
     : 0;
   const penalty = Math.min(MASTERY_WEIGHTS.penaltyCap, input.lapses * MASTERY_PENALTIES.lapse + input.recentAgain * MASTERY_PENALTIES.recentAgain + (input.activeWrongWord ? MASTERY_PENALTIES.activeWrongWord : 0));
-  return Math.round(Math.max(0, Math.min(100, stability + accuracy + interval + streak + experience + speedBonus - penalty)));
+  const rawScore = Math.max(0, Math.min(100, stability + accuracy + interval + streak + experience + speedBonus - penalty));
+
+  const daysElapsed = elapsedDays ?? input.elapsedDays;
+  if (daysElapsed != null && daysElapsed > 0 && input.stability > 0) {
+    const retrievability = calculateRetrievability(daysElapsed, input.stability);
+    const retentionMultiplier = Math.min(1.0, Math.max(0.3, retrievability / 0.9));
+    return Math.round(rawScore * retentionMultiplier);
+  }
+
+  return Math.round(rawScore);
 }
 
 /** Maps a numeric mastery score to a discrete level: NEW → LEARNING → FAMILIAR → PROFICIENT → MASTERED */

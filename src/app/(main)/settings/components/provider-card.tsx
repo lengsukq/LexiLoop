@@ -64,7 +64,7 @@ export function ProviderCard({
       </label>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
-        <Select className="h-8 w-56 text-xs" value={testModel} onChange={(event) => onTestModelChange(index, event.target.value)}>
+        <Select compact className="w-56" value={testModel} onChange={(event) => onTestModelChange(index, event.target.value)}>
           <option value="">选择已保存的模型</option>
           {configuredModels(provider).map((model) => <option key={model} value={model}>{model}</option>)}
         </Select>

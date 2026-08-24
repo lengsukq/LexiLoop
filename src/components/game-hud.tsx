@@ -13,9 +13,25 @@ export function GameTimerPill({ remainingMs, urgentAt = 10_000 }: { remainingMs:
   </div>;
 }
 
-/** Combo counter badge; highlights once the combo reaches 3. */
+/** Combo counter badge; highlights with flame animation as combo rises. */
 export function GameComboBadge({ combo }: { combo: number }) {
-  return <Badge tone={combo >= 3 ? "amber" : "slate"}><Flame className="size-3.5" />{combo} 连击</Badge>;
+  if (combo === 0) return null;
+  const isHigh = combo >= 5;
+  return (
+    <div
+      key={combo}
+      className={`animate-scale-in flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-all ${
+        isHigh
+          ? "bg-gradient-to-r from-warning to-danger text-white shadow-[0_0_16px_rgba(255,149,0,0.4)] scale-110"
+          : combo >= 2
+          ? "bg-warning/15 text-warning-deep border border-warning/30 dark:text-warning"
+          : "bg-quaternary-label/12 text-secondary-label"
+      }`}
+    >
+      <Flame className={`size-3.5 ${isHigh ? "animate-bounce" : ""}`} />
+      <span>{combo} 连击 {isHigh ? "🔥" : ""}</span>
+    </div>
+  );
 }
 
 /**

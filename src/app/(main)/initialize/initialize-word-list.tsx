@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, ChevronRight, ExternalLink, Loader2, RotateCcw } from "lucide-react";
-import { Alert, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Progress, SearchInput } from "@/components/ui";
+import { Alert, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Progress, SearchInput, Select } from "@/components/ui";
 import { InitializationBadge } from "@/components/status-badges";
 import { TASK_TYPE_LABELS, formatTs, type InitializationTask, type InitializationWord } from "./types";
 
@@ -55,13 +55,15 @@ export function InitializeWordList({
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
             />
-            <select
-              className="h-9 w-[108px] shrink-0 rounded-[14px] border border-black/[0.06] bg-white/60 px-3 text-sm shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
+            <Select
+              compact
+              className="w-[108px] shrink-0"
+              aria-label="按状态筛选"
               value={filter}
               onChange={(event) => onFilterChange(event.target.value)}
             >
               {FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
       </CardHeader>

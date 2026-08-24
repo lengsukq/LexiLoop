@@ -26,7 +26,7 @@ export default function SettingsPage() {
         title="设置与数据"
         description="调整每日学习计划、词典来源，并管理完整备份。"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" onClick={() => void data.load()}><RefreshCw className="size-4" />刷新</Button>
             <Button onClick={() => void data.save()} disabled={data.busy === "save"}>
               {data.busy === "save" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存

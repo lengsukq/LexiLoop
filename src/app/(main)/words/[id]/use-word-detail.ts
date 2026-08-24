@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { waitForAiTask } from "@/lib/ai-task-client";
 import { apiFetch } from "@/lib/client-api";
 import { playEntryTtsPreferYoudao } from "@/lib/tts-client";
+import { toast } from "@/components/ui";
 import type { RelatedWordItem } from "@/lib/types";
 import type {
   RelatedPreview,
@@ -89,8 +90,11 @@ export function useWordDetail(wordId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ definition: manualDefinition }),
       }));
+      toast.success("手动释义已保存");
     } catch (reason) {
-      setError(errorMessage(reason, "保存手动释义失败"));
+      const err = errorMessage(reason, "保存手动释义失败");
+      setError(err);
+      toast.error(err);
     } finally {
       setSaving(false);
     }
@@ -104,9 +108,12 @@ export function useWordDetail(wordId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode }),
       });
+      toast.success("已创建词条初始化任务");
       await load();
     } catch (reason) {
-      setError(errorMessage(reason, "创建任务失败"));
+      const err = errorMessage(reason, "创建任务失败");
+      setError(err);
+      toast.error(err);
     }
   }
 
@@ -114,9 +121,12 @@ export function useWordDetail(wordId: string) {
     if (!word || !window.confirm(`确定删除“${word.term}”及全部学习记录吗？`)) return;
     try {
       await apiFetch(`/api/words/${word.id}`, { method: "DELETE" });
+      toast.success(`已删除词条“${word.term}”`);
       router.push("/words");
     } catch (reason) {
-      setError(errorMessage(reason, "删除失败"));
+      const err = errorMessage(reason, "删除失败");
+      setError(err);
+      toast.error(err);
     }
   }
 
@@ -291,6 +301,7 @@ export function useWordDetail(wordId: string) {
       }));
       setYoudaoOpen(false);
       setYoudaoPreview(null);
+      toast.success("已应用有道词典内容");
     } catch (reason) {
       setYoudaoError(errorMessage(reason, "应用有道词典内容失败"));
     } finally {

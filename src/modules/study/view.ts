@@ -73,12 +73,70 @@ function shuffle<T>(items: T[]): T[] {
   return items;
 }
 
+async function findSpecificDistractorRows(terms: string[], excludedId: number): Promise<DistractorRow[]> {
+  if (!terms.length) return [];
+  return await sqlite.prepare(`SELECT w.id AS word_id, w.term, c.definitions_json
+    FROM words w JOIN word_contents c ON c.word_id = w.id
+    WHERE w.term IN (${terms.map(() => "?").join(",")}) AND w.id != ?
+      AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]'
+    LIMIT 6`).all(...terms, excludedId) as DistractorRow[];
+}
+
+async function findActiveWrongDistractorRows(excludedId: number): Promise<DistractorRow[]> {
+  return await sqlite.prepare(`SELECT w.id AS word_id, w.term, c.definitions_json
+    FROM wrong_word_states x JOIN words w ON w.id = x.word_id JOIN word_contents c ON c.word_id = w.id
+    WHERE x.active = 1 AND w.id != ? AND w.is_suspended = 0
+      AND c.definitions_json IS NOT NULL AND c.definitions_json != '[]'
+    ORDER BY x.wrong_count DESC LIMIT 8`).all(excludedId) as DistractorRow[];
+}
+
 async function generateMeaningChoices(wordId: number, targetLanguage: string, content: DictionaryContent): Promise<string[]> {
   const definitions = targetDefinitionTexts(content.definitions, targetLanguage);
   const correct = definitions; if (!correct) return [];
-  const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
-  const distractors: string[] = []; const seen = new Set([correct.toLocaleLowerCase()]);
-  for (const row of rows) { if (distractors.length >= 3) break; const text = preferredDefinitionText(row.definitions_json, targetLanguage); if (text && !seen.has(text.toLocaleLowerCase())) { seen.add(text.toLocaleLowerCase()); distractors.push(text); } }
+
+  const distractors: string[] = [];
+  const seen = new Set([correct.toLocaleLowerCase()]);
+
+  // 1. 优先提取易混词 (Confused words) 的释义作为高质量干扰项
+  const confusedTerms = (content.confusedWords ?? []).map((item) => item.word).filter(Boolean);
+  if (confusedTerms.length > 0) {
+    const confusedRows = await findSpecificDistractorRows(confusedTerms, wordId);
+    for (const row of confusedRows) {
+      if (distractors.length >= 3) break;
+      const text = preferredDefinitionText(row.definitions_json, targetLanguage);
+      if (text && !seen.has(text.toLocaleLowerCase())) {
+        seen.add(text.toLocaleLowerCase());
+        distractors.push(text);
+      }
+    }
+  }
+
+  // 2. 其次融合用户自身的活跃错词本 (User's active wrong words)
+  if (distractors.length < 3) {
+    const wrongRows = await findActiveWrongDistractorRows(wordId);
+    for (const row of wrongRows) {
+      if (distractors.length >= 3) break;
+      const text = preferredDefinitionText(row.definitions_json, targetLanguage);
+      if (text && !seen.has(text.toLocaleLowerCase())) {
+        seen.add(text.toLocaleLowerCase());
+        distractors.push(text);
+      }
+    }
+  }
+
+  // 3. 最后从全局随机池中补齐
+  if (distractors.length < 3) {
+    const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
+    for (const row of rows) {
+      if (distractors.length >= 3) break;
+      const text = preferredDefinitionText(row.definitions_json, targetLanguage);
+      if (text && !seen.has(text.toLocaleLowerCase())) {
+        seen.add(text.toLocaleLowerCase());
+        distractors.push(text);
+      }
+    }
+  }
+
   return shuffle([correct, ...distractors]);
 }
 
@@ -89,15 +147,48 @@ async function generateWordChoices(wordId: number, term: string, targetLanguage:
   const choices = [correct];
   const choiceDefinitions: Record<string, string> = { [correct]: correctDefinitions };
   const seen = new Set([correct.toLocaleLowerCase()]);
-  const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
-  for (const row of rows) {
-    if (choices.length >= 4) break;
-    const candidateTerm = row.term.trim();
-    const candidateDefinitions = targetDefinitionTexts(row.definitions_json, targetLanguage);
-    if (!candidateTerm || !candidateDefinitions || seen.has(candidateTerm.toLocaleLowerCase())) continue;
-    seen.add(candidateTerm.toLocaleLowerCase());
-    choices.push(candidateTerm);
-    choiceDefinitions[candidateTerm] = candidateDefinitions;
+
+  // 1. 优先提取易混词 (Confused words) 作为看汉选英的高质干扰项
+  const confusedTerms = (content.confusedWords ?? []).map((item) => item.word).filter(Boolean);
+  if (confusedTerms.length > 0) {
+    const confusedRows = await findSpecificDistractorRows(confusedTerms, wordId);
+    for (const row of confusedRows) {
+      if (choices.length >= 4) break;
+      const cTerm = row.term.trim();
+      const cDef = targetDefinitionTexts(row.definitions_json, targetLanguage);
+      if (!cTerm || !cDef || seen.has(cTerm.toLocaleLowerCase())) continue;
+      seen.add(cTerm.toLocaleLowerCase());
+      choices.push(cTerm);
+      choiceDefinitions[cTerm] = cDef;
+    }
+  }
+
+  // 2. 其次融合用户自身活跃错词
+  if (choices.length < 4) {
+    const wrongRows = await findActiveWrongDistractorRows(wordId);
+    for (const row of wrongRows) {
+      if (choices.length >= 4) break;
+      const cTerm = row.term.trim();
+      const cDef = targetDefinitionTexts(row.definitions_json, targetLanguage);
+      if (!cTerm || !cDef || seen.has(cTerm.toLocaleLowerCase())) continue;
+      seen.add(cTerm.toLocaleLowerCase());
+      choices.push(cTerm);
+      choiceDefinitions[cTerm] = cDef;
+    }
+  }
+
+  // 3. 最后从全局池中补齐
+  if (choices.length < 4) {
+    const rows = await takeDistractorRows(new Set([wordId]), DISTRACTOR_TAKE_SIZE);
+    for (const row of rows) {
+      if (choices.length >= 4) break;
+      const candidateTerm = row.term.trim();
+      const candidateDefinitions = targetDefinitionTexts(row.definitions_json, targetLanguage);
+      if (!candidateTerm || !candidateDefinitions || seen.has(candidateTerm.toLocaleLowerCase())) continue;
+      seen.add(candidateTerm.toLocaleLowerCase());
+      choices.push(candidateTerm);
+      choiceDefinitions[candidateTerm] = candidateDefinitions;
+    }
   }
   return { choices: shuffle(choices), choiceDefinitions };
 }

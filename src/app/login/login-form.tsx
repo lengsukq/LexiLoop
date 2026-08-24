@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { KeyRound, LoaderCircle, LockKeyhole } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, KeyRound, LoaderCircle, LockKeyhole } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 export function LoginForm({ nextPath }: { nextPath: string }) {
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,15 +64,31 @@ export function LoginForm({ nextPath }: { nextPath: string }) {
                   <input
                     autoFocus
                     required
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
+                    onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))}
+                    onKeyDown={(event) => setCapsLock(event.getModifierState("CapsLock"))}
                     placeholder="输入密码"
                     autoComplete="current-password"
                     className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-tertiary-label dark:placeholder:text-[#636366]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="ios-press grid size-7 place-items-center rounded-full text-tertiary-label hover:text-label"
+                    title={showPassword ? "隐藏密码" : "显示密码"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
                 </div>
               </label>
+
+              {capsLock && (
+                <p className="flex items-center gap-1.5 text-xs font-medium text-warning dark:text-warning">
+                  <AlertCircle className="size-3.5" />已开启大写锁定 (Caps Lock)
+                </p>
+              )}
 
               {error && <p role="alert" className="rounded-[14px] bg-danger/10 px-3.5 py-3 text-[13px] font-medium leading-5 text-danger-deep dark:text-[#ff6961]">{error}</p>}
 

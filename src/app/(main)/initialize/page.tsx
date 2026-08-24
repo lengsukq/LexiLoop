@@ -162,7 +162,7 @@ export default function InitializePage() {
         title="词条初始化"
         description="为词条补齐释义、音标、例句等学习内容；选择范围后创建后台任务。"
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" onClick={() => void load()}><RefreshCw className="size-4" />刷新</Button>
             <Button variant="outline" onClick={() => void runNow()} disabled={running}>
               {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}{running ? "处理中..." : "立即处理"}
@@ -211,6 +211,28 @@ export default function InitializePage() {
         onClose={() => setDetailJobId(null)}
         onQueueWord={() => void queueDetailWord()}
       />
+
+      {/* 底部浮动批量操作栏 */}
+      {selectedWordIds.size > 0 && (
+        <div className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-lg animate-fade-up lg:bottom-8">
+          <div className="liquid-glass liquid-glass-specular flex items-center justify-between gap-3 rounded-[22px] px-4 py-3 shadow-[0_16px_50px_rgba(0,0,0,0.2)]">
+            <div className="flex items-center gap-2">
+              <span className="grid size-6 place-items-center rounded-full bg-accent text-xs font-bold text-white">
+                {selectedWordIds.size}
+              </span>
+              <span className="text-sm font-semibold text-label">已选词条</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => openConfigurator("SELECTED")}>
+                配置初始化
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedWordIds(new Set())}>
+                取消选择
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

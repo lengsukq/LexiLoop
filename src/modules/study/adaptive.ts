@@ -2,9 +2,9 @@ import type { EntryType, QuestionType, ReviewRating } from "@/lib/types";
 import { sqlite } from "@/db/client";
 
 const MAX_FOLLOW_UPS_PER_WORD = 2;
-// The follow-up should only reappear well after the current question, so that
-// the learner gets a chance to answer several other items in between.
-const FOLLOW_UP_DELAY = 8;
+// 递增间隔检索：首次做错 5 题后快速复现（拯救工作记忆），二次做错 10 题后拉长间隔复现（加深长时记忆）
+const FIRST_FOLLOW_UP_DELAY = 5;
+const SECOND_FOLLOW_UP_DELAY = 10;
 
 export interface AdaptiveFollowUp {
   questionType: QuestionType;
@@ -14,7 +14,10 @@ export interface AdaptiveFollowUp {
 
 function nextQuestionType(current: QuestionType, entryType: EntryType): QuestionType {
   if (entryType === "SENTENCE") return "ZH_TO_EN_SPELLING";
-  return current === "EN_TO_ZH_CHOICE" ? "ZH_TO_EN_SPELLING" : "EN_TO_ZH_CHOICE";
+  if (current === "EN_TO_ZH") return "EN_TO_ZH_CHOICE";
+  if (current === "EN_TO_ZH_CHOICE") return "ZH_TO_EN_SPELLING";
+  if (current === "ZH_TO_EN_CHOICE") return "ZH_TO_EN_SPELLING";
+  return "ZH_TO_EN_SPELLING";
 }
 
 function isExcludedSession(sourceType: string | null): boolean {
@@ -62,24 +65,26 @@ export async function scheduleAdaptiveFollowUp(input: {
     .get(input.itemId, input.sessionId) as { position: number } | undefined;
   if (!current) return null;
 
-  // Place the follow-up at least FOLLOW_UP_DELAY items after the current one.
-  // We look up the FOLLOW_UP_DELAY-th item that follows the current item and
+  const followUpDelay = Number(answeredCount.count) === 0 ? FIRST_FOLLOW_UP_DELAY : SECOND_FOLLOW_UP_DELAY;
+
+  // Place the follow-up at least followUpDelay items after the current one.
+  // We look up the followUpDelay-th item that follows the current item and
   // insert halfway between it and its predecessor. This keeps a real distance
   // (unlike the old midpoint-with-next hack) while avoiding an O(n) rewrite and
   // preserving the unique (study_session_id, position) constraint.
   const target = await sqlite.prepare(`SELECT position FROM study_session_items
     WHERE study_session_id = ? AND position > ?
     ORDER BY position ASC LIMIT 1 OFFSET ?`)
-    .get(input.sessionId, current.position, FOLLOW_UP_DELAY - 1) as { position: number } | undefined;
+    .get(input.sessionId, current.position, followUpDelay - 1) as { position: number } | undefined;
   let position: number;
   if (target) {
     const prev = await sqlite.prepare(`SELECT position FROM study_session_items
       WHERE study_session_id = ? AND position < ?
       ORDER BY position DESC LIMIT 1`)
       .get(input.sessionId, target.position) as { position: number } | undefined;
-    position = prev ? (prev.position + target.position) / 2 : current.position + FOLLOW_UP_DELAY;
+    position = prev ? (prev.position + target.position) / 2 : current.position + followUpDelay;
   } else {
-    // Fewer than FOLLOW_UP_DELAY items remain in the session: append to the end.
+    // Fewer than followUpDelay items remain in the session: append to the end.
     const last = await sqlite.prepare(`SELECT MAX(position) AS position FROM study_session_items
       WHERE study_session_id = ?`).get(input.sessionId) as { position: number | null };
     position = (last?.position ?? current.position) + 1;

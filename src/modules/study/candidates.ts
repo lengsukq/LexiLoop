@@ -6,7 +6,16 @@ import { DAY_MS, HOUR_MS } from "@/lib/time";
 import { startOfLocalDay } from "@/lib/date-key";
 import { definitionMeaningSql, summaryTranslationSql } from "@/modules/dictionary/availability";
 
-export interface StudyCandidate { id: number; term: string; normalized_term: string; source_language: string; target_language: string; content_type: EntryType; continuousTaskType?: "REVIEW" | "WRONG" | "NEW"; }
+export interface StudyCandidate {
+  id: number;
+  term: string;
+  normalized_term: string;
+  source_language: string;
+  target_language: string;
+  content_type: EntryType;
+  mastery_score?: number | null;
+  continuousTaskType?: "REVIEW" | "WRONG" | "NEW";
+}
 export type CandidateScope = "LEXICAL" | "SENTENCE" | "ALL";
 type RecommendedCandidate = StudyCandidate & { recommendedQuestionType: QuestionType };
 type Pools = { due: StudyCandidate[]; wrong: StudyCandidate[]; fresh: StudyCandidate[]; limits: { due: number; wrong: number; fresh: number } };
@@ -34,7 +43,7 @@ function hasMeaningSql(scope: CandidateScope): string {
   return `AND (${definitionMeaning} OR ${summaryTranslationSql()})`;
 }
 function availabilitySql(): string { return `NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items active_item JOIN study_sessions active_session ON active_session.id = active_item.study_session_id WHERE active_item.word_id = w.id AND active_item.status = 'PENDING' AND active_session.completed_at IS NULL AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME' AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%' AND active_session.started_at >= ?)`; }
-const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type";
+const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type, performance.mastery_score";
 async function dueCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> {
   return await sqlite.prepare(`SELECT ${selectColumns} FROM review_cards c JOIN words w ON w.id = c.word_id
     LEFT JOIN word_review_stats performance ON performance.word_id = w.id
@@ -185,7 +194,21 @@ export function selectCandidates(mode: StudyMode, pools: Pools, options: { rando
   const ratios: Array<{ items: StudyCandidate[]; take: number }> = mode === "LISTENING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }] : mode === "SPELLING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }] : [{ items: groups.due, take: 4 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }];
   return interleave(ratios);
 }
-export function questionFor(mode: StudyMode, taskType: string, position = 0): QuestionType { if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING"; if (mode === "LISTENING") return "LISTENING_SPELLING"; if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING"; if (mode === "DAILY") return taskType === "NEW" ? "EN_TO_ZH" : position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE"; return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH"; }
+export function questionFor(mode: StudyMode, taskType: string, position = 0, masteryScore?: number): QuestionType {
+  if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING";
+  if (mode === "LISTENING") return "LISTENING_SPELLING";
+  if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING";
+  if (mode === "DAILY") {
+    if (taskType === "NEW") return "EN_TO_ZH";
+    if (masteryScore != null) {
+      if (masteryScore < 35) return "EN_TO_ZH_CHOICE";
+      if (masteryScore < 70) return "ZH_TO_EN_CHOICE";
+      return "ZH_TO_EN_SPELLING";
+    }
+    return position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE";
+  }
+  return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH";
+}
 export function taskFor(mode: StudyMode, candidate: StudyCandidate, sets: { due: Set<number>; wrong: Set<number> }): "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING" { if (mode === "LISTENING") return "LISTENING"; if (mode === "SPELLING") return "SPELLING"; if (mode === "DUE_REVIEW") return "REVIEW"; if (mode === "NEW_WORDS") return "NEW"; if (candidate.continuousTaskType) return candidate.continuousTaskType; if (sets.due.has(candidate.id)) return "REVIEW"; if (sets.wrong.has(candidate.id)) return "WRONG"; return "NEW"; }
 type PoolLimits = { due: number; wrong: number; fresh: number };
 

@@ -72,12 +72,8 @@ export function WordHeader({
             {translationMessage && missingTranslation && <p className={`mt-2 max-w-2xl text-xs ${translationMessage.startsWith("已") ? "text-emerald-100" : "text-amber-200"}`}>{translationMessage}</p>}
             <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {entryTypeLabel(word.entryType)}</p>
             <PronunciationControls
-              accent={selectedAccent}
-              phonetic={
-                word.content.pronunciations.find((p) => p.accent === selectedAccent)?.phonetic
-                ?? word.content.pronunciations.find((p) => p.accent === "UK")?.phonetic
-                ?? null
-              }
+              word={word}
+              selectedAccent={selectedAccent}
               tip={ttsTip}
               onAccentChange={onAccentChange}
               onPlay={onPlay}
@@ -115,21 +111,65 @@ function TranslationAction({ busy, onTranslate }: { busy: boolean; onTranslate: 
   </div>;
 }
 
-function PronunciationControls({ accent, phonetic, tip, onAccentChange, onPlay }: {
-  accent: "US" | "UK";
-  phonetic: string | null;
+function PronunciationControls({ word, selectedAccent, tip, onAccentChange, onPlay }: {
+  word: WordDetail;
+  selectedAccent: "US" | "UK";
   tip: string;
   onAccentChange: (accent: "US" | "UK") => void;
   onPlay: () => Promise<void>;
 }) {
-  return <div className="mt-4 flex flex-wrap items-center gap-2">
-    <div className="flex items-center gap-2">
-      <div className="flex overflow-hidden rounded-lg border border-white/25">
-        {(["US", "UK"] as const).map((value) => <button key={value} type="button" onClick={() => onAccentChange(value)} className={`px-2.5 py-1 text-xs font-medium transition ${accent === value ? "bg-white/30 text-white" : "text-white/70 hover:bg-white/10"}`}>{value === "US" ? "美" : "英"}</button>)}
+  const us = word.content.pronunciations.find((p) => p.accent === "US");
+  const uk = word.content.pronunciations.find((p) => p.accent === "UK");
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {us && (
+          <button
+            type="button"
+            onClick={() => {
+              onAccentChange("US");
+              void onPlay();
+            }}
+            className={`ios-press inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition ${
+              selectedAccent === "US"
+                ? "bg-white text-accent shadow-[0_2px_10px_rgba(0,0,0,0.15)]"
+                : "bg-white/15 text-white hover:bg-white/25"
+            }`}
+          >
+            <Volume2 className="size-3.5" />
+            <span>美 {us.phonetic || ""}</span>
+          </button>
+        )}
+        {uk && (
+          <button
+            type="button"
+            onClick={() => {
+              onAccentChange("UK");
+              void onPlay();
+            }}
+            className={`ios-press inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md transition ${
+              selectedAccent === "UK"
+                ? "bg-white text-accent shadow-[0_2px_10px_rgba(0,0,0,0.15)]"
+                : "bg-white/15 text-white hover:bg-white/25"
+            }`}
+          >
+            <Volume2 className="size-3.5" />
+            <span>英 {uk.phonetic || ""}</span>
+          </button>
+        )}
+        {!us && !uk && (
+          <button
+            type="button"
+            onClick={() => void onPlay()}
+            className="ios-press inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/25"
+          >
+            <Volume2 className="size-3.5" />
+            <span>播放发音</span>
+          </button>
+        )}
       </div>
-      {phonetic && <span className="text-sm font-medium tracking-wide text-white/90">{phonetic}</span>}
+      {tip && <p className="w-full text-xs text-amber-300">{tip}</p>}
     </div>
-    <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm transition hover:bg-white/25" onClick={() => void onPlay()}><Volume2 className="size-4" />播放发音</button>
-    {tip && <p className="w-full text-xs text-amber-300">{tip}</p>}
-  </div>;
+  );
 }

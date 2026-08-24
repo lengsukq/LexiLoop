@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AlertCircle, ArrowRight, BookPlus, CheckCircle2, ChevronDown, ChevronUp, ListChecks, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import type { EntryType, ManualContentPreview } from "@/lib/types";
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, PageHeader, Select, buttonClass } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Kbd, PageHeader, Select, buttonClass, toast } from "@/components/ui";
 
 type TypeChoice = "AUTO" | EntryType;
 
@@ -56,6 +56,7 @@ export default function CreatePage() {
   const [busy, setBusy] = useState<"preview" | "confirm" | "">("");
   const [error, setError] = useState("");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [previewDone, setPreviewDone] = useState(0);
 
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
   const lineCount = lines.length;
@@ -74,6 +75,7 @@ export default function CreatePage() {
     setBusy("preview");
     setError("");
     setExpandedIndex(null);
+    setPreviewDone(0);
     await runWithConcurrency(lines, PREVIEW_CONCURRENCY, async (term, index) => {
       try {
         const data = await apiFetch<ManualContentPreview>("/api/manual/preview", {
@@ -89,6 +91,8 @@ export default function CreatePage() {
         setBatch((previous) => previous?.map((row, i) => i === index ? { ...row, preview: data } : row) ?? null);
       } catch (reason) {
         setBatch((previous) => previous?.map((row, i) => i === index ? { ...row, error: errorMessage(reason, "生成预览失败") } : row) ?? null);
+      } finally {
+        setPreviewDone((count) => count + 1);
       }
     });
     setBusy("");
@@ -149,12 +153,46 @@ export default function CreatePage() {
     <PageHeader title="手动添加" description="每行输入一个单词、短语或句子，先由有道词典生成预览，确认后才正式进入词库。" />
 
     <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><BookPlus className="size-5 text-accent" />输入学习内容</CardTitle></CardHeader>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2"><BookPlus className="size-5 text-accent" />输入学习内容</CardTitle>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-secondary-label">快捷填入：</span>
+            <button
+              type="button"
+              onClick={() => { setText("serendipity\nresilient\nmeticulous"); if (batch) reset(); }}
+              className="ios-press rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-secondary-label hover:bg-accent/10 hover:text-accent dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+            >
+              + 单词示例
+            </button>
+            <button
+              type="button"
+              onClick={() => { setText("bring up\ntake for granted\ncome across"); if (batch) reset(); }}
+              className="ios-press rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-secondary-label hover:bg-accent/10 hover:text-accent dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+            >
+              + 短语示例
+            </button>
+            <button
+              type="button"
+              onClick={() => { setText("Practice makes perfect.\nAction speaks louder than words."); if (batch) reset(); }}
+              className="ios-press rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-secondary-label hover:bg-accent/10 hover:text-accent dark:bg-white/[0.06] dark:hover:bg-white/[0.12]"
+            >
+              + 句子示例
+            </button>
+          </div>
+        </div>
+      </CardHeader>
       <CardContent className="space-y-5">
         <textarea
           className="glass-inner min-h-36 w-full rounded-[18px] p-4 text-lg outline-none transition placeholder:text-tertiary-label focus:border-accent/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10),0_0_0_4px_rgba(0,122,255,0.08)]"
           value={text}
           onChange={(event) => { setText(event.target.value); if (batch) reset(); }}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && lineCount > 0 && busy === "") {
+              event.preventDefault();
+              void generatePreviews();
+            }
+          }}
           placeholder={'每行一个单词/词组/句子，例如：\nabandon\nbreak down\nI have been working here for five years.'}
           maxLength={MAX_TOTAL_CHARS}
         />
@@ -169,7 +207,11 @@ export default function CreatePage() {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-tertiary-label">生成预览会先查询有道词典，识别不出短语或句子时自动用腾讯翻译 / AI 兜底，不会创建正式词条。</p>
-          <Button size="lg" onClick={() => void generatePreviews()} disabled={lineCount === 0 || busy !== ""}>{busy === "preview" ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}{batch ? "重新生成预览" : "生成预览"}</Button>
+          <Button size="lg" onClick={() => void generatePreviews()} disabled={lineCount === 0 || busy !== ""}>
+            {busy === "preview" ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
+            {batch ? "重新生成预览" : "生成预览"}
+            <Kbd className="ml-1.5 hidden sm:inline-flex bg-white/20 text-white border-white/30">⌘ Enter</Kbd>
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -188,7 +230,7 @@ export default function CreatePage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {busy === "preview" && <div className="flex items-center gap-3 rounded-[16px] border border-accent/10 bg-accent/[0.06] p-4 text-sm text-accent shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]"><Loader2 className="size-4 animate-spin" />正在逐行查询有道词典，请稍候…</div>}
+          {busy === "preview" && <div className="flex items-center gap-3 rounded-[16px] border border-accent/10 bg-accent/[0.06] p-4 text-sm text-accent shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]"><Loader2 className="size-4 animate-spin" />正在逐行查询有道词典，请稍候…（{previewDone}/{batch.length}）</div>}
           {batch.map((row, index) => <BatchRowCard key={`${row.term}-${index}`} row={row} index={index} expanded={expandedIndex === index} busy={busy !== ""} onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)} onConfirm={() => void confirmRow(index)} />)}
         </CardContent>
       </Card>

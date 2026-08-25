@@ -12,7 +12,7 @@ import type {
 
 /** Words without a usable definition must not be recommended or studied. */
 function hasDefinitionSql(): string {
-  return `AND ${definitionMeaningSql()}`;
+  return definitionMeaningSql();
 }
 const VALID_QUESTION_TYPES = new Set<QuestionType>([
   "EN_TO_ZH",

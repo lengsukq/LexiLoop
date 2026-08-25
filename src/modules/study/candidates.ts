@@ -43,7 +43,7 @@ function hasMeaningSql(scope: CandidateScope): string {
   return `AND (${definitionMeaning} OR ${summaryTranslationSql()})`;
 }
 function availabilitySql(): string { return `NOT EXISTS (SELECT 1 FROM study_session_items skipped WHERE skipped.word_id = w.id AND skipped.status = 'SKIPPED' AND COALESCE(skipped.skip_reason, '') NOT IN ('SESSION_EXPIRED', 'PROGRESS_RESET') AND skipped.answered_at IS NOT NULL AND skipped.answered_at >= ?) AND NOT EXISTS (SELECT 1 FROM study_session_items active_item JOIN study_sessions active_session ON active_session.id = active_item.study_session_id WHERE active_item.word_id = w.id AND active_item.status = 'PENDING' AND active_session.completed_at IS NULL AND COALESCE(active_session.source_type, '') <> 'MATCH_GAME' AND COALESCE(active_session.source_type, '') NOT LIKE 'GAME_%' AND active_session.started_at >= ?)`; }
-const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type, performance.mastery_score";
+const selectColumns = "w.id, w.term, w.normalized_term, w.source_language, w.target_language, w.content_type, w.mastery_score";
 async function dueCandidates(limit: number, now: number, scope: CandidateScope): Promise<StudyCandidate[]> {
   return await sqlite.prepare(`SELECT ${selectColumns} FROM review_cards c JOIN words w ON w.id = c.word_id
     LEFT JOIN word_review_stats performance ON performance.word_id = w.id

@@ -79,7 +79,7 @@ export function DailyAiSuggestion() {
   }
 
   if (!data && error) {
-    return <Card><CardContent className="flex flex-col items-center gap-3 py-8 text-center"><AlertCircle className="size-7 text-danger" /><div><b className="text-sm">AI 建议生成失败</b><p className="mt-1 text-xs text-quaternary-label">{error}</p></div><Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="size-4" />重试</Button></CardContent></Card>;
+    return <Card><CardContent className="flex flex-col items-center gap-3 py-8 text-center"><AlertCircle className="size-7 text-danger" /><div><b className="text-sm">建议生成失败</b><p className="mt-1 text-xs text-quaternary-label">{error}</p></div><Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="size-4" />重试</Button></CardContent></Card>;
   }
 
   if (!data) return null;
@@ -90,8 +90,8 @@ export function DailyAiSuggestion() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="flex items-center gap-2"><Sparkles className="size-5 text-purple" />今日 AI 学习建议</CardTitle>
-            <Badge tone={data.generator === "AI" ? "purple" : "slate"}>{data.generator === "AI" ? "AI 生成" : "智能规则"}</Badge>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="size-5 text-purple" />今日学习建议</CardTitle>
+            <Badge tone="slate">智能推荐</Badge>
             <Badge tone={scoreTone}>昨日质量 {data.qualityScore ?? "无记录"}</Badge>
           </div>
           <p className="mt-1 text-xs text-quaternary-label">基于 {data.sourceDateKey} 的学习数据和当前复习状态生成</p>
@@ -120,13 +120,10 @@ export function DailyAiSuggestion() {
           <div className="mt-4 space-y-2">
             {data.actions.slice(0, 3).map((action, index) => <div key={`${action}-${index}`} className="flex items-start gap-2 rounded-[12px] bg-white/60 p-2.5 text-sm dark:bg-black/15"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" /><span>{action}</span></div>)}
           </div>
-
-          {data.generator === "RULE_BASED" && !data.configured && <div className="mt-4 rounded-[12px] border border-warning/15 bg-warning/[0.06] p-3 text-xs leading-relaxed text-warning-deep">当前未启用“每日学习建议”模型，已使用本地规则生成。可在<Link href="/settings" className="mx-1 font-semibold underline">设置 → AI 模型</Link>中启用。</div>}
-          {data.generationWarning && data.configured && <p className="mt-3 text-xs text-warning">AI 调用失败，本次已回退到本地建议：{data.generationWarning}</p>}
         </div>
 
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-danger" />{data.generator === "AI" ? "AI 今日必做题" : "今日重点复习"}</h3><p className="mt-1 text-xs text-quaternary-label">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red" className="shrink-0">{data.recommendedItems.length} 题</Badge></div>
+          <div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h3 className="flex items-center gap-2 text-sm font-semibold"><Target className="size-4 text-danger" />今日重点复习</h3><p className="mt-1 text-xs text-quaternary-label">优先处理昨天答错、仍在错词队列或已经到期的词条。</p></div><Badge tone="red" className="shrink-0">{data.recommendedItems.length} 题</Badge></div>
           {data.recommendedItems.length ? <>
             <div className="grid max-h-[290px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {data.recommendedItems.map((item, index) => <div key={item.wordId} className="rounded-[15px] border border-black/[0.05] bg-black/[0.02] p-3 dark:border-white/[0.07] dark:bg-white/[0.03]">
@@ -135,7 +132,7 @@ export function DailyAiSuggestion() {
                 <p className="mt-1.5 text-xs leading-relaxed text-quaternary-label">{item.reason}</p>
               </div>)}
             </div>
-            <Link href="/study?mode=AI_RECOMMENDED" className={`${buttonClass("primary", "lg")} mt-4 w-full`}><Brain className="size-5" />{data.generator === "AI" ? "开始 AI 必做题" : "开始重点复习"}<ArrowRight className="size-5" /></Link>
+            <Link href="/study?mode=AI_RECOMMENDED" className={`${buttonClass("primary", "lg")} mt-4 w-full`}><Brain className="size-5" />开始重点复习<ArrowRight className="size-5" /></Link>
           </> : <div className="grid min-h-52 place-items-center rounded-[18px] border border-dashed border-black/[0.08] text-center dark:border-white/[0.1]"><div><Target className="mx-auto size-7 text-success" /><b className="mt-2 block text-sm">暂时没有高风险词条</b><p className="mt-1 text-xs text-quaternary-label">可以继续完成常规今日学习。</p></div></div>}
         </div>
       </div>

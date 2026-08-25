@@ -1,5 +1,17 @@
 import type { DictionaryContent, EntryType } from "@/lib/types";
-import { parseDefinitions, parseExamples, parsePhonetics, parsePhraseDefinition, parsePhrases, parseTranslation, parseWordForms } from "./youdao-fields";
+import {
+  parseDefinitions,
+  parseEnDefinitions,
+  parseExamples,
+  parsePhonetics,
+  parsePhraseDefinition,
+  parsePhrases,
+  parsePhrasesFromHtml,
+  parseSynonymsFromHtml,
+  parseTranslation,
+  parseWordFamilyFromHtml,
+  parseWordForms,
+} from "./youdao-fields";
 
 export interface YoudaoParseOptions {
   term: string;
@@ -48,6 +60,11 @@ export function hasAnyContent(content: Partial<DictionaryContent>): boolean {
       || content.forms?.length
       || content.examples?.length
       || content.phrases?.length
+      || content.synonyms?.length
+      || content.antonyms?.length
+      || content.wordFamily?.length
+      || content.roots?.length
+      || content.affixes?.length
       || content.summary?.translation?.trim()
       || content.summary?.shortDefinition?.trim(),
   );
@@ -62,14 +79,19 @@ export function parseYoudaoHtml(html: string, optionsOrTerm: YoudaoParseOptions 
 
   const translation = parseTranslation(lines, options.term, options.targetLanguage);
   const definitions = parseDefinitions(lines, options.targetLanguage);
+  const enDefinitions = options.entryType === "WORD" ? parseEnDefinitions(html) : [];
   const examples = parseExamples(lines, options.term);
-  const phrases = parsePhrases(lines);
+  const phrases = mergePhrasesPreserveOrder(parsePhrases(lines), parsePhrasesFromHtml(html));
+  const synonyms = options.entryType === "WORD" ? parseSynonymsFromHtml(html) : [];
+  const wordFamily = options.entryType === "WORD" ? parseWordFamilyFromHtml(html) : [];
   const content: Partial<DictionaryContent> = {
-    pronunciations: options.entryType === "WORD" ? parsePhonetics(lines, options.term) : [],
-    definitions,
+    pronunciations: options.entryType === "WORD" ? parsePhonetics(lines, options.term, html) : [],
+    definitions: [...definitions, ...enDefinitions],
     forms: options.entryType === "WORD" ? parseWordForms(lines) : [],
     examples,
     phrases,
+    synonyms,
+    wordFamily,
     tags: parseTags(lines),
   };
 
@@ -97,9 +119,6 @@ export function parseYoudaoHtml(html: string, optionsOrTerm: YoudaoParseOptions 
       }
     }
   } else if (options.entryType === "PHRASE" && !content.definitions?.length) {
-    // Phrase pages rarely carry POS-prefixed definitions or a dedicated
-    // "有道翻译" block; fall back to the network-definition entry for the term
-    // so the phrase still gets a learnable meaning (and study choices).
     const phraseDefinition = parsePhraseDefinition(lines, options.term, options.targetLanguage);
     if (phraseDefinition) {
       content.definitions = [
@@ -110,4 +129,18 @@ export function parseYoudaoHtml(html: string, optionsOrTerm: YoudaoParseOptions 
   }
 
   return content;
+}
+
+function mergePhrasesPreserveOrder(a: DictionaryContent["phrases"], b: DictionaryContent["phrases"]): DictionaryContent["phrases"] {
+  if (!a.length) return b;
+  if (!b.length) return a;
+  const seen = new Set(a.map((p) => p.phrase.toLowerCase()));
+  const merged = [...a];
+  for (const item of b) {
+    if (!seen.has(item.phrase.toLowerCase())) {
+      seen.add(item.phrase.toLowerCase());
+      merged.push(item);
+    }
+  }
+  return merged;
 }

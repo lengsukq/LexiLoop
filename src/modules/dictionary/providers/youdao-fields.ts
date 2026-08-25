@@ -46,14 +46,43 @@ function matchesTerm(sentence: string, term: string): boolean {
   return new RegExp(`(?:^|[^a-z])${escaped}(?:$|[^a-z])`, "i").test(sentence);
 }
 
-export function parsePhonetics(lines: string[], term = ""): DictionaryContent["pronunciations"] {
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number(code)));
+}
+
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, "").trim();
+}
+
+export function parsePhonetics(lines: string[], term = "", html?: string): DictionaryContent["pronunciations"] {
   const text = lines.join(" "); const result: DictionaryContent["pronunciations"] = [];
   const trimmedTerm = term.trim();
   const audioBase = trimmedTerm ? `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(trimmedTerm)}` : null;
-  const uk = text.match(/英\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/英\s*\/\s*([^/]+?)\s*\//);
-  const us = text.match(/美\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/美\s*\/\s*([^/]+?)\s*\//);
-  if (uk?.[1]) result.push({ accent: "UK", phonetic: uk[1].trim(), audioUrl: audioBase ? `${audioBase}&type=1` : null, source: dictionarySource, isSynthetic: false });
-  if (us?.[1]) result.push({ accent: "US", phonetic: us[1].trim(), audioUrl: audioBase ? `${audioBase}&type=2` : null, source: dictionarySource, isSynthetic: false });
+  let ukPhonetic: string | null = null;
+  let usPhonetic: string | null = null;
+  if (html) {
+    const ukMatch = html.match(/英\s*<span[^>]*class="phonetic"[^>]*>([^<]+)<\/span>/);
+    const usMatch = html.match(/美\s*<span[^>]*class="phonetic"[^>]*>([^<]+)<\/span>/);
+    if (ukMatch?.[1]) ukPhonetic = decodeHtmlEntities(ukMatch[1]).replace(/[\[\]]/g, "").trim();
+    if (usMatch?.[1]) usPhonetic = decodeHtmlEntities(usMatch[1]).replace(/[\[\]]/g, "").trim();
+  }
+  if (!ukPhonetic) {
+    const uk = text.match(/英\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/英\s*\/\s*([^/]+?)\s*\//);
+    if (uk?.[1]) ukPhonetic = uk[1].trim();
+  }
+  if (!usPhonetic) {
+    const us = text.match(/美\s*[\[/]\s*([^\]/]+?)\s*[\]]/) ?? text.match(/美\s*\/\s*([^/]+?)\s*\//);
+    if (us?.[1]) usPhonetic = us[1].trim();
+  }
+  if (ukPhonetic) result.push({ accent: "UK", phonetic: ukPhonetic, audioUrl: audioBase ? `${audioBase}&type=1` : null, source: dictionarySource, isSynthetic: false });
+  if (usPhonetic) result.push({ accent: "US", phonetic: usPhonetic, audioUrl: audioBase ? `${audioBase}&type=2` : null, source: dictionarySource, isSynthetic: false });
   return result;
 }
 
@@ -158,12 +187,9 @@ export function parsePhraseDefinition(
   const normalizedTerm = term.trim().toLocaleLowerCase();
   if (!normalizedTerm) return null;
   const readTranslation = (line: string, next: string): string => {
-    // "…" (U+2026) is not in the CJK block, so allow a leading ellipsis on the
-    // meaning side ("The proportion of …的比例").
     const inline = line.match(/^(.+?)([…⋯]*[\u3400-\u9fff].+)$/);
     const raw = (inline?.[2] ?? (/^[…⋯]*[\u3400-\u9fff]/.test(next) ? next : "")).replace(/^[；;，,、：:\s]+/, "").trim();
     if (!raw) return "";
-    // The meaning must be on the correct side of the language boundary.
     const containsCjk = /[\u3400-\u9fff]/.test(raw);
     if (language.toLowerCase().startsWith("zh") ? !containsCjk : containsCjk) return "";
     return raw;
@@ -184,9 +210,6 @@ export function parsePhraseDefinition(
       if (!phrase) continue;
       const normalizedPhrase = phrase.toLocaleLowerCase();
       const exact = normalizedPhrase === normalizedTerm;
-      // Only accept entries that extend the term ("the proportion of sth" for
-      // "the proportion of"); the reverse direction could match a shorter
-      // entry ("put up") and claim its meaning for a longer phrase.
       const extension = allowExtension
         && normalizedTerm.includes(" ")
         && normalizedPhrase.startsWith(`${normalizedTerm} `);
@@ -212,4 +235,128 @@ export function parseTranslation(lines: string[], term: string, language = "zh-C
     if (!language.toLowerCase().startsWith("zh") && !/[\u3400-\u9fff]/.test(value)) return { translation: value, source: translationSource };
   }
   return null;
+}
+
+// --- New: enriched sections from HTML ---
+
+export function parseEnDefinitions(html: string): DictionaryContent["definitions"] {
+  const sectionMatch = html.match(/id="tEETrans"[\s\S]*?<\/ul>\s*<\/div>/);
+  if (!sectionMatch) return [];
+  const section = sectionMatch[0];
+  const result: DictionaryContent["definitions"] = [];
+  const posBlocks = section.split(/<span class="pos">/);
+  if (posBlocks.length > 1) {
+    for (let index = 1; index < posBlocks.length; index += 1) {
+      const block = posBlocks[index]!;
+      const posRaw = decodeHtmlEntities(stripHtmlTags(block.split("</span>")[0] ?? "")).trim().replace(/\.$/, "");
+      const pos = posRaw && /^[a-zA-Z]+$/.test(posRaw) ? posRaw : null;
+      const defPattern = /<span class="def">([^<]+)<\/span>/g;
+      let m: RegExpExecArray | null;
+      let found = false;
+      while ((m = defPattern.exec(block)) !== null) {
+        const defText = decodeHtmlEntities(stripHtmlTags(m[1]!)).trim();
+        if (!defText) continue;
+        found = true;
+        result.push({ language: "en", partOfSpeech: pos, text: defText, source: "youdao:en-definition", isUserEdited: false });
+      }
+      if (!found) {
+        const fallback = block.match(/<span class="def">([^<]+)<\/span>/);
+        if (fallback?.[1]) {
+          const defText = decodeHtmlEntities(stripHtmlTags(fallback[1])).trim();
+          if (defText) result.push({ language: "en", partOfSpeech: pos, text: defText, source: "youdao:en-definition", isUserEdited: false });
+        }
+      }
+    }
+    if (result.length) return result;
+  }
+  const defOnly = /<span class="def">([^<]+)<\/span>/g;
+  let m: RegExpExecArray | null;
+  while ((m = defOnly.exec(section)) !== null) {
+    const defText = decodeHtmlEntities(stripHtmlTags(m[1]!)).trim();
+    if (!defText) continue;
+    result.push({ language: "en", partOfSpeech: null, text: defText, source: "youdao:en-definition", isUserEdited: false });
+  }
+  return result;
+}
+
+export function parseSynonymsFromHtml(html: string): DictionaryContent["synonyms"] {
+  const sectionMatch = html.match(/id="synonyms"[\s\S]*?<\/div>\s*<div id="relWordTab"/);
+  const fallback = html.match(/id="synonyms"[\s\S]*?<\/div>/);
+  const section = sectionMatch?.[0] ?? fallback?.[0];
+  if (!section) return [];
+  const result: DictionaryContent["synonyms"] = [];
+  const anchorPattern = /<a[^>]*class="search-js"[^>]*>([^<]+)<\/a>/g;
+  let m: RegExpExecArray | null;
+  while ((m = anchorPattern.exec(section)) !== null) {
+    const word = decodeHtmlEntities(m[1]!.trim());
+    if (!word || word.length < 2 || word.length > 40) continue;
+    if (!/^[a-zA-Z][a-zA-Z\s'-]*$/.test(word)) continue;
+    result.push({ word, translation: null, partOfSpeech: null, relation: "SYNONYM", source: "youdao" });
+  }
+  const seen = new Set<string>();
+  return result.filter((item) => {
+    const key = item.word.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function parseWordFamilyFromHtml(html: string): DictionaryContent["wordFamily"] {
+  const sectionMatch = html.match(/id="relWordTab"[\s\S]*?<\/div>\s*<div id="discriminate"/);
+  const fallback = html.match(/id="relWordTab"[\s\S]*?<\/div>/);
+  const section = sectionMatch?.[0] ?? fallback?.[0];
+  if (!section) return [];
+  const result: DictionaryContent["wordFamily"] = [];
+  const ROOT_LABEL_RE = /^\s*词根\s*[:：]?\s*$/;
+  const posFromLine = (text: string): string | null => {
+    const t = text.replace(ROOT_LABEL_RE, "").trim().toLowerCase();
+    if (!t) return null;
+    if (/^(adj|n|v|adv|prep|conj|int|pron|art|num)\.?$/.test(t)) return t.replace(".", "");
+    return null;
+  };
+  let currentPos: string | null = null;
+  const blocks = section.split(/<p class="wordGroup">/);
+  for (const block of blocks) {
+    const end = block.indexOf("</p>");
+    if (end < 0) continue;
+    const inner = block.slice(0, end);
+    const textOnly = stripHtmlTags(inner);
+    if (ROOT_LABEL_RE.test(textOnly) || textOnly.trim() === "词根：") continue;
+    const maybePos = posFromLine(textOnly);
+    if (maybePos) { currentPos = maybePos; continue; }
+    if (!inner.includes("<a")) continue;
+    const anchor = inner.match(/<a[^>]*>([^<]+)<\/a>/);
+    if (!anchor?.[1]) continue;
+    const word = decodeHtmlEntities(anchor[1].trim());
+    if (!word || !/^[a-zA-Z][a-zA-Z'-]*$/.test(word)) continue;
+    const afterAnchor = inner.slice((anchor.index ?? 0) + anchor[0].length);
+    const translation = decodeHtmlEntities(stripHtmlTags(afterAnchor)).trim().replace(/^[；;，,、\s]+/, "") || null;
+    result.push({ word, translation, partOfSpeech: currentPos, relation: "WORD_FAMILY", source: "youdao:word-family" });
+  }
+  const seen = new Set<string>();
+  return result.filter((item) => {
+    const key = `${item.word.toLowerCase()}|${item.partOfSpeech ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function parsePhrasesFromHtml(html: string): DictionaryContent["phrases"] {
+  const sectionMatch = html.match(/id="wordGroup"[\s\S]*?<\/div>\s*<div id="synonyms"/);
+  const fallback = html.match(/id="wordGroup"[\s\S]*?<\/div>/);
+  const section = sectionMatch?.[0] ?? fallback?.[0];
+  if (!section) return [];
+  const result: DictionaryContent["phrases"] = [];
+  const groupPattern = /<p class="wordGroup">[\s\S]*?<a[^>]*>([^<]+)<\/a>([\s\S]*?)<\/p>/g;
+  let m: RegExpExecArray | null;
+  while ((m = groupPattern.exec(section)) !== null) {
+    const phrase = decodeHtmlEntities(m[1]!.trim());
+    const translation = decodeHtmlEntities(stripHtmlTags(m[2]!)).trim().replace(/^[；;，,、\s]+/, "") || null;
+    if (!phrase || phrase.length < 2 || phrase.length > 80) continue;
+    if (!/^[a-zA-Z]/.test(phrase)) continue;
+    result.push({ phrase, translation, source: "youdao:phrase" });
+  }
+  return result;
 }

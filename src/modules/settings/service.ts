@@ -26,7 +26,8 @@ const settingsSchema = z.object({
   tencentTranslateSecretKey: z.string(),
   tencentTranslateProjectId: z.number().int().min(0).max(999999),
   youdaoEnabled: z.boolean(),
-  translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ai", "mymemory", "tencent-translate", "youdao"])).max(10),
+  icibaEnabled: z.boolean(),
+  translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ai", "mymemory", "tencent-translate", "youdao", "iciba"])).max(10),
   llmConfig: z.object({
     providers: z.array(z.object({
       id: z.string().min(1),

@@ -12,6 +12,7 @@ const PROVIDER_LABELS: Record<InitializationProviderId, string> = {
   mymemory: "MyMemory 翻译",
   "tencent-translate": "腾讯翻译",
   youdao: "有道词典",
+  iciba: "金山词霸",
 };
 
 export function StudySettingsTab({
@@ -46,6 +47,7 @@ export function StudySettingsTab({
       case "mymemory": return settings.myMemoryEnabled;
       case "merriam-webster": return settings.merriamWebsterEnabled;
       case "youdao": return settings.youdaoEnabled;
+      case "iciba": return settings.icibaEnabled;
       case "tencent-translate": return settings.tencentTranslateEnabled;
       case "ai": return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
       default: return true;
@@ -159,6 +161,7 @@ export function StudySettingsTab({
               <Toggle label="MyMemory 翻译" checked={settings.myMemoryEnabled} onChange={(value) => update("myMemoryEnabled", value)} />
               <Toggle label="Merriam-Webster 词典" checked={settings.merriamWebsterEnabled} onChange={(value) => update("merriamWebsterEnabled", value)} />
               <Toggle label="有道词典" checked={settings.youdaoEnabled} onChange={(value) => update("youdaoEnabled", value)} />
+              <Toggle label="金山词霸" checked={settings.icibaEnabled} onChange={(value) => update("icibaEnabled", value)} />
             </div>
           </section>
 

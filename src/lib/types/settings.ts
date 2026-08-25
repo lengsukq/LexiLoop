@@ -6,7 +6,7 @@ export interface AppSettings {
   dictionaryApiEnabled: boolean; myMemoryEnabled: boolean; merriamWebsterEnabled: boolean;
   merriamWebsterDictionaryKey: string; merriamWebsterThesaurusKey: string; backgroundConcurrency: number; aiRetryCount: number;
   tencentTranslateEnabled: boolean; tencentTranslateSecretId: string; tencentTranslateSecretKey: string; tencentTranslateProjectId: number;
-  youdaoEnabled: boolean; translationProviderOrder: InitializationProviderId[]; llmConfig: LlmConfig;
+  youdaoEnabled: boolean; icibaEnabled: boolean; translationProviderOrder: InitializationProviderId[]; llmConfig: LlmConfig;
 }
 
 export const LLM_PURPOSE_IDS = ["TTS", "IMPORT_ENRICHMENT", "STUDY_PLAN", "SUGGESTION"] as const;

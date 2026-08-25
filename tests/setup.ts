@@ -59,7 +59,7 @@ beforeEach(async () => {
   const { invalidateSettingsCache } = await import("@/modules/settings/service");
   const now = Date.now();
   // 默认禁用一切真实网络 provider，确保测试不发起真实 HTTP 请求。
-  for (const key of ["dictionaryApiEnabled", "myMemoryEnabled", "merriamWebsterEnabled", "youdaoEnabled", "tencentTranslateEnabled"]) {
+  for (const key of ["dictionaryApiEnabled", "myMemoryEnabled", "merriamWebsterEnabled", "youdaoEnabled", "icibaEnabled", "tencentTranslateEnabled"]) {
     await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run(key, JSON.stringify(false), now);
   }
   invalidateSettingsCache();

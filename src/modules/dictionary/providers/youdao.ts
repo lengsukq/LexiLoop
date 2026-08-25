@@ -9,7 +9,10 @@ const ENDPOINTS: YoudaoEndpoint[] = [
   { id: "dict.youdao.com", buildUrl: (term) => new URL(`https://dict.youdao.com/w/eng/${encodeURIComponent(term)}`) },
   { id: "youdao.com/result", buildUrl: (term) => { const url = new URL("https://www.youdao.com/result"); url.searchParams.set("word", term); url.searchParams.set("lang", "en"); return url; } },
 ];
-const SUPPORTED_FIELDS = new Set(["definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary"]);
+const SUPPORTED_FIELDS = new Set([
+  "definitions", "pronunciations.phonetic", "pronunciations.audio",
+  "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "roots", "affixes", "summary", "tags",
+]);
 
 export class YoudaoProvider implements DictionaryProvider {
   readonly id = "youdao";
@@ -51,8 +54,14 @@ function satisfiesRequestedFields(content: DictionaryContent, input: LookupInput
   }
   return requested.every((field) => {
     if (field === "definitions") return content.definitions.length > 0;
-    if (field === "pronunciations.phonetic") return content.pronunciations.some((item) => Boolean(item.phonetic));
+    if (field === "pronunciations.phonetic" || field === "pronunciations.audio") return content.pronunciations.some((item) => Boolean(item.phonetic));
     if (field === "summary") return Boolean(content.summary.translation || content.summary.shortDefinition);
+    if (field === "synonyms") return content.synonyms.length > 0;
+    if (field === "antonyms") return content.antonyms.length > 0;
+    if (field === "wordFamily") return content.wordFamily.length > 0;
+    if (field === "roots") return content.roots.length > 0;
+    if (field === "affixes") return content.affixes.length > 0;
+    if (field === "tags") return content.tags.length > 0;
     return content[field === "examples" ? "examples" : field === "phrases" ? "phrases" : "forms"].length > 0;
   });
 }

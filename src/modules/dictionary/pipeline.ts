@@ -11,6 +11,7 @@ import { DictionaryApiProvider } from "./providers/dictionary-api";
 import { MyMemoryProvider } from "./providers/mymemory";
 import { AiLexicalProvider } from "./providers/ai-lexical";
 import { YoudaoProvider } from "./providers/youdao";
+import { IcibaProvider } from "./providers/iciba";
 import { MerriamWebsterProvider } from "./providers/merriam-webster";
 import { TencentTranslateProvider } from "./providers/tencent-translate";
 import { contentStatus, mergeDictionaryContent } from "./content";
@@ -24,7 +25,8 @@ import {
 export const PROVIDER_CAPABILITIES: Record<InitializationProviderId, InitializationField[]> = {
   "merriam-webster": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
   "dictionaryapi.dev": ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "synonyms", "antonyms"],
-  youdao: ["definitions", "pronunciations.phonetic", "examples", "phrases", "forms", "summary"],
+  youdao: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "roots", "affixes", "summary", "tags"],
+  iciba: ["definitions", "pronunciations.phonetic", "pronunciations.audio", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "roots", "affixes", "summary", "tags"],
   ai: ["definitions", "examples", "phrases", "forms", "synonyms", "antonyms", "wordFamily", "confusedWords", "roots", "affixes", "tags", "summary", "learning", "sentenceAnalysis"],
   mymemory: ["definitions"],
   "tencent-translate": ["definitions"],
@@ -44,6 +46,7 @@ function createProvider(id: InitializationProviderId, settings: AppSettings): Di
     return new TencentTranslateProvider({ secretId: settings.tencentTranslateSecretId.trim(), secretKey: settings.tencentTranslateSecretKey.trim(), projectId: settings.tencentTranslateProjectId });
   }
   if (id === "youdao") return settings.youdaoEnabled ? new YoudaoProvider() : null;
+  if (id === "iciba") return settings.icibaEnabled ? new IcibaProvider() : null;
   return null;
 }
 
@@ -56,7 +59,7 @@ function providersFor(settings: AppSettings, selected?: InitializationProviderId
     // must be dictionary-backed, while AI runs as an explicit supplemental task.
     order = [...settings.translationProviderOrder];
   } else {
-    order = ["youdao", "merriam-webster", "dictionaryapi.dev", "mymemory"];
+    order = ["youdao", "iciba", "merriam-webster", "dictionaryapi.dev", "mymemory"];
   }
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }

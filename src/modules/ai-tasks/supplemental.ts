@@ -24,7 +24,14 @@ export async function generateChineseMnemonic(wordId: number, attemptCount = 1):
     const mnemonic = await callLlm(
       { apiType: provider.apiType, baseUrl, apiKey: provider.apiKey, model: purpose.model, timeoutMs: purpose.timeoutMs ?? 30_000 },
       `${prompt}${correction}`,
-      { systemPrompt: "只能用简体中文讲解；不得输出英文完整句子或英文释义。", maxOutputTokens: 300, temperature: 0.7 },
+      {
+        systemPrompt: "只能用简体中文讲解；不得输出英文完整句子或英文释义。",
+        maxOutputTokens: purpose.maxOutputTokens ?? 300,
+        temperature: purpose.temperature ?? 0.7,
+        thinkingEnabled: purpose.thinkingEnabled ?? false,
+        thinkingBudgetTokens: purpose.thinkingBudgetTokens,
+        reasoningEffort: purpose.reasoningEffort,
+      },
     );
     if (!mnemonic) throw new ApiError("AI_EMPTY_RESPONSE");
     return mnemonic;

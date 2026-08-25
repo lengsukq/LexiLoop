@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, GripVertical, Loader2, PlugZap, Volume2 } from "lucide-react";
-import type { AppSettings, InitializationProviderId } from "@/lib/types";
+import type { AppSettings, InitializationProviderId, VocabularyLevel } from "@/lib/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from "@/components/ui";
 import { Toggle, type SettingsUpdater, type TestState } from "../settings-shared";
 import { StudyPlanSettings } from "./study-plan-settings";
@@ -89,6 +89,24 @@ export function StudySettingsTab({
   return (
     <div className="space-y-5">
       <StudyPlanSettings settings={settings} update={update} />
+
+      <Card>
+        <CardHeader><CardTitle>文章导词 · 词汇水平</CardTitle></CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-tertiary-label">影响“粘贴文章”时 AI 对“哪些词值得学”的判断；AUTO 会按你已掌握词库自适应。</p>
+          <label className="max-w-80 space-y-1.5">
+            <span className="text-xs font-medium">词汇水平</span>
+            <Select value={settings.vocabularyLevel ?? "AUTO"} onChange={(event) => update("vocabularyLevel", event.target.value as VocabularyLevel)}>
+              <option value="AUTO">自动（按词库自适应）</option>
+              <option value="CET4">CET-4</option>
+              <option value="CET6">CET-6</option>
+              <option value="KY">考研</option>
+              <option value="IELTS">雅思</option>
+              <option value="TOEFL">托福</option>
+            </Select>
+          </label>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>语音与词典</CardTitle></CardHeader>

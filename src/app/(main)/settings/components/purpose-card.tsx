@@ -53,7 +53,41 @@ export function PurposeCard({
             </label>
             {purposeId === "IMPORT_ENRICHMENT" && <ImportEnrichmentFields config={config} purposeId={purposeId} onUpdate={onUpdate} />}
           </div>
+          <ThinkingToggle config={config} purposeId={purposeId} onUpdate={onUpdate} />
           <RetryPolicy settings={settings} purposeId={purposeId} config={config} providerId={provider?.id ?? ""} retryProviderId={retryProvider?.id ?? ""} retryModels={retryModels} onUpdate={onUpdate} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThinkingToggle({ config, purposeId, onUpdate }: { config: PurposeConfig; purposeId: LlmPurposeId; onUpdate: (purposeId: LlmPurposeId, field: keyof PurposeConfig, value: unknown) => void }) {
+  const enabled = Boolean(config.thinkingEnabled);
+  return (
+    <div className="rounded-2xl border border-black/[0.06] bg-white/[0.6] p-3.5 dark:border-white/[0.08] dark:bg-white/[0.04]">
+      <label className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">启用思考</p>
+          <p className="mt-0.5 text-xs leading-5 text-tertiary-label">默认关闭以避免 Vercel 免费版 10s 超时；开启后耗时与费用显著增加</p>
+        </div>
+        <input type="checkbox" checked={enabled} onChange={(event) => onUpdate(purposeId, "thinkingEnabled", event.target.checked)} className="size-4 accent-accent" />
+      </label>
+      {enabled && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-secondary-label">思考预算 Token</span>
+            <Input type="number" min={1024} max={20000} step={256} value={config.thinkingBudgetTokens ?? 4000} onChange={(event) => onUpdate(purposeId, "thinkingBudgetTokens", Math.max(1024, Math.min(20000, Number(event.target.value) || 4000)))} />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-secondary-label">推理强度（可选）</span>
+            <Select value={config.reasoningEffort ?? ""} onChange={(event) => onUpdate(purposeId, "reasoningEffort", event.target.value || undefined)}>
+              <option value="">自动</option>
+              <option value="minimal">minimal</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </Select>
+          </label>
         </div>
       )}
     </div>

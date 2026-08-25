@@ -4,6 +4,7 @@ import type { AppSettings, LlmPurposeId } from "@/lib/types";
 import { z } from "zod";
 
 const settingsSchema = z.object({
+  vocabularyLevel: z.enum(["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"]).default("AUTO"),
   dailyNewWords: z.number().int().min(0).max(100),
   dailyWrongWordLimit: z.number().int().min(0).max(100),
   dailyDueReviewLimit: z.number().int().min(1).max(500),
@@ -49,6 +50,9 @@ const settingsSchema = z.object({
         temperature: z.number().min(0).max(1).optional(),
         maxOutputTokens: z.number().int().min(500).max(200000).optional(),
         timeoutMs: z.number().int().min(5000).max(300000).optional(),
+        thinkingEnabled: z.boolean().default(false),
+        thinkingBudgetTokens: z.number().int().min(1024).max(20000).optional(),
+        reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional(),
       }),
     ),
   }),

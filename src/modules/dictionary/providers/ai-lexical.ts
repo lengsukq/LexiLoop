@@ -28,7 +28,14 @@ export class AiLexicalProvider implements DictionaryProvider {
     const provider = this.settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
     if (!provider) return { content: null, errorCode: "AI_PROVIDER_MISSING", errorMessage: "AI Provider 未找到或已被删除" };
     if (!provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return { content: null, errorCode: "AI_CONFIG_INCOMPLETE", errorMessage: "AI 提供商、API Key、接口地址或模型未配置完整" };
-    const options = { temperature: purpose.temperature ?? 0.2, maxOutputTokens: purpose.maxOutputTokens ?? 200_000, timeoutMs: purpose.timeoutMs ?? 180_000 };
+    const options = {
+      temperature: purpose.temperature ?? 0.2,
+      maxOutputTokens: purpose.maxOutputTokens ?? 200_000,
+      timeoutMs: purpose.timeoutMs ?? 180_000,
+      thinkingEnabled: purpose.thinkingEnabled ?? false,
+      thinkingBudgetTokens: purpose.thinkingBudgetTokens,
+      reasoningEffort: purpose.reasoningEffort,
+    };
     let rawText = "";
     try {
       const prompt = promptFor(input);

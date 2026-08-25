@@ -14,10 +14,10 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = {
     },
   ],
   purposes: {
-    TTS: { enabled: false, providerId: "", model: "" },
-    IMPORT_ENRICHMENT: { enabled: false, providerId: "", model: "" },
-    STUDY_PLAN: { enabled: false, providerId: "", model: "" },
-    SUGGESTION: { enabled: false, providerId: "", model: "" },
+    TTS: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
+    IMPORT_ENRICHMENT: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
+    STUDY_PLAN: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
+    SUGGESTION: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
   },
 };
 
@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   youdaoEnabled: true,
   icibaEnabled: true,
   translationProviderOrder: ["youdao", "iciba", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "mymemory"] as InitializationProviderId[],
+  vocabularyLevel: "AUTO",
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 
@@ -53,3 +54,9 @@ export const IMPORT_PREVIEW_TTL_MS = 30 * MINUTE_MS;
 export const MAX_CSV_BYTES = 10 * 1024 * 1024;
 export const MAX_CSV_ROWS = 20_000;
 export const WORKER_STALE_AFTER_MS = 30_000;
+export const MAX_ARTICLE_CHARS = 50_000;
+export const MIN_ARTICLE_CHARS = 20;
+export const MAX_ARTICLE_CANDIDATES = 200;
+export const MAX_ARTICLE_SELECTED = 100;
+export const ARTICLE_AI_CANDIDATE_LIMIT = 80;
+export const ARTICLE_SNIPPET_CHARS = 8000;

@@ -80,7 +80,14 @@ export async function generateAiSuggestion(
   const text = await callLlm(
     { apiType: provider.apiType, baseUrl, apiKey: provider.apiKey, model: purpose.model, timeoutMs: purpose.timeoutMs ?? MINUTE_MS },
     prompt,
-    { systemPrompt: "只输出有效 JSON。", maxOutputTokens: purpose.maxOutputTokens ?? 2000, temperature: purpose.temperature ?? 0.2 },
+    {
+      systemPrompt: "只输出有效 JSON。",
+      maxOutputTokens: purpose.maxOutputTokens ?? 2000,
+      temperature: purpose.temperature ?? 0.2,
+      thinkingEnabled: purpose.thinkingEnabled ?? false,
+      thinkingBudgetTokens: purpose.thinkingBudgetTokens,
+      reasoningEffort: purpose.reasoningEffort,
+    },
   );
   if (!text) throw new Error("AI 没有返回建议内容");
   return {

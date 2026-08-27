@@ -12,7 +12,7 @@ export async function generateChineseMnemonic(wordId: number, attemptCount = 1):
   const word = await sqlite.prepare("SELECT term, source_language, target_language FROM words WHERE id = ?").get(wordId) as Record<string, unknown> | undefined;
   if (!word) throw new ApiError("WORD_NOT_FOUND");
   const settings = settingsForAiAttempt(await getSettings(), attemptCount);
-  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const purpose = settings.llmConfig.ai;
   if (!purpose.enabled) throw new ApiError("AI_DISABLED");
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) throw new ApiError("AI_CONFIG_INCOMPLETE");

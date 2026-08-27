@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  experimental: {
+    // Queen 本地备份 JSON 约 20MB（22M 文件）；默认 10MB 会截断 FormData，导致解析失败。
+    // 自托管/Queen 环境放宽到 50MB，Vercel 上不受此影响（由平台限制）。
+    ...(isVercel ? {} : { proxyClientMaxBodySize: "50mb" as unknown as number }),
+  },
 };
 
 export default nextConfig;

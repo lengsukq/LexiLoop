@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
+    "deploy:queen": "bash scripts/deploy-queen.sh",
     "check": "yarn typecheck && yarn lint && yarn test && yarn build"
   },
   "dependencies": {

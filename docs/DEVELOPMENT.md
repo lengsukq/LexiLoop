@@ -1,14 +1,14 @@
-# LexiLoop v1.0 开发与架构文档
+# LexiLoop 开发与架构文档
 
 ## 1. 定位
 
-LexiLoop（词环）是单用户、自托管的 Next.js 词汇学习应用。核心原则：只初始化 CSV 中实际导入的词条；SQLite 是唯一业务数据源；无需账号、多用户和云端数据库。
+LexiLoop（词环）是单用户、自托管的 Next.js 词汇学习应用。核心原则：只初始化 CSV 中实际导入的词条；PostgreSQL 是唯一业务数据源；无需账号、多用户和云端数据库。
 
 ## 2. 技术栈
 
 - Next.js 16 App Router、React 19、TypeScript strict
 - Tailwind CSS 4、Recharts、Lucide
-- SQLite、better-sqlite3、Drizzle ORM schema
+- PostgreSQL（`pg` + 统一 SQL 门面 `src/db/executor.ts`）
 - OpenAI-compatible / Anthropic 结构化 AI 初始化；Edge TTS 发音
 - ts-fsrs
 - Vitest、Playwright
@@ -55,14 +55,20 @@ AI 生成的近义词、反义词、同根词和易混词保存为结构化对�
 
 ## 6. Worker 可靠性
 
-- SQLite 事务串行领取。
-- 同一词条仅允许一个 QUEUED / RUNNING 任务。
-- RUNNING 锁超过十分钟自动回到 QUEUED。
+- 事务串行领取（`SELECT ... FOR UPDATE SKIP LOCKED`）。
+- 同一词条仅允许一个 QUEUED / RUNNING 任务（partial unique index）。
+- RUNNING 锁超过十分钟自动回到 QUEUED（`recoverStaleJobs`）。
 - 已有 READY / PARTIAL 内容的词在补充或刷新期间继续可学习；刷新失败不会覆盖旧内容。
 - 强制刷新保留用户手动释义和用户例句。
 - 瞬时错误按 5 秒、30 秒、2 分钟、10 分钟、30 分钟退避。
 - Provider 尝试记录字段、耗时和错误。
 - `/api/health` 根据真实心跳报告 `idle/working/stale/not_required`。
+
+### 6.1 后台驱动（Vercel vs Docker）
+
+- 单一原语 `src/modules/background/tick.ts:runBackgroundTick`，在 Vercel 与 Docker 间复用。
+- Vercel：`vercel.json` 日级 Cron（`0 0 * * *`，Hobby 上限）+ 浏览器 `BackgroundKeepalive` 3s/60s 轮询 + `/api/initialization/status` 按需触发。
+- Docker：`src/instrumentation.ts:register` 在 `NODE_ENV=production && VERCEL !== "1"` 时启动 `src/modules/background/docker-tick.ts` 的 10 秒进程内轮询（`workerId=lexiloop-docker`），无需浏览器在线；`BACKGROUND_DOCKER_TICK_ENABLED=false` 可关闭退化为纯 KeepAlive。
 
 ## 7. 学习模型
 
@@ -78,11 +84,13 @@ AI 生成的近义词、反义词、同根词和易混词保存为结构化对�
 
 ## 8. 备份恢复
 
-SQLite 导出使用在线 backup API，先 checkpoint WAL；下载完成后删除服务器临时文件，避免重复导出耗尽磁盘。
+JSON 备份导出（`/api/backups/json`），恢复经表与迁移版本校验。PostgreSQL 迁移位于 `src/db/migrations/pg/`，由 `yarn db:migrate` 在独立事务内逐个应用。
 
-恢复文件必须通过 integrity_check、必要表检查和迁移版本检查。来自未来未知迁移的数据库会被拒绝；较旧但兼容的数据库可暂存为 `restore-pending.sqlite`，重启后原子替换并自动执行缺失迁移，同时保留恢复前备份。app 与 worker 的迁移使用立即事务，避免并发启动重复执行。
+## 9. Docker 部署
 
-## 9. 验收命令
+见 `README.md#Docker 部署`、`Dockerfile`、`docker-compose.yml`、`scripts/deploy-queen.sh`。Vercel 构建（`VERCEL=1`）自动忽略 Docker 产物；Docker 构建输出 `standalone` 并通过 `src/instrumentation.ts` 启用进程内 tick。
+
+## 10. 验收命令
 
 ```bash
 yarn typecheck

@@ -49,7 +49,7 @@ function buildPrompt(
 
 export async function getSuggestionConfiguration(): Promise<SuggestionConfiguration> {
   const settings = await getSettings();
-  const purpose = settings.llmConfig.purposes.SUGGESTION;
+  const purpose = settings.llmConfig.ai;
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   return {
     configured: Boolean(
@@ -69,8 +69,8 @@ export async function generateAiSuggestion(
   candidates: SuggestionCandidate[],
   attemptCount = 1,
 ): Promise<GeneratedAiSuggestion | null> {
-  const settings = settingsForAiAttempt(await getSettings(), attemptCount, "SUGGESTION");
-  const purpose = settings.llmConfig.purposes.SUGGESTION;
+  const settings = settingsForAiAttempt(await getSettings(), attemptCount);
+  const purpose = settings.llmConfig.ai;
   if (!purpose.enabled) return null;
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return null;

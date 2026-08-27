@@ -27,4 +27,14 @@ test-screenshots/
 # Local coding-agent artifacts
 .zcode/
 
+# Private deploy to Queen (personal server, never commit)
+scripts/deploy-queen.sh
+
 .DS_Store
+.vercel
+.env*
+# Private self-hosted deploy (keep Queen infra local)
+Dockerfile
+docker-compose.yml
+.dockerignore
+.idea/

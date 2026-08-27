@@ -37,7 +37,7 @@ describe("adaptive follow-up scheduling", () => {
     const sessionId = await createSession();
     const wordId = await createWord();
     const currentItemId = await insertItem(sessionId, 0, wordId, "ANSWERED");
-    for (let position = 1; position <= 9; position += 1) await insertItem(sessionId, position, await createWord(`river${position}`));
+    for (let position = 1; position <= 12; position += 1) await insertItem(sessionId, position, await createWord(`river${position}`));
 
     const result = await scheduleAdaptiveFollowUp({
       sessionId,
@@ -54,12 +54,12 @@ describe("adaptive follow-up scheduling", () => {
     const between = await sqlite.prepare(`SELECT count(*) AS count FROM study_session_items
       WHERE study_session_id = ? AND position > 0 AND position < ?`)
       .get(sessionId, result!.position) as { count: number };
-    expect(Number(between.count)).toBe(7);
+    expect(Number(between.count)).toBe(9);
     const inserted = await sqlite.prepare(`SELECT position, question_type, task_type, status
       FROM study_session_items WHERE study_session_id = ? AND position = ?`)
       .get(sessionId, result!.position) as Record<string, unknown>;
     expect(inserted).toEqual({
-      position: 7.5,
+      position: 9.5,
       question_type: "ZH_TO_EN_SPELLING",
       task_type: "WRONG",
       status: "PENDING",

@@ -66,8 +66,9 @@ export default function SettingsPage() {
               onFetchProviderModels={llm.fetchProviderModels}
               onTestProvider={llm.testProvider}
               onProviderTestModelChange={llm.changeProviderTestModel}
+              onRemoveProviderModel={llm.removeProviderModel}
               onRemoveProvider={llm.removeProvider}
-              onUpdatePurpose={llm.updatePurpose}
+              onUpdateAi={llm.updateAi}
             />
           )}
           {activeTab === "data" && (

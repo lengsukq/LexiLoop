@@ -4,7 +4,7 @@ import type { InitializationField, InitializationProviderId } from "@/lib/types"
 
 export async function getInitializationOptions() {
   const settings = await getSettings();
-  const aiPurpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const aiPurpose = settings.llmConfig.ai;
   const aiProvider = settings.llmConfig.providers.find((provider) => provider.id === aiPurpose.providerId);
   const mwDictionaryReady = Boolean(settings.merriamWebsterDictionaryKey.trim());
   const mwThesaurusReady = Boolean(settings.merriamWebsterThesaurusKey.trim());

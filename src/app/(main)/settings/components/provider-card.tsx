@@ -1,6 +1,6 @@
-import { Loader2, RefreshCw, Trash2, Zap } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, X, Zap } from "lucide-react";
 import type { LlmProviderConfig } from "@/lib/types";
-import { Button, Input, Select } from "@/components/ui";
+import { Badge, Button, Input, Select } from "@/components/ui";
 import { configuredModels, type ProviderOperationState } from "../settings-shared";
 
 export function ProviderCard({
@@ -11,6 +11,7 @@ export function ProviderCard({
   testModel,
   onUpdateField,
   onUpdateModels,
+  onRemoveModel,
   onFetchModels,
   onTest,
   onTestModelChange,
@@ -23,11 +24,13 @@ export function ProviderCard({
   testModel: string;
   onUpdateField: (index: number, field: keyof LlmProviderConfig, value: string) => void;
   onUpdateModels: (index: number, value: string) => void;
+  onRemoveModel: (index: number, model: string) => void;
   onFetchModels: (index: number) => Promise<void>;
   onTest: (index: number) => Promise<void>;
   onTestModelChange: (index: number, model: string) => void;
   onRemove: (index: number) => void;
 }) {
+  const models = provider.models ?? [];
   return (
     <div className="rounded-[18px] border border-white/50 bg-white/40 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.04)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-2">
@@ -51,17 +54,38 @@ export function ProviderCard({
         <Button variant="ghost" size="sm" className="shrink-0 text-danger" onClick={() => onRemove(index)} aria-label="移除 Provider"><Trash2 className="size-4" /></Button>
       </div>
 
-      <label className="mt-3 block space-y-1.5">
+      <div className="mt-3 space-y-2">
         <span className="text-xs font-medium text-secondary-label">可保存模型</span>
-        <Input value={(provider.models ?? []).join(", ")} onChange={(event) => onUpdateModels(index, event.target.value)} placeholder="从 Models 接口获取，或手动输入（用逗号分隔）" />
+        {models.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {models.map((model) => (
+              <Badge key={model} tone="slate" className="gap-1 pr-1">
+                {model}
+                <button type="button" onClick={() => onRemoveModel(index, model)} aria-label={`移除 ${model}`} className="ml-0.5 grid size-4 place-items-center rounded-full hover:bg-black/10 dark:hover:bg-white/15">
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-tertiary-label">暂无模型，请通过接口获取或手动添加。</p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
+          <Input className="min-w-48 flex-1" placeholder="输入模型名，用逗号分隔后回车添加" onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            const value = (event.target as HTMLInputElement).value.trim();
+            if (!value) return;
+            onUpdateModels(index, [...models, value].join(", "));
+            (event.target as HTMLInputElement).value = "";
+          }} />
           <Button variant="outline" size="sm" type="button" onClick={() => void onFetchModels(index)} disabled={modelState?.state === "loading"}>
             {modelState?.state === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}从 Models 接口获取
           </Button>
-          <span className="text-xs text-tertiary-label">读取当前 Provider 的 `/models` 并加入清单。</span>
+          <span className="text-xs text-tertiary-label">回车添加；读取 `/models` 后选择加入。</span>
           <OperationMessage operation={modelState} />
         </div>
-      </label>
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[0.06] pt-3 dark:border-white/[0.08]">
         <Select compact className="w-56" value={testModel} onChange={(event) => onTestModelChange(index, event.target.value)}>

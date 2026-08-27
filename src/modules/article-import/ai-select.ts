@@ -20,9 +20,9 @@ export interface AiSelectResult {
 
 export async function aiSelectTerms(input: AiSelectInput): Promise<AiSelectResult> {
   const settings = await getSettings();
-  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const purpose = settings.llmConfig.ai;
 
-  if (!purpose?.enabled) return { applied: false, selected: [], error: "AI 未启用，请到设置页开启 IMPORT_ENRICHMENT。" };
+  if (!purpose?.enabled) return { applied: false, selected: [], error: "AI 未启用，请到设置页开启 AI。" };
 
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) {

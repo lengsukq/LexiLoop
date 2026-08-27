@@ -16,14 +16,14 @@ export class AiLexicalProvider implements DictionaryProvider {
 
   constructor(settings: AppSettings) {
     this.settings = settings;
-    const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+    const purpose = settings.llmConfig.ai;
     this.id = `ai:${purpose.providerId}:${purpose.model}`;
   }
 
-  supports(): boolean { return this.settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled; }
+  supports(): boolean { return this.settings.llmConfig.ai.enabled; }
 
   async lookup(input: LookupInput): Promise<ProviderResult> {
-    const purpose = this.settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+    const purpose = this.settings.llmConfig.ai;
     if (!purpose.enabled) return { content: null, errorCode: "AI_DISABLED", errorMessage: "AI 词条初始化未启用" };
     const provider = this.settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
     if (!provider) return { content: null, errorCode: "AI_PROVIDER_MISSING", errorMessage: "AI Provider 未找到或已被删除" };

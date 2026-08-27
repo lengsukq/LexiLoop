@@ -39,7 +39,7 @@ function providerKey(provider: DictionaryProvider): InitializationProviderId {
 function createProvider(id: InitializationProviderId, settings: AppSettings): DictionaryProvider | null {
   if (id === "merriam-webster") return settings.merriamWebsterEnabled ? new MerriamWebsterProvider(settings) : null;
   if (id === "dictionaryapi.dev") return settings.dictionaryApiEnabled ? new DictionaryApiProvider() : null;
-  if (id === "ai") return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled ? new AiLexicalProvider(settings) : null;
+  if (id === "ai") return settings.llmConfig.ai.enabled ? new AiLexicalProvider(settings) : null;
   if (id === "mymemory") return settings.myMemoryEnabled ? new MyMemoryProvider() : null;
   if (id === "tencent-translate") {
     if (!settings.tencentTranslateEnabled || !settings.tencentTranslateSecretId.trim() || !settings.tencentTranslateSecretKey.trim()) return null;

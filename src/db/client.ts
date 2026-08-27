@@ -5,15 +5,30 @@ const globalDb = globalThis as typeof globalThis & { __lexiloopDbFacade?: Sqlite
 
 function createBundle(): SqliteLikeDatabase {
   const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_URL is required in PostgreSQL mode");
+  if (!databaseUrl) throw new Error("DATABASE_URL is required (PostgreSQL)");
   return createPgFacade(databaseUrl, (pool) => applyPgMigrations(pool));
 }
 
-const bundle = globalDb.__lexiloopDbFacade ?? createBundle();
-if (process.env.NODE_ENV !== "production") globalDb.__lexiloopDbFacade = bundle;
+function getBundle(): SqliteLikeDatabase {
+  const existing = globalDb.__lexiloopDbFacade;
+  if (existing) return existing;
+  const bundle = createBundle();
+  if (process.env.NODE_ENV !== "production") globalDb.__lexiloopDbFacade = bundle;
+  return bundle;
+}
+
+const bundleProxy = new Proxy({} as SqliteLikeDatabase, {
+  get(_target, prop) {
+    const bundle = getBundle();
+    const value = (bundle as unknown as Record<string, unknown>)[prop as string];
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(bundle) : value;
+  },
+});
 
 /**
- * Unified database handle backed by PostgreSQL. The name is kept as `sqlite`
- * for historical reasons; it always dispatches to the Postgres driver now.
+ * PostgreSQL-backed database facade. The name `sqlite` is kept for
+ * backwards compatibility at call sites (42+ imports) — it is always
+ * PostgreSQL. Prefer `import { db } ...` in new code.
  */
-export const sqlite = bundle;
+export const sqlite: SqliteLikeDatabase = bundleProxy;
+export const db: SqliteLikeDatabase = bundleProxy;

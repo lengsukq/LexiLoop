@@ -18,14 +18,11 @@ function settingsWithAiEnabled(): AppSettings {
       providers: [
         { id: "openai", name: "OpenAI", apiType: "openai", apiKey: "", baseUrl: "https://api.openai.com/v1" },
       ],
-      purposes: {
-        ...DEFAULT_SETTINGS.llmConfig.purposes,
-        IMPORT_ENRICHMENT: {
-          ...DEFAULT_SETTINGS.llmConfig.purposes.IMPORT_ENRICHMENT,
-          enabled: true,
-          providerId: "openai",
-          model: "gpt-4o-mini",
-        },
+      ai: {
+        ...DEFAULT_SETTINGS.llmConfig.ai,
+        enabled: true,
+        providerId: "openai",
+        model: "gpt-4o-mini",
       },
     },
   };
@@ -35,38 +32,33 @@ describe("AI lexical pipeline", () => {
   it("switches to the configured fallback model from the second task attempt", () => {
     const settings = settingsWithAiEnabled();
     settings.llmConfig.providers.push({ id: "fallback", name: "Fallback", apiType: "openai", apiKey: "", baseUrl: "https://fallback.test/v1" });
-    settings.llmConfig.purposes.IMPORT_ENRICHMENT.retryProviderId = "fallback";
-    settings.llmConfig.purposes.IMPORT_ENRICHMENT.retryModel = "fallback-model";
+    settings.llmConfig.ai.retryProviderId = "fallback";
+    settings.llmConfig.ai.retryModel = "fallback-model";
 
-    expect(settingsForAiAttempt(settings, 1).llmConfig.purposes.IMPORT_ENRICHMENT.model).toBe("gpt-4o-mini");
-    expect(settingsForAiAttempt(settings, 2).llmConfig.purposes.IMPORT_ENRICHMENT.model).toBe("fallback-model");
-    expect(settingsForAiAttempt(settings, 2).llmConfig.purposes.IMPORT_ENRICHMENT.providerId).toBe("fallback");
+    expect(settingsForAiAttempt(settings, 1).llmConfig.ai.model).toBe("gpt-4o-mini");
+    expect(settingsForAiAttempt(settings, 2).llmConfig.ai.model).toBe("fallback-model");
+    expect(settingsForAiAttempt(settings, 2).llmConfig.ai.providerId).toBe("fallback");
   });
 
-  it("can switch the configured purpose to its fallback model", () => {
+  it("can switch to fallback via retryModel only", () => {
     const settings = settingsWithAiEnabled();
-    settings.llmConfig.purposes.SUGGESTION = {
-      ...settings.llmConfig.purposes.SUGGESTION,
-      enabled: true,
-      providerId: "openai",
-      model: "gpt-4o-mini",
-      retryModel: "gpt-4.1-mini",
-    };
+    settings.llmConfig.ai.retryModel = "gpt-4.1-mini";
 
-    expect(settingsForAiAttempt(settings, 1, "SUGGESTION").llmConfig.purposes.SUGGESTION.model).toBe("gpt-4o-mini");
-    expect(settingsForAiAttempt(settings, 2, "SUGGESTION").llmConfig.purposes.SUGGESTION.model).toBe("gpt-4.1-mini");
+    expect(settingsForAiAttempt(settings, 1).llmConfig.ai.model).toBe("gpt-4o-mini");
+    expect(settingsForAiAttempt(settings, 2).llmConfig.ai.model).toBe("gpt-4.1-mini");
   });
 
   it("falls back to AI only when no dictionary provider returns definitions", async () => {
+    const settings = settingsWithAiEnabled();
+    settings.translationProviderOrder = ["ai"];
     const result = await lookupDictionary({
       term: "happy",
       normalizedTerm: "happy",
       entryType: "WORD",
       sourceLanguage: "en",
       targetLanguage: "zh-CN",
-    }, settingsWithAiEnabled());
+    }, settings);
 
-    // 所有词典来源禁用 → 无释义 → 降级尝试 AI（配置不完整时安全失败）
     expect(result.attempts.map((attempt) => attempt.providerId)).toEqual(["ai:openai:gpt-4o-mini"]);
     expect(result.attempts[0]?.errorCode).toBe("AI_CONFIG_INCOMPLETE");
   });
@@ -111,7 +103,7 @@ describe("AI lexical pipeline", () => {
     expect(result.attempts[0]?.status).toBe("FAILED");
   });
 
-  it("falls back from Youdao's primary endpoint to its official result endpoint", async () => {
+  it("falls back from Youdao primary endpoint to its official result endpoint", async () => {
     const settings = settingsWithAiEnabled();
     settings.youdaoEnabled = true;
     const fetchMock = vi.fn()

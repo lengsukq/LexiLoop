@@ -1,1 +1,1 @@
-export type { LlmPurposeId, LlmConfig, LlmProviderConfig, LlmPurposeConfig } from "@/lib/types";
+export type { LlmConfig, LlmProviderConfig, LlmAiConfig } from "@/lib/types";

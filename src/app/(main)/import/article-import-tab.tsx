@@ -225,7 +225,7 @@ export default function ArticleImportTab({ onImported }: { onImported?: () => vo
             )}
             {!preview.aiApplied && !preview.aiError && (
               <Alert tone="info" icon={<Wand2 className="size-4" />} className="mt-4">
-                到“设置 → 模型服务 → IMPORT_ENRICHMENT”配置 LLM，可获得按你词汇量智能筛选的效果。
+                到“设置 → 模型服务 → AI”配置 LLM，可获得按你词汇量智能筛选的效果。
               </Alert>
             )}
           </CardContent>

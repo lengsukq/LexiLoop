@@ -13,16 +13,14 @@ export interface AppSettings {
   vocabularyLevel: VocabularyLevel;
 }
 
-export const LLM_PURPOSE_IDS = ["TTS", "IMPORT_ENRICHMENT", "STUDY_PLAN", "SUGGESTION"] as const;
-export type LlmPurposeId = (typeof LLM_PURPOSE_IDS)[number];
 export interface LlmProviderConfig {
   id: string; name: string; apiType: "openai" | "anthropic"; baseUrl: string; apiKey: string; models?: string[]; defaultModel?: string;
 }
-export interface LlmPurposeConfig {
+export interface LlmAiConfig {
   enabled: boolean; providerId: string; model: string; retryProviderId?: string; retryModel?: string;
   temperature?: number; maxOutputTokens?: number; timeoutMs?: number;
   thinkingEnabled?: boolean;
   thinkingBudgetTokens?: number;
   reasoningEffort?: "minimal" | "low" | "medium" | "high";
 }
-export interface LlmConfig { providers: LlmProviderConfig[]; purposes: Record<LlmPurposeId, LlmPurposeConfig>; }
+export interface LlmConfig { providers: LlmProviderConfig[]; ai: LlmAiConfig; }

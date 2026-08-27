@@ -49,7 +49,7 @@ export function StudySettingsTab({
       case "youdao": return settings.youdaoEnabled;
       case "iciba": return settings.icibaEnabled;
       case "tencent-translate": return settings.tencentTranslateEnabled;
-      case "ai": return settings.llmConfig.purposes.IMPORT_ENRICHMENT.enabled;
+      case "ai": return settings.llmConfig.ai.enabled;
       default: return true;
     }
   }

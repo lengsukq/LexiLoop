@@ -1,10 +1,9 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { errorMessage } from "@/lib/format";
 import { apiFetch } from "@/lib/client-api";
-import type { AppSettings, LlmProviderConfig, LlmPurposeId } from "@/lib/types";
+import type { AppSettings, LlmAiConfig, LlmProviderConfig } from "@/lib/types";
 import { parseModels, type ModelPickerState, type ProviderOperationState } from "./settings-shared";
 
-type PurposeConfig = AppSettings["llmConfig"]["purposes"][LlmPurposeId];
 type SettingsSetter = Dispatch<SetStateAction<AppSettings | null>>;
 
 function operation(state: ProviderOperationState["state"], message = ""): ProviderOperationState {
@@ -18,15 +17,12 @@ export function useLlmSettings(settings: AppSettings | null, setSettings: Settin
   const [modelPicker, setModelPicker] = useState<ModelPickerState | null>(null);
   const [modelFilter, setModelFilter] = useState("");
 
-  function updatePurpose(purposeId: LlmPurposeId, field: keyof PurposeConfig, value: unknown) {
+  function updateAi(field: keyof LlmAiConfig, value: unknown) {
     setSettings((current) => current ? {
       ...current,
       llmConfig: {
         ...current.llmConfig,
-        purposes: {
-          ...current.llmConfig.purposes,
-          [purposeId]: { ...current.llmConfig.purposes[purposeId], [field]: value },
-        },
+        ai: { ...current.llmConfig.ai, [field]: value },
       },
     } : current);
   }
@@ -72,21 +68,39 @@ export function useLlmSettings(settings: AppSettings | null, setSettings: Settin
     } : current);
   }
 
+  function removeProviderModel(index: number, model: string) {
+    setSettings((current) => {
+      if (!current) return current;
+      const provider = current.llmConfig.providers[index];
+      if (!provider) return current;
+      const models = (provider.models ?? []).filter((item) => item !== model);
+      const defaultModel = provider.defaultModel === model ? models[0] ?? "" : provider.defaultModel;
+      const providers = current.llmConfig.providers.map((item, i) => i === index ? { ...item, models, defaultModel: defaultModel ?? "" } : item);
+      let ai = current.llmConfig.ai;
+      if (ai.model === model && ai.providerId === provider.id) ai = { ...ai, model: defaultModel ?? "" };
+      if (ai.retryModel === model) {
+        const retryProvider = providers.find((p) => p.id === (ai.retryProviderId || ai.providerId));
+        const fallback = retryProvider?.defaultModel || retryProvider?.models?.[0] || "";
+        ai = { ...ai, retryModel: ai.retryModel === model ? fallback : ai.retryModel };
+      }
+      return { ...current, llmConfig: { ...current.llmConfig, providers, ai } };
+    });
+  }
+
   function removeProvider(index: number) {
     setSettings((current) => {
       if (!current) return current;
       const removed = current.llmConfig.providers[index];
       if (!removed) return current;
-      const purposes = { ...current.llmConfig.purposes };
-      for (const purposeId of Object.keys(purposes) as LlmPurposeId[]) {
-        if (purposes[purposeId].providerId === removed.id) purposes[purposeId] = { ...purposes[purposeId], enabled: false, providerId: "" };
-      }
+      let ai = current.llmConfig.ai;
+      if (ai.providerId === removed.id) ai = { ...ai, enabled: false, providerId: "" };
+      if (ai.retryProviderId === removed.id) ai = { ...ai, retryProviderId: "", retryModel: "" };
       return {
         ...current,
         llmConfig: {
           ...current.llmConfig,
           providers: current.llmConfig.providers.filter((_, providerIndex) => providerIndex !== index),
-          purposes,
+          ai,
         },
       };
     });
@@ -178,10 +192,11 @@ export function useLlmSettings(settings: AppSettings | null, setSettings: Settin
     modelFilter,
     setModelFilter,
     setModelPicker,
-    updatePurpose,
+    updateAi,
     addProvider,
     updateProviderField,
     updateProviderModels,
+    removeProviderModel,
     removeProvider,
     changeProviderTestModel,
     testProvider,

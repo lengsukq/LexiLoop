@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool, types as pgTypes } from "pg";
 
-export type DatabaseMode = "sqlite" | "postgres";
+export type DatabaseMode = "postgres";
 
 export interface RunResult {
   changes: number;
@@ -22,8 +22,10 @@ export type SqliteLikeTransaction<TArgs extends unknown[], TResult> = {
 };
 
 /**
- * The facade mirrors the subset of the better-sqlite3 API that LexiLoop uses,
- * but every method is async so a single code path works against both backends.
+ * PostgreSQL facade that preserves the async `prepare().get/all/run` and
+ * `transaction()` call sites historically written against better-sqlite3.
+ * The codebase is PostgreSQL-only; the SQLite compat layer is kept only at
+ * the call-site level (placeholder rewriting, `prepare` shape).
  */
 export interface SqliteLikeDatabase {
   readonly mode: DatabaseMode;
@@ -34,13 +36,14 @@ export interface SqliteLikeDatabase {
     fn: (...args: TArgs) => TResult | Promise<TResult>,
   ): SqliteLikeTransaction<TArgs, TResult>;
   close(): Promise<void>;
+  /** @deprecated SQLite file backup — PostgreSQL uses JSON backup via `createJsonBackup` instead. */
   backup(destination: string): Promise<void>;
 }
 
 // ---- placeholder rewriting -------------------------------------------------
 
 /**
- * Converts SQLite positional `?` placeholders into PostgreSQL `$1, $2, ...`.
+ * Converts SQLite-style positional `?` placeholders into PostgreSQL `$1, $2, ...`.
  * Scans quoted strings and comments so literal question marks are preserved.
  */
 export function rewriteSql(sql: string): string {
@@ -57,11 +60,10 @@ export function rewriteSql(sql: string): string {
       while (i < length) {
         const c = sql[i];
         output += c;
-        // NOTE: no backslash-escape handling here. Both PostgreSQL
-        // (standard_conforming_strings=on) and SQLite use doubled quotes to
-        // escape a quote inside a string literal; backslash is an ordinary
-        // character. Treating `\` as an escape here corrupted literals such
-        // as `ESCAPE '\'` (rewrote them to `ESCAPE ''`).
+        // NOTE: no backslash-escape handling here. PostgreSQL with
+        // standard_conforming_strings=on uses doubled quotes to escape a quote
+        // inside a string literal; backslash is an ordinary character. Treating
+        // `\` as an escape here corrupted literals such as `ESCAPE '\'`.
         if (c === quote) {
           i += 1;
           break;
@@ -134,12 +136,13 @@ export function createPgFacade(
   pgTypes.setTypeParser(pgTypes.builtins.INT8, (value) => Number(value));
   pgTypes.setTypeParser(pgTypes.builtins.NUMERIC, (value) => Number(value));
 
+  const isLocalhost = (() => { try { const u = new URL(normalizePgUrl(connectionString)); return u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "::1"; } catch { return false; } })();
   const pool = new Pool({
     connectionString: normalizePgUrl(connectionString),
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
-    ssl: { rejectUnauthorized: false },
+    ...(isLocalhost ? {} : { ssl: { rejectUnauthorized: false } }),
   });
   const transactionStore = new AsyncLocalStorage<TransactionConnection>();
   let ready: Promise<void> = Promise.resolve();
@@ -200,9 +203,6 @@ export function createPgFacade(
       }
     };
     const wrapper = ((...args: TArgs) => run(args)) as SqliteLikeTransaction<TArgs, TResult>;
-    // Postgres 没有 SQLite 的 deferred/exclusive 事务语义，三者当前都走同一条
-    // BEGIN/COMMIT 路径（见上方 run）。保留这三个别名仅为兼容调用方接口，不要误以为
-    // 它们对应不同的隔离级别。
     wrapper.immediate = (...args: TArgs) => run(args);
     wrapper.deferred = (...args: TArgs) => run(args);
     wrapper.exclusive = (...args: TArgs) => run(args);
@@ -220,7 +220,7 @@ export function createPgFacade(
     transaction,
     close: async () => pool.end(),
     backup: async () => {
-      throw new Error("SQLite file backup is unavailable in PostgreSQL mode");
+      throw new Error("SQLite file backup is unavailable — use JSON backup (GET /api/backups/json, POST /api/backups/restore) on PostgreSQL.");
     },
   };
 }

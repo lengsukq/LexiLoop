@@ -116,7 +116,7 @@ async function queueSupplementalTasks(
   sourceLanguage: string,
   targetLanguage: string,
 ): Promise<void> {
-  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const purpose = settings.llmConfig.ai;
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!purpose.enabled || !provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) return;
 

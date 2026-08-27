@@ -1,7 +1,47 @@
 import { sqlite } from "@/db/client";
 import { DEFAULT_SETTINGS } from "@/lib/config";
-import type { AppSettings, LlmPurposeId } from "@/lib/types";
+import type { AppSettings } from "@/lib/types";
 import { z } from "zod";
+
+const aiConfigSchema = z.object({
+  enabled: z.boolean(),
+  providerId: z.string(),
+  model: z.string(),
+  retryProviderId: z.string().trim().max(200).optional(),
+  retryModel: z.string().trim().max(200).optional(),
+  temperature: z.number().min(0).max(1).optional(),
+  maxOutputTokens: z.number().int().min(500).max(200000).optional(),
+  timeoutMs: z.number().int().min(5000).max(300000).optional(),
+  thinkingEnabled: z.boolean().default(false),
+  thinkingBudgetTokens: z.number().int().min(1024).max(20000).optional(),
+  reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional(),
+});
+
+function coalesceLegacyLlmConfig(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  if (!record.purposes || typeof record.purposes !== "object") return value;
+  const purposes = record.purposes as Record<string, unknown>;
+  let picked: unknown = null;
+  for (const key of ["IMPORT_ENRICHMENT", "SUGGESTION", "STUDY_PLAN", "TTS"]) {
+    const entry = purposes[key] as { enabled?: boolean; providerId?: string } | undefined;
+    if (entry?.enabled && typeof entry.providerId === "string" && entry.providerId.trim()) {
+      picked = entry;
+      break;
+    }
+  }
+  if (!picked) {
+    for (const entry of Object.values(purposes)) {
+      if (entry && typeof entry === "object" && typeof (entry as { providerId?: unknown }).providerId === "string" && String((entry as { providerId: string }).providerId).trim()) {
+        picked = entry;
+        break;
+      }
+    }
+  }
+  const { purposes: _purposes, ...rest } = record;
+  void _purposes;
+  return { ...rest, ai: (picked as object) ?? { enabled: false, providerId: "", model: "", thinkingEnabled: false } };
+}
 
 const settingsSchema = z.object({
   vocabularyLevel: z.enum(["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"]).default("AUTO"),
@@ -29,7 +69,7 @@ const settingsSchema = z.object({
   youdaoEnabled: z.boolean(),
   icibaEnabled: z.boolean(),
   translationProviderOrder: z.array(z.enum(["merriam-webster", "dictionaryapi.dev", "ai", "mymemory", "tencent-translate", "youdao", "iciba"])).max(10),
-  llmConfig: z.object({
+  llmConfig: z.preprocess(coalesceLegacyLlmConfig, z.object({
     providers: z.array(z.object({
       id: z.string().min(1),
       name: z.string().min(1),
@@ -39,26 +79,21 @@ const settingsSchema = z.object({
       models: z.array(z.string().trim().min(1).max(200)).max(1000).default([]),
       defaultModel: z.string().trim().max(200).default(""),
     })),
-    purposes: z.record(
-      z.string(),
-      z.object({
-        enabled: z.boolean(),
-        providerId: z.string(),
-        model: z.string(),
-        retryProviderId: z.string().trim().max(200).optional(),
-        retryModel: z.string().trim().max(200).optional(),
-        temperature: z.number().min(0).max(1).optional(),
-        maxOutputTokens: z.number().int().min(500).max(200000).optional(),
-        timeoutMs: z.number().int().min(5000).max(300000).optional(),
-        thinkingEnabled: z.boolean().default(false),
-        thinkingBudgetTokens: z.number().int().min(1024).max(20000).optional(),
-        reasoningEffort: z.enum(["minimal", "low", "medium", "high"]).optional(),
-      }),
-    ),
-  }),
+    ai: aiConfigSchema,
+  })),
 });
 
-export const partialSettingsSchema = settingsSchema.partial().strict();
+export const partialSettingsSchema = z.preprocess(
+  (value: unknown) => {
+    if (!value || typeof value !== "object") return value;
+    const record = value as Record<string, unknown>;
+    if (record.llmConfig && typeof record.llmConfig === "object") {
+      return { ...record, llmConfig: coalesceLegacyLlmConfig(record.llmConfig) };
+    }
+    return value;
+  },
+  settingsSchema.partial().strict(),
+);
 
 const SETTINGS_CACHE_TTL_MS = 30_000;
 let settingsCache: { value: AppSettings; expiresAt: number } | null = null;
@@ -67,24 +102,19 @@ export function invalidateSettingsCache(): void {
   settingsCache = null;
 }
 
-/** A retry can deliberately switch both provider and model without altering the saved primary binding. */
 export function settingsForAiAttempt(
   settings: AppSettings,
   attemptCount: number,
-  purposeId: LlmPurposeId = "IMPORT_ENRICHMENT",
 ): AppSettings {
-  const purpose = settings.llmConfig.purposes[purposeId];
-  const retryModel = purpose.retryModel?.trim();
+  const ai = settings.llmConfig.ai;
+  const retryModel = ai.retryModel?.trim();
   if (attemptCount <= 1 || !retryModel) return settings;
-  const retryProviderId = purpose.retryProviderId?.trim() || purpose.providerId;
+  const retryProviderId = ai.retryProviderId?.trim() || ai.providerId;
   return {
     ...settings,
     llmConfig: {
       ...settings.llmConfig,
-      purposes: {
-        ...settings.llmConfig.purposes,
-        [purposeId]: { ...purpose, providerId: retryProviderId, model: retryModel },
-      },
+      ai: { ...ai, providerId: retryProviderId, model: retryModel },
     },
   };
 }
@@ -94,8 +124,6 @@ export async function getSettings(): Promise<AppSettings> {
   const rows = await sqlite.prepare("SELECT key, value_json FROM settings").all() as Array<{ key: string; value_json: string }>;
   const values: Record<string, unknown> = {};
   for (const row of rows) values[row.key] = JSON.parse(row.value_json) as unknown;
-  // Migrate legacy single playbackSpeed into per-category speeds when the new
-  // fields have never been saved individually.
   const legacySpeed = typeof values.playbackSpeed === "number" ? values.playbackSpeed : null;
   if (legacySpeed !== null) {
     delete values.playbackSpeed;

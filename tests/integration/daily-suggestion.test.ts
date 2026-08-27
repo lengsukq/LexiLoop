@@ -39,16 +39,13 @@ describe("daily AI suggestion", () => {
           { id: "primary", name: "Primary", apiType: "openai", apiKey: "test-key", baseUrl: "https://primary.test/v1" },
           { id: "fallback", name: "Fallback", apiType: "openai", apiKey: "test-key", baseUrl: "https://fallback.test/v1" },
         ],
-        purposes: {
-          ...DEFAULT_SETTINGS.llmConfig.purposes,
-          SUGGESTION: {
-            ...DEFAULT_SETTINGS.llmConfig.purposes.SUGGESTION,
-            enabled: true,
-            providerId: "primary",
-            model: "primary-model",
-            retryProviderId: "fallback",
-            retryModel: "fallback-model",
-          },
+        ai: {
+          ...DEFAULT_SETTINGS.llmConfig.ai,
+          enabled: true,
+          providerId: "primary",
+          model: "primary-model",
+          retryProviderId: "fallback",
+          retryModel: "fallback-model",
         },
       },
     });

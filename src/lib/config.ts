@@ -13,12 +13,7 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = {
       defaultModel: "",
     },
   ],
-  purposes: {
-    TTS: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
-    IMPORT_ENRICHMENT: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
-    STUDY_PLAN: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
-    SUGGESTION: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
-  },
+  ai: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {

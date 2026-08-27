@@ -53,14 +53,15 @@ const ALL_TABLES = [
 
 beforeEach(async () => {
   const { sqlite } = await import("@/db/client");
-  for (const table of ALL_TABLES) await sqlite.exec(`DELETE FROM ${table}`);
-  // 默认禁用真实网络 provider（等价于原 DICTIONARY_API_ENABLED/MYMEMORY_ENABLED 环境变量默认值），
-  // 使测试不发起真实 HTTP 请求，并失效设置缓存以确保读取到最新值。
+  try {
+    await sqlite.exec(`TRUNCATE ${ALL_TABLES.join(", ")} CASCADE`);
+  } catch {
+    for (const table of ALL_TABLES) await sqlite.exec(`DELETE FROM ${table}`);
+  }
   const { invalidateSettingsCache } = await import("@/modules/settings/service");
   const now = Date.now();
-  // 默认禁用一切真实网络 provider，确保测试不发起真实 HTTP 请求。
   for (const key of ["dictionaryApiEnabled", "myMemoryEnabled", "merriamWebsterEnabled", "youdaoEnabled", "icibaEnabled", "tencentTranslateEnabled"]) {
-    await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)").run(key, JSON.stringify(false), now);
+    await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = EXCLUDED.updated_at").run(key, JSON.stringify(false), now);
   }
   invalidateSettingsCache();
 });

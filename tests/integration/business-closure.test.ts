@@ -226,7 +226,7 @@ describe("example translation completion", () => {
         llmConfig: {
           ...DEFAULT_SETTINGS.llmConfig,
           providers: [{ id: "test", name: "Test", apiType: "openai", baseUrl: "https://example.test/v1", apiKey: "test", models: ["test-model"], defaultModel: "test-model" }],
-          purposes: { ...DEFAULT_SETTINGS.llmConfig.purposes, IMPORT_ENRICHMENT: { enabled: true, providerId: "test", model: "test-model" } },
+          ai: { ...DEFAULT_SETTINGS.llmConfig.ai, enabled: true, providerId: "test", model: "test-model" },
         },
       });
       const { translateMissingExamples } = await import("@/modules/translations/service");

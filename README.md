@@ -40,7 +40,7 @@ yarn db:migrate   # 应用数据库迁移
 yarn dev
 ```
 
-后台任务（初始化、每日 AI 建议、周期维护）由请求内按需触发推进：打开「词条初始化」页面会每 3 秒自动处理一批任务，CSV 导入提交后也会立即触发处理，无需单独进程或常驻引擎。
+后台任务（初始化、每日 AI 建议、周期维护）由请求内按需触发推进：打开「词条初始化」页面会每 3 秒自动处理一批任务，CSV 导入提交后也会立即触发处理，无需单独进程或常驻引擎。Docker 部署下由进程内 10 秒轮询兜底（见下方「Docker 部署」）。
 
 质量检查：
 
@@ -100,6 +100,22 @@ LexiLoop 采用 **tick 驱动模式**：没有常驻 Worker 进程，初始化�
 - Edge TTS 发音通过 WebSocket 合成（最长 15 秒），TTS 相关接口已放宽函数超时到 60 秒（Hobby 计划上限）。
 - 健康检查 `/api/health` 的 `backgroundEngine` 在 Vercel 上显示的是最近一次 tick 的心跳，不代表常驻 Worker 存在。
 
+## Docker 部署（本地构建直推 Queen）
+
+```bash
+# 一键构建并推送到 Queen（需本机安装 sshpass，或改用 ssh 密钥）
+yarn deploy:queen            # 最新版
+yarn deploy:queen v1.2.3     # 指定版本 tag
+
+# Queen 侧需准备：
+# - /tmp/lexiloop.env（含 DATABASE_URL、LEXILOOP_PASSWORD 等）
+# - docker-compose.yml（仓库根目录的 docker-compose.yml 可直接拷到 /vol3/1000/code/）
+# 验证：
+curl http://10.0.111.1:8012/api/health
+```
+
+`DATABASE_URL` 指向 Queen 内网 Postgres 示例：`postgresql://postgres:postgres@10.0.111.1:5432/lexiloop?sslmode=require`。首次部署前对线上库执行 `DATABASE_URL=<线上串> yarn db:migrate`。Docker 容器内由 `src/instrumentation.ts` 在 `NODE_ENV=production` 且非 Vercel 时自动启动 10 秒 tick 轮询，无需浏览器在线；`BACKGROUND_DOCKER_TICK_ENABLED=false` 可关闭该轮询退化为纯 KeepAlive 驱动。
+
 ## 环境变量
 
 | 变量 | 说明 | 默认 |
@@ -107,6 +123,8 @@ LexiLoop 采用 **tick 驱动模式**：没有常驻 Worker 进程，初始化�
 | `DATABASE_URL` | PostgreSQL 连接串，必需 | — |
 | `APP_TIMEZONE` | 应用时区 | `Asia/Shanghai` |
 | `LEXILOOP_PASSWORD` | 登录密码；留空不启用认证 | — |
+| `CRON_SECRET` | 访问 `/api/background/tick` 的 Bearer 密钥 | — |
+| `BACKGROUND_DOCKER_TICK_ENABLED` | Docker 进程内 10s tick 开关 | `true` |
 
 > 说明：词典数据源开关（DictionaryAPI.dev / MyMemory / 有道）、初始化并行数、AI 重试次数等均可在「设置」页面配置，不再提供环境变量；后台任务由请求内按需触发与定时 Cron 推进。代码中已不再使用 SQLite 相关环境变量（`DATABASE_PATH`、`ECDICT_DATABASE_PATH`、`ECDICT_ENABLED` 等）。
 

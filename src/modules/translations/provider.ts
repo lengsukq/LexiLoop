@@ -12,7 +12,7 @@ type ProviderConfig = { apiType: "openai" | "anthropic"; baseUrl: string; apiKey
 
 async function getProvider(attemptCount: number): Promise<ProviderConfig> {
   const settings = settingsForAiAttempt(await getSettings(), attemptCount);
-  const purpose = settings.llmConfig.purposes.IMPORT_ENRICHMENT;
+  const purpose = settings.llmConfig.ai;
   if (!purpose.enabled) throw new ApiError("AI_DISABLED");
   const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
   if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) throw new ApiError("AI_CONFIG_INCOMPLETE");

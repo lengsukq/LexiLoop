@@ -1,8 +1,15 @@
-import type { AppSettings, LlmPurposeId, LlmProviderConfig } from "@/lib/types";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+
+import type { AppSettings, LlmProviderConfig } from "@/lib/types";
+
 import { Input } from "@/components/ui";
 
 export type SettingsTab = "study" | "ai" | "data";
+export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: "study", label: "学习计划" },
+  { id: "ai", label: "AI 模型" },
+  { id: "data", label: "数据管理" },
+];
 export type TestState = "idle" | "testing" | "success" | "error";
 
 export interface ProviderOperationState {
@@ -16,31 +23,12 @@ export interface ModelPickerState {
   selected: string[];
 }
 
-export const PURPOSE_META: Array<{ id: LlmPurposeId; label: string; description: string }> = [
-  { id: "IMPORT_ENRICHMENT", label: "AI 词条初始化", description: "为导入词条生成完整、结构化的学习内容" },
-  { id: "STUDY_PLAN", label: "生成学习计划", description: "根据学习进度生成每日计划" },
-  { id: "SUGGESTION", label: "每日学习建议", description: "回顾昨日质量并生成今日必做题" },
-];
-
-export const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
-  { id: "study", label: "学习计划" },
-  { id: "ai", label: "AI 模型" },
-  { id: "data", label: "数据管理" },
-];
-
 export function configuredModels(provider: LlmProviderConfig): string[] {
   return [...new Set([...(provider.models ?? []), provider.defaultModel ?? ""].filter(Boolean))];
 }
 
 export function parseModels(value: string): string[] {
   return [...new Set(value.split(/[\n,]/).map((model) => model.trim()).filter(Boolean))];
-}
-
-export function formatBytes(value: number): string {
-  if (!value) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
-  return `${(value / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
 }
 
 export type SettingsUpdater = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;

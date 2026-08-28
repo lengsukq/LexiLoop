@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { Clock3, Flame, Loader2 } from "lucide-react";
 import { formatClockTime } from "@/lib/format";
-import { Badge } from "@/components/ui";
 
 /** Countdown pill shown in the play header; turns red and pulses when time is low. */
 export function GameTimerPill({ remainingMs, urgentAt = 10_000 }: { remainingMs: number; urgentAt?: number }) {

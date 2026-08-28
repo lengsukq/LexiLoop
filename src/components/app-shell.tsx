@@ -42,10 +42,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 全局常驻后台保活：跨页面切换持续推进初始化队列 */}
       <BackgroundKeepalive />
       {/* Desktop Sidebar — Liquid Glass */}
-      <aside className="liquid-glass liquid-glass-specular liquid-glass-edge fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col p-6 lg:flex">
+      <aside className="liquid-glass liquid-glass-specular liquid-glass-edge fixed inset-y-0 left-0 z-30 hidden w-[256px] flex-col p-5 lg:flex">
         <Logo href="/" />
 
-        <nav className="relative z-10 mt-8 flex-1 space-y-1.5">
+        <nav className="relative z-10 mt-7 flex-1 space-y-1">
           {navigation.map((item) => {
             const active = isActive(item.href, pathname);
             return (
@@ -53,36 +53,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "ios-press flex items-center gap-3 rounded-[14px] px-4 py-3 text-[15px] font-medium transition-all duration-300",
+                  "ios-press flex items-center gap-3 rounded-[13px] px-3.5 py-2.5 text-[14.5px] font-medium transition-all duration-200",
                   active
-                    ? "glass-inner text-accent shadow-[0_4px_20px_rgba(0,122,255,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] dark:text-[#0a84ff]"
-                    : "text-secondary-label hover:bg-white/40 hover:text-[#1c1c1e] hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] hover:backdrop-blur-xl dark:text-secondary-label dark:hover:bg-white/[0.06] dark:hover:text-[#f5f5f7]",
+                    ? "bg-accent/10 text-accent font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:bg-accent/15 dark:text-[#0a84ff]"
+                    : "text-secondary-label hover:bg-black/[0.04] hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:bg-white/[0.06] dark:hover:text-[#f5f5f7]",
                 )}
               >
-                <item.icon className={cn("size-5 transition-all", active && "drop-shadow-[0_1px_3px_rgba(0,122,255,0.4)]")} />
+                <item.icon className={cn("size-4.5 transition-transform duration-200", active && "scale-105")} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="relative z-10 px-3 text-xs text-tertiary-label dark:text-[#48484a]">LexiLoop v1.0 · 自托管</div>
+        <div className="relative z-10 px-3 text-xs text-tertiary-label dark:text-[#545458]">LexiLoop v1.0 · 自托管</div>
       </aside>
 
       {/* Main Content */}
-      <main className={cn("app-main lg:pb-8", isStudyScreen ? "pb-4" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]")}>
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">{children}</div>
+      <main className={cn("app-main lg:pb-8", isStudyScreen ? "pb-4" : "pb-[calc(6rem+env(safe-area-inset-bottom))]")}>
+        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">{children}</div>
       </main>
 
       {/* Mobile More Sheet */}
       {moreOpen && (
         <div className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden">
-          <div className="absolute inset-0 bg-black/25 backdrop-blur-md" onClick={() => setMoreOpen(false)} />
-          <div className="relative mx-4 mb-[calc(5rem+env(safe-area-inset-bottom))] max-h-[60vh] overflow-y-auto">
-            <div className="liquid-glass-elevated liquid-glass-specular animate-scale-in rounded-[26px] p-4">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-200" onClick={() => setMoreOpen(false)} />
+          <div className="relative mx-3.5 mb-[calc(4.75rem+env(safe-area-inset-bottom))] max-h-[60vh] overflow-y-auto">
+            <div className="liquid-glass-elevated liquid-glass-specular animate-scale-in rounded-[24px] p-4 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
               <div className="mb-3 flex items-center justify-between px-1">
-                <span className="text-sm font-semibold text-secondary-label">更多</span>
-                <button className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.06] text-secondary-label dark:bg-white/[0.08] dark:text-secondary-label" onClick={() => setMoreOpen(false)}>
+                <span className="text-xs font-semibold text-secondary-label uppercase tracking-wider">更多导航</span>
+                <button className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.05] text-secondary-label dark:bg-white/[0.08] dark:text-secondary-label" onClick={() => setMoreOpen(false)}>
                   <X className="size-3.5" />
                 </button>
               </div>
@@ -95,13 +95,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
                       className={cn(
-                        "ios-press flex items-center gap-3 rounded-[16px] px-4 py-3.5 text-[15px] font-medium transition-all",
+                        "ios-press flex items-center gap-2.5 rounded-[14px] px-3.5 py-3 text-[14px] font-medium transition-all",
                         active
-                          ? "glass-inner text-accent"
-                          : "text-secondary-label hover:bg-white/40 dark:text-secondary-label dark:hover:bg-white/[0.06]",
+                          ? "bg-accent/10 text-accent font-semibold dark:bg-accent/15"
+                          : "text-secondary-label hover:bg-black/[0.04] dark:text-secondary-label dark:hover:bg-white/[0.06]",
                       )}
                     >
-                      <item.icon className="size-5" />
+                      <item.icon className="size-4.5" />
                       {item.label}
                     </Link>
                   );
@@ -112,9 +112,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Mobile Tab Bar — Floating Liquid Glass Pill (5 primary + more) */}
-      {!isStudyScreen && <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 lg:hidden" aria-label="主导航">
-        <div className="liquid-glass liquid-glass-specular liquid-glass-edge relative mx-auto flex max-w-md items-center justify-around rounded-[22px] px-1.5 py-2 shadow-[0_16px_60px_rgba(0,0,0,0.14),0_4px_16px_rgba(0,0,0,0.08)]">
+      {/* Mobile Tab Bar — Floating Liquid Glass Pill */}
+      {!isStudyScreen && <nav className="fixed inset-x-3 bottom-[max(0.6rem,env(safe-area-inset-bottom))] z-30 lg:hidden" aria-label="主导航">
+        <div className="liquid-glass liquid-glass-specular relative mx-auto flex max-w-md items-center justify-around rounded-[20px] px-1 py-1.5 shadow-[0_12px_32px_-4px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.04)]">
           {primaryNav.map((item) => {
             const active = isActive(item.href, pathname);
             return (
@@ -122,12 +122,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "ios-press relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[12px] px-1 py-1.5 transition-all duration-200",
+                  "ios-press relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[12px] px-1 py-1.5 transition-all duration-150",
                   active ? "text-accent" : "text-quaternary-label dark:text-[#636366]",
                 )}
               >
-                <item.icon className={cn("size-[22px] transition-all", active && "drop-shadow-[0_1px_4px_rgba(0,122,255,0.5)]")} />
-                <span className={cn("text-[10px] leading-tight", active ? "font-bold" : "font-medium")}>{item.label}</span>
+                <item.icon className={cn("size-[20px] transition-transform duration-150", active && "scale-105")} />
+                <span className={cn("text-[10px] leading-tight", active ? "font-semibold" : "font-medium")}>{item.label}</span>
               </Link>
             );
           })}
@@ -136,15 +136,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-expanded={moreOpen}
             aria-label={moreOpen ? "收起更多导航" : "打开更多导航"}
             className={cn(
-              "ios-press relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[12px] px-1 py-1.5 transition-all duration-200",
+              "ios-press relative z-10 flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-[12px] px-1 py-1.5 transition-all duration-150",
               secondaryActive || moreOpen ? "text-accent" : "text-quaternary-label dark:text-[#636366]",
             )}
           >
-            {moreOpen ? <X className="size-[22px]" /> : <MoreHorizontal className={cn("size-[22px] transition-all", secondaryActive && "drop-shadow-[0_1px_4px_rgba(0,122,255,0.5)]")} />}
-            <span className={cn("text-[10px] leading-tight", secondaryActive || moreOpen ? "font-bold" : "font-medium")}>{moreOpen ? "收起" : "更多"}</span>
+            {moreOpen ? <X className="size-[20px]" /> : <MoreHorizontal className={cn("size-[20px] transition-transform duration-150", secondaryActive && "scale-105")} />}
+            <span className={cn("text-[10px] leading-tight", secondaryActive || moreOpen ? "font-semibold" : "font-medium")}>{moreOpen ? "收起" : "更多"}</span>
           </button>
         </div>
       </nav>}
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
 import { useEffect, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function buttonClass(
@@ -7,24 +7,23 @@ export function buttonClass(
   size: "sm" | "md" | "lg" = "md",
 ) {
   return cn(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:pointer-events-none disabled:opacity-40 ios-press",
-    size === "sm" ? "h-9 px-3.5 text-[13px]" : size === "lg" ? "h-[54px] px-8 text-[17px]" : "h-11 px-5 text-[15px]",
-    variant === "primary" && "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_16px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_24px_rgba(0,122,255,0.4)]",
-    variant === "secondary" && "bg-accent/10 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] hover:bg-accent/15 dark:bg-accent/15",
-    variant === "outline" && "border border-white/50 bg-white/50 text-label shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-2xl hover:bg-white/70 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:border-white/[0.1] dark:bg-white/[0.06]",
-    variant === "ghost" && "text-secondary-label hover:bg-black/[0.04] dark:hover:bg-white/[0.08]",
-    variant === "danger" && "bg-gradient-to-b from-[#ff453a] to-[#ff3b30] text-white shadow-[0_4px_16px_rgba(255,59,48,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_24px_rgba(255,59,48,0.4)]",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl font-medium tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-40 ios-press",
+    size === "sm" ? "h-9 px-3.5 text-[13px]" : size === "lg" ? "h-[52px] px-7 text-[16px] font-semibold" : "h-10 px-4.5 text-[14px]",
+    variant === "primary" && "bg-accent text-white shadow-[0_2px_8px_rgba(0,122,255,0.25),inset_0_1px_0_rgba(255,255,255,0.28)] hover:shadow-[0_4px_16px_rgba(0,122,255,0.35)] hover:brightness-105 active:brightness-95",
+    variant === "secondary" && "bg-accent/10 text-accent hover:bg-accent/[0.14] dark:bg-accent/[0.14] dark:hover:bg-accent/20",
+    variant === "outline" && "border border-black/[0.08] bg-white/70 text-label shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl hover:bg-white hover:border-black/[0.12] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] dark:border-white/[0.1] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]",
+    variant === "ghost" && "text-secondary-label hover:bg-black/[0.04] hover:text-label dark:hover:bg-white/[0.06] dark:hover:text-[#f5f5f7]",
+    variant === "danger" && "bg-danger text-white shadow-[0_2px_8px_rgba(255,59,48,0.25),inset_0_1px_0_rgba(255,255,255,0.28)] hover:shadow-[0_4px_16px_rgba(255,59,48,0.35)] hover:brightness-105",
   );
 }
 
-import { Loader2 } from "lucide-react";
 export { toast, ToastContainer } from "./toast";
 
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <kbd
       className={cn(
-        "inline-flex items-center justify-center rounded-md border border-black/10 bg-black/[0.04] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-secondary-label shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)] dark:border-white/15 dark:bg-white/[0.08] dark:text-secondary-label dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.1)]",
+        "inline-flex items-center justify-center rounded-md border border-black/[0.08] bg-black/[0.03] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-secondary-label dark:border-white/12 dark:bg-white/[0.06] dark:text-secondary-label",
         className,
       )}
     >
@@ -58,7 +57,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[20px] transition-all duration-300 sm:rounded-[22px]",
+        "liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[22px] transition-all duration-300 sm:rounded-[24px]",
         className,
       )}
       {...props}
@@ -67,36 +66,36 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative z-10 px-4 pb-2 pt-4 sm:px-5 sm:pt-5", className)} {...props} />;
+  return <div className={cn("relative z-10 px-4.5 pb-2 pt-4.5 sm:px-6 sm:pt-5.5", className)} {...props} />;
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative z-10 px-4 pb-4 pt-2 sm:px-5 sm:pb-5", className)} {...props} />;
+  return <div className={cn("relative z-10 px-4.5 pb-4.5 pt-2 sm:px-6 sm:pb-6", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("text-[17px] font-bold tracking-tight text-label", className)} {...props} />;
+  return <h2 className={cn("text-[17px] font-semibold tracking-tight text-label", className)} {...props} />;
 }
 
 export function Badge({ children, tone = "slate", className }: { children: ReactNode; tone?: "slate" | "green" | "amber" | "red" | "blue" | "purple" | "glass"; className?: string }) {
   const tones = {
-    slate: "bg-quaternary-label/12 text-secondary-label dark:bg-secondary-label/15",
-    green: "bg-success/12 text-success-deep dark:bg-success/15",
-    amber: "bg-warning/12 text-warning-deep dark:bg-warning/15",
-    red: "bg-danger/12 text-danger-deep dark:bg-danger/15",
-    blue: "bg-accent/12 text-accent-deep dark:bg-accent/15",
-    purple: "bg-purple/12 text-purple-deep dark:bg-purple/15",
-    glass: "border border-white/25 bg-white/[0.18] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-md",
+    slate: "bg-quaternary-label/10 text-secondary-label dark:bg-secondary-label/12",
+    green: "bg-success/10 text-success-deep dark:bg-success/15 dark:text-success",
+    amber: "bg-warning/10 text-warning-deep dark:bg-warning/15 dark:text-warning",
+    red: "bg-danger/10 text-danger-deep dark:bg-danger/15 dark:text-danger",
+    blue: "bg-accent/10 text-accent-deep dark:bg-accent/15 dark:text-accent",
+    purple: "bg-purple/10 text-purple-deep dark:bg-purple/15 dark:text-purple",
+    glass: "border border-white/30 bg-white/[0.22] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] backdrop-blur-md",
   } as const;
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tones[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-tight", tones[tone], className)}>{children}</span>;
 }
 
 export function Progress({ value, max = 100, indeterminate = false, className }: { value: number; max?: number; indeterminate?: boolean; className?: string }) {
   const percent = Math.max(0, Math.min(100, max ? (value / max) * 100 : 0));
   return (
-    <div className={cn("h-[7px] overflow-hidden rounded-full bg-black/[0.06] shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] dark:bg-white/[0.08]", className)}>
+    <div className={cn("h-[6px] overflow-hidden rounded-full bg-black/[0.05] dark:bg-white/[0.08]", className)}>
       <div
-        className={cn("h-full rounded-full bg-gradient-to-r from-accent via-[#5ac8fa] to-accent shadow-[0_1px_4px_rgba(0,122,255,0.3)]", indeterminate ? "animate-progress-slide w-2/5" : "transition-all duration-700 ease-out")}
+        className={cn("h-full rounded-full bg-gradient-to-r from-accent to-[#5ac8fa] shadow-[0_1px_3px_rgba(0,122,255,0.25)]", indeterminate ? "animate-progress-slide w-2/5" : "transition-all duration-500 ease-out")}
         style={indeterminate ? undefined : { width: `${percent}%` }}
       />
     </div>
@@ -104,9 +103,9 @@ export function Progress({ value, max = 100, indeterminate = false, className }:
 }
 
 const fieldClass = cn(
-  "h-11 w-full rounded-[14px] border border-white/50 bg-white/50 px-4 text-[15px] shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-2xl outline-none transition-all duration-300",
-  "placeholder:text-tertiary-label focus:border-accent/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10),0_0_0_4px_rgba(0,122,255,0.08)]",
-  "dark:border-white/[0.08] dark:bg-white/[0.06] dark:placeholder:text-[#636366] dark:focus:shadow-[0_8px_32px_rgba(10,132,255,0.12),0_0_0_4px_rgba(10,132,255,0.1)]",
+  "h-10.5 w-full rounded-[13px] border border-black/[0.08] bg-white/60 px-3.5 text-[14px] shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl outline-none transition-all duration-200",
+  "placeholder:text-tertiary-label focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08),0_0_0_3px_rgba(0,122,255,0.12)]",
+  "dark:border-white/[0.09] dark:bg-white/[0.05] dark:placeholder:text-[#636366] dark:focus:bg-white/[0.08] dark:focus:shadow-[0_4px_16px_rgba(10,132,255,0.12),0_0_0_3px_rgba(10,132,255,0.15)]",
 );
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
@@ -116,8 +115,8 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
 export function SearchInput({ className, inputClassName, ...props }: InputHTMLAttributes<HTMLInputElement> & { inputClassName?: string }) {
   return (
     <div className={cn("relative", className)}>
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-tertiary-label" />
-      <input {...props} className={cn(fieldClass, "h-9 pl-9 text-sm", inputClassName)} />
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-tertiary-label" />
+      <input {...props} className={cn(fieldClass, "h-9.5 pl-8.5 text-[13.5px]", inputClassName)} />
     </div>
   );
 }
@@ -128,12 +127,12 @@ export function Select({ className, compact = false, ...props }: React.SelectHTM
       <select
         {...props}
         className={cn(
-          "w-full appearance-none rounded-xl border border-white/50 bg-white/50 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl outline-none transition-all focus:border-accent/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08] dark:bg-white/[0.06]",
-          compact ? "h-8 pl-3 pr-8 text-xs" : "h-11 pl-4 pr-9 text-[15px]",
+          "w-full appearance-none rounded-[13px] border border-black/[0.08] bg-white/60 shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] dark:border-white/[0.09] dark:bg-white/[0.05] dark:focus:bg-white/[0.08]",
+          compact ? "h-8 pl-3 pr-7 text-xs font-medium" : "h-10.5 pl-3.5 pr-9 text-[14px]",
           props.disabled && "opacity-40",
         )}
       />
-      <ChevronDown className={cn("pointer-events-none absolute top-1/2 -translate-y-1/2 text-tertiary-label", compact ? "right-2.5 size-3.5" : "right-3 size-4")} />
+      <ChevronDown className={cn("pointer-events-none absolute top-1/2 -translate-y-1/2 text-tertiary-label", compact ? "right-2 size-3.5" : "right-3 size-4")} />
     </div>
   );
 }
@@ -145,7 +144,7 @@ export function Segmented<T extends string>({ options, value, onChange, classNam
   className?: string;
 }) {
   return (
-    <div className={cn("inline-flex gap-0.5 rounded-2xl bg-white/50 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-2xl dark:bg-white/[0.06]", className)} role="tablist">
+    <div className={cn("inline-flex gap-0.5 rounded-[14px] bg-black/[0.04] p-1 backdrop-blur-xl dark:bg-white/[0.06]", className)} role="tablist">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -156,9 +155,9 @@ export function Segmented<T extends string>({ options, value, onChange, classNam
             aria-selected={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "flex-1 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition-all duration-200",
+              "ios-press flex-1 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] font-medium transition-all duration-200",
               active
-                ? "bg-white text-[#1c1c1e] shadow-[0_2px_8px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] dark:bg-white/[0.14] dark:text-white"
+                ? "bg-white text-[#1c1c1e] shadow-[0_1px_4px_rgba(0,0,0,0.08)] dark:bg-white/[0.14] dark:text-white"
                 : "text-secondary-label hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:text-white",
             )}
           >
@@ -172,12 +171,12 @@ export function Segmented<T extends string>({ options, value, onChange, classNam
 
 export function Alert({ tone = "danger", icon, children, className }: { tone?: "danger" | "info" | "success"; icon?: ReactNode; children: ReactNode; className?: string }) {
   const tones = {
-    danger: "border-danger/15 bg-danger/[0.06] text-danger-deep shadow-[0_4px_16px_rgba(255,59,48,0.05)]",
-    info: "border-accent/15 bg-accent/[0.06] text-accent-deep dark:text-[#64b5ff]",
-    success: "border-success/15 bg-success/[0.06] text-success-deep",
+    danger: "border-danger/15 bg-danger/[0.05] text-danger-deep dark:text-danger",
+    info: "border-accent/15 bg-accent/[0.05] text-accent-deep dark:text-[#64b5ff]",
+    success: "border-success/15 bg-success/[0.05] text-success-deep dark:text-success",
   } as const;
   return (
-    <div className={cn("flex items-start gap-2 rounded-[16px] border p-3 text-sm backdrop-blur-sm", tones[tone], className)}>
+    <div className={cn("flex items-start gap-2.5 rounded-[16px] border p-3.5 text-[13.5px] leading-relaxed backdrop-blur-md", tones[tone], className)}>
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <div className="min-w-0">{children}</div>
     </div>
@@ -186,11 +185,11 @@ export function Alert({ tone = "danger", icon, children, className }: { tone?: "
 
 export function EmptyState({ icon, title, description, action }: { icon?: ReactNode; title: string; description: string; action?: ReactNode }) {
   return (
-    <div className="liquid-glass-elevated animate-scale-in flex min-h-56 flex-col items-center justify-center rounded-[22px] p-6 text-center sm:min-h-64 sm:rounded-[28px] sm:p-10">
+    <div className="liquid-glass-elevated animate-scale-in flex min-h-56 flex-col items-center justify-center rounded-[24px] p-6 text-center sm:min-h-64 sm:rounded-[28px] sm:p-10">
       {icon}
-      <h2 className="mt-4 text-xl font-bold tracking-tight text-label">{title}</h2>
-      <p className="mt-2 max-w-md text-[15px] leading-relaxed text-secondary-label">{description}</p>
-      {action && <div className="mt-6">{action}</div>}
+      <h2 className="mt-4 text-lg font-semibold tracking-tight text-label sm:text-xl">{title}</h2>
+      <p className="mt-1.5 max-w-md text-[14px] leading-relaxed text-secondary-label">{description}</p>
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
@@ -199,8 +198,8 @@ export function PageHeader({ title, description, action }: { title: string; desc
   return (
     <div className="animate-fade-down flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-label">{title}</h1>
-        {description && <p className="mt-1 text-[15px] text-secondary-label">{description}</p>}
+        <h1 className="text-[26px] font-bold tracking-tight text-label sm:text-[28px]">{title}</h1>
+        {description && <p className="mt-1 text-[14px] text-secondary-label leading-relaxed">{description}</p>}
       </div>
       {action}
     </div>
@@ -208,7 +207,6 @@ export function PageHeader({ title, description, action }: { title: string; desc
 }
 
 export function Dialog({ open, onClose, title, children, maxWidth = "max-w-lg", keepMounted = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; maxWidth?: string; keepMounted?: boolean }) {
-  // Esc 关闭 + 打开期间锁定背景滚动，与移动端弹层行为保持一致
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -223,12 +221,12 @@ export function Dialog({ open, onClose, title, children, maxWidth = "max-w-lg", 
   if (!open && !keepMounted) return null;
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${open ? "" : "hidden"}`}>
-      <div className="absolute inset-0 bg-black/25 backdrop-blur-md" onClick={onClose} />
-      <div className={`liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full ${maxWidth} overflow-y-auto rounded-[28px] p-6`}>
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-label">{title}</h2>
-          <button onClick={onClose} className="ios-press grid size-8 place-items-center rounded-full bg-black/[0.06] text-secondary-label dark:bg-white/[0.08]">
-            <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-200" onClick={onClose} />
+      <div className={`liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full ${maxWidth} overflow-y-auto rounded-[26px] p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.18)]`}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold tracking-tight text-label">{title}</h2>
+          <button onClick={onClose} className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.05] text-secondary-label hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]">
+            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
         {children}
@@ -251,8 +249,8 @@ function paginationRange(page: number, totalPages: number): (number | "...")[] {
 
 function pageButtonClass(sticky: boolean) {
   return cn(
-    sticky ? "grid size-9 place-items-center rounded-[11px] sm:size-10 sm:rounded-[12px]" : "grid size-10 place-items-center rounded-[12px]",
-    "ios-press border border-white/50 bg-white/50 shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm transition disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:bg-white/[0.05]",
+    sticky ? "grid size-8.5 place-items-center rounded-[10px] sm:size-9 sm:rounded-[11px]" : "grid size-9.5 place-items-center rounded-[11px]",
+    "ios-press border border-black/[0.06] bg-white/70 shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-md transition disabled:pointer-events-none disabled:opacity-30 dark:border-white/[0.08] dark:bg-white/[0.06]",
   );
 }
 
@@ -263,25 +261,25 @@ export function Pagination({ page, totalPages, total, onChange, className, stick
   return (
     <div className={cn(
       sticky ? "flex-row items-center justify-between gap-2" : "flex-col items-center gap-3 sm:flex-row sm:justify-between",
-      sticky && "liquid-glass liquid-glass-specular liquid-glass-edge sticky top-3 z-20 mx-auto w-full overflow-hidden rounded-[18px] bg-white/[0.9] px-2.5 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.12),0_3px_12px_rgba(0,0,0,0.06)] backdrop-blur-2xl dark:bg-[#1c1c1e]/[0.9] sm:rounded-[20px] sm:px-4 sm:py-3",
+      sticky && "liquid-glass liquid-glass-specular sticky top-3 z-20 mx-auto w-full overflow-hidden rounded-[18px] px-3 py-2 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)] sm:rounded-[20px] sm:px-4 sm:py-2.5",
       className,
     )}>
-      {total !== undefined && <p className={cn("text-sm text-secondary-label", sticky && "whitespace-nowrap text-xs")}>共 {total} 条</p>}
-      <nav className={cn("flex items-center gap-1.5", sticky && "gap-1 sm:gap-1.5")}>
+      {total !== undefined && <p className={cn("text-xs font-medium text-secondary-label num-tabular", sticky && "whitespace-nowrap")}>共 {total} 条</p>}
+      <nav className={cn("flex items-center gap-1", sticky && "gap-1")}>
         <button className={pageButtonClass(sticky)} disabled={page <= 1} onClick={() => onChange(page - 1)} aria-label="上一页">
           <ChevronLeft className="size-4" />
         </button>
         {paginationRange(page, totalPages).map((item, index) =>
           item === "..." ? (
-            <span key={`ellipsis-${index}`} className="px-1 text-sm text-tertiary-label">…</span>
+            <span key={`ellipsis-${index}`} className="px-1 text-xs text-tertiary-label">…</span>
           ) : (
             <button
               key={item}
               className={cn(
-                sticky ? "ios-press size-9 rounded-[11px] text-[13px] font-medium transition-all duration-200 sm:size-10 sm:rounded-[12px] sm:text-sm" : "ios-press size-10 rounded-[12px] text-sm font-medium transition-all duration-200",
+                sticky ? "ios-press size-8.5 rounded-[10px] text-[13px] font-medium transition-all duration-150 sm:size-9 sm:rounded-[11px]" : "ios-press size-9.5 rounded-[11px] text-[13px] font-medium transition-all duration-150",
                 item === page
-                  ? "bg-gradient-to-b from-[#0a84ff] to-[#007aff] text-white shadow-[0_4px_14px_rgba(0,122,255,0.35),inset_0_1px_0_rgba(255,255,255,0.2)]"
-                  : "border border-white/50 bg-white/50 text-secondary-label shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-sm hover:bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.1]",
+                  ? "bg-accent text-white shadow-[0_2px_8px_rgba(0,122,255,0.3)]"
+                  : "border border-black/[0.06] bg-white/70 text-secondary-label shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-md hover:bg-white dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]",
               )}
               onClick={() => onChange(item)}
             >{item}</button>
@@ -294,3 +292,4 @@ export function Pagination({ page, totalPages, total, onChange, className, stick
     </div>
   );
 }
+

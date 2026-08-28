@@ -81,7 +81,7 @@ export async function claimJobs(workerId: string, limit: number): Promise<Claime
       maxAttempts: row.max_attempts,
       requestedFields: parseStringArray<InitializationField>(row.requested_fields_json),
       requestedProviders: parseStringArray<InitializationProviderId>(row.requested_providers_json),
-      providerStrategy: row.provider_strategy ?? "PARALLEL_MERGE",
+      providerStrategy: row.provider_strategy ?? "PRIORITY_FALLBACK",
     });
   }
   return claimed;
@@ -149,7 +149,7 @@ async function failOrRetry(job: ClaimedJob, transient: boolean, errorCode: strin
 export async function processJob(job: ClaimedJob): Promise<void> {
   if (job.taskType !== "INITIALIZE") {
     try {
-      await runSupplementalTask(job.taskType, job.wordId, job.attemptCount);
+      await runSupplementalTask(job.taskType, job.wordId);
       await completeJob(job, "READY", Date.now());
     } catch (error) {
       const text = String(error);
@@ -200,7 +200,7 @@ export async function processJob(job: ClaimedJob): Promise<void> {
       initializationMode: job.mode,
       requestedFields,
       requestedProviders: job.requestedProviders,
-      providerStrategy: job.providerStrategy ?? "PARALLEL_MERGE",
+      providerStrategy: job.providerStrategy ?? "PRIORITY_FALLBACK",
       existingContent: existing,
     }, settings);
     const now = Date.now();

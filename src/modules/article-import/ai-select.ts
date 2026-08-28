@@ -1,4 +1,4 @@
-import { callLlm } from "@/modules/llm/client";
+import { callLlmWithFallback, resolveLlmProviders } from "@/modules/llm/client";
 import { getSettings } from "@/modules/settings/service";
 import type { VocabularyLevel } from "@/lib/types";
 import { buildArticleSelectionPrompt, parseJsonLoose } from "./prompt";
@@ -20,14 +20,13 @@ export interface AiSelectResult {
 
 export async function aiSelectTerms(input: AiSelectInput): Promise<AiSelectResult> {
   const settings = await getSettings();
-  const purpose = settings.llmConfig.ai;
-
-  if (!purpose?.enabled) return { applied: false, selected: [], error: "AI 未启用，请到设置页开启 AI。" };
-
-  const provider = settings.llmConfig.providers.find((item) => item.id === purpose.providerId);
-  if (!provider || !provider.apiKey.trim() || !provider.baseUrl.trim() || !purpose.model.trim()) {
+  const { primary, fallback } = resolveLlmProviders(settings);
+  if (!primary) {
+    const purpose = settings.llmConfig.ai;
+    if (!purpose?.enabled) return { applied: false, selected: [], error: "AI 未启用，请到设置页开启 AI。" };
     return { applied: false, selected: [], error: "AI 服务配置不完整，请到设置页补全。" };
   }
+  const purpose = settings.llmConfig.ai;
 
   const { systemPrompt, userPrompt } = buildArticleSelectionPrompt({
     articleText: input.articleText,
@@ -39,24 +38,14 @@ export async function aiSelectTerms(input: AiSelectInput): Promise<AiSelectResul
 
   let raw = "";
   try {
-    raw = await callLlm(
-      {
-        apiType: provider.apiType,
-        baseUrl: provider.baseUrl,
-        apiKey: provider.apiKey,
-        model: purpose.model,
-        timeoutMs: purpose.timeoutMs ?? 30_000,
-      },
-      userPrompt,
-      {
-        systemPrompt,
-        maxOutputTokens: purpose.maxOutputTokens ?? 3000,
-        temperature: purpose.temperature ?? 0.2,
-        thinkingEnabled: purpose.thinkingEnabled ?? false,
-        thinkingBudgetTokens: purpose.thinkingBudgetTokens,
-        reasoningEffort: purpose.reasoningEffort,
-      },
-    );
+    raw = await callLlmWithFallback(primary, fallback, userPrompt, {
+      systemPrompt,
+      maxOutputTokens: purpose.maxOutputTokens ?? 3000,
+      temperature: purpose.temperature ?? 0.2,
+      thinkingEnabled: purpose.thinkingEnabled ?? false,
+      thinkingBudgetTokens: purpose.thinkingBudgetTokens,
+      reasoningEffort: purpose.reasoningEffort,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 请求失败";
     return { applied: false, selected: [], error: message };

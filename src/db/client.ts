@@ -13,7 +13,7 @@ function getBundle(): SqliteLikeDatabase {
   const existing = globalDb.__lexiloopDbFacade;
   if (existing) return existing;
   const bundle = createBundle();
-  if (process.env.NODE_ENV !== "production") globalDb.__lexiloopDbFacade = bundle;
+  globalDb.__lexiloopDbFacade = bundle;
   return bundle;
 }
 

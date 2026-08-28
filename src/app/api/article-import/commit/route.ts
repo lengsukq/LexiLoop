@@ -20,7 +20,7 @@ const schema = z.object({
   resetLearningProgress: z.boolean().default(false),
 });
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function toKey(term: string, entryType?: string) {
   const normalized = term.normalize("NFKC").toLowerCase();

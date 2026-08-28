@@ -57,7 +57,7 @@ export async function queueAiTask(
     } | undefined;
   const requestedFields = taskType === "INITIALIZE" ? normalizeRequestedFields(options.requestedFields) : [];
   const requestedProviders = taskType === "INITIALIZE" ? uniqueOrdered(options.requestedProviders) : [];
-  const providerStrategy = options.providerStrategy ?? "PARALLEL_MERGE";
+  const providerStrategy = options.providerStrategy ?? "PRIORITY_FALLBACK";
   if (active) {
     const activeFields = parseStringArray<InitializationField>(active.requested_fields_json);
     const activeProviders = parseStringArray<InitializationProviderId>(active.requested_providers_json);
@@ -73,7 +73,7 @@ export async function queueAiTask(
         strongerInitializationMode(active.mode, mode), priority, maxAttempts,
         taskType === "INITIALIZE" ? (mergedFields.length ? JSON.stringify(mergedFields) : null) : active.requested_fields_json,
         taskType === "INITIALIZE" ? (mergedProviders.length ? JSON.stringify(mergedProviders) : null) : active.requested_providers_json,
-        options.providerStrategy ?? active.provider_strategy ?? "PARALLEL_MERGE",
+        options.providerStrategy ?? active.provider_strategy ?? "PRIORITY_FALLBACK",
         now, now, active.id,
       );
     return active.id;

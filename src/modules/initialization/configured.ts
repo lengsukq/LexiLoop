@@ -29,7 +29,7 @@ export async function previewConfiguredInitialization(input: ConfiguredInitializ
     scope: requestedIds ? "SELECTED" as const : "ALL" as const,
     requestedWords: requestedIds?.length ?? rows.length, existingWords: rows.length,
     selectedWords: selected.length, skippedExisting: rows.length - selected.length, requestedFields,
-    requestedProviders: uniqueOrdered(input.requestedProviders), providerStrategy: input.providerStrategy ?? "PARALLEL_MERGE",
+    requestedProviders: uniqueOrdered(input.requestedProviders), providerStrategy: input.providerStrategy ?? "PRIORITY_FALLBACK",
     mode: input.mode ?? "FILL_MISSING_FIELDS", sample: selected.slice(0, 8).map((row) => ({ id: Number(row.selected_word_id), term: String(row.term) })),
   };
 }

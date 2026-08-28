@@ -64,10 +64,34 @@ function providersFor(settings: AppSettings, selected?: InitializationProviderId
   return order.map((id) => createProvider(id, settings)).filter((provider): provider is DictionaryProvider => Boolean(provider));
 }
 
-function supportsRequestedFields(provider: DictionaryProvider, requestedFields: InitializationField[]): boolean {
+function supportsRequestedFields(provider: DictionaryProvider, requestedFields: InitializationField[], input?: LookupInput): boolean {
   if (!requestedFields.length) return true;
   const capabilities = PROVIDER_CAPABILITIES[providerKey(provider)];
-  return requestedFields.some((field) => capabilities.includes(field));
+  const hasOverlap = requestedFields.some((field) => capabilities.includes(field));
+  if (!hasOverlap) return false;
+  // SENTENCE 场景下有道/iciba 实际只产 definitions/summary/examples/phrases，勾了 synonyms/wordFamily 等无效字段时直接跳过该来源
+  if (input?.entryType === "SENTENCE") {
+    const key = providerKey(provider);
+    if (key === "youdao" || key === "iciba") {
+      const SENTENCE_FIELDS: InitializationField[] = ["definitions", "summary", "examples", "phrases"];
+      if (!requestedFields.some((field) => (SENTENCE_FIELDS as string[]).includes(field))) return false;
+    }
+  }
+  return true;
+}
+
+function fallbackQualityScore(content: DictionaryContent, input: LookupInput): number {
+  const targetDefs = content.definitions.filter((item) => item.language === input.targetLanguage && item.text.trim());
+  const hasTargetDef = targetDefs.length > 0 ? 1 : content.definitions.some((item) => item.text.trim()) ? 0.5 : 0;
+  const hasEnoughExamples = content.examples.length >= 2 ? 1 : content.examples.length >= 1 ? 0.5 : 0;
+  const hasPhonetics = content.pronunciations.some((item) => Boolean(item.phonetic?.trim())) ? 1 : 0;
+  let score = hasTargetDef * 0.5 + hasEnoughExamples * 0.3 + hasPhonetics * 0.2;
+  if (input.entryType === "SENTENCE") {
+    const hasTranslation = Boolean(content.summary.translation?.trim());
+    // 句子必须有译文才算高质量，否则即使 READY 也不截断
+    if (!hasTranslation) score = Math.min(score, 0.6);
+  }
+  return score;
 }
 
 function requestedContentReady(
@@ -123,7 +147,7 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
 }> {
   const requestedFields = normalizeRequestedFields(input.requestedFields);
   const providers = providersFor(settings, input.requestedProviders)
-    .filter((provider) => provider.supports(input) && supportsRequestedFields(provider, requestedFields));
+    .filter((provider) => provider.supports(input) && supportsRequestedFields(provider, requestedFields, input));
 
   let settled: SettledProvider[];
   if (input.providerStrategy === "PRIORITY_FALLBACK") {
@@ -133,7 +157,9 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
       const result = await runProvider(provider, input, requestedFields);
       settled.push(result);
       if (result.content) accumulated = mergeDictionaryContent(accumulated, result.content);
-      if (requestedContentReady(accumulated, requestedFields, input)) break;
+      if (requestedContentReady(accumulated, requestedFields, input)) {
+        if (fallbackQualityScore(accumulated, input) >= 0.8) break;
+      }
     }
   } else {
     settled = await Promise.all(providers.map((provider) => runProvider(provider, input, requestedFields)));
@@ -144,12 +170,20 @@ export async function lookupDictionary(input: LookupInput, settings: AppSettings
   // 释义降级：主数据来源都没有返回释义时，依次尝试腾讯翻译和 AI
   const needsDefinitionFallback =
     contentStatus(content, input.entryType) === "FAILED" &&
-    (!requestedFields.length || requestedFields.includes("definitions"));
+    (!requestedFields.length || requestedFields.includes("definitions") || requestedFields.includes("summary"));
+  const isYoudaoOnlySentence =
+    input.requestedProviders?.length === 1 &&
+    input.requestedProviders[0] === "youdao" &&
+    input.entryType === "SENTENCE" &&
+    (!requestedFields.length || requestedFields.includes("definitions") || requestedFields.includes("summary"));
+  const allowFallback = !input.requestedProviders?.length || isYoudaoOnlySentence;
   // An explicit provider list is an intentional source boundary. Do not silently
   // add Tencent or AI when a user selected a specific dictionary, such as Youdao.
-  if (needsDefinitionFallback && !input.requestedProviders?.length) {
+  // Exception: YOUDAO_ONLY + SENTENCE 允许受控回退到腾讯翻译，避免句子必败。
+  if (needsDefinitionFallback && allowFallback) {
     const attempted = new Set(settled.map((item) => item.attempt.providerId.startsWith("ai:") ? "ai" : item.attempt.providerId));
-    for (const fallbackId of ["tencent-translate", "ai"] as InitializationProviderId[]) {
+    const fallbackIds: InitializationProviderId[] = isYoudaoOnlySentence ? ["tencent-translate"] : ["tencent-translate", "ai"];
+    for (const fallbackId of fallbackIds) {
       if (attempted.has(fallbackId)) continue;
       const provider = createProvider(fallbackId, settings);
       if (!provider || !provider.supports(input)) continue;

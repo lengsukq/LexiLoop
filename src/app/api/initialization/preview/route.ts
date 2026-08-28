@@ -10,7 +10,7 @@ const schema = z.object({
   wordIds: z.array(z.number().int().positive()).min(1).max(5000).optional(),
   requestedFields: z.array(z.enum(INITIALIZATION_FIELDS)).min(1),
   requestedProviders: z.array(z.enum(INITIALIZATION_PROVIDER_IDS)).min(1),
-  providerStrategy: z.enum(PROVIDER_STRATEGIES).default("PARALLEL_MERGE"),
+  providerStrategy: z.enum(PROVIDER_STRATEGIES).default("PRIORITY_FALLBACK"),
 }).strict();
 
 export async function POST(request: NextRequest) {

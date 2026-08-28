@@ -34,7 +34,7 @@ export async function getJobDetails(jobId: number) {
       targetLanguage: row.target_language as string, status: row.status as string, mode: row.mode as string,
       requestedFields: parseStringArray<InitializationField>(row.requested_fields_json),
       requestedProviders: parseStringArray<InitializationProviderId>(row.requested_providers_json),
-      providerStrategy: (row.provider_strategy as ProviderStrategy | null) ?? "PARALLEL_MERGE",
+      providerStrategy: (row.provider_strategy as ProviderStrategy | null) ?? "PRIORITY_FALLBACK",
       priority: row.priority as number, attemptCount: row.attempt_count as number, maxAttempts: row.max_attempts as number,
       lastError: row.last_error as string | null, lastErrorCode: row.last_error_code as string | null,
       availableAt: row.available_at as number | null, lockedAt: row.locked_at as number | null, lockedBy: row.locked_by as string | null,

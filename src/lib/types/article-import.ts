@@ -1,5 +1,3 @@
-import type { EntryType } from "./core";
-
 export interface ArticleCandidate {
   term: string;
   normalizedTerm: string;

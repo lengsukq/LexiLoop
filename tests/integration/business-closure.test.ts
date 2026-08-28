@@ -108,7 +108,7 @@ describe("initialization continuity", () => {
   it("keeps an existing usable word learnable when a forced refresh fails", async () => {
     // 禁用有道以避免测试依赖外部网络：强制刷新失败需所有 provider 均不可用。
     const now0 = Date.now();
-    await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?)")
+    await sqlite.prepare("INSERT INTO settings(key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = EXCLUDED.updated_at")
       .run("youdaoEnabled", JSON.stringify(false), now0);
     const { invalidateSettingsCache } = await import("@/modules/settings/service");
     invalidateSettingsCache();

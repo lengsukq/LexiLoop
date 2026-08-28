@@ -18,6 +18,7 @@ import type { LeaderboardSummary } from "@/lib/types";
 import { GameSummary, type SummaryItem } from "@/components/game-summary";
 import { GameErrorBanner, GamePlayHeader, GameSavingOverlay } from "@/components/game-hud";
 import { GameMistakeCallout, GameResultAccuracy, GameResultHero, GameResultStats } from "@/components/game-result";
+import { GameMistakeFlashcards } from "@/components/game-mistake-flashcards";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Progress, buttonClass } from "@/components/ui";
 
@@ -71,6 +72,7 @@ export default function MatchPage() {
   const [result, setResult] = useState<MatchResult | null>(null);
   const [error, setError] = useState("");
   const [summaryItems, setSummaryItems] = useState<SummaryItem[]>([]);
+  const [showFlashcards, setShowFlashcards] = useState(false);
 
   const {
     combo, mistakeCount,
@@ -96,6 +98,7 @@ export default function MatchPage() {
       const matched = matchedRef.current.has(item.itemId);
       const hadMistake = hasMistake(item.itemId);
       return {
+        wordId: item.wordId,
         term: item.term,
         definition: item.definition,
         status: matched ? (hadMistake ? "recovered" : "correct") : "missed",
@@ -203,39 +206,39 @@ export default function MatchPage() {
   const preset = PRESETS.find((item) => item.id === presetId) ?? PRESETS[1];
 
   if (phase === "setup" || phase === "loading") {
-    return <div className="mx-auto max-w-3xl space-y-5 py-2 sm:py-6">
+    return <div className="mx-auto max-w-3xl space-y-4 py-2 sm:space-y-5 sm:py-5">
       <div className="flex items-center justify-between">
         <Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />返回</Link>
         <Badge tone="purple"><Gamepad2 className="size-3.5" />趣味练习</Badge>
       </div>
-      <Card className="overflow-hidden">
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple via-[#5856d6] to-accent px-5 py-8 text-white sm:px-10 sm:py-11">
-          <div className="absolute -right-12 -top-12 size-40 rounded-full bg-white/10 blur-3xl" />
+      <Card className="overflow-hidden rounded-[24px]">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#af52de] via-[#5856d6] to-[#007aff] px-5 py-7 text-white shadow-[inset_0_1.5px_0_rgba(255,255,255,0.3)] sm:px-8 sm:py-9">
+          <div className="absolute -right-12 -top-12 size-40 rounded-full bg-white/10 blur-2xl pointer-events-none" />
           <div className="relative text-center">
-            <span className="mx-auto grid size-16 place-items-center rounded-[20px] bg-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] backdrop-blur-xl"><Zap className="size-8" /></span>
-            <h1 className="mt-5 text-2xl font-bold tracking-tight sm:text-3xl">限时词汇配对</h1>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-white/75 sm:text-[15px]">将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。</p>
+            <span className="mx-auto grid size-13 place-items-center rounded-[16px] bg-white/20 shadow-xs backdrop-blur-md"><Zap className="size-6.5" /></span>
+            <h1 className="mt-3.5 text-xl font-bold tracking-tight sm:text-2xl">限时词汇配对</h1>
+            <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed text-white/80 sm:text-[13.5px]">将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。</p>
           </div>
         </div>
-        <CardContent className="space-y-5 py-5 sm:px-8 sm:py-7">
-          <div className="grid gap-3 sm:grid-cols-3">
+        <CardContent className="space-y-4 py-4 sm:px-7 sm:py-6">
+          <div className="grid gap-2.5 sm:grid-cols-3">
             {PRESETS.map((item) => {
               const active = presetId === item.id;
-              return <button key={item.id} type="button" onClick={() => setPresetId(item.id)} className={`ios-press rounded-[18px] border p-4 text-left transition-all ${active ? "border-accent/45 bg-accent/[0.08] shadow-[0_8px_30px_rgba(0,122,255,0.12)]" : "glass-inner border-white/40 hover:border-accent/25 dark:border-white/[0.08]"}`}>
-                <div className="flex items-center justify-between"><b className="text-[15px]">{item.name}</b>{active && <CheckCircle2 className="size-4 text-accent" />}</div>
-                <p className="mt-2 text-xs text-quaternary-label">{item.pairs} 组 · {item.seconds} 秒</p>
-                <p className="mt-1 text-xs text-tertiary-label">{item.desc}</p>
+              return <button key={item.id} type="button" onClick={() => setPresetId(item.id)} className={`ios-press rounded-[16px] border p-3.5 text-left transition-all ${active ? "border-accent/50 bg-accent/[0.08] shadow-[0_4px_16px_rgba(0,122,255,0.10)]" : "border-black/[0.08] bg-white/60 hover:bg-white hover:border-black/[0.12] dark:border-white/[0.09] dark:bg-white/[0.04]"}`}>
+                <div className="flex items-center justify-between"><b className="text-[14px] font-semibold">{item.name}</b>{active && <CheckCircle2 className="size-4 text-accent" />}</div>
+                <p className="mt-1.5 text-xs text-quaternary-label num-tabular">{item.pairs} 组 · {item.seconds} 秒</p>
+                <p className="mt-0.5 text-[11px] text-tertiary-label">{item.desc}</p>
               </button>;
             })}
           </div>
-          <div className="grid grid-cols-3 gap-2 rounded-[16px] bg-black/[0.025] p-3 text-center dark:bg-white/[0.035]">
-            <div><p className="text-lg font-bold">{preset.pairs}</p><p className="text-xs text-quaternary-label">词汇组数</p></div>
-            <div><p className="text-lg font-bold">{preset.seconds}s</p><p className="text-xs text-quaternary-label">限时时间</p></div>
-            <div><p className="text-lg font-bold text-danger">优先</p><p className="text-xs text-quaternary-label">错词加入</p></div>
+          <div className="grid grid-cols-3 gap-2 rounded-[14px] bg-black/[0.03] p-2.5 text-center dark:bg-white/[0.04]">
+            <div><p className="num-tabular text-base font-bold sm:text-lg">{preset.pairs}</p><p className="text-[11px] text-quaternary-label">词汇组数</p></div>
+            <div><p className="num-tabular text-base font-bold sm:text-lg">{preset.seconds}s</p><p className="text-[11px] text-quaternary-label">限时时间</p></div>
+            <div><p className="text-base font-bold text-danger sm:text-lg">优先</p><p className="text-[11px] text-quaternary-label">错词加入</p></div>
           </div>
           <GameErrorBanner error={error} />
           <Button size="lg" className="w-full" onClick={() => void startGame()} disabled={phase === "loading"}>
-            {phase === "loading" ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
+            {phase === "loading" ? <Loader2 className="size-4.5 animate-spin" /> : <Sparkles className="size-4.5" />}
             {phase === "loading" ? "正在组题…" : "开始配对"}
           </Button>
         </CardContent>
@@ -244,41 +247,67 @@ export default function MatchPage() {
   }
 
   if (phase === "result" && result) {
-    return <div className="mx-auto max-w-2xl space-y-5 py-6">
-      <Card className="overflow-hidden">
-        <GameResultHero gradient="bg-gradient-to-br from-success via-[#0a84ff] to-[#5856d6]" label="本轮得分" score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} />
-        <CardContent className="space-y-5 py-6 sm:px-8">
+    const mistakeItems = summaryItems.filter((item) => item.status !== "correct");
+    return <div className="mx-auto max-w-2xl space-y-4 py-5">
+      <Card className="overflow-hidden rounded-[24px]">
+        <GameResultHero gradient="bg-gradient-to-br from-success via-[#007aff] to-[#5856d6]" label="本轮得分" score={result.score} elapsedMs={result.elapsedMs} maxCombo={result.maxCombo} />
+        <CardContent className="space-y-4 py-5 sm:px-7">
           <GameResultStats firstTryCorrect={result.firstTryCorrect} recovered={result.recovered} missed={result.missed} firstLabel="一次配对" missedLabel="未完成" />
           <GameResultAccuracy accuracy={result.accuracy} label="首次配对正确率" />
+          
+          {mistakeItems.length > 0 && (
+            <div className="rounded-[16px] border border-warning/25 bg-warning/[0.06] p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+              <div>
+                <p className="text-[13.5px] font-bold text-warning-deep flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-warning" />
+                  趁热打铁 · 错词专项记忆
+                </p>
+                <p className="mt-0.5 text-xs text-secondary-label">本轮有 {mistakeItems.length} 个词条配对失误，建议使用闪卡速记强化吸收。</p>
+              </div>
+              <Button size="sm" onClick={() => setShowFlashcards(true)} className="whitespace-nowrap w-full sm:w-auto text-xs">
+                <Sparkles className="size-3.5" />
+                30秒错词速记 ({mistakeItems.length})
+              </Button>
+            </div>
+          )}
+
           <GameSummary items={summaryItems} />
           <LeaderboardPanel leaderboard={result.leaderboard} />
           {(result.recovered > 0 || result.missed > 0) && <GameMistakeCallout>错配或超时词条已按“忘记”记录，后续会优先出现在错词强化和下一轮配对中。</GameMistakeCallout>}
           <div className="grid gap-2 sm:grid-cols-2">
-            <Button size="lg" onClick={() => { setPhase("setup"); setSession(null); setResult(null); }}><RotateCcw className="size-5" />再来一轮</Button>
-            <Link href="/" className={buttonClass("outline", "lg")}><ArrowLeft className="size-5" />返回首页</Link>
+            <Button size="lg" onClick={() => { setPhase("setup"); setSession(null); setResult(null); }}><RotateCcw className="size-4.5" />再来一轮</Button>
+            <Link href="/" className={buttonClass("outline", "lg")}><ArrowLeft className="size-4.5" />返回首页</Link>
           </div>
         </CardContent>
       </Card>
+
+      {showFlashcards && (
+        <GameMistakeFlashcards
+          open={showFlashcards}
+          onClose={() => setShowFlashcards(false)}
+          mistakes={mistakeItems}
+        />
+      )}
     </div>;
   }
 
   if (!session) return null;
   const progress = matched.size / Math.max(1, session.pairCount) * 100;
 
-  return <div className="mx-auto max-w-4xl space-y-3 pb-3 sm:space-y-5 sm:py-4">
+  return <div className="mx-auto max-w-4xl space-y-3 pb-3 sm:space-y-4 sm:py-3">
     <GamePlayHeader remainingMs={remainingMs} combo={combo} exit={<Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link>} />
-    <div className="space-y-2">
-      <div className="flex justify-between text-xs text-quaternary-label"><span>已配对 {matched.size}/{session.pairCount}</span><span>错配 {mistakeCount}</span></div>
+    <div className="space-y-1.5">
+      <div className="flex justify-between text-xs text-quaternary-label num-tabular"><span>已配对 {matched.size}/{session.pairCount}</span><span>错配 {mistakeCount}</span></div>
       <Progress value={progress} />
     </div>
 
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden rounded-[24px]">
       <CardHeader className="pb-2"><CardTitle>点击英文与对应释义</CardTitle></CardHeader>
-      <CardContent className="grid grid-cols-1 gap-2 pb-4 min-[420px]:grid-cols-2 sm:gap-4 sm:px-7 sm:pb-7">
-        <div className="space-y-2 sm:space-y-3">
+      <CardContent className="grid grid-cols-1 gap-2 pb-4 min-[420px]:grid-cols-2 sm:gap-3.5 sm:px-6 sm:pb-6">
+        <div className="space-y-2 sm:space-y-2.5">
           {words.map((item) => <MatchCard key={item.itemId} side="word" item={item} selected={selected} matched={matched.has(item.itemId)} wrong={wrongFlash.has(`word:${item.itemId}`)} onClick={() => selectCard("word", item)} />)}
         </div>
-        <div className="space-y-2 sm:space-y-3">
+        <div className="space-y-2 sm:space-y-2.5">
           {definitions.map((item) => <MatchCard key={item.itemId} side="definition" item={item} selected={selected} matched={matched.has(item.itemId)} wrong={wrongFlash.has(`definition:${item.itemId}`)} onClick={() => selectCard("definition", item)} />)}
         </div>
       </CardContent>
@@ -299,9 +328,10 @@ function MatchCard({ side, item, selected, matched, wrong, onClick }: {
 }) {
   const active = selected?.side === side && selected.itemId === item.itemId;
   const priority = side === "word" && item.priority !== "NORMAL";
-  return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[58px] w-full items-center rounded-[15px] border px-3 py-2.5 text-left transition-all duration-200 sm:min-h-[68px] sm:rounded-[18px] sm:px-4 ${matched ? "pointer-events-none scale-95 border-success/20 bg-success/[0.08] opacity-0" : wrong ? "animate-[shake_0.35s_ease-in-out] border-danger bg-danger/10 text-danger-deep" : active ? "border-accent bg-accent/10 shadow-[0_6px_24px_rgba(0,122,255,0.18)]" : "glass-inner border-white/45 hover:border-accent/35 dark:border-white/[0.08]"}`}>
-    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] sm:text-[17px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-danger">重点复习</small>}</span> : <span className="line-clamp-4 break-words text-[13px] leading-snug sm:text-[14px]">{item.definition}</span>}
-    {active && <span className="absolute right-2 top-2 size-2 rounded-full bg-accent" />}
-    {wrong && <XCircle className="absolute right-2 top-2 size-4 text-danger" />}
+  return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[54px] w-full items-center rounded-[14px] border px-3 py-2 text-left transition-all duration-200 sm:min-h-[62px] sm:rounded-[16px] sm:px-3.5 ${matched ? "pointer-events-none scale-95 opacity-0 duration-300" : wrong ? "animate-shake border-danger/50 bg-danger/[0.08] text-danger-deep" : active ? "border-accent bg-accent/[0.09] shadow-[0_2px_12px_rgba(0,122,255,0.18)] scale-[1.01]" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}>
+    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] font-semibold sm:text-[16px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-danger">重点复习</small>}</span> : <span className="line-clamp-3 break-words text-[13px] leading-snug sm:text-[13.5px] text-secondary-label">{item.definition}</span>}
+    {active && <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent" />}
+    {wrong && <XCircle className="absolute right-2.5 top-2.5 size-4 text-danger" />}
   </button>;
 }
+

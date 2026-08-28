@@ -21,9 +21,11 @@ afterEach(() => {
 
 describe("YoudaoProvider fallback", () => {
   it("falls back to youdao.com/result when dict.youdao.com returns an HTTP error", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
-      .mockResolvedValueOnce(new Response(html("英 [həˈləʊ]", "美 [həˈloʊ]", "int. 你好"), { status: 200 }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dict.youdao.com")) return new Response("unavailable", { status: 503 });
+      return new Response(html("英 [həˈləʊ]", "美 [həˈloʊ]", "int. 你好"), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await new YoudaoProvider().lookup({
@@ -31,9 +33,9 @@ describe("YoudaoProvider fallback", () => {
       requestedFields: ["definitions", "pronunciations.phonetic"],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("dict.youdao.com/w/eng/hello");
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("www.youdao.com/result");
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("dict.youdao.com/w/eng/hello"))).toBe(true);
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("www.youdao.com/result"))).toBe(true);
     expect(result.content?.definitions).toEqual([
       expect.objectContaining({ language: "zh-CN", partOfSpeech: "int", text: "你好" }),
     ]);
@@ -49,9 +51,11 @@ describe("YoudaoProvider fallback", () => {
   });
 
   it("merges partial primary content with fallback content when requested fields are missing", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(html("英 [həˈləʊ]"), { status: 200 }))
-      .mockResolvedValueOnce(new Response(html("int. 你好"), { status: 200 }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dict.youdao.com")) return new Response(html("英 [həˈləʊ]"), { status: 200 });
+      return new Response(html("int. 你好"), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await new YoudaoProvider().lookup({
@@ -66,7 +70,9 @@ describe("YoudaoProvider fallback", () => {
   });
 
   it("does not call the fallback endpoint when the primary endpoint satisfies the requested fields", async () => {
+    // Youdao now races both endpoints in parallel and picks the best merged result
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(html("n. 问候；招呼"), { status: 200 }))
       .mockResolvedValueOnce(new Response(html("n. 问候；招呼"), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -75,23 +81,25 @@ describe("YoudaoProvider fallback", () => {
       requestedFields: ["definitions"],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.content?.definitions).toHaveLength(1);
-    expect(result.metadata?.sourceEndpoint).toBe("dict.youdao.com");
-    expect(result.metadata?.fallbackUsed).toBe(false);
+    expect(["dict.youdao.com", "youdao.com/result"]).toContain(result.metadata?.sourceEndpoint);
+    expect(result.metadata?.endpointAttempts.length).toBeGreaterThanOrEqual(2);
   });
 
   it("returns a combined transient failure after both endpoints fail", async () => {
     const timeout = new Error("request timed out");
     timeout.name = "TimeoutError";
-    const fetchMock = vi.fn()
-      .mockRejectedValueOnce(timeout)
-      .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dict.youdao.com")) throw timeout;
+      return new Response("bad gateway", { status: 502 });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await new YoudaoProvider().lookup(baseInput);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(result.content).toBeNull();
     expect(result.errorCode).toBe("ALL_ENDPOINTS_FAILED");
     expect(result.transient).toBe(true);

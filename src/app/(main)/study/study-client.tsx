@@ -7,7 +7,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Clock3, Headphones, 
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, playEntryTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
-import type { DictionaryContent, QuestionType, ReviewRating, StudyMode } from "@/lib/types";
+import type { AffixItem, DictionaryContent, QuestionType, RelatedWordItem, ReviewRating, RootItem, StudyMode } from "@/lib/types";
 import { entryTypeLabel } from "@/lib/entry-type-label";
 import { Badge, Button, Card, CardContent, Kbd, Progress, buttonClass } from "@/components/ui";
 
@@ -89,6 +89,7 @@ export function StudyClient() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [choicesVisible, setChoicesVisible] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [error, setError] = useState("");
   const [choiceRevealDelaySeconds, setChoiceRevealDelaySeconds] = useState(2);
   const choiceRevealTimerRef = useRef<number | null>(null);
@@ -228,10 +229,11 @@ export function StudyClient() {
         : userAnswer.trim().toLocaleLowerCase() === current.word.term.trim().toLocaleLowerCase()
       : null;
 
-  async function reloadSession(sessionId: number) {
+  const reloadSession = useCallback(async (sessionId: number) => {
     applySession(await apiFetch<SessionData>(`/api/study/sessions/${sessionId}`));
-  }
-  async function reveal() {
+  }, [applySession]);
+
+  const reveal = useCallback(async () => {
     if (!current) return;
     if (choiceRevealTimerRef.current !== null) {
       window.clearTimeout(choiceRevealTimerRef.current);
@@ -242,8 +244,56 @@ export function StudyClient() {
     setRevealed(true); setLastResult(null);
     try { setIntervals(await apiFetch<Interval[]>("/api/reviews/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wordId: current.word.id }) })); }
     catch { setIntervals([]); }
+  }, [captureQuestionDuration, current, dismissKeyboard]);
+
+  async function generateAiMnemonicForCurrent() {
+    if (!current) return;
+    setAiGenerating(true);
+    setError("");
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        mnemonic: string;
+        learning: DictionaryContent["learning"];
+        roots?: RootItem[];
+        affixes?: AffixItem[];
+        confusedWords?: RelatedWordItem[];
+      }>(`/api/words/${current.word.id}/mnemonic`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sync: true }),
+      });
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item, itemIdx) => {
+            if (itemIdx !== index) return item;
+            return {
+              ...item,
+              word: {
+                ...item.word,
+                content: {
+                  ...item.word.content,
+                  learning: res.learning,
+                  roots: res.roots?.length ? res.roots : item.word.content.roots,
+                  affixes: res.affixes?.length ? res.affixes : item.word.content.affixes,
+                  confusedWords: res.confusedWords?.length ? res.confusedWords : item.word.content.confusedWords,
+                },
+              },
+            };
+          }),
+        };
+      });
+    } catch {
+      setError("AI 助记生成失败，请稍后重试。");
+    } finally {
+      setAiGenerating(false);
+    }
   }
-  async function rate(rating: ReviewRating) {
+
+  const rate = useCallback(async (rating: ReviewRating) => {
     if (!current || !data) return;
     const sessionId = data.session.id;
     setSubmitting(true); setError("");
@@ -286,8 +336,9 @@ export function StudyClient() {
       }
     } catch (reason) { setError(errorMessage(reason, "提交答案失败")); }
     finally { setSubmitting(false); }
-  }
-  async function skip() {
+  }, [captureQuestionDuration, current, data, index, reloadSession, selectedChoice, userAnswer]);
+
+  const skip = useCallback(async () => {
     if (!current || !data) return;
     captureActiveQuestionDuration();
     dismissKeyboard();
@@ -301,7 +352,7 @@ export function StudyClient() {
       applySession(session);
     } catch (reason) { setError(errorMessage(reason, "跳过失败")); }
     finally { setSubmitting(false); }
-  }
+  }, [applySession, captureActiveQuestionDuration, current, data, dismissKeyboard]);
 
   // 桌面端全套键盘快捷键支持：1-4 评分、Space 翻转/检查、R 重播发音、S 稍后再学
   useEffect(() => {
@@ -365,7 +416,7 @@ export function StudyClient() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [choicesVisible, current, rate, reveal, revealed, skip, submitting]);
+  }, [captureQuestionDuration, choicesVisible, current, rate, reveal, revealed, skip, submitting]);
 
   if (!data && !error) return <div className="grid min-h-[75vh] place-items-center"><div className="animate-scale-in text-center"><Loader2 className="mx-auto size-10 animate-spin text-accent" /><p className="mt-3 text-[15px] text-quaternary-label">正在生成 {MODE_LABELS[mode]} 队列…</p></div></div>;
   if (error && !data) return <div className="mx-auto max-w-xl py-20 text-center"><AlertCircle className="mx-auto size-12 text-danger" /><h1 className="mt-4 text-xl font-bold">无法开始学习</h1><p className="mt-2 text-[15px] text-secondary-label">{error}</p><div className="mt-6 flex justify-center gap-3"><Button onClick={() => void start()}><RotateCcw className="size-4" />重试</Button><Link href="/" className={buttonClass("outline")}>返回首页</Link></div></div>;
@@ -379,24 +430,22 @@ export function StudyClient() {
   return <div className="animate-fade-up mx-auto max-w-3xl space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link><div className="text-center"><div className="flex items-center justify-center gap-2"><p className="text-[15px] font-bold">{MODE_LABELS[activeMode]}</p>{data.resumed && <Badge tone="amber">继续上次</Badge>}</div><p className="text-xs text-tertiary-label">已处理 {data.session.completedCount} / {data.session.plannedCount}</p></div><Badge tone={current.taskType === "WRONG" ? "red" : current.taskType === "NEW" ? "purple" : "blue"}>{current.taskType}</Badge></div>
     <Progress value={progress} />
-    <Card className="h-[calc(100dvh-7.25rem)] max-h-[720px] min-h-[260px] overflow-hidden sm:h-[calc(100dvh-8rem)] sm:min-h-[420px] lg:h-[calc(100dvh-9.5rem)]"><CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-3 sm:px-10 sm:py-4">
+    <Card className="h-[calc(100dvh-7.25rem)] max-h-[720px] min-h-[260px] overflow-hidden rounded-[24px] sm:h-[calc(100dvh-8rem)] sm:min-h-[420px] lg:h-[calc(100dvh-9.5rem)]"><CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-3 sm:px-8 sm:py-4">
       <div className="flex items-center justify-between text-xs text-tertiary-label"><span>{entryTypeLabel(current.word.entryType)}</span><span>{current.word.sourceLanguage} → {current.word.targetLanguage}</span></div>
       <div className="min-h-0 overflow-y-auto overscroll-contain">
         <div className={`flex min-h-full w-full flex-col items-center px-1 text-center ${revealed ? "justify-start py-[clamp(0.5rem,2vh,1.25rem)]" : "justify-center py-[clamp(1rem,4vh,3rem)]"}`}>
         {current.questionType === "ZH_TO_EN_CHOICE" ? <>
-          <p className="text-[13px] text-quaternary-label">根据释义选择单词</p>
-          <div className="glass-inner mt-3 w-full max-w-xl rounded-[16px] border border-accent/10 bg-accent/[0.045] px-4 py-3 text-left shadow-[0_12px_36px_rgba(0,122,255,0.06)] sm:px-6 sm:py-4">
-            <DefinitionBlock definitions={definitions} className="text-lg font-bold leading-snug sm:text-xl" />
+          <p className="text-[12.5px] font-medium text-quaternary-label">根据释义选择单词</p>
+          <div className="glass-inner mt-2.5 w-full max-w-xl rounded-[16px] border border-accent/15 bg-accent/[0.04] px-4 py-3 text-left shadow-[0_4px_16px_rgba(0,122,255,0.04)] sm:px-6 sm:py-3.5">
+            <DefinitionBlock definitions={definitions} className="text-base font-bold leading-snug sm:text-lg" />
           </div>
-          {!revealed && hasChoices && <p className="mt-3 text-[13px] text-quaternary-label">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
-          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
+          {!revealed && hasChoices && <p className="mt-2.5 text-xs text-quaternary-label">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-2.5" : "mt-4"}`}>
             {(current.choices ?? []).map((choice, cIdx) => {
               const isCorrect = normalizeChoiceAnswer(choice) === normalizeChoiceAnswer(current.word.term);
               const isSelected = choice === selectedChoice;
               const showState = revealed && (isCorrect || isSelected);
               const choiceDefinition = current.choiceDefinitions?.[choice];
-              // After reveal, only keep the correct option and the user's pick so
-              // the option list stays on screen without scrolling.
               if (revealed && !isCorrect && !isSelected) return null;
               return <button key={choice} type="button" disabled={revealed} onClick={() => {
                 if (!revealed) {
@@ -405,96 +454,170 @@ export function StudyClient() {
                   setSelectedChoice(choice); setLastResult(null);
                   void reveal();
                 }
-              }} className={`ios-press rounded-[16px] border-[1.5px] px-4 py-2.5 text-left transition-all duration-200 ${showState ? (isCorrect ? "border-success bg-success/[0.08] text-success-deep shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-success" : "border-danger bg-danger/[0.08] text-danger-deep shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-danger") : isSelected ? "border-accent/55 bg-accent/[0.08] text-[#005ecb] shadow-[0_8px_28px_rgba(0,122,255,0.12)] dark:text-[#0a84ff]" : "glass-inner border-white/50 hover:border-accent/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}>
-                <span className="flex items-center justify-between gap-3"><span className="min-w-0 break-words text-[15px] font-semibold"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span><Volume2 className="size-4 shrink-0 opacity-55" /></span>
-                {revealed && <span className="mt-1.5 block text-[13px] font-normal leading-relaxed text-secondary-label">{choiceDefinition ?? "暂无释义"}</span>}
+              }} className={`ios-press rounded-[14px] border px-3.5 py-2.5 text-left transition-all duration-200 ${showState ? (isCorrect ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success" : "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger") : isSelected ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}>
+                <span className="flex items-center justify-between gap-3"><span className="min-w-0 break-words text-[14.5px] font-medium"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span><Volume2 className="size-4 shrink-0 opacity-50" /></span>
+                {revealed && <span className="mt-1 block text-xs font-normal leading-relaxed text-secondary-label">{choiceDefinition ?? "暂无释义"}</span>}
               </button>;
             })}
-          </div> : !hasChoices ? <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-danger/20 px-4 py-4 text-sm text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-accent/20 px-4 py-4 text-sm text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆释义，选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-accent/20 px-4 py-3 text-xs text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆释义，选项即将出现</div>}
         </> : current.questionType === "EN_TO_ZH_CHOICE" ? <>
-          <p className="text-[13px] text-quaternary-label">选择正确的释义</p>
-          <h1 className={`break-words font-bold tracking-tight ${revealed ? "mt-2 text-xl sm:text-2xl" : "mt-3 text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>
+          <p className="text-[12.5px] font-medium text-quaternary-label">选择正确的释义</p>
+          <h1 className={`break-words font-bold tracking-tight ${revealed ? "mt-1.5 text-xl sm:text-2xl" : "mt-2.5 text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>
           {!revealed && <Pronunciation item={current} />}
-          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-3" : "mt-5"}`}>
+          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-2.5" : "mt-4"}`}>
             {(current.choices ?? []).map((choice, cIdx) => {
               const isCorrect = choice === definitionText;
               const isSelected = choice === selectedChoice;
               const showState = revealed && (isCorrect || isSelected);
-              // After reveal, only keep the correct option and the user's pick.
               if (revealed && !isCorrect && !isSelected) return null;
               return <button key={choice} type="button" aria-pressed={isSelected} disabled={revealed} onClick={() => {
                 captureQuestionDuration();
                 setSelectedChoice(choice); setLastResult(null);
                 void reveal();
-              }} className={`ios-press break-words rounded-[16px] border-[1.5px] px-4 py-2.5 text-left text-[15px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-success bg-success/[0.08] text-success-deep shadow-[0_8px_24px_rgba(52,199,89,0.12)] dark:text-success" : "border-danger bg-danger/[0.08] text-danger-deep shadow-[0_8px_24px_rgba(255,59,48,0.12)] dark:text-danger") : isSelected ? "border-accent/55 bg-accent/[0.08] text-[#005ecb] shadow-[0_8px_28px_rgba(0,122,255,0.12)] dark:text-[#0a84ff]" : "glass-inner border-white/50 hover:border-accent/40 hover:shadow-[0_8px_32px_rgba(0,122,255,0.10)] dark:border-white/[0.08]"}`}><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</button>;
+              }} className={`ios-press break-words rounded-[14px] border px-3.5 py-2.5 text-left text-[14.5px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success" : "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger") : isSelected ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</button>;
             })}
-          </div> : !hasChoices ? <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-danger/20 px-4 py-4 text-sm text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-5 flex w-full max-w-xl items-center justify-center gap-2 rounded-[16px] border border-dashed border-accent/20 px-4 py-4 text-sm text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆单词含义，释义选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-accent/20 px-4 py-3 text-xs text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆单词含义，释义选项即将出现</div>}
         </> : current.questionType === "EN_TO_ZH" ? <>
-          {!revealed && <p className="text-[13px] text-quaternary-label">{current.word.entryType === "SENTENCE" ? "理解句意、语法和关键表达" : "回忆它的含义"}</p>}
-          {!revealed && <h1 className={`mt-3 break-words font-bold tracking-tight ${current.word.entryType === "SENTENCE" ? "max-w-2xl text-xl leading-snug sm:text-3xl" : "text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>}
+          {!revealed && <p className="text-[12.5px] font-medium text-quaternary-label">{current.word.entryType === "SENTENCE" ? "理解句意、语法和关键表达" : "回忆它的含义"}</p>}
+          {!revealed && <h1 className={`mt-2.5 break-words font-bold tracking-tight ${current.word.entryType === "SENTENCE" ? "max-w-2xl text-xl leading-snug sm:text-3xl" : "text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>}
           {!revealed && (current.word.entryType === "SENTENCE"
-            ? <button type="button" onClick={() => void playWord(current)} className="ios-press mt-3 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-4" />朗读句子</button>
+            ? <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3.5" />朗读句子</button>
             : <Pronunciation item={current} />)}
         </> : current.questionType === "ZH_TO_EN_SPELLING" ? <>
           {revealed ? <div className="w-full max-w-xl">
-            <p className="text-[13px] text-quaternary-label">{current.word.entryType === "SENTENCE" ? "根据中文还原完整英文句子" : "根据释义拼写英文"}</p>
-            <div className="mt-1.5 space-y-1 text-lg font-bold leading-snug sm:text-xl"><DefinitionBlock definitions={definitions} /></div>
+            <p className="text-[12.5px] font-medium text-quaternary-label">{current.word.entryType === "SENTENCE" ? "根据中文还原完整英文句子" : "根据释义拼写英文"}</p>
+            <div className="mt-1.5 space-y-1 text-base font-bold leading-snug sm:text-lg"><DefinitionBlock definitions={definitions} /></div>
           </div> : <>
-            <span className="grid size-12 place-items-center rounded-[16px] bg-warning/12 text-warning">{current.word.entryType === "SENTENCE" ? <MessageSquareText className="size-6" /> : <Keyboard className="size-6" />}</span>
-            <p className="mt-3 text-[13px] text-quaternary-label">{current.word.entryType === "SENTENCE" ? "根据中文翻译还原完整英文句子" : "根据释义拼写英文"}</p>
-            <div className="mt-2 max-w-xl text-xl font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
-            <button type="button" onClick={() => void playWord(current)} className="ios-press mt-3 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
-              <Volume2 className="size-4" />{current.word.entryType === "SENTENCE" ? "听原句（提示）" : "重播发音"}
+            <span className="grid size-11 place-items-center rounded-[14px] bg-warning/10 text-warning">{current.word.entryType === "SENTENCE" ? <MessageSquareText className="size-5.5" /> : <Keyboard className="size-5.5" />}</span>
+            <p className="mt-2.5 text-[12.5px] font-medium text-quaternary-label">{current.word.entryType === "SENTENCE" ? "根据中文翻译还原完整英文句子" : "根据释义拼写英文"}</p>
+            <div className="mt-1.5 max-w-xl text-lg font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
+            <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
+              <Volume2 className="size-3.5" />{current.word.entryType === "SENTENCE" ? "听原句（提示）" : "重播发音"}
             </button>
-            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-3 max-w-full break-all text-center font-mono text-lg tracking-[0.2em] text-accent sm:text-2xl sm:tracking-[0.3em]">{getHintPattern(current.word.term)}</p>}
+            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-2.5 max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getHintPattern(current.word.term)}</p>}
             {current.word.entryType === "SENTENCE"
-              ? <textarea ref={sentenceAnswerRef} autoFocus rows={4} autoCapitalize="sentences" autoCorrect="off" spellCheck={false} className="mt-3 min-h-24 w-full max-w-xl resize-none glass-inner rounded-[16px] border-[1.5px] border-white/50 px-4 py-3 text-left text-base leading-relaxed outline-none transition-all focus:border-accent/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入完整英文句子（Ctrl/⌘ + Enter 检查）" />
-              : <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-3 h-12 w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-lg outline-none transition-all focus:border-accent/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] sm:text-xl dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入英文词条" />}
+              ? <textarea ref={sentenceAnswerRef} autoFocus rows={3} autoCapitalize="sentences" autoCorrect="off" spellCheck={false} className="mt-2.5 min-h-20 w-full max-w-xl resize-none rounded-[14px] border border-black/[0.08] bg-white/70 px-3.5 py-2.5 text-left text-[14.5px] leading-relaxed outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入完整英文句子（Ctrl/⌘ + Enter 检查）" />
+              : <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-2.5 h-11 w-full max-w-md rounded-[14px] border border-black/[0.08] bg-white/70 px-4 text-center text-base outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] sm:text-lg dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入英文词条" />}
           </>}
         </> : <>
-          {revealed ? <p className="text-[13px] text-quaternary-label">听力拼写答案</p> : <>
-            <button type="button" onClick={() => void playWord(current)} className="ios-press grid size-16 place-items-center rounded-full bg-[#5ac8fa]/12 text-accent sm:size-20"><Headphones className="size-8 sm:size-9" /></button>
-            <p className="mt-3 text-[13px] text-quaternary-label">已自动播放，也可点击上方按钮重播</p>
-            <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-4 h-12 w-full max-w-md glass-inner rounded-[16px] border-[1.5px] border-white/50 px-5 text-center text-xl outline-none transition-all focus:border-accent/50 focus:shadow-[0_8px_32px_rgba(0,122,255,0.12),0_0_0_4px_rgba(0,122,255,0.08)] dark:border-white/[0.08]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入听到的词条" />
+          {revealed ? <p className="text-[12.5px] font-medium text-quaternary-label">听力拼写答案</p> : <>
+            <button type="button" onClick={() => void playWord(current)} className="ios-press grid size-14 place-items-center rounded-full bg-[#5ac8fa]/10 text-accent sm:size-16"><Headphones className="size-7 sm:size-8" /></button>
+            <p className="mt-2.5 text-[12.5px] text-quaternary-label">已自动播放，也可点击上方按钮重播</p>
+            <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-3 h-11 w-full max-w-md rounded-[14px] border border-black/[0.08] bg-white/70 px-4 text-center text-lg outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入听到的词条" />
           </>}
         </>}
 
-        {revealed && <div className="animate-fade-up glass-inner mt-5 w-full max-w-xl rounded-[18px] p-4 text-left sm:p-5">
+        {revealed && <div className="animate-fade-up glass-inner mt-4 w-full max-w-xl rounded-[18px] p-3.5 text-left sm:p-4.5">
           <div className="flex items-start gap-3">
-            {exactLocal === false ? <XCircle className="mt-1 size-5 shrink-0 text-danger" /> : <CheckCircle2 className="mt-1 size-5 shrink-0 text-success" />}
+            {exactLocal === false ? <XCircle className="mt-0.5 size-4.5 shrink-0 text-danger" /> : <CheckCircle2 className="mt-0.5 size-4.5 shrink-0 text-success" />}
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className={`text-xs font-semibold ${exactLocal === false ? "text-danger" : exactLocal === true ? "text-success" : "text-accent"}`}>{exactLocal === false ? "正确答案" : exactLocal === true ? "回答正确" : "参考答案"}</p>
-                  <p className="mt-1 break-words text-xl font-bold tracking-tight sm:text-2xl">{current.word.term}</p>
+                  <p className={`text-[11px] font-semibold tracking-tight ${exactLocal === false ? "text-danger" : exactLocal === true ? "text-success" : "text-accent"}`}>{exactLocal === false ? "正确答案" : exactLocal === true ? "回答正确" : "参考答案"}</p>
+                  <p className="mt-0.5 break-words text-lg font-bold tracking-tight sm:text-xl">{current.word.term}</p>
                 </div>
-                <button type="button" onClick={() => void playWord(current)} className="ios-press inline-flex shrink-0 items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
-                  <Volume2 className="size-4" />播放
+                <button type="button" onClick={() => void playWord(current)} className="ios-press inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent/[0.08] px-3 py-1 text-xs font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
+                  <Volume2 className="size-3.5" />播放
                 </button>
               </div>
-              <div className="mt-3 border-t border-black/[0.06] pt-3 dark:border-white/[0.06]">
-                <DefinitionBlock definitions={definitions} className="mt-1 text-[14px] leading-relaxed text-secondary-label sm:text-[15px] dark:text-secondary-label" />
+              <div className="mt-2.5 border-t border-black/[0.05] pt-2.5 dark:border-white/[0.06]">
+                <DefinitionBlock definitions={definitions} className="text-[13.5px] leading-relaxed text-secondary-label" />
               </div>
-              <div className="mt-3 space-y-3">
-              {current.word.entryType === "SENTENCE" && (current.word.content.sentenceAnalysis.grammarNotes.length > 0 || current.word.content.sentenceAnalysis.keyExpressions.length > 0 || current.word.content.sentenceAnalysis.variations.length > 0) && <div className="space-y-3 rounded-[14px] bg-accent/[0.055] p-3.5">
-                {current.word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="text-xs font-semibold text-accent">语法要点</p><ul className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-secondary-label">{current.word.content.sentenceAnalysis.grammarNotes.map((note) => <li key={note}>• {note}</li>)}</ul></div>}
-                {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-accent">关键表达</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[14px] font-semibold">{item.expression}</p><ClampedText text={item.meaning + (item.note ? ` · ${item.note}` : "")} className="text-[13px] leading-relaxed text-secondary-label" /></div>)}</div></div>}
-                {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-accent">替换句型</p><div className="mt-1.5 space-y-2">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[10px] bg-white/45 px-3 py-2 dark:bg-white/[0.04]"><ClampedText text={item.sentence} className="text-[13px] font-medium leading-relaxed" />{item.translation && <ClampedText text={item.translation} className="mt-0.5 text-xs text-quaternary-label" />}</div>)}</div></div>}
+
+              {/* 错选提示 */}
+              {selectedChoice && exactLocal === false && (
+                <div className="mt-2 rounded-[10px] border border-danger/20 bg-danger/[0.05] p-2 text-left text-xs">
+                  <span className="font-semibold text-danger">❌ 你的选择：</span>
+                  <span className="text-secondary-label font-medium">
+                    {selectedChoice} {current.choiceDefinitions?.[selectedChoice] ? `(${current.choiceDefinitions[selectedChoice]})` : ""}
+                  </span>
+                </div>
+              )}
+
+              <div className="mt-2.5 space-y-2">
+              {/* 词根词缀 */}
+              {(current.word.content.roots.length > 0 || current.word.content.affixes.length > 0) && (
+                <div className="rounded-[10px] bg-accent/[0.04] p-2.5">
+                  <p className="text-[10.5px] font-bold uppercase tracking-wider text-accent-deep">🧩 构词拆解</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {current.word.content.roots.map((root) => (
+                      <span key={root.root} className="rounded-md bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-label dark:bg-white/[0.08]">
+                        <span className="font-mono text-accent">词根 {root.root}</span>: {root.meaning}
+                      </span>
+                    ))}
+                    {current.word.content.affixes.map((affix) => (
+                      <span key={`${affix.type}-${affix.value}`} className="rounded-md bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-label dark:bg-white/[0.08]">
+                        <span className="font-mono text-purple">{affix.type === "PREFIX" ? "前缀" : "后缀"} {affix.value}</span>: {affix.meaning}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 易混词 */}
+              {current.word.content.confusedWords.length > 0 && (
+                <div className="rounded-[10px] bg-black/[0.02] px-2.5 py-1.5 text-xs text-secondary-label dark:bg-white/[0.03]">
+                  <span className="font-semibold text-warning-deep">⚠️ 易混词：</span>
+                  {current.word.content.confusedWords.map((cw) => cw.word).join("、")}
+                </div>
+              )}
+
+              {/* 趣味助记 */}
+              {current.word.content.learning.mnemonic ? (
+                <div className="flex items-start justify-between gap-2 rounded-[12px] bg-warning/[0.06] p-2.5">
+                  <div className="flex items-start gap-1.5">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    <div>
+                      <p className="text-[10.5px] font-bold text-warning-deep">趣味助记</p>
+                      <p className="mt-0.5 text-[12.5px] leading-relaxed text-label">{current.word.content.learning.mnemonic}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void generateAiMnemonicForCurrent()}
+                    disabled={aiGenerating}
+                    className="ios-press shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[10.5px] font-semibold text-warning-deep hover:bg-warning/20 disabled:opacity-50"
+                  >
+                    {aiGenerating ? <Loader2 className="size-3 animate-spin" /> : "换一个"}
+                  </button>
+                </div>
+              ) : current.word.entryType !== "SENTENCE" ? (
+                <div className="flex items-center justify-between gap-2 rounded-[12px] border border-dashed border-warning/25 bg-warning/[0.03] p-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="size-3.5 text-warning" />
+                    <p className="text-xs text-secondary-label">该单词暂无趣味助记</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void generateAiMnemonicForCurrent()}
+                    disabled={aiGenerating}
+                    className="h-6.5 text-[11px] border-warning/30 text-warning-deep hover:bg-warning/10"
+                  >
+                    {aiGenerating ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                    {aiGenerating ? "AI 创作中…" : "✨ AI 巧记"}
+                  </Button>
+                </div>
+              ) : null}
+
+              {current.word.entryType === "SENTENCE" && (current.word.content.sentenceAnalysis.grammarNotes.length > 0 || current.word.content.sentenceAnalysis.keyExpressions.length > 0 || current.word.content.sentenceAnalysis.variations.length > 0) && <div className="space-y-2.5 rounded-[12px] bg-accent/[0.045] p-3">
+                {current.word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="text-xs font-semibold text-accent">语法要点</p><ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-secondary-label">{current.word.content.sentenceAnalysis.grammarNotes.map((note) => <li key={note}>• {note}</li>)}</ul></div>}
+                {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-accent">关键表达</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[13px] font-semibold">{item.expression}</p><ClampedText text={item.meaning + (item.note ? ` · ${item.note}` : "")} className="text-xs leading-relaxed text-secondary-label" /></div>)}</div></div>}
+                {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-accent">替换句型</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[8px] bg-white/50 px-2.5 py-1.5 dark:bg-white/[0.04]"><ClampedText text={item.sentence} className="text-xs font-medium leading-relaxed" />{item.translation && <ClampedText text={item.translation} className="mt-0.5 text-[11px] text-quaternary-label" />}</div>)}</div></div>}
               </div>}
-              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[12px] bg-black/[0.025] px-3 py-2.5 dark:bg-white/[0.035]"><div className="flex items-start justify-between gap-2"><p className="text-[14px] italic leading-relaxed text-quaternary-label sm:text-[15px]">{current.word.content.examples[0].sentence}</p><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-7 shrink-0 place-items-center rounded-full bg-accent/[0.08] text-accent transition hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3.5" /></button></div>{current.word.content.examples[0].translation && <p className="mt-1.5 text-[13px] leading-relaxed text-secondary-label sm:text-[14px] dark:text-secondary-label">{current.word.content.examples[0].translation}</p>}</div>}
-              {current.word.content.learning.mnemonic && <div className="flex items-start gap-2 rounded-[14px] bg-warning/[0.08] p-3"><Sparkles className="mt-0.5 size-4 shrink-0 text-warning" /><p className="text-[13px] leading-relaxed text-warning-deep sm:text-[14px] dark:text-warning">{current.word.content.learning.mnemonic}</p></div>}
+              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[10px] bg-black/[0.02] px-3 py-2 dark:bg-white/[0.03]"><div className="flex items-start justify-between gap-2"><p className="text-[13.5px] italic leading-relaxed text-quaternary-label">{current.word.content.examples[0].sentence}</p><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-6 shrink-0 place-items-center rounded-full bg-accent/[0.08] text-accent transition hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3" /></button></div>{current.word.content.examples[0].translation && <p className="mt-1 text-xs leading-relaxed text-secondary-label">{current.word.content.examples[0].translation}</p>}</div>}
               </div>
             </div>
           </div>
         </div>}
-        {lastResult && <div className={`mt-4 flex items-center gap-2 text-[15px] font-semibold ${lastResult.rating === "EASY" || lastResult.isCorrect ? "text-success" : "text-danger"}`}>{lastResult.rating === "EASY" || lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.rating === "EASY" ? "已掌握，近期不会再出现" : lastResult.isCorrect ? "已记录" : lastResult.adaptiveFollowUp ? "已加入错词强化，稍后会再次出现" : "已加入错词强化"}</div>}
-        {error && <div className="mt-4 rounded-[14px] bg-danger/[0.08] p-3 text-[14px] text-danger-deep">{error}</div>}
+        {lastResult && <div className={`mt-3 flex items-center gap-1.5 text-[14px] font-semibold ${lastResult.rating === "EASY" || lastResult.isCorrect ? "text-success" : "text-danger"}`}>{lastResult.rating === "EASY" || lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.rating === "EASY" ? "已掌握，近期不会再出现" : lastResult.isCorrect ? "已记录" : lastResult.adaptiveFollowUp ? "已加入错词强化，稍后会再次出现" : "已加入错词强化"}</div>}
+        {error && <div className="mt-3 rounded-[12px] bg-danger/[0.06] p-2.5 text-xs text-danger-deep">{error}</div>}
         </div>
       </div>
-      <div className="shrink-0 pt-1.5 sm:pt-3">
-      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-[12px] text-tertiary-label sm:text-[13px]">{hasChoices ? (choicesVisible ? "点击上方选项或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-[12px] text-tertiary-label sm:text-[13px]">{hasChoices ? (choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span><Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-danger/20 text-danger hover:bg-danger/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记<Kbd className="hidden sm:inline-flex ml-1">1</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span><Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-5" />显示答案<Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div>) : <div className="border-t border-black/[0.06] pt-2 sm:pt-3 dark:border-white/[0.06]">
+      <div className="shrink-0 pt-1.5 sm:pt-2.5">
+      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击上方选项或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span><Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-danger/20 text-danger hover:bg-danger/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记<Kbd className="hidden sm:inline-flex ml-1">1</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span><Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-4.5" />显示答案<Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div>) : <div className="border-t border-black/[0.05] pt-2 sm:pt-2.5 dark:border-white/[0.06]">
         {current.questionType === "ZH_TO_EN_CHOICE" && <p className="mb-1.5 text-center text-[11px] text-quaternary-label sm:mb-2 sm:text-xs">已按“{exactLocal === true ? "认识" : "忘记"}”记录，按数字键或点击熟悉度直接进入下一题</p>}
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating, rIdx) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "glass-inner border-danger/25 text-danger-deep shadow-[0_6px_24px_rgba(255,59,48,0.10)] dark:text-danger", HARD: "glass-inner border-warning/25 text-warning-deep shadow-[0_6px_24px_rgba(255,149,0,0.10)] dark:text-warning", GOOD: "glass-inner border-accent/25 text-accent-deep shadow-[0_6px_24px_rgba(0,122,255,0.10)] dark:text-[#0a84ff]", EASY: "glass-inner border-success/25 text-success-deep shadow-[0_6px_24px_rgba(52,199,89,0.10)] dark:text-success" } as const; const shortcutKey = String(rIdx + 1); return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press min-h-10 rounded-[12px] border-[1.5px] px-1.5 py-1.5 text-center transition-all duration-200 disabled:opacity-40 sm:min-h-12 sm:rounded-[14px] sm:p-3 ${styles[rating]}`}><div className="flex items-center justify-center gap-1.5"><b className="text-[13px] sm:text-[15px]">{labels[rating]}</b><Kbd className="hidden sm:inline-flex text-[10px] px-1">{shortcutKey}</Kbd></div><span className="mt-0.5 block text-[10px] opacity-60 sm:mt-1 sm:text-[11px]">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div></div>}
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating, rIdx) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "border border-danger/20 bg-danger/[0.04] text-danger-deep hover:bg-danger/[0.08] dark:text-danger", HARD: "border border-warning/20 bg-warning/[0.04] text-warning-deep hover:bg-warning/[0.08] dark:text-warning", GOOD: "border border-accent/20 bg-accent/[0.04] text-accent-deep hover:bg-accent/[0.08] dark:text-[#0a84ff]", EASY: "border border-success/20 bg-success/[0.04] text-success-deep hover:bg-success/[0.08] dark:text-success" } as const; const shortcutKey = String(rIdx + 1); return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press min-h-9.5 rounded-[12px] px-1.5 py-1.5 text-center transition-all duration-150 disabled:opacity-40 sm:min-h-11 sm:rounded-[13px] sm:p-2.5 ${styles[rating]}`}><div className="flex items-center justify-center gap-1.5"><b className="text-[13px] sm:text-[14px]">{labels[rating]}</b><Kbd className="hidden sm:inline-flex text-[9px] px-1">{shortcutKey}</Kbd></div><span className="mt-0.5 block text-[10px] opacity-65 sm:text-[10.5px] num-tabular">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div></div>}
       </div>
     </CardContent></Card>
   </div>;

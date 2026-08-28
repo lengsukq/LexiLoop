@@ -67,9 +67,14 @@ describe("sentence crawling", () => {
   });
 
   it("falls back to Tencent translation when Youdao returns no meaning for a sentence", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(html("双语例句", "1", "How are you?", "你好吗？"), { status: 200 }))
-      .mockResolvedValue(new Response(JSON.stringify({ Response: { TargetText: "你好吗？" } }), { status: 200 }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("youdao.com")) return new Response(html("双语例句", "1", "How are you?", "你好吗？"), { status: 200 });
+      if (url.includes("tmt.tencentcloudapi.com") || url.includes("tencent")) {
+        return new Response(JSON.stringify({ Response: { TargetText: "你好吗？" } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ Response: { TargetText: "你好吗？" } }), { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await lookupDictionary({

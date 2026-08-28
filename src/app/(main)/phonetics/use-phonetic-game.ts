@@ -80,6 +80,7 @@ export function usePhoneticGame() {
       const solved = answer?.solved ?? false;
       const hadMistake = answer?.hadMistake ?? true;
       return {
+        wordId: item.wordId,
         term: item.term,
         definition: item.definition,
         phonetic: item.phonetic,

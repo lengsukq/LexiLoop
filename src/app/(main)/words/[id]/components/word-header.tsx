@@ -60,17 +60,18 @@ export function WordHeader({
       </div>
     </div>
 
-    <Card className="overflow-hidden">
-      <div className="bg-gradient-to-br from-accent to-[#5856d6] p-5 text-white shadow-[0_16px_48px_rgba(0,122,255,0.25)] sm:p-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="overflow-hidden rounded-[24px]">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#007aff] via-[#5856d6] to-[#af52de] p-5 text-white shadow-[inset_0_1.5px_0_rgba(255,255,255,0.3)] sm:p-7">
+        <div className="absolute -right-12 -top-12 size-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <WordBadges word={word} />
-            <h1 className="mt-4 break-words text-3xl font-bold sm:mt-5 sm:text-4xl lg:text-5xl">{word.term}</h1>
-            {word.content.summary.translation && <p className="mt-2 text-lg font-medium text-white/95 sm:mt-3 sm:text-xl">{word.content.summary.translation}</p>}
-            {word.content.summary.shortDefinition && <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-white/80">{word.content.summary.shortDefinition}</p>}
+            <h1 className="mt-3.5 break-words text-2xl font-bold tracking-tight sm:mt-4 sm:text-3xl lg:text-4xl">{word.term}</h1>
+            {word.content.summary.translation && <p className="mt-1.5 text-base font-medium text-white/95 sm:text-lg">{word.content.summary.translation}</p>}
+            {word.content.summary.shortDefinition && <p className="mt-1.5 max-w-2xl break-words text-xs leading-relaxed text-white/80 sm:text-sm">{word.content.summary.shortDefinition}</p>}
             {missingTranslation && <TranslationAction busy={translationBusy} onTranslate={onTranslateSummary} />}
-            {translationMessage && missingTranslation && <p className={`mt-2 max-w-2xl text-xs ${translationMessage.startsWith("已") ? "text-emerald-100" : "text-amber-200"}`}>{translationMessage}</p>}
-            <p className="mt-3 text-sm text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {entryTypeLabel(word.entryType)}</p>
+            {translationMessage && missingTranslation && <p className={`mt-1.5 max-w-2xl text-xs ${translationMessage.startsWith("已") ? "text-emerald-100" : "text-amber-200"}`}>{translationMessage}</p>}
+            <p className="mt-2 text-xs text-white/70">{word.sourceLanguageName ?? word.sourceLanguage} → {word.targetLanguageName ?? word.targetLanguage} · {entryTypeLabel(word.entryType)}</p>
             <PronunciationControls
               word={word}
               selectedAccent={selectedAccent}
@@ -79,10 +80,10 @@ export function WordHeader({
               onPlay={onPlay}
             />
           </div>
-          <div className="shrink-0 self-start rounded-3xl bg-white/15 p-5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:self-auto">
-            <p className="text-4xl font-bold">{word.masteryScore}</p>
-            <p className="text-xs text-white/70">熟练度</p>
-            <Progress value={word.masteryScore} className="mt-3 w-28 bg-white/20 [&>div]:bg-white" />
+          <div className="shrink-0 self-start rounded-[20px] bg-white/15 p-4 text-center shadow-xs backdrop-blur-md sm:self-auto sm:p-4.5">
+            <p className="num-tabular text-3xl font-bold tracking-tight sm:text-4xl">{word.masteryScore}</p>
+            <p className="text-[11px] text-white/70">熟练度</p>
+            <Progress value={word.masteryScore} className="mt-2.5 w-24 bg-white/20 [&>div]:bg-white" />
           </div>
         </div>
       </div>

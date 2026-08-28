@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AlertCircle, ArrowRight, BookPlus, CheckCircle2, ChevronDown, ChevronUp, ListChecks, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import type { EntryType, ManualContentPreview } from "@/lib/types";
-import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Kbd, PageHeader, Select, buttonClass, toast } from "@/components/ui";
+import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Kbd, PageHeader, Select, buttonClass } from "@/components/ui";
 
 type TypeChoice = "AUTO" | EntryType;
 
@@ -184,7 +184,7 @@ export default function CreatePage() {
       </CardHeader>
       <CardContent className="space-y-5">
         <textarea
-          className="glass-inner min-h-36 w-full rounded-[18px] p-4 text-lg outline-none transition placeholder:text-tertiary-label focus:border-accent/40 focus:shadow-[0_8px_32px_rgba(0,122,255,0.10),0_0_0_4px_rgba(0,122,255,0.08)]"
+          className="min-h-32 w-full rounded-[16px] border border-black/[0.08] bg-white/70 p-3.5 text-base outline-none transition placeholder:text-tertiary-label focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] dark:border-white/[0.09] dark:bg-white/[0.05]"
           value={text}
           onChange={(event) => { setText(event.target.value); if (batch) reset(); }}
           onKeyDown={(event) => {
@@ -196,19 +196,19 @@ export default function CreatePage() {
           placeholder={'每行一个单词/词组/句子，例如：\nabandon\nbreak down\nI have been working here for five years.'}
           maxLength={MAX_TOTAL_CHARS}
         />
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 num-tabular">
           <p className="text-xs text-tertiary-label">已输入 {lineCount} 行，最多 {MAX_ROWS} 行。类型、原语言、目标语言会应用到每一行。</p>
           <span className="text-xs font-medium text-tertiary-label">{text.length}/{MAX_TOTAL_CHARS}</span>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-2"><span className="text-sm font-medium">内容类型</span><Select className="w-full" value={typeChoice} onChange={(event) => setTypeChoice(event.target.value as TypeChoice)}><option value="AUTO">自动判断</option><option value="WORD">单词</option><option value="PHRASE">短语</option><option value="SENTENCE">句子</option></Select></label>
-          <label className="space-y-2"><span className="text-sm font-medium">原语言</span><Select className="w-full" value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}><option value="en">英语</option><option value="zh-CN">简体中文</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></Select></label>
-          <label className="space-y-2"><span className="text-sm font-medium">目标语言</span><Select className="w-full" value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}><option value="zh-CN">简体中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></Select></label>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="space-y-1.5"><span className="text-xs font-medium text-secondary-label">内容类型</span><Select className="w-full" value={typeChoice} onChange={(event) => setTypeChoice(event.target.value as TypeChoice)}><option value="AUTO">自动判断</option><option value="WORD">单词</option><option value="PHRASE">短语</option><option value="SENTENCE">句子</option></Select></label>
+          <label className="space-y-1.5"><span className="text-xs font-medium text-secondary-label">原语言</span><Select className="w-full" value={sourceLanguage} onChange={(event) => setSourceLanguage(event.target.value)}><option value="en">英语</option><option value="zh-CN">简体中文</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></Select></label>
+          <label className="space-y-1.5"><span className="text-xs font-medium text-secondary-label">目标语言</span><Select className="w-full" value={targetLanguage} onChange={(event) => setTargetLanguage(event.target.value)}><option value="zh-CN">简体中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></Select></label>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-tertiary-label">生成预览会先查询有道词典，识别不出短语或句子时自动用腾讯翻译 / AI 兜底，不会创建正式词条。</p>
           <Button size="lg" onClick={() => void generatePreviews()} disabled={lineCount === 0 || busy !== ""}>
-            {busy === "preview" ? <Loader2 className="size-5 animate-spin" /> : <Sparkles className="size-5" />}
+            {busy === "preview" ? <Loader2 className="size-4.5 animate-spin" /> : <Sparkles className="size-4.5" />}
             {batch ? "重新生成预览" : "生成预览"}
             <Kbd className="ml-1.5 hidden sm:inline-flex bg-white/20 text-white border-white/30">⌘ Enter</Kbd>
           </Button>
@@ -218,24 +218,24 @@ export default function CreatePage() {
 
     {error && <Alert icon={<AlertCircle className="size-4" />}>{error}</Alert>}
 
-    {batch && <div className="space-y-5">
-      <Card>
+    {batch && <div className="space-y-4">
+      <Card className="rounded-[22px]">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2"><ListChecks className="size-5 text-accent" />批量预览</CardTitle>
-              <p className="mt-1 text-sm text-secondary-label">{successRows.length > 0 && <span className="font-medium text-accent">{successRows.length} 行成功</span>}{successRows.length > 0 && " · "}共 {batch.length} 行，确认后才会写入正式词库</p>
+              <CardTitle className="flex items-center gap-2"><ListChecks className="size-4.5 text-accent" />批量预览</CardTitle>
+              <p className="mt-1 text-xs text-secondary-label">{successRows.length > 0 && <span className="font-semibold text-accent">{successRows.length} 行成功</span>}{successRows.length > 0 && " · "}共 {batch.length} 行，确认后才会写入正式词库</p>
             </div>
-            <Button variant="ghost" onClick={() => void generatePreviews()} disabled={busy !== ""}>{busy === "preview" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}重新生成</Button>
+            <Button variant="ghost" size="sm" onClick={() => void generatePreviews()} disabled={busy !== ""}>{busy === "preview" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}重新生成</Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {busy === "preview" && <div className="flex items-center gap-3 rounded-[16px] border border-accent/10 bg-accent/[0.06] p-4 text-sm text-accent shadow-[0_4px_12px_rgba(0,122,255,0.04)] backdrop-blur-sm dark:text-[#0a84ff]"><Loader2 className="size-4 animate-spin" />正在逐行查询有道词典，请稍候…（{previewDone}/{batch.length}）</div>}
+        <CardContent className="space-y-2.5">
+          {busy === "preview" && <div className="flex items-center gap-2.5 rounded-[14px] border border-accent/15 bg-accent/[0.05] p-3 text-xs text-accent dark:text-[#0a84ff]"><Loader2 className="size-4 animate-spin" />正在逐行查询有道词典，请稍候…（{previewDone}/{batch.length}）</div>}
           {batch.map((row, index) => <BatchRowCard key={`${row.term}-${index}`} row={row} index={index} expanded={expandedIndex === index} busy={busy !== ""} onToggle={() => setExpandedIndex(expandedIndex === index ? null : index)} onConfirm={() => void confirmRow(index)} />)}
         </CardContent>
       </Card>
 
-      {allConfirmed ? <Card><CardContent className="py-10 text-center"><CheckCircle2 className="mx-auto size-12 text-success" /><h2 className="mt-3 text-xl font-bold">已全部加入词库</h2><p className="mt-2 text-sm text-secondary-label">共确认 {successRows.length} 个词条，词典预览内容已经正式保存。</p><div className="mt-5 flex flex-wrap justify-center gap-3">{successRows.map((row) => row.confirmedWordId !== null && <Link key={row.confirmedWordId} href={`/words/${row.confirmedWordId}`} className={buttonClass("primary")}><ArrowRight className="size-4" />打开{row.term}</Link>)}<Button variant="outline" onClick={() => { setText(""); reset(); }}>继续添加</Button></div></CardContent></Card> : <Card><CardContent className="flex flex-col gap-4 pt-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">确认后才会写入正式词库</p><p className="mt-1 text-sm text-secondary-label">确认不会再次查询词典，也可以先逐个展开查看后再确认。</p></div><Button size="lg" onClick={() => void confirmAll()} disabled={pendingRows.length === 0 || busy !== ""}>{busy === "confirm" ? <Loader2 className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}全部确认加入（{pendingRows.length}）</Button></CardContent></Card>}
+      {allConfirmed ? <Card className="rounded-[22px]"><CardContent className="py-9 text-center"><CheckCircle2 className="mx-auto size-11 text-success" /><h2 className="mt-2.5 text-lg font-bold">已全部加入词库</h2><p className="mt-1 text-xs text-secondary-label">共确认 {successRows.length} 个词条，词典预览内容已经正式保存。</p><div className="mt-4 flex flex-wrap justify-center gap-2.5">{successRows.map((row) => row.confirmedWordId !== null && <Link key={row.confirmedWordId} href={`/words/${row.confirmedWordId}`} className={buttonClass("primary", "sm")}><ArrowRight className="size-3.5" />打开{row.term}</Link>)}<Button variant="outline" size="sm" onClick={() => { setText(""); reset(); }}>继续添加</Button></div></CardContent></Card> : <Card className="rounded-[22px]"><CardContent className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">确认后才会写入正式词库</p><p className="mt-0.5 text-xs text-secondary-label">确认不会再次查询词典，也可以先逐个展开查看后再确认。</p></div><Button size="lg" onClick={() => void confirmAll()} disabled={pendingRows.length === 0 || busy !== ""}>{busy === "confirm" ? <Loader2 className="size-4.5 animate-spin" /> : <CheckCircle2 className="size-4.5" />}全部确认加入（{pendingRows.length}）</Button></CardContent></Card>}
     </div>}
   </div>;
 }
@@ -248,13 +248,13 @@ function BatchRowCard({ row, index, expanded, busy, onToggle, onConfirm }: {
   onToggle: () => void;
   onConfirm: () => void;
 }) {
-  return <div className="rounded-[18px] border border-white/50 bg-white/40 p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.06] dark:bg-white/[0.04]">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent/10 text-xs font-bold text-accent dark:bg-[#0a84ff]/15 dark:text-[#0a84ff]">{index + 1}</span>
+  return <div className="rounded-[16px] border border-black/[0.07] bg-white/60 p-3.5 shadow-2xs dark:border-white/[0.07] dark:bg-white/[0.04]">
+    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent/10 text-xs font-bold text-accent dark:bg-[#0a84ff]/15 dark:text-[#0a84ff]">{index + 1}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <b className="truncate text-[15px]">{row.term}</b>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <b className="truncate text-[14.5px] font-semibold">{row.term}</b>
             {row.preview && <Badge>{TYPE_META[row.preview.contentType].label}</Badge>}
             {row.preview?.existingWordId && <Badge tone="amber">已存在</Badge>}
             {row.confirmedWordId !== null && <Badge tone="green">已确认</Badge>}

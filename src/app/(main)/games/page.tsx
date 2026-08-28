@@ -72,6 +72,7 @@ function GamesPageContent() {
       const solved = answer?.solved ?? false;
       const hadMistake = answer?.hadMistake ?? true;
       return {
+        wordId: item.wordId,
         term: item.term,
         definition: item.definition,
         status: solved ? (hadMistake ? "recovered" : "correct") : "missed",

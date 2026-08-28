@@ -515,6 +515,14 @@ export function StudyClient() {
                 <div>
                   <p className={`text-[11px] font-semibold tracking-tight ${exactLocal === false ? "text-danger" : exactLocal === true ? "text-success" : "text-accent"}`}>{exactLocal === false ? "正确答案" : exactLocal === true ? "回答正确" : "参考答案"}</p>
                   <p className="mt-0.5 break-words text-lg font-bold tracking-tight sm:text-xl">{current.word.term}</p>
+                  {(() => {
+                    const usPh = current.word.content.pronunciations.find((pr) => pr.accent === "US")?.phonetic || null;
+                    const ukPh = current.word.content.pronunciations.find((pr) => pr.accent === "UK")?.phonetic || null;
+                    const ph = usPh || ukPh;
+                    const accent = usPh ? "US" : ukPh ? "UK" : null;
+                    if (!ph) return null;
+                    return <p className="mt-1 font-mono text-xs tracking-wide text-tertiary-label">/{ph}/ <span className="ml-1 rounded-full bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-secondary-label dark:bg-white/[0.08]">{accent === "US" ? "美" : "英"}</span></p>;
+                  })()}
                 </div>
                 <button type="button" onClick={() => void playWord(current)} className="ios-press inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent/[0.08] px-3 py-1 text-xs font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
                   <Volume2 className="size-3.5" />播放

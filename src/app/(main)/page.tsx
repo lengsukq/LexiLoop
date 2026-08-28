@@ -80,7 +80,7 @@ export default function HomePage() {
           }
           title="从 EasyDict 收藏开始"
           description="导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，不会导入整本词典。"
-          action={<Link href="/import" className={buttonClass("primary", "lg")}><Upload className="size-5" />导入 CSV</Link>}
+          action={<Link href="/add?tab=csv" className={buttonClass("primary", "lg")}><Upload className="size-5" />导入 CSV</Link>}
         />
       </div>
     );

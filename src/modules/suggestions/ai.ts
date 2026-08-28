@@ -1,6 +1,5 @@
 import { getSettings } from "@/modules/settings/service";
 import { z } from "zod";
-import { MINUTE_MS } from "@/lib/time";
 import { RECOMMENDATION_LIMIT } from "./content";
 import { extractJson } from "@/lib/json";
 import { callLlmWithFallback, resolveLlmProviders } from "@/modules/llm/client";

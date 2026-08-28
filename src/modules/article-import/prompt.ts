@@ -11,26 +11,27 @@ const LEVEL_HINT: Record<VocabularyLevel, string> = {
 
 export function buildArticleSelectionPrompt(input: {
   articleText: string;
-  candidates: Array<{ term: string; normalizedTerm: string; occurrences: number }>;
+  candidates: Array<{ term: string; normalizedTerm: string; occurrences: number; sourceSentence?: string | null }>;
   knownSample: string[];
   totalKnown: number;
   vocabularyLevel: VocabularyLevel;
 }): { systemPrompt: string; userPrompt: string } {
   const systemPrompt = "只输出有效 JSON，不要输出任何解释或 markdown。";
-
   const articleSnippet = input.articleText.slice(0, 8000);
-
   const userPrompt = [
-    "你是词汇筛选助手。根据文章与候选词，选出值得该用户学习的单词。",
+    "你是词汇与句法筛选助手。结合文章语境与候选词，选出值得该用户学习的单词、短语与句子。",
     `用户水平：${input.vocabularyLevel} — ${LEVEL_HINT[input.vocabularyLevel]}`,
     `用户已掌握词数：${input.totalKnown}，示例：${input.knownSample.slice(0, 30).join(", ") || "无"}`,
-    "规则：已掌握/过于常见/停用词不选；优先选对理解文章关键且对该水平有学习价值的词；每个 reason 不超过 20 字。",
-    "输出 JSON 格式：{\"selected\":[{\"term\":string,\"reason\":string,\"difficulty\":1-5,\"cefrLevel\":\"A1\"|\"A2\"|\"B1\"|\"B2\"|\"C1\"|\"C2\"|null,\"frequency\":\"VERY_COMMON\"|\"COMMON\"|\"NORMAL\"|\"RARE\"|null}]}",
+    "规则：已掌握/过于常见/停用词不选；优先选对理解文章关键且对该水平有学习价值的内容；每个 reason/nuance 不超过 24 字。",
+    "输出 JSON 格式（严格 JSON，无 trailing comma）：",
+    '{"words":[{"term":string,"reason":string,"difficulty":1-5,"cefrLevel":"A1"|"A2"|"B1"|"B2"|"C1"|"C2"|null,"frequency":"VERY_COMMON"|"COMMON"|"NORMAL"|"RARE"|null}],'
+    + '"phrases":[{"term":string,"reason":string,"difficulty":1-5,"cefrLevel":string|null,"literalTranslation":string,"freeTranslation":string,"keyVocab":[{"term":string,"pos":string|null,"meaning":string}],"grammar":{"pattern":string|null,"notes":string[]},"nuance":string|null}],'
+    + '"sentences":[{"sentence":string,"literalTranslation":string,"freeTranslation":string,"keyVocab":[{"term":string,"pos":string|null,"meaning":string}],"grammar":{"pattern":string|null,"notes":string[]},"nuance":string|null}]}',
+    "约束：phrases 0-15 个，sentences 0-10 个；短语如 because of 等固定搭配需包含 keyVocab 对 each 词的词性与释义；句子的 grammar 需点出句型/从句；均给出直译与意译。",
     "",
     `<article>${articleSnippet}</article>`,
     `<candidates>${JSON.stringify(input.candidates)}</candidates>`,
   ].join("\n");
-
   return { systemPrompt, userPrompt };
 }
 

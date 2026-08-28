@@ -23,7 +23,20 @@ function cleanArticle(raw: string): string {
   return raw.normalize("NFKC").replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").trim();
 }
 
-export function extractArticleTerms(articleText: string): ArticleExtractResult {
+export function extractSentences(cleaned: string): string[] {
+  try {
+    const segmenter = new (Intl as unknown as { Segmenter: new (l:string, o:unknown)=>{segment:(s:string)=>Iterable<{segment:string}>} }).Segmenter("en", { granularity: "sentence" });
+    const raw = [...segmenter.segment(cleaned)].map((s) => s.segment.trim()).filter(Boolean);
+    if (raw.length) return raw;
+  } catch {}
+  const parts = cleaned.match(/[^.!?。！？]+[.!?。！？]+/g) ?? [];
+  const rest = cleaned.replace(/[^.!?。！？]+[.!?。！？]+/g, "").trim();
+  const out = parts.map((s) => s.trim());
+  if (rest) out.push(rest);
+  return out.filter(Boolean);
+}
+
+export function extractArticleTerms(articleText: string, sourceLanguage = "en", targetLanguage = "zh-CN"): ArticleExtractResult {
   const cleaned = cleanArticle(articleText);
   const rawTokens = cleaned.match(/[A-Za-z][A-Za-z'-]*/g) ?? [];
   const wordCount = rawTokens.length;
@@ -37,11 +50,11 @@ export function extractArticleTerms(articleText: string): ArticleExtractResult {
     const lower = stripped.toLowerCase();
     if (STOPWORDS.has(lower)) continue;
 
-    const normalized = normalizeTerm(stripped, "en");
+    const normalized = normalizeTerm(stripped, sourceLanguage);
     if (normalized.length < 2 || normalized.length > 30) continue;
     if (STOPWORDS.has(normalized)) continue;
 
-    const key = identityKey(normalized, "en", "zh-CN");
+    const key = identityKey(normalized, sourceLanguage, targetLanguage);
     const existing = counts.get(key);
     if (existing) existing.count += 1;
     else counts.set(key, { term: stripped, count: 1 });

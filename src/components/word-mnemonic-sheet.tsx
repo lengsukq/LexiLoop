@@ -5,7 +5,7 @@ import { AlertCircle, BookOpen, Loader2, RefreshCw, Sparkles, Volume2, XCircle }
 import { apiFetch } from "@/lib/client-api";
 import { playEntryTts } from "@/lib/tts-client";
 import type { AffixItem, DefinitionItem, LearningContent, PronunciationItem, RelatedWordItem, RootItem } from "@/lib/types";
-import { Badge, Button, Dialog } from "./ui";
+import { Button, Dialog } from "./ui";
 
 export interface MnemonicSheetWordData {
   id?: number;

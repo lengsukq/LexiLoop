@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, BookMarked, Home, Import, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
+import { BarChart3, BookMarked, Home, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Logo } from "./logo";
 import { BackgroundKeepalive } from "@/components/background-keepalive";
@@ -12,15 +12,14 @@ const navigation = [
   { label: "今日", href: "/", icon: Home },
   { label: "复习", href: "/study", icon: PlayCircle },
   { label: "单词本", href: "/words", icon: BookMarked },
-  { label: "添加", href: "/create", icon: PlusCircle },
-  { label: "导入", href: "/import", icon: Import },
+  { label: "添加", href: "/add", icon: PlusCircle },
   { label: "初始化", href: "/initialize", icon: RefreshCw },
   { label: "统计", href: "/statistics", icon: BarChart3 },
   { label: "设置", href: "/settings", icon: Settings },
 ];
 
 /** Mobile: primary tabs shown directly in the tab bar */
-const mobilePrimary = ["/", "/study", "/words", "/create"];
+const mobilePrimary = ["/", "/study", "/words", "/add"];
 
 function isActive(href: string, pathname: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);

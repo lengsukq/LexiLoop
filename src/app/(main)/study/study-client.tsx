@@ -232,10 +232,9 @@ export function StudyClient() {
   }, [choiceRevealDelaySeconds, current, resetQuestionTimer]);
   useEffect(() => {
     if (!current) return;
-    if (current.word.entryType === "SENTENCE" && current.questionType === "ZH_TO_EN_SPELLING") return;
-    if (current.questionType === "ZH_TO_EN_CHOICE") return;
+    if (revealed) return;
 
-    const playbackKey = `${data?.session.id ?? 0}:${current.itemId}`;
+    const playbackKey = `q:${data?.session.id ?? 0}:${current.itemId}`;
     if (autoPlayedRef.current === playbackKey) return;
     autoPlayedRef.current = playbackKey;
 
@@ -243,7 +242,20 @@ export function StudyClient() {
       void playWord(current);
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [current, data?.session.id]);
+  }, [current, data?.session.id, revealed]);
+
+  const revealedPlayedRef = useRef("");
+  useEffect(() => {
+    if (!current || !revealed) return;
+    const playbackKey = `r:${data?.session.id ?? 0}:${current.itemId}`;
+    if (revealedPlayedRef.current === playbackKey) return;
+    revealedPlayedRef.current = playbackKey;
+
+    const timer = window.setTimeout(() => {
+      void playWord(current);
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [current, data?.session.id, revealed]);
   const complete = Boolean(data && (data.session.completedAt || data.resumeIndex >= data.items.length));
   const autoContinuationPending = Boolean(data && autoContinue && complete && data.items.length > 0);
   useEffect(() => {

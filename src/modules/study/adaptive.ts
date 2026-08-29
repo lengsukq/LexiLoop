@@ -17,6 +17,10 @@ function nextQuestionType(current: QuestionType, entryType: EntryType): Question
   if (current === "EN_TO_ZH") return "EN_TO_ZH_CHOICE";
   if (current === "EN_TO_ZH_CHOICE") return "ZH_TO_EN_SPELLING";
   if (current === "ZH_TO_EN_CHOICE") return "ZH_TO_EN_SPELLING";
+  if (current === "CLOZE_SENTENCE") return "ZH_TO_EN_SPELLING";
+  if (current === "LISTENING_CHOICE") return "LISTENING_SPELLING";
+  if (current === "LETTER_BANK") return "ZH_TO_EN_SPELLING";
+  if (current === "LISTENING_SPELLING") return "LISTENING_CHOICE";
   return "ZH_TO_EN_SPELLING";
 }
 

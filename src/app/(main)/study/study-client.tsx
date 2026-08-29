@@ -3,13 +3,14 @@ import Link from "next/link";
 import { errorMessage } from "@/lib/format";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Clock3, Headphones, Home, Keyboard, Loader2, MessageSquareText, RotateCcw, Sparkles, Volume2, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Clock3, Eye, Headphones, Home, Keyboard, Lightbulb, Loader2, MessageSquareText, RotateCcw, Sparkles, Volume2, XCircle } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { playCachedTts, playEntryTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type { AffixItem, DictionaryContent, QuestionType, RelatedWordItem, ReviewRating, RootItem, StudyMode } from "@/lib/types";
 import { entryTypeLabel } from "@/lib/entry-type-label";
 import { Badge, Button, Card, CardContent, Kbd, Progress, buttonClass } from "@/components/ui";
+import { SentenceDiff, TermDiff } from "@/components/answer-diff";
 
 function clientId(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -22,6 +23,8 @@ interface Item {
   itemId: number; position: number; taskType: string; questionType: QuestionType; status: string; skipReason: string | null;
   choices?: string[];
   choiceDefinitions?: Record<string, string>;
+  cloze?: { sentence: string; translation: string | null; blankedSentence: string } | null;
+  letters?: Array<{ id: string; value: string }>;
   word: { id: number; term: string; sourceLanguage: string; targetLanguage: string; entryType: string; content: DictionaryContent };
 }
 interface SessionData {
@@ -52,11 +55,21 @@ function getHintPattern(term: string): string | null {
   if (term.length <= 2 || /\s/.test(term)) return null;
   const firstLetter = term[0];
   const lastLetter = term[term.length - 1];
-  // Long words use a compact (non-spaced) blank run so the hint fits the card width.
   const middleBlanks = term.length > 12
     ? "_".repeat(term.length - 2)
     : term.slice(1, -1).split("").map(() => "_").join(" ");
   return `${firstLetter} ${middleBlanks} ${lastLetter}`;
+}
+function getProgressiveHint(term: string, level: number): string | null {
+  if (term.length <= 2 || /\s/.test(term)) return null;
+  if (level <= 0) return getHintPattern(term);
+  const revealCount = Math.min(term.length - 2, level + 1);
+  const revealed = term.slice(1, 1 + revealCount);
+  const remaining = term.length - 2 - revealCount;
+  const blanks = remaining <= 0 ? "" : term.length > 12 ? "_".repeat(remaining) : Array(remaining).fill("_").join(" ");
+  const sep = term.length > 12 ? "" : " ";
+  const middle = revealed.split("").join(sep) + (remaining > 0 ? sep + blanks : "");
+  return `${term[0]} ${middle} ${term[term.length - 1]}`;
 }
 function normalizeSentenceAnswer(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase().replace(/[’‘]/g, "'").replace(/[\p{P}\p{S}]+/gu, " ").replace(/\s+/g, " ").trim();
@@ -89,10 +102,16 @@ export function StudyClient() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [choicesVisible, setChoicesVisible] = useState(false);
+  const [choiceRevealProgress, setChoiceRevealProgress] = useState(0);
+  const choiceProgressTimerRef = useRef<number | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [error, setError] = useState("");
   const [choiceRevealDelaySeconds, setChoiceRevealDelaySeconds] = useState(2);
   const choiceRevealTimerRef = useRef<number | null>(null);
+  const [hintLevel, setHintLevel] = useState(0);
+  const [usedHint, setUsedHint] = useState(false);
+  const [revealSections, setRevealSections] = useState({ mnemonic: true, roots: false, grammar: false, example: false });
+  const [builtLetterIds, setBuiltLetterIds] = useState<string[]>([]);
   const [autoContinue, setAutoContinue] = useState(mode === "DAILY");
   const autoContinueRef = useRef(mode === "DAILY");
   const [autoStopReason, setAutoStopReason] = useState<"USER" | "EXHAUSTED" | null>(null);
@@ -128,6 +147,11 @@ export function StudyClient() {
     setLastResult(null);
     setSelectedChoice(null);
     setChoicesVisible(false);
+    setChoiceRevealProgress(0);
+    setHintLevel(0);
+    setUsedHint(false);
+    setRevealSections({ mnemonic: true, roots: false, grammar: false, example: false });
+    setBuiltLetterIds([]);
   }, [dismissKeyboard]);
 
   const start = useCallback(async (forceNew = false) => {
@@ -165,17 +189,44 @@ export function StudyClient() {
       questionDurationRef.current = null;
       resetQuestionTimer();
       answerIdRef.current = clientId();
-      const isChoiceQuestion = current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE";
+      setHintLevel(0);
+      setUsedHint(false);
+      setRevealSections({ mnemonic: true, roots: false, grammar: false, example: false });
+      setBuiltLetterIds([]);
+      const isChoiceQuestion = current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE";
       const delayMs = Math.max(0, choiceRevealDelaySeconds) * 1000;
-      choiceRevealTimerRef.current = window.setTimeout(() => {
-        choiceRevealTimerRef.current = null;
-        setChoicesVisible(true);
-      }, isChoiceQuestion ? delayMs : 0);
+      if (isChoiceQuestion && delayMs > 0) {
+        setChoicesVisible(false);
+        setChoiceRevealProgress(0);
+        const startedAt = Date.now();
+        choiceProgressTimerRef.current = window.setInterval(() => {
+          const elapsed = Date.now() - startedAt;
+          setChoiceRevealProgress(Math.min(1, elapsed / delayMs));
+        }, 80);
+        choiceRevealTimerRef.current = window.setTimeout(() => {
+          choiceRevealTimerRef.current = null;
+          if (choiceProgressTimerRef.current !== null) {
+            window.clearInterval(choiceProgressTimerRef.current);
+            choiceProgressTimerRef.current = null;
+          }
+          setChoiceRevealProgress(1);
+          setChoicesVisible(true);
+        }, delayMs) as unknown as number;
+      } else {
+        setChoicesVisible(!isChoiceQuestion || delayMs === 0 ? true : false);
+        if (!isChoiceQuestion) setChoiceRevealProgress(1);
+        else setChoiceRevealProgress(delayMs === 0 ? 1 : 0);
+        if (!isChoiceQuestion) setChoicesVisible(true);
+      }
     }
     return () => {
       if (choiceRevealTimerRef.current !== null) {
         window.clearTimeout(choiceRevealTimerRef.current);
         choiceRevealTimerRef.current = null;
+      }
+      if (choiceProgressTimerRef.current !== null) {
+        window.clearInterval(choiceProgressTimerRef.current);
+        choiceProgressTimerRef.current = null;
       }
     };
   }, [choiceRevealDelaySeconds, current, resetQuestionTimer]);
@@ -221,8 +272,12 @@ export function StudyClient() {
   const hasChoices = Boolean(current?.choices?.length);
   const exactLocal = current && current.questionType === "EN_TO_ZH_CHOICE"
     ? (selectedChoice ? selectedChoice === definitionText : null)
-    : current && current.questionType === "ZH_TO_EN_CHOICE"
+    : current && (current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE")
       ? (selectedChoice ? normalizeChoiceAnswer(selectedChoice) === normalizeChoiceAnswer(current.word.term) : null)
+    : current && current.questionType === "CLOZE_SENTENCE"
+      ? (userAnswer.trim() ? userAnswer.trim().toLocaleLowerCase() === current.word.term.trim().toLocaleLowerCase() : null)
+    : current && current.questionType === "LETTER_BANK"
+      ? (builtLetterIds.length ? builtLetterIds.map((id) => current.letters?.find((l) => l.id === id)?.value ?? "").join("").toLocaleLowerCase() === current.word.term.toLocaleLowerCase() : null)
     : current && current.questionType !== "EN_TO_ZH"
       ? current.word.entryType === "SENTENCE"
         ? normalizeSentenceAnswer(userAnswer) === normalizeSentenceAnswer(current.word.term)
@@ -233,12 +288,30 @@ export function StudyClient() {
     applySession(await apiFetch<SessionData>(`/api/study/sessions/${sessionId}`));
   }, [applySession]);
 
+  const revealChoiceNow = useCallback(() => {
+    if (choiceRevealTimerRef.current !== null) {
+      window.clearTimeout(choiceRevealTimerRef.current);
+      choiceRevealTimerRef.current = null;
+    }
+    if (choiceProgressTimerRef.current !== null) {
+      window.clearInterval(choiceProgressTimerRef.current);
+      choiceProgressTimerRef.current = null;
+    }
+    setChoiceRevealProgress(1);
+    setChoicesVisible(true);
+  }, []);
+
   const reveal = useCallback(async () => {
     if (!current) return;
     if (choiceRevealTimerRef.current !== null) {
       window.clearTimeout(choiceRevealTimerRef.current);
       choiceRevealTimerRef.current = null;
     }
+    if (choiceProgressTimerRef.current !== null) {
+      window.clearInterval(choiceProgressTimerRef.current);
+      choiceProgressTimerRef.current = null;
+    }
+    setChoiceRevealProgress(1);
     captureQuestionDuration();
     dismissKeyboard();
     setRevealed(true); setLastResult(null);
@@ -295,17 +368,22 @@ export function StudyClient() {
 
   const rate = useCallback(async (rating: ReviewRating) => {
     if (!current || !data) return;
+    const effectiveRating: ReviewRating = usedHint && (current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING") && exactLocal === false && (rating === "GOOD" || rating === "EASY") ? "HARD" : rating;
     const sessionId = data.session.id;
     setSubmitting(true); setError("");
     try {
       const result = await apiFetch<AnswerResult>("/api/study/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         clientAnswerId: answerIdRef.current || clientId(), wordId: current.word.id, studySessionId: sessionId,
-        studySessionItemId: current.itemId, rating, questionType: current.questionType,
-        userAnswer: current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" ? (selectedChoice ?? undefined) : (userAnswer || undefined),
+        studySessionItemId: current.itemId, rating: effectiveRating, questionType: current.questionType,
+        userAnswer: (() => {
+          if (current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE") return selectedChoice ?? undefined;
+          if (current.questionType === "LETTER_BANK") return builtLetterIds.map((id) => current.letters?.find((l) => l.id === id)?.value ?? "").join("") || undefined;
+          return userAnswer || undefined;
+        })(),
         durationMs: captureQuestionDuration(),
       }) });
       setLastResult(result);
-      await new Promise((resolve) => window.setTimeout(resolve, 650));
+      await new Promise((resolve) => window.setTimeout(resolve, 320));
       if (result.adaptiveFollowUp) {
         // A follow-up item may have been inserted mid-session; reload to pick it up.
         await reloadSession(sessionId);
@@ -317,6 +395,10 @@ export function StudyClient() {
         setLastResult(null);
         setSelectedChoice(null);
         setChoicesVisible(false);
+        setChoiceRevealProgress(0);
+        setHintLevel(0);
+        setUsedHint(false);
+        setBuiltLetterIds([]);
         setData((prev) => {
           if (!prev) return prev;
           const isLast = index >= prev.items.length - 1;
@@ -336,7 +418,7 @@ export function StudyClient() {
       }
     } catch (reason) { setError(errorMessage(reason, "提交答案失败")); }
     finally { setSubmitting(false); }
-  }, [captureQuestionDuration, current, data, index, reloadSession, selectedChoice, userAnswer]);
+  }, [captureQuestionDuration, current, data, exactLocal, index, reloadSession, selectedChoice, usedHint, userAnswer]);
 
   const skip = useCallback(async () => {
     if (!current || !data) return;
@@ -376,8 +458,26 @@ export function StudyClient() {
       }
 
       if (!revealed) {
+        if (
+          !isInput &&
+          (current?.questionType === "EN_TO_ZH_CHOICE" || current?.questionType === "ZH_TO_EN_CHOICE" || current?.questionType === "LISTENING_CHOICE") &&
+          !choicesVisible
+        ) {
+          if (event.key === " " || event.key === "Enter") {
+            event.preventDefault();
+            revealChoiceNow();
+            return;
+          }
+        }
         // 未揭晓状态：Space 翻转/显示答案
         if (!isInput && event.key === " " && current) {
+          if (current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE") {
+            if (!choicesVisible) {
+              event.preventDefault();
+              revealChoiceNow();
+              return;
+            }
+          }
           event.preventDefault();
           void reveal();
           return;
@@ -386,7 +486,7 @@ export function StudyClient() {
         // 选择题模式下数字键 1-4 快捷作答
         if (
           !isInput &&
-          (current?.questionType === "EN_TO_ZH_CHOICE" || current?.questionType === "ZH_TO_EN_CHOICE") &&
+          (current?.questionType === "EN_TO_ZH_CHOICE" || current?.questionType === "ZH_TO_EN_CHOICE" || current?.questionType === "LISTENING_CHOICE") &&
           choicesVisible &&
           current.choices
         ) {
@@ -395,7 +495,7 @@ export function StudyClient() {
             const choice = current.choices[num - 1];
             if (choice) {
               event.preventDefault();
-              if (current.questionType === "ZH_TO_EN_CHOICE") {
+              if (current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE") {
                 void playEntryTts(choice, choice === current.word.term ? current.word.entryType : "WORD");
               }
               captureQuestionDuration();
@@ -416,7 +516,7 @@ export function StudyClient() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [captureQuestionDuration, choicesVisible, current, rate, reveal, revealed, skip, submitting]);
+  }, [captureQuestionDuration, choicesVisible, current, rate, reveal, revealChoiceNow, revealed, skip, submitting]);
 
   if (!data && !error) return <div className="grid min-h-[75vh] place-items-center"><div className="animate-scale-in text-center"><Loader2 className="mx-auto size-10 animate-spin text-accent" /><p className="mt-3 text-[15px] text-quaternary-label">正在生成 {MODE_LABELS[mode]} 队列…</p></div></div>;
   if (error && !data) return <div className="mx-auto max-w-xl py-20 text-center"><AlertCircle className="mx-auto size-12 text-danger" /><h1 className="mt-4 text-xl font-bold">无法开始学习</h1><p className="mt-2 text-[15px] text-secondary-label">{error}</p><div className="mt-6 flex justify-center gap-3"><Button onClick={() => void start()}><RotateCcw className="size-4" />重试</Button><Link href="/" className={buttonClass("outline")}>返回首页</Link></div></div>;
@@ -434,19 +534,89 @@ export function StudyClient() {
       <div className="flex items-center justify-between text-xs text-tertiary-label"><span>{entryTypeLabel(current.word.entryType)}</span><span>{current.word.sourceLanguage} → {current.word.targetLanguage}</span></div>
       <div className="min-h-0 overflow-y-auto overscroll-contain">
         <div className={`flex min-h-full w-full flex-col items-center px-1 text-center ${revealed ? "justify-start py-[clamp(0.5rem,2vh,1.25rem)]" : "justify-center py-[clamp(1rem,4vh,3rem)]"}`}>
-        {current.questionType === "ZH_TO_EN_CHOICE" ? <>
+        {current.questionType === "CLOZE_SENTENCE" ? <>
+          {revealed ? <div className="w-full max-w-xl">
+            <p className="text-[12.5px] font-medium text-quaternary-label">补全句子中的单词</p>
+            <div className="mt-1.5 rounded-[12px] bg-accent/[0.04] px-3 py-2 text-left text-sm leading-relaxed sm:text-[15px]">{current.cloze?.blankedSentence ?? "____"}</div>
+            {current.cloze?.translation && <p className="mt-1.5 text-xs text-secondary-label">{current.cloze.translation}</p>}
+            <div className="mt-2 space-y-1 text-base font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
+          </div> : <>
+            <p className="text-[12.5px] font-medium text-quaternary-label">根据释义补全句子</p>
+            <div className="mt-2 w-full max-w-xl rounded-[12px] bg-accent/[0.04] px-3 py-2 text-left text-sm leading-relaxed sm:text-[15px]">{current.cloze?.blankedSentence ?? "____"}</div>
+            {current.cloze?.translation && <p className="mt-1.5 text-xs text-secondary-label">{current.cloze.translation}</p>}
+            <div className="mt-2 text-sm font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
+            <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]"><Volume2 className="size-3.5" />重播发音</button>
+            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-2.5 max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getProgressiveHint(current.word.term, hintLevel) ?? getHintPattern(current.word.term)}</p>}
+            <div className="mt-2.5 flex w-full max-w-md justify-center gap-2">
+              <button type="button" onClick={() => { setHintLevel((v) => v + 1); setUsedHint(true); }} disabled={hintLevel >= current.word.term.length - 2} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] disabled:opacity-40 dark:text-[#0a84ff]"><Lightbulb className="size-3.5" />提示</button>
+              <button type="button" onClick={() => { setUsedHint(true); void reveal(); }} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-warning/20 bg-warning/[0.06] px-3 py-1 text-xs font-semibold text-warning-deep hover:bg-warning/[0.12]"><Eye className="size-3.5" />不会</button>
+            </div>
+            <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-2.5 h-11 w-full max-w-md rounded-[14px] border border-black/[0.08] bg-white/70 px-4 text-center text-base outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] sm:text-lg dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入单词补全句子" />
+          </>}
+        </> : current.questionType === "LETTER_BANK" ? <>
+          {revealed ? <div className="w-full max-w-xl">
+            <p className="text-[12.5px] font-medium text-quaternary-label">拼出单词</p>
+            <div className="mt-1.5 space-y-1 text-base font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
+          </div> : <>
+            <p className="text-[12.5px] font-medium text-quaternary-label">根据释义拼出单词（点选字母）</p>
+            <div className="mt-1.5 max-w-xl text-base font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
+            <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]"><Volume2 className="size-3.5" />重播发音</button>
+            <div className="mt-3 flex min-h-12 w-full max-w-md flex-wrap items-center justify-center gap-1.5 rounded-[14px] border-2 border-dashed border-accent/20 bg-accent/[0.04] px-3 py-2">
+              {builtLetterIds.length ? builtLetterIds.map((id) => {
+                const tile = current.letters?.find((l) => l.id === id);
+                return <button key={id} type="button" onClick={() => setBuiltLetterIds((ids) => ids.filter((v) => v !== id))} className="ios-press grid size-9 place-items-center rounded-[10px] bg-accent text-sm font-bold uppercase text-white shadow">{tile?.value ?? ""}</button>;
+              }) : <span className="text-xs text-tertiary-label">点按字母拼写</span>}
+            </div>
+            <div className="mt-3 flex max-w-md flex-wrap justify-center gap-1.5">
+              {(current.letters ?? []).map((letter) => {
+                const used = builtLetterIds.includes(letter.id);
+                return <button key={letter.id} type="button" disabled={used} onClick={() => { if (!used) setBuiltLetterIds((ids) => [...ids, letter.id]); }} className={`ios-press grid size-9 place-items-center rounded-[10px] border text-sm font-bold uppercase shadow-sm ${used ? "opacity-25 border-black/5 bg-black/5 dark:bg-white/5" : "border-black/[0.06] bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.06]"}`}>{letter.value}</button>;
+              })}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBuiltLetterIds([])} disabled={!builtLetterIds.length}>清空</Button>
+              <Button variant="outline" size="sm" onClick={() => { setUsedHint(true); void reveal(); }}>不会</Button>
+              <Button size="sm" onClick={() => void reveal()} disabled={!builtLetterIds.length}>检查答案</Button>
+            </div>
+          </>}
+        </> : current.questionType === "LISTENING_CHOICE" ? <>
+          <p className="text-[12.5px] font-medium text-quaternary-label">听发音选择单词</p>
+          <button type="button" onClick={() => void playWord(current)} className="ios-press mt-3 grid size-14 place-items-center rounded-full bg-[#5ac8fa]/10 text-accent sm:size-16"><Headphones className="size-7 sm:size-8" /></button>
+          <p className="mt-2 text-xs text-quaternary-label">已自动播放，可点击重播</p>
+          {!revealed && hasChoices && <p className="mt-2.5 text-xs text-quaternary-label">{choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {!revealed && !choicesVisible && hasChoices && <div className="mt-3 w-full max-w-xl space-y-2"><div className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]"><div className="h-full rounded-full bg-accent transition-all duration-100" style={{ width: `${Math.round(choiceRevealProgress * 100)}%` }} /></div><button type="button" onClick={revealChoiceNow} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] dark:text-[#0a84ff]"><Eye className="size-3.5" />立即显示选项<Kbd className="hidden sm:inline-flex ml-1 text-[10px]">Space</Kbd></button></div>}
+          {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-2.5" : "mt-4"}`}>
+            {(current.choices ?? []).map((choice, cIdx) => {
+              const isCorrect = normalizeChoiceAnswer(choice) === normalizeChoiceAnswer(current.word.term);
+              const isSelected = choice === selectedChoice;
+              const choiceDefinition = current.choiceDefinitions?.[choice];
+              const revealedStyle = revealed
+                ? isCorrect ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success" : isSelected ? "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger" : "border-black/[0.06] bg-black/[0.015] text-tertiary-label opacity-75 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                : isSelected ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]";
+              return <button key={choice} type="button" disabled={revealed} onClick={() => { if (!revealed) { void playEntryTts(choice, choice === current.word.term ? current.word.entryType : "WORD"); captureQuestionDuration(); setSelectedChoice(choice); setLastResult(null); void reveal(); } }} className={`ios-press rounded-[14px] border px-3.5 py-2.5 text-left transition-all duration-200 ${revealedStyle}`}><span className="flex items-center justify-between gap-3"><span className="min-w-0 break-words text-[14.5px] font-medium"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span>{revealed ? (isCorrect ? <CheckCircle2 className="size-4 shrink-0 text-success" /> : isSelected ? <XCircle className="size-4 shrink-0 text-danger" /> : null) : <Volume2 className="size-4 shrink-0 opacity-50" />}</span>{revealed && <span className="mt-1 block text-xs font-normal leading-relaxed text-secondary-label">{choiceDefinition ?? "暂无释义"}</span>}</button>;
+            })}
+          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : null}
+        </> : current.questionType === "ZH_TO_EN_CHOICE" ? <>
           <p className="text-[12.5px] font-medium text-quaternary-label">根据释义选择单词</p>
           <div className="glass-inner mt-2.5 w-full max-w-xl rounded-[16px] border border-accent/15 bg-accent/[0.04] px-4 py-3 text-left shadow-[0_4px_16px_rgba(0,122,255,0.04)] sm:px-6 sm:py-3.5">
             <DefinitionBlock definitions={definitions} className="text-base font-bold leading-snug sm:text-lg" />
           </div>
           {!revealed && hasChoices && <p className="mt-2.5 text-xs text-quaternary-label">{choicesVisible ? "点击候选单词即作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {!revealed && !choicesVisible && hasChoices && <div className="mt-3 w-full max-w-xl space-y-2"><div className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]"><div className="h-full rounded-full bg-accent transition-all duration-100" style={{ width: `${Math.round(choiceRevealProgress * 100)}%` }} /></div><button type="button" onClick={revealChoiceNow} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] dark:text-[#0a84ff]"><Eye className="size-3.5" />立即显示选项<Kbd className="hidden sm:inline-flex ml-1 text-[10px]">Space</Kbd></button></div>}
           {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-2.5" : "mt-4"}`}>
             {(current.choices ?? []).map((choice, cIdx) => {
               const isCorrect = normalizeChoiceAnswer(choice) === normalizeChoiceAnswer(current.word.term);
               const isSelected = choice === selectedChoice;
-              const showState = revealed && (isCorrect || isSelected);
               const choiceDefinition = current.choiceDefinitions?.[choice];
-              if (revealed && !isCorrect && !isSelected) return null;
+              const revealedStyle = revealed
+                ? isCorrect
+                  ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success"
+                  : isSelected
+                    ? "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger"
+                    : "border-black/[0.06] bg-black/[0.015] text-tertiary-label opacity-75 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                : isSelected
+                  ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs"
+                  : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]";
               return <button key={choice} type="button" disabled={revealed} onClick={() => {
                 if (!revealed) {
                   void playEntryTts(choice, choice === current.word.term ? current.word.entryType : "WORD");
@@ -454,30 +624,40 @@ export function StudyClient() {
                   setSelectedChoice(choice); setLastResult(null);
                   void reveal();
                 }
-              }} className={`ios-press rounded-[14px] border px-3.5 py-2.5 text-left transition-all duration-200 ${showState ? (isCorrect ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success" : "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger") : isSelected ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}>
-                <span className="flex items-center justify-between gap-3"><span className="min-w-0 break-words text-[14.5px] font-medium"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span><Volume2 className="size-4 shrink-0 opacity-50" /></span>
+              }} className={`ios-press rounded-[14px] border px-3.5 py-2.5 text-left transition-all duration-200 ${revealedStyle}`}>
+                <span className="flex items-center justify-between gap-3"><span className="min-w-0 break-words text-[14.5px] font-medium"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span>{revealed ? (isCorrect ? <CheckCircle2 className="size-4 shrink-0 text-success" /> : isSelected ? <XCircle className="size-4 shrink-0 text-danger" /> : null) : <Volume2 className="size-4 shrink-0 opacity-50" />}</span>
                 {revealed && <span className="mt-1 block text-xs font-normal leading-relaxed text-secondary-label">{choiceDefinition ?? "暂无释义"}</span>}
               </button>;
             })}
-          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-accent/20 px-4 py-3 text-xs text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆释义，选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : null}
         </> : current.questionType === "EN_TO_ZH_CHOICE" ? <>
           <p className="text-[12.5px] font-medium text-quaternary-label">选择正确的释义</p>
           <h1 className={`break-words font-bold tracking-tight ${revealed ? "mt-1.5 text-xl sm:text-2xl" : "mt-2.5 text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>
           {!revealed && <Pronunciation item={current} />}
+          {!revealed && hasChoices && <p className="mt-2 text-xs text-quaternary-label">{choicesVisible ? "点击释义作答或按 1-4" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)}</p>}
+          {!revealed && !choicesVisible && hasChoices && <div className="mt-3 w-full max-w-xl space-y-2"><div className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]"><div className="h-full rounded-full bg-accent transition-all duration-100" style={{ width: `${Math.round(choiceRevealProgress * 100)}%` }} /></div><button type="button" onClick={revealChoiceNow} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] dark:text-[#0a84ff]"><Eye className="size-3.5" />立即显示选项<Kbd className="hidden sm:inline-flex ml-1 text-[10px]">Space</Kbd></button></div>}
           {choicesVisible && hasChoices ? <div className={`grid w-full max-w-xl gap-2 ${revealed ? "mt-2.5" : "mt-4"}`}>
             {(current.choices ?? []).map((choice, cIdx) => {
               const isCorrect = choice === definitionText;
               const isSelected = choice === selectedChoice;
-              const showState = revealed && (isCorrect || isSelected);
-              if (revealed && !isCorrect && !isSelected) return null;
+              const revealedStyle = revealed
+                ? isCorrect
+                  ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success"
+                  : isSelected
+                    ? "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger"
+                    : "border-black/[0.06] bg-black/[0.015] text-tertiary-label opacity-70 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                : isSelected
+                  ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs"
+                  : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]";
               return <button key={choice} type="button" aria-pressed={isSelected} disabled={revealed} onClick={() => {
                 captureQuestionDuration();
                 setSelectedChoice(choice); setLastResult(null);
                 void reveal();
-              }} className={`ios-press break-words rounded-[14px] border px-3.5 py-2.5 text-left text-[14.5px] font-medium transition-all duration-200 disabled:opacity-90 ${showState ? (isCorrect ? "border-success/40 bg-success/[0.08] text-success-deep shadow-xs dark:text-success" : "border-danger/40 bg-danger/[0.08] text-danger-deep shadow-xs dark:text-danger") : isSelected ? "border-accent/60 bg-accent/[0.08] text-accent font-semibold shadow-xs" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</button>;
+              }} className={`ios-press break-words rounded-[14px] border px-3.5 py-2.5 text-left text-[14.5px] font-medium transition-all duration-200 ${revealedStyle}`}><span className="flex items-center justify-between gap-2"><span className="flex-1"><Kbd className="mr-2 hidden sm:inline-flex">{cIdx + 1}</Kbd>{choice}</span>{revealed && (isCorrect ? <CheckCircle2 className="size-4 shrink-0 text-success" /> : isSelected ? <XCircle className="size-4 shrink-0 text-danger" /> : null)}</span></button>;
             })}
-          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-accent/20 px-4 py-3 text-xs text-secondary-label"><Clock3 className="size-4 text-accent" />先回忆单词含义，释义选项即将出现</div>}
+          </div> : !hasChoices ? <div className="glass-inner mt-4 flex w-full max-w-xl items-center justify-center gap-2 rounded-[14px] border border-dashed border-danger/20 px-4 py-3 text-xs text-secondary-label"><AlertCircle className="size-4 text-danger" />该词条暂无释义，可稍后再学</div> : null}
         </> : current.questionType === "EN_TO_ZH" ? <>
+          {revealed && <p className="mt-2 text-center text-[11px] text-quaternary-label">诚实自评更有助于记忆 · 回忆不起来请选“忘记”</p>}
           {!revealed && <p className="text-[12.5px] font-medium text-quaternary-label">{current.word.entryType === "SENTENCE" ? "理解句意、语法和关键表达" : "回忆它的含义"}</p>}
           {!revealed && <h1 className={`mt-2.5 break-words font-bold tracking-tight ${current.word.entryType === "SENTENCE" ? "max-w-2xl text-xl leading-snug sm:text-3xl" : "text-2xl sm:text-4xl lg:text-5xl"}`}>{current.word.term}</h1>}
           {!revealed && (current.word.entryType === "SENTENCE"
@@ -494,7 +674,16 @@ export function StudyClient() {
             <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]">
               <Volume2 className="size-3.5" />{current.word.entryType === "SENTENCE" ? "听原句（提示）" : "重播发音"}
             </button>
-            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-2.5 max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getHintPattern(current.word.term)}</p>}
+            {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && (
+              <div className="mt-2.5 flex w-full max-w-md flex-col items-center gap-2">
+                <p className="max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getProgressiveHint(current.word.term, hintLevel) ?? getHintPattern(current.word.term)}</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button type="button" onClick={() => { setHintLevel((v) => v + 1); setUsedHint(true); }} disabled={hintLevel >= current.word.term.length - 2} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] disabled:opacity-40 dark:text-[#0a84ff]"><Lightbulb className="size-3.5" />提示 {hintLevel > 0 ? `(${hintLevel})` : ""}</button>
+                  <button type="button" onClick={() => { setUsedHint(true); void reveal(); }} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-warning/20 bg-warning/[0.06] px-3 py-1 text-xs font-semibold text-warning-deep hover:bg-warning/[0.12]"><Eye className="size-3.5" />不会，直接看答案</button>
+                </div>
+                {usedHint && <p className="text-[11px] text-quaternary-label">已使用提示，本题将按“模糊”记录</p>}
+              </div>
+            )}
             {current.word.entryType === "SENTENCE"
               ? <textarea ref={sentenceAnswerRef} autoFocus rows={3} autoCapitalize="sentences" autoCorrect="off" spellCheck={false} className="mt-2.5 min-h-20 w-full max-w-xl resize-none rounded-[14px] border border-black/[0.08] bg-white/70 px-3.5 py-2.5 text-left text-[14.5px] leading-relaxed outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入完整英文句子（Ctrl/⌘ + Enter 检查）" />
               : <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-2.5 h-11 w-full max-w-md rounded-[14px] border border-black/[0.08] bg-white/70 px-4 text-center text-base outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] sm:text-lg dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入英文词条" />}
@@ -542,12 +731,24 @@ export function StudyClient() {
                 </div>
               )}
 
+              {(current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING" || current.questionType === "CLOZE_SENTENCE" || current.questionType === "LETTER_BANK") && exactLocal === false && (
+                current.word.entryType === "SENTENCE"
+                  ? <SentenceDiff expected={current.word.term} actual={(current.questionType === "LETTER_BANK" ? builtLetterIds.map((id) => current.letters?.find((l) => l.id === id)?.value ?? "").join("") : userAnswer)} />
+                  : <TermDiff expected={current.word.term} actual={(current.questionType === "LETTER_BANK" ? builtLetterIds.map((id) => current.letters?.find((l) => l.id === id)?.value ?? "").join("") : userAnswer)} />
+              )}
+              {usedHint && (current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING") && !revealed && null}
+              {usedHint && revealed && (current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING") && exactLocal !== true && (
+                <p className="mt-2 text-xs text-warning-deep">已使用提示，建议选择“模糊”</p>
+              )}
+
               <div className="mt-2.5 space-y-2">
-              {/* 词根词缀 */}
               {(current.word.content.roots.length > 0 || current.word.content.affixes.length > 0) && (
                 <div className="rounded-[10px] bg-accent/[0.04] p-2.5">
-                  <p className="text-[10.5px] font-bold uppercase tracking-wider text-accent-deep">🧩 构词拆解</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
+                  <button type="button" onClick={() => setRevealSections((s) => ({ ...s, roots: !s.roots }))} className="flex w-full items-center justify-between text-left">
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-accent-deep">🧩 构词拆解</span>
+                    <ChevronDown className={`size-3.5 text-accent transition-transform ${revealSections.roots ? "rotate-180" : ""}`} />
+                  </button>
+                  {revealSections.roots && <div className="mt-1 flex flex-wrap gap-1">
                     {current.word.content.roots.map((root) => (
                       <span key={root.root} className="rounded-md bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-label dark:bg-white/[0.08]">
                         <span className="font-mono text-accent">词根 {root.root}</span>: {root.meaning}
@@ -558,7 +759,7 @@ export function StudyClient() {
                         <span className="font-mono text-purple">{affix.type === "PREFIX" ? "前缀" : "后缀"} {affix.value}</span>: {affix.meaning}
                       </span>
                     ))}
-                  </div>
+                  </div>}
                 </div>
               )}
 
@@ -570,24 +771,16 @@ export function StudyClient() {
                 </div>
               )}
 
-              {/* 趣味助记 */}
               {current.word.content.learning.mnemonic ? (
-                <div className="flex items-start justify-between gap-2 rounded-[12px] bg-warning/[0.06] p-2.5">
-                  <div className="flex items-start gap-1.5">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                    <div>
-                      <p className="text-[10.5px] font-bold text-warning-deep">趣味助记</p>
-                      <p className="mt-0.5 text-[12.5px] leading-relaxed text-label">{current.word.content.learning.mnemonic}</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void generateAiMnemonicForCurrent()}
-                    disabled={aiGenerating}
-                    className="ios-press shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[10.5px] font-semibold text-warning-deep hover:bg-warning/20 disabled:opacity-50"
-                  >
-                    {aiGenerating ? <Loader2 className="size-3 animate-spin" /> : "换一个"}
+                <div className="rounded-[12px] bg-warning/[0.06] p-2.5">
+                  <button type="button" onClick={() => setRevealSections((s) => ({ ...s, mnemonic: !s.mnemonic }))} className="flex w-full items-center justify-between text-left">
+                    <span className="flex items-center gap-1.5 text-[10.5px] font-bold text-warning-deep"><Sparkles className="size-3.5 text-warning" />趣味助记</span>
+                    <span className="flex items-center gap-2"><span className="text-[11px] text-quaternary-label">{revealSections.mnemonic ? "收起" : "展开"}</span><ChevronDown className={`size-3.5 text-warning transition-transform ${revealSections.mnemonic ? "rotate-180" : ""}`} /></span>
                   </button>
+                  {revealSections.mnemonic && <div className="mt-1.5 flex items-start justify-between gap-2">
+                    <p className="text-[12.5px] leading-relaxed text-label">{current.word.content.learning.mnemonic}</p>
+                    <button type="button" onClick={() => void generateAiMnemonicForCurrent()} disabled={aiGenerating} className="ios-press shrink-0 rounded-full bg-warning/12 px-2 py-0.5 text-[10.5px] font-semibold text-warning-deep hover:bg-warning/20 disabled:opacity-50">{aiGenerating ? <Loader2 className="size-3 animate-spin" /> : "换一个"}</button>
+                  </div>}
                 </div>
               ) : current.word.entryType !== "SENTENCE" ? (
                 <div className="flex items-center justify-between gap-2 rounded-[12px] border border-dashed border-warning/25 bg-warning/[0.03] p-2.5">
@@ -608,12 +801,24 @@ export function StudyClient() {
                 </div>
               ) : null}
 
-              {current.word.entryType === "SENTENCE" && (current.word.content.sentenceAnalysis.grammarNotes.length > 0 || current.word.content.sentenceAnalysis.keyExpressions.length > 0 || current.word.content.sentenceAnalysis.variations.length > 0) && <div className="space-y-2.5 rounded-[12px] bg-accent/[0.045] p-3">
-                {current.word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="text-xs font-semibold text-accent">语法要点</p><ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-secondary-label">{current.word.content.sentenceAnalysis.grammarNotes.map((note) => <li key={note}>• {note}</li>)}</ul></div>}
-                {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-accent">关键表达</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[13px] font-semibold">{item.expression}</p><ClampedText text={item.meaning + (item.note ? ` · ${item.note}` : "")} className="text-xs leading-relaxed text-secondary-label" /></div>)}</div></div>}
-                {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-accent">替换句型</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[8px] bg-white/50 px-2.5 py-1.5 dark:bg-white/[0.04]"><ClampedText text={item.sentence} className="text-xs font-medium leading-relaxed" />{item.translation && <ClampedText text={item.translation} className="mt-0.5 text-[11px] text-quaternary-label" />}</div>)}</div></div>}
+              {current.word.entryType === "SENTENCE" && (current.word.content.sentenceAnalysis.grammarNotes.length > 0 || current.word.content.sentenceAnalysis.keyExpressions.length > 0 || current.word.content.sentenceAnalysis.variations.length > 0) && <div className="rounded-[12px] bg-accent/[0.045] p-3">
+                <button type="button" onClick={() => setRevealSections((s) => ({ ...s, grammar: !s.grammar }))} className="flex w-full items-center justify-between text-left">
+                  <span className="text-xs font-semibold text-accent">句型与表达 {revealSections.grammar ? "" : `· ${current.word.content.sentenceAnalysis.grammarNotes.length + current.word.content.sentenceAnalysis.keyExpressions.length + current.word.content.sentenceAnalysis.variations.length} 项`}</span>
+                  <ChevronDown className={`size-3.5 text-accent transition-transform ${revealSections.grammar ? "rotate-180" : ""}`} />
+                </button>
+                {revealSections.grammar && <div className="mt-2 space-y-2.5">
+                  {current.word.content.sentenceAnalysis.grammarNotes.length > 0 && <div><p className="text-xs font-semibold text-accent">语法要点</p><ul className="mt-1 space-y-0.5 text-xs leading-relaxed text-secondary-label">{current.word.content.sentenceAnalysis.grammarNotes.map((note) => <li key={note}>• {note}</li>)}</ul></div>}
+                  {current.word.content.sentenceAnalysis.keyExpressions.length > 0 && <div><p className="text-xs font-semibold text-accent">关键表达</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.keyExpressions.map((item) => <div key={item.expression}><p className="text-[13px] font-semibold">{item.expression}</p><ClampedText text={item.meaning + (item.note ? ` · ${item.note}` : "")} className="text-xs leading-relaxed text-secondary-label" /></div>)}</div></div>}
+                  {current.word.content.sentenceAnalysis.variations.length > 0 && <div><p className="text-xs font-semibold text-accent">替换句型</p><div className="mt-1 space-y-1.5">{current.word.content.sentenceAnalysis.variations.slice(0, 3).map((item) => <div key={item.sentence} className="rounded-[8px] bg-white/50 px-2.5 py-1.5 dark:bg-white/[0.04]"><ClampedText text={item.sentence} className="text-xs font-medium leading-relaxed" />{item.translation && <ClampedText text={item.translation} className="mt-0.5 text-[11px] text-quaternary-label" />}</div>)}</div></div>}
+                </div>}
               </div>}
-              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[10px] bg-black/[0.02] px-3 py-2 dark:bg-white/[0.03]"><div className="flex items-start justify-between gap-2"><p className="text-[13.5px] italic leading-relaxed text-quaternary-label">{current.word.content.examples[0].sentence}</p><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-6 shrink-0 place-items-center rounded-full bg-accent/[0.08] text-accent transition hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3" /></button></div>{current.word.content.examples[0].translation && <p className="mt-1 text-xs leading-relaxed text-secondary-label">{current.word.content.examples[0].translation}</p>}</div>}
+              {current.word.entryType !== "SENTENCE" && current.word.content.examples[0] && <div className="rounded-[10px] bg-black/[0.02] px-3 py-2 dark:bg-white/[0.03]">
+                <button type="button" onClick={() => setRevealSections((s) => ({ ...s, example: !s.example }))} className="flex w-full items-center justify-between text-left">
+                  <span className="text-[11px] font-semibold text-tertiary-label">例句</span>
+                  <ChevronDown className={`size-3.5 text-tertiary-label transition-transform ${revealSections.example ? "rotate-180" : ""}`} />
+                </button>
+                {revealSections.example ? <><div className="mt-1.5 flex items-start justify-between gap-2"><p className="text-[13.5px] italic leading-relaxed text-quaternary-label">{current.word.content.examples[0].sentence}</p><button type="button" aria-label="朗读例句" onClick={() => void playCachedTts(current.word.content.examples[0]!.sentence, "US", "sentence")} className="ios-press grid size-6 shrink-0 place-items-center rounded-full bg-accent/[0.08] text-accent transition hover:bg-accent/[0.14] dark:text-[#0a84ff]"><Volume2 className="size-3" /></button></div>{current.word.content.examples[0].translation && <p className="mt-1 text-xs leading-relaxed text-secondary-label">{current.word.content.examples[0].translation}</p>}</> : <p className="mt-1 line-clamp-1 text-[12px] italic text-quaternary-label">{current.word.content.examples[0].sentence}</p>}
+              </div>}
               </div>
             </div>
           </div>
@@ -623,8 +828,8 @@ export function StudyClient() {
         </div>
       </div>
       <div className="shrink-0 pt-1.5 sm:pt-2.5">
-      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击上方选项或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType !== "EN_TO_ZH" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span><Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-danger/20 text-danger hover:bg-danger/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记<Kbd className="hidden sm:inline-flex ml-1">1</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || !userAnswer.trim()}><Sparkles className="size-4 shrink-0" /><span>检查答案</span><Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-4.5" />显示答案<Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div>) : <div className="border-t border-black/[0.05] pt-2 sm:pt-2.5 dark:border-white/[0.06]">
-        {current.questionType === "ZH_TO_EN_CHOICE" && <p className="mb-1.5 text-center text-[11px] text-quaternary-label sm:mb-2 sm:text-xs">已按“{exactLocal === true ? "认识" : "忘记"}”记录，按数字键或点击熟悉度直接进入下一题</p>}
+      {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "LISTENING_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击上方选项或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "CLOZE_SENTENCE" || current.questionType === "LETTER_BANK" || current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span><Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-danger/20 text-danger hover:bg-danger/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记<Kbd className="hidden sm:inline-flex ml-1">1</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || (current.questionType === "LETTER_BANK" ? !builtLetterIds.length : !userAnswer.trim())}><Sparkles className="size-4 shrink-0" /><span>检查答案</span><Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-4.5" />显示答案<Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div>) : <div className="border-t border-black/[0.05] pt-2 sm:pt-2.5 dark:border-white/[0.06]">
+        {(current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE" || current.questionType === "EN_TO_ZH_CHOICE") && <p className="mb-1.5 text-center text-[11px] text-quaternary-label sm:mb-2 sm:text-xs">已按“{exactLocal === true ? "认识" : "忘记"}”记录，按数字键或点击熟悉度直接进入下一题</p>}
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">{(["AGAIN", "HARD", "GOOD", "EASY"] as ReviewRating[]).map((rating, rIdx) => { const interval = intervals.find((item) => item.rating === rating); const labels = { AGAIN: "忘记", HARD: "模糊", GOOD: "认识", EASY: "很熟" } as const; const styles = { AGAIN: "border border-danger/20 bg-danger/[0.04] text-danger-deep hover:bg-danger/[0.08] dark:text-danger", HARD: "border border-warning/20 bg-warning/[0.04] text-warning-deep hover:bg-warning/[0.08] dark:text-warning", GOOD: "border border-accent/20 bg-accent/[0.04] text-accent-deep hover:bg-accent/[0.08] dark:text-[#0a84ff]", EASY: "border border-success/20 bg-success/[0.04] text-success-deep hover:bg-success/[0.08] dark:text-success" } as const; const shortcutKey = String(rIdx + 1); return <button key={rating} disabled={submitting} onClick={() => void rate(rating)} className={`ios-press min-h-9.5 rounded-[12px] px-1.5 py-1.5 text-center transition-all duration-150 disabled:opacity-40 sm:min-h-11 sm:rounded-[13px] sm:p-2.5 ${styles[rating]}`}><div className="flex items-center justify-center gap-1.5"><b className="text-[13px] sm:text-[14px]">{labels[rating]}</b><Kbd className="hidden sm:inline-flex text-[9px] px-1">{shortcutKey}</Kbd></div><span className="mt-0.5 block text-[10px] opacity-65 sm:text-[10.5px] num-tabular">{interval ? formatInterval(interval.scheduledDays) : "—"}</span></button>; })}</div></div>}
       </div>
     </CardContent></Card>

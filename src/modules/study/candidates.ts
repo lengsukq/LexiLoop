@@ -194,17 +194,35 @@ export function selectCandidates(mode: StudyMode, pools: Pools, options: { rando
   const ratios: Array<{ items: StudyCandidate[]; take: number }> = mode === "LISTENING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 2 }] : mode === "SPELLING" ? [{ items: groups.due, take: 5 }, { items: groups.wrong, take: 3 }, { items: groups.fresh, take: 1 }] : [{ items: groups.due, take: 4 }, { items: groups.wrong, take: 2 }, { items: groups.fresh, take: 1 }];
   return interleave(ratios);
 }
-export function questionFor(mode: StudyMode, taskType: string, position = 0, masteryScore?: number): QuestionType {
+function isSimpleSpellingTerm(term: string): boolean {
+  return /^[a-zA-Z]{3,14}$/.test(term);
+}
+
+export function questionFor(mode: StudyMode, taskType: string, position = 0, masteryScore?: number, extra?: { term?: string; hasExample?: boolean }): QuestionType {
   if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING";
-  if (mode === "LISTENING") return "LISTENING_SPELLING";
-  if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") return "ZH_TO_EN_SPELLING";
+  if (mode === "LISTENING") {
+    // Mix spelling and choice for variety: even positions use choice
+    if (position % 3 === 1 && masteryScore != null && masteryScore < 50) return "LISTENING_CHOICE";
+    if (position % 2 === 1) return "LISTENING_CHOICE";
+    return "LISTENING_SPELLING";
+  }
+  if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") {
+    if (extra?.term && isSimpleSpellingTerm(extra.term) && position % 3 === 0) return "LETTER_BANK";
+    return "ZH_TO_EN_SPELLING";
+  }
   if (mode === "DAILY") {
     if (taskType === "NEW") return "EN_TO_ZH";
+    const term = extra?.term ?? "";
+    const hasExample = extra?.hasExample ?? false;
     if (masteryScore != null) {
       if (masteryScore < 35) return "EN_TO_ZH_CHOICE";
+      if (masteryScore < 55 && hasExample) return "CLOZE_SENTENCE";
       if (masteryScore < 70) return "ZH_TO_EN_CHOICE";
+      if (isSimpleSpellingTerm(term) && position % 4 === 0) return "LETTER_BANK";
       return "ZH_TO_EN_SPELLING";
     }
+    if (position % 6 === 5 && hasExample) return "CLOZE_SENTENCE";
+    if (position % 4 === 3 && term && isSimpleSpellingTerm(term)) return "LETTER_BANK";
     return position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE";
   }
   return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH";

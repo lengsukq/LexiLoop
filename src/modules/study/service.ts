@@ -53,7 +53,7 @@ export async function startStudySession(mode: StudyMode, resume = true, continuo
     for (const [index, candidate] of selected.entries()) {
       const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong });
       const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType;
-      await insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index, candidate.mastery_score ?? undefined), now);
+      await insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index, candidate.mastery_score ?? undefined, { term: candidate.term }), now);
     }
     return id;
   }).immediate();

@@ -17,8 +17,12 @@ function hasDefinitionSql(): string {
 const VALID_QUESTION_TYPES = new Set<QuestionType>([
   "EN_TO_ZH",
   "EN_TO_ZH_CHOICE",
+  "ZH_TO_EN_CHOICE",
   "ZH_TO_EN_SPELLING",
   "LISTENING_SPELLING",
+  "CLOZE_SENTENCE",
+  "LISTENING_CHOICE",
+  "LETTER_BANK",
 ]);
 function accumulator(map: Map<number, CandidateAccumulator>, wordId: number): CandidateAccumulator {
   const existing = map.get(wordId);

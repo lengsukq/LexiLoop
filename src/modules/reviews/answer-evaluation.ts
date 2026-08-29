@@ -137,7 +137,7 @@ export function canonicalTerm(term: string): string {
 }
 
 export function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definitions: DefinitionValue[]): boolean {
-  const spelling = input.questionType === "ZH_TO_EN_SPELLING" || input.questionType === "LISTENING_SPELLING";
+  const spelling = input.questionType === "ZH_TO_EN_SPELLING" || input.questionType === "LISTENING_SPELLING" || input.questionType === "CLOZE_SENTENCE" || input.questionType === "LETTER_BANK";
   if (spelling) {
     if (word.content_type === "SENTENCE") {
       const userNorm = normalizeSentenceAnswer(input.userAnswer ?? "");
@@ -157,6 +157,24 @@ export function isAnswerCorrect(input: AnswerInput, word: ReviewWordRow, definit
     if (targetTerm.length >= 7 && levenshteinDistance(userTerm, targetTerm) <= 1) {
       return true;
     }
+    return false;
+  }
+  if (input.questionType === "CLOZE_SENTENCE") {
+    const userTerm = normalizeTerm(input.userAnswer ?? "", word.source_language);
+    const targetTerm = word.normalized_term;
+    if (userTerm === targetTerm) return true;
+    if (canonicalTerm(userTerm) === canonicalTerm(targetTerm)) return true;
+    if (targetTerm.length >= 7 && levenshteinDistance(userTerm, targetTerm) <= 1) return true;
+    return false;
+  }
+  if (input.questionType === "LETTER_BANK") {
+    const userTerm = normalizeTerm(input.userAnswer ?? "", word.source_language);
+    return userTerm === word.normalized_term || canonicalTerm(userTerm) === canonicalTerm(word.normalized_term);
+  }
+  if (input.questionType === "LISTENING_CHOICE") {
+    const userTerm = normalizeTerm(input.userAnswer ?? "", word.source_language);
+    if (userTerm === word.normalized_term) return true;
+    if (canonicalTerm(userTerm) === canonicalTerm(word.normalized_term)) return true;
     return false;
   }
   if (input.questionType === "EN_TO_ZH_CHOICE") {
@@ -181,7 +199,10 @@ export function evaluateReviewAnswer(input: AnswerInput, word: ReviewWordRow): A
   const objectivelyScored = input.questionType === "ZH_TO_EN_SPELLING"
     || input.questionType === "LISTENING_SPELLING"
     || input.questionType === "EN_TO_ZH_CHOICE"
-    || input.questionType === "ZH_TO_EN_CHOICE";
+    || input.questionType === "ZH_TO_EN_CHOICE"
+    || input.questionType === "CLOZE_SENTENCE"
+    || input.questionType === "LISTENING_CHOICE"
+    || input.questionType === "LETTER_BANK";
   const respectsEasyChoice = objectivelyScored && !isCorrect && input.rating === "EASY";
   // A wrong answer rated "fuzzy" keeps the HARD grade: it is not treated as a
   // full lapse, so it enters the wrong-word pool but is reviewed in a later

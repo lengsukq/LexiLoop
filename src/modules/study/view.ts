@@ -54,10 +54,16 @@ export async function getStudySession(sessionId: number, resumed = false) {
     const questionType = row.question_type as QuestionType; const content = row.definitions_json === null ? emptyDictionaryContent() : dictionaryContentFromRow(row);
     const item = { itemId: Number(row.item_id), position: Number(row.position), taskType: row.task_type as StudyItemView["taskType"], questionType, status: String(row.status), skipReason: row.skip_reason === null ? null : String(row.skip_reason), word: { id: Number(row.word_id), term: String(row.term), sourceLanguage: String(row.source_language), targetLanguage: String(row.target_language), entryType: row.content_type as EntryType, content } } as StudyItemView & { status: string; skipReason: string | null };
     if (questionType === "EN_TO_ZH_CHOICE") item.choices = await generateMeaningChoices(Number(row.word_id), String(row.target_language), content);
-    if (questionType === "ZH_TO_EN_CHOICE") {
+    if (questionType === "ZH_TO_EN_CHOICE" || questionType === "LISTENING_CHOICE") {
       const payload = await generateWordChoices(Number(row.word_id), String(row.term), String(row.target_language), content);
       item.choices = payload.choices;
       item.choiceDefinitions = payload.choiceDefinitions;
+    }
+    if (questionType === "CLOZE_SENTENCE") {
+      item.cloze = buildClozeExtra(String(row.term), content);
+    }
+    if (questionType === "LETTER_BANK") {
+      item.letters = buildLetterTiles(String(row.term));
     }
     return item;
   }));
@@ -192,3 +198,25 @@ async function generateWordChoices(wordId: number, term: string, targetLanguage:
   }
   return { choices: shuffle(choices), choiceDefinitions };
 }
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+}
+
+function buildClozeExtra(term: string, content: DictionaryContent): { sentence: string; translation: string | null; blankedSentence: string } | null {
+  const candidates = (content.examples ?? [])
+    .map((ex) => ({ sentence: String(ex.sentence ?? "").trim(), translation: (ex.translation as string | null) ?? null }))
+    .filter((ex) => ex.sentence);
+  let chosen = candidates.find((ex) => new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(ex.sentence)) ?? candidates[0] ?? null;
+  if (!chosen) return null;
+  const blankedSentence = chosen.sentence.replace(new RegExp(`\\b${escapeRegExp(term)}\\b`, "gi"), "____");
+  return { sentence: chosen.sentence, translation: chosen.translation, blankedSentence: blankedSentence === chosen.sentence ? chosen.sentence.replace(term, "____") : blankedSentence };
+}
+
+function buildLetterTiles(term: string): Array<{ id: string; value: string }> {
+  const original = [...term].map((value, index) => ({ id: `${index}-${value}`, value }));
+  let shuffled = shuffle(original);
+  const unchanged = shuffled.map((tile) => tile.value).join("").toLocaleLowerCase() === term.toLocaleLowerCase();
+  if (unchanged && shuffled.length > 1) shuffled = [...shuffled.slice(1), shuffled[0]!];
+  return shuffled;
+}
+

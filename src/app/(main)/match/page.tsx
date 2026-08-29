@@ -303,7 +303,7 @@ export default function MatchPage() {
 
     <Card className="overflow-hidden rounded-[24px]">
       <CardHeader className="pb-2"><CardTitle>点击英文与对应释义</CardTitle></CardHeader>
-      <CardContent className="grid grid-cols-1 gap-2 pb-4 min-[420px]:grid-cols-2 sm:gap-3.5 sm:px-6 sm:pb-6">
+      <CardContent className="grid grid-cols-2 gap-2 pb-4 sm:gap-3.5 sm:px-6 sm:pb-6">
         <div className="space-y-2 sm:space-y-2.5">
           {words.map((item) => <MatchCard key={item.itemId} side="word" item={item} selected={selected} matched={matched.has(item.itemId)} wrong={wrongFlash.has(`word:${item.itemId}`)} onClick={() => selectCard("word", item)} />)}
         </div>

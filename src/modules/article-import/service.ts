@@ -23,6 +23,7 @@ export interface CreateArticlePreviewInput {
   articleText: string;
   sourceLanguage?: string;
   targetLanguage?: string;
+  examTargets?: ExamTarget[];
 }
 
 function clampArticleText(raw: string): string {
@@ -52,7 +53,8 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
 
   const settings = await getSettings();
   const vocabularyLevel = (settings.vocabularyLevel ?? "AUTO") as VocabularyLevel;
-  const examTargets = (settings.examTargets ?? (vocabularyLevel !== "AUTO" ? [vocabularyLevel as unknown as ExamTarget] : [])) as ExamTarget[];
+  const settingsExamTargets = (settings.examTargets ?? (vocabularyLevel !== "AUTO" ? [vocabularyLevel as unknown as ExamTarget] : [])) as ExamTarget[];
+  const examTargets = (Array.isArray(input.examTargets) ? input.examTargets : settingsExamTargets) as ExamTarget[];
 
   const knownSample = existingRows.slice(0, 30).map((row) => row.normalized_term);
   const totalKnown = existingRows.length;

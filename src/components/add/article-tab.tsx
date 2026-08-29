@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, CheckCircle2, FileText, Loader2, Sparkles, Wand2, BookOpen, Layers, MessageSquareText } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { errorMessage } from "@/lib/format";
 import { MAX_ARTICLE_CHARS, MIN_ARTICLE_CHARS } from "@/lib/config";
-import type { ArticleCandidate, ArticleImportPreview, ImportMode } from "@/lib/types";
+import type { AppSettings, ArticleCandidate, ArticleImportPreview, ExamTarget, ImportMode } from "@/lib/types";
+import { EXAM_TARGETS } from "@/lib/types";
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, buttonClass, toast } from "@/components/ui";
 
 interface CommitResult {
@@ -18,6 +19,8 @@ interface CommitResult {
 
 const SAMPLE_ARTICLE =
   "The rapid advancement of artificial intelligence has profoundly reshaped how we acquire knowledge. While conventional rote memorization emphasizes repetition, contemporary cognitive science suggests that contextual learning—encountering vocabulary within authentic discourse—yields more durable retention. Nevertheless, learners often feel overwhelmed when faced with an entire article replete with unfamiliar terminology. An intelligent system that discerns which words merit attention, based on the learner's existing lexicon, can transform a daunting passage into a curated learning experience.";
+
+const EXAM_LABEL: Record<ExamTarget, string> = { CET4: "CET-4", CET6: "CET-6", KY: "考研", IELTS: "雅思", TOEFL: "托福" };
 
 function candidateKey(c: ArticleCandidate): string {
   const normalized = c.normalizedTerm.toLowerCase();
@@ -42,9 +45,29 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
   const [result, setResult] = useState<CommitResult | null>(null);
   const [filter, setFilter] = useState<"all" | "WORD" | "PHRASE" | "SENTENCE">("all");
   const [showRecommendedOnly, setShowRecommendedOnly] = useState(false);
+  const [examTargets, setExamTargets] = useState<ExamTarget[]>([]);
+  const [examTargetsLoaded, setExamTargetsLoaded] = useState(false);
 
   const charCount = articleText.length;
   const canAnalyze = charCount >= MIN_ARTICLE_CHARS && charCount <= MAX_ARTICLE_CHARS;
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<AppSettings>("/api/settings")
+      .then((s) => {
+        if (cancelled) return;
+        setExamTargets(s.examTargets ?? []);
+        setExamTargetsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setExamTargetsLoaded(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  function toggleExamTarget(target: ExamTarget) {
+    setExamTargets((prev) => (prev.includes(target) ? prev.filter((t) => t !== target) : [...prev, target]));
+  }
 
   const grouped = useMemo(() => {
     if (!preview) return { words: [] as ArticleCandidate[], phrases: [] as ArticleCandidate[], sentences: [] as ArticleCandidate[] };
@@ -82,14 +105,13 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
       const data = await apiFetch<ArticleImportPreview>("/api/article-import/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleText }),
+        body: JSON.stringify({ articleText, examTargets: examTargets.length ? examTargets : undefined }),
       });
       setPreview(data);
       const initialKeys = data.recommendedKeys?.length
         ? data.recommendedKeys.map((k) => k.toLowerCase())
         : data.candidates.filter((c) => data.recommendedTerms.map((t) => t.toLowerCase()).includes(c.normalizedTerm.toLowerCase())).map((c) => candidateKey(c).toLowerCase());
       const aiCandidateKeys = new Set(initialKeys);
-      // phrases/sentences: select all CANDIDATE by default (AI-curated)
       for (const c of data.candidates) {
         if ((c.entryType === "PHRASE" || c.entryType === "SENTENCE") && c.status === "CANDIDATE") aiCandidateKeys.add(candidateKey(c).toLowerCase());
       }
@@ -178,6 +200,45 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
     setFilter("all");
   }
 
+  function ImportStrategyCard() {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>导入策略</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-3">
+            {[
+              { value: "FILL_MISSING", title: "智能补充", description: "新增词条，并给已有词条补充缺失的释义、发音和例句。" },
+              { value: "SKIP_EXISTING", title: "仅新增", description: "已有词条完全跳过，不创建初始化任务。" },
+              { value: "FORCE_DICTIONARY_REFRESH", title: "强制刷新", description: "重新查询已有词条的词典内容，但保留学习进度。" },
+            ].map((item) => (
+              <label key={item.value} className={`cursor-pointer rounded-[18px] border p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm transition ${mode === item.value ? "border-accent/40 bg-accent/[0.06] ring-2 ring-accent/15" : "border-white/50 bg-white/40 hover:border-white/70 dark:border-white/[0.08] dark:bg-white/[0.04]"}`}>
+                <input className="sr-only" type="radio" name="article-mode" checked={mode === item.value} onChange={() => setMode(item.value as ImportMode)} />
+                <b className="text-sm">{item.title}</b>
+                <p className="mt-1 text-xs leading-5 text-secondary-label">{item.description}</p>
+              </label>
+            ))}
+          </div>
+          <label className="flex items-start gap-3 rounded-[18px] border border-danger/20 bg-danger/[0.05] p-4 text-sm shadow-[0_4px_16px_rgba(255,59,48,0.04)] backdrop-blur-sm">
+            <input type="checkbox" className="mt-1 accent-danger" checked={reset} onChange={(event) => setReset(event.target.checked)} />
+            <span>
+              <b className="text-danger-deep">重置本次已有词条的学习进度</b>
+              <span className="mt-1 block text-xs text-danger/70">删除复习卡、复习日志和错词状态，词典内容不会删除。</span>
+            </span>
+          </label>
+          {error && <Alert tone="danger" icon={<AlertCircle className="size-4" />}>{error}</Alert>}
+          <div className="flex justify-end">
+            <Button size="lg" onClick={() => void commit()} disabled={selected.size === 0}>
+              确认导入 {selected.size} 个
+              <ArrowRight className="size-5" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (step === "analyzing") {
     return (
       <Card>
@@ -235,6 +296,8 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
   if (step === "preview" && preview) {
     return (
       <div className="space-y-5">
+        <ImportStrategyCard />
+
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -459,41 +522,6 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
             <p className="text-xs text-tertiary-label">已根据词库与类型去重；AI 推荐含短语与句子固定搭配，已自动勾选，可手动增删。</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>导入策略</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 lg:grid-cols-3">
-              {[
-                { value: "FILL_MISSING", title: "智能补充", description: "新增词条，并给已有词条补充缺失的释义、发音和例句。" },
-                { value: "SKIP_EXISTING", title: "仅新增", description: "已有词条完全跳过，不创建初始化任务。" },
-                { value: "FORCE_DICTIONARY_REFRESH", title: "强制刷新", description: "重新查询已有词条的词典内容，但保留学习进度。" },
-              ].map((item) => (
-                <label key={item.value} className={`cursor-pointer rounded-[18px] border p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] backdrop-blur-sm transition ${mode === item.value ? "border-accent/40 bg-accent/[0.06] ring-2 ring-accent/15" : "border-white/50 bg-white/40 hover:border-white/70 dark:border-white/[0.08] dark:bg-white/[0.04]"}`}>
-                  <input className="sr-only" type="radio" name="article-mode" checked={mode === item.value} onChange={() => setMode(item.value as ImportMode)} />
-                  <b className="text-sm">{item.title}</b>
-                  <p className="mt-1 text-xs leading-5 text-secondary-label">{item.description}</p>
-                </label>
-              ))}
-            </div>
-            <label className="flex items-start gap-3 rounded-[18px] border border-danger/20 bg-danger/[0.05] p-4 text-sm shadow-[0_4px_16px_rgba(255,59,48,0.04)] backdrop-blur-sm">
-              <input type="checkbox" className="mt-1 accent-danger" checked={reset} onChange={(event) => setReset(event.target.checked)} />
-              <span>
-                <b className="text-danger-deep">重置本次已有词条的学习进度</b>
-                <span className="mt-1 block text-xs text-danger/70">删除复习卡、复习日志和错词状态，词典内容不会删除。</span>
-              </span>
-            </label>
-            {error && <Alert tone="danger" icon={<AlertCircle className="size-4" />}>{error}</Alert>}
-            <div className="flex justify-end">
-              <Button size="lg" onClick={() => void commit()} disabled={selected.size === 0}>
-                确认导入 {selected.size} 个
-                <ArrowRight className="size-5" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -506,9 +534,35 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
             <Wand2 className="size-5 text-accent" />
             粘贴英文文章
           </CardTitle>
-          <p className="mt-1 text-sm text-secondary-label">AI 会结合你的词库与词汇水平，自动挑出值得学的单词、短语与句子。未配置 AI 也可按生词与本地切句导入。</p>
+          <p className="mt-1 text-sm text-secondary-label">AI 会结合你的词库与考试目标，自动挑出值得学的单词、短语与句子。未配置 AI 也可按生词与本地切句导入。</p>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div>
+            <p className="mb-2 text-xs font-medium text-secondary-label">考试目标 · 可多选，不选为自适应（支持跨档如四级 + 托福）</p>
+            <div className="flex flex-wrap gap-2">
+              {EXAM_TARGETS.map((target) => {
+                const active = examTargets.includes(target);
+                return (
+                  <button
+                    key={target}
+                    type="button"
+                    onClick={() => toggleExamTarget(target)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-accent bg-accent text-white shadow-sm" : "border-black/10 bg-white text-secondary-label hover:border-accent/30 dark:border-white/10 dark:bg-white/[0.06]"}`}
+                  >
+                    {EXAM_LABEL[target]}
+                  </button>
+                );
+              })}
+              {examTargets.length > 0 && (
+                <button type="button" onClick={() => setExamTargets([])} className="rounded-full border border-black/10 px-3 py-1.5 text-xs text-tertiary-label hover:text-secondary-label dark:border-white/10">
+                  清空
+                </button>
+              )}
+            </div>
+            {!examTargetsLoaded && <p className="mt-1.5 text-xs text-tertiary-label">正在读取设置…</p>}
+            {examTargetsLoaded && examTargets.length === 0 && <p className="mt-1.5 text-xs text-tertiary-label">当前：自适应（按已掌握词库）</p>}
+          </div>
+
           <div className="relative">
             <textarea
               value={articleText}

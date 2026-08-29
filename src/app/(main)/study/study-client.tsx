@@ -547,9 +547,16 @@ export function StudyClient() {
             <div className="mt-2 text-sm font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
             <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]"><Volume2 className="size-3.5" />重播发音</button>
             {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && <p className="mt-2.5 max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getProgressiveHint(current.word.term, hintLevel) ?? getHintPattern(current.word.term)}</p>}
+            {current.word.entryType !== "SENTENCE" && (() => {
+              const usPh = current.word.content.pronunciations.find((pr) => pr.accent === "US")?.phonetic || null;
+              const ukPh = current.word.content.pronunciations.find((pr) => pr.accent === "UK")?.phonetic || null;
+              const ph = usPh || ukPh;
+              if (!ph) return null;
+              const accent = usPh ? "US" : "UK";
+              return <p className="font-mono text-xs tracking-wide text-tertiary-label">/{ph}/ <span className="ml-1 rounded-full bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-secondary-label dark:bg-white/[0.08]">{accent === "US" ? "美" : "英"}</span></p>;
+            })()}
             <div className="mt-2.5 flex w-full max-w-md justify-center gap-2">
               <button type="button" onClick={() => { setHintLevel((v) => v + 1); setUsedHint(true); }} disabled={hintLevel >= current.word.term.length - 2} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] disabled:opacity-40 dark:text-[#0a84ff]"><Lightbulb className="size-3.5" />提示</button>
-              <button type="button" onClick={() => { setUsedHint(true); void reveal(); }} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-warning/20 bg-warning/[0.06] px-3 py-1 text-xs font-semibold text-warning-deep hover:bg-warning/[0.12]"><Eye className="size-3.5" />不会</button>
             </div>
             <input ref={answerInputRef} autoFocus enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="mt-2.5 h-11 w-full max-w-md rounded-[14px] border border-black/[0.08] bg-white/70 px-4 text-center text-base outline-none transition-all focus:border-accent focus:bg-white focus:shadow-[0_4px_16px_rgba(0,122,255,0.08)] sm:text-lg dark:border-white/[0.09] dark:bg-white/[0.05]" value={userAnswer} onChange={(event) => setUserAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && userAnswer.trim()) { event.preventDefault(); void reveal(); } }} placeholder="输入单词补全句子" />
           </>}
@@ -561,6 +568,14 @@ export function StudyClient() {
             <p className="text-[12.5px] font-medium text-quaternary-label">根据释义拼出单词（点选字母）</p>
             <div className="mt-1.5 max-w-xl text-base font-bold leading-snug"><DefinitionBlock definitions={definitions} /></div>
             <button type="button" onClick={() => void playWord(current)} className="ios-press mt-2.5 inline-flex items-center gap-2 rounded-full bg-accent/[0.08] px-3.5 py-1.5 text-xs font-semibold text-accent hover:bg-accent/[0.14] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]"><Volume2 className="size-3.5" />重播发音</button>
+            {(() => {
+              const usPh = current.word.content.pronunciations.find((pr) => pr.accent === "US")?.phonetic || null;
+              const ukPh = current.word.content.pronunciations.find((pr) => pr.accent === "UK")?.phonetic || null;
+              const ph = usPh || ukPh;
+              if (!ph) return null;
+              const accent = usPh ? "US" : "UK";
+              return <p className="mt-1 font-mono text-xs tracking-wide text-tertiary-label">/{ph}/ <span className="ml-1 rounded-full bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-secondary-label dark:bg-white/[0.08]">{accent === "US" ? "美" : "英"}</span></p>;
+            })()}
             <div className="mt-3 flex min-h-12 w-full max-w-md flex-wrap items-center justify-center gap-1.5 rounded-[14px] border-2 border-dashed border-accent/20 bg-accent/[0.04] px-3 py-2">
               {builtLetterIds.length ? builtLetterIds.map((id) => {
                 const tile = current.letters?.find((l) => l.id === id);
@@ -575,7 +590,6 @@ export function StudyClient() {
             </div>
             <div className="mt-3 flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setBuiltLetterIds([])} disabled={!builtLetterIds.length}>清空</Button>
-              <Button variant="outline" size="sm" onClick={() => { setUsedHint(true); void reveal(); }}>不会</Button>
               <Button size="sm" onClick={() => void reveal()} disabled={!builtLetterIds.length}>检查答案</Button>
             </div>
           </>}
@@ -677,9 +691,16 @@ export function StudyClient() {
             {current.word.entryType !== "SENTENCE" && getHintPattern(current.word.term) && (
               <div className="mt-2.5 flex w-full max-w-md flex-col items-center gap-2">
                 <p className="max-w-full break-all text-center font-mono text-base tracking-[0.2em] text-accent sm:text-xl sm:tracking-[0.25em]">{getProgressiveHint(current.word.term, hintLevel) ?? getHintPattern(current.word.term)}</p>
+                {(() => {
+                  const usPh = current.word.content.pronunciations.find((pr) => pr.accent === "US")?.phonetic || null;
+                  const ukPh = current.word.content.pronunciations.find((pr) => pr.accent === "UK")?.phonetic || null;
+                  const ph = usPh || ukPh;
+                  if (!ph) return null;
+                  const accent = usPh ? "US" : "UK";
+                  return <p className="font-mono text-xs tracking-wide text-tertiary-label">/{ph}/ <span className="ml-1 rounded-full bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-secondary-label dark:bg-white/[0.08]">{accent === "US" ? "美" : "英"}</span></p>;
+                })()}
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <button type="button" onClick={() => { setHintLevel((v) => v + 1); setUsedHint(true); }} disabled={hintLevel >= current.word.term.length - 2} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/[0.12] disabled:opacity-40 dark:text-[#0a84ff]"><Lightbulb className="size-3.5" />提示 {hintLevel > 0 ? `(${hintLevel})` : ""}</button>
-                  <button type="button" onClick={() => { setUsedHint(true); void reveal(); }} className="ios-press inline-flex items-center gap-1.5 rounded-full border border-warning/20 bg-warning/[0.06] px-3 py-1 text-xs font-semibold text-warning-deep hover:bg-warning/[0.12]"><Eye className="size-3.5" />不会，直接看答案</button>
                 </div>
                 {usedHint && <p className="text-[11px] text-quaternary-label">已使用提示，本题将按“模糊”记录</p>}
               </div>

@@ -437,7 +437,7 @@ export function resolveLlmProviders(settings: AppSettings): { primary: LlmProvid
     baseUrl: primaryProvider.baseUrl,
     apiKey: primaryProvider.apiKey,
     model: ai.model.trim(),
-    timeoutMs: ai.timeoutMs ?? 120_000,
+    timeoutMs: ai.timeoutMs ?? 180_000,
   };
   const retryModel = ai.retryModel?.trim();
   if (!retryModel) return { primary };
@@ -450,7 +450,7 @@ export function resolveLlmProviders(settings: AppSettings): { primary: LlmProvid
     baseUrl: retryProvider.baseUrl,
     apiKey: retryProvider.apiKey,
     model: retryModel,
-    timeoutMs: ai.timeoutMs ?? 120_000,
+    timeoutMs: ai.timeoutMs ?? 180_000,
   };
   return { primary, fallback };
 }

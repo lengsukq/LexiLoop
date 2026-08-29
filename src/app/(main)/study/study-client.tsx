@@ -233,6 +233,11 @@ export function StudyClient() {
   useEffect(() => {
     if (!current) return;
     if (revealed) return;
+    if (
+      current.questionType === "ZH_TO_EN_CHOICE" ||
+      current.questionType === "LISTENING_CHOICE" ||
+      current.questionType === "EN_TO_ZH_CHOICE"
+    ) return;
 
     const playbackKey = `q:${data?.session.id ?? 0}:${current.itemId}`;
     if (autoPlayedRef.current === playbackKey) return;

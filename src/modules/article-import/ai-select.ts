@@ -1,6 +1,6 @@
 import { callLlmWithFallback, resolveLlmProviders } from "@/modules/llm/client";
 import { getSettings } from "@/modules/settings/service";
-import type { VocabularyLevel } from "@/lib/types";
+import type { ExamTarget, VocabularyLevel } from "@/lib/types";
 import { buildArticleSelectionPrompt, parseJsonLoose } from "./prompt";
 import { normalizeLegacyResponse } from "./schema";
 
@@ -9,7 +9,8 @@ export interface AiSelectInput {
   candidates: Array<{ term: string; normalizedTerm: string; occurrences: number; sourceSentence?: string | null }>;
   knownSample: string[];
   totalKnown: number;
-  vocabularyLevel: VocabularyLevel;
+  examTargets?: ExamTarget[];
+  vocabularyLevel?: VocabularyLevel;
 }
 
 export interface AiSelectResult {
@@ -38,6 +39,7 @@ export async function aiSelectTerms(input: AiSelectInput): Promise<AiSelectResul
     candidates: input.candidates,
     knownSample: input.knownSample,
     totalKnown: input.totalKnown,
+    examTargets: input.examTargets,
     vocabularyLevel: input.vocabularyLevel,
   });
 

@@ -45,6 +45,7 @@ function coalesceLegacyLlmConfig(value: unknown): unknown {
 
 const settingsSchema = z.object({
   vocabularyLevel: z.enum(["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"]).default("AUTO"),
+  examTargets: z.array(z.enum(["CET4", "CET6", "KY", "IELTS", "TOEFL"])).max(5).default([]),
   dailyNewWords: z.number().int().min(0).max(100),
   dailyWrongWordLimit: z.number().int().min(0).max(100),
   dailyDueReviewLimit: z.number().int().min(1).max(500),
@@ -130,6 +131,11 @@ export async function getSettings(): Promise<AppSettings> {
     for (const key of ["wordSpeed", "phraseSpeed", "sentenceSpeed"]) {
       if (values[key] === undefined) values[key] = legacySpeed;
     }
+  }
+  if (!Array.isArray(values.examTargets) && typeof values.vocabularyLevel === "string") {
+    const lvl = values.vocabularyLevel as string;
+    if (lvl !== "AUTO" && ["CET4", "CET6", "KY", "IELTS", "TOEFL"].includes(lvl)) values.examTargets = [lvl];
+    else if (lvl === "AUTO") values.examTargets = [];
   }
   const result = settingsSchema.parse({ ...DEFAULT_SETTINGS, ...values }) as AppSettings;
   settingsCache = { value: result, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };

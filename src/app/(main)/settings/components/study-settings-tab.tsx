@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, GripVertical, Loader2, PlugZap, Volume2 } from "lucide-react";
-import type { AppSettings, InitializationProviderId, VocabularyLevel } from "@/lib/types";
+import type { AppSettings, ExamTarget, InitializationProviderId } from "@/lib/types";
+import { EXAM_TARGETS } from "@/lib/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from "@/components/ui";
 import { Toggle, type SettingsUpdater, type TestState } from "../settings-shared";
 import { StudyPlanSettings } from "./study-plan-settings";
@@ -91,20 +92,37 @@ export function StudySettingsTab({
       <StudyPlanSettings settings={settings} update={update} />
 
       <Card>
-        <CardHeader><CardTitle>文章导词 · 词汇水平</CardTitle></CardHeader>
+        <CardHeader><CardTitle>文章导词 · 考试目标</CardTitle></CardHeader>
         <CardContent>
-          <p className="mb-3 text-xs text-tertiary-label">影响“粘贴文章”时 AI 对“哪些词值得学”的判断；AUTO 会按你已掌握词库自适应。</p>
-          <label className="max-w-80 space-y-1.5">
-            <span className="text-xs font-medium">词汇水平</span>
-            <Select value={settings.vocabularyLevel ?? "AUTO"} onChange={(event) => update("vocabularyLevel", event.target.value as VocabularyLevel)}>
-              <option value="AUTO">自动（按词库自适应）</option>
-              <option value="CET4">CET-4</option>
-              <option value="CET6">CET-6</option>
-              <option value="KY">考研</option>
-              <option value="IELTS">雅思</option>
-              <option value="TOEFL">托福</option>
-            </Select>
-          </label>
+          <p className="mb-3 text-xs text-tertiary-label">多选，AI 会同时覆盖各档位的生词区间；不选为自适应（按已掌握词库）。支持跨档如四级 + 托福。</p>
+          <div className="flex flex-wrap gap-2">
+            {EXAM_TARGETS.map((target) => {
+              const active = (settings.examTargets ?? []).includes(target);
+              const labelMap: Record<ExamTarget, string> = { CET4: "CET-4", CET6: "CET-6", KY: "考研", IELTS: "雅思", TOEFL: "托福" };
+              return (
+                <button
+                  key={target}
+                  type="button"
+                  onClick={() => {
+                    const current = settings.examTargets ?? [];
+                    const next = current.includes(target) ? current.filter((t) => t !== target) : [...current, target];
+                    update("examTargets", next);
+                    if (next.length === 0) update("vocabularyLevel", "AUTO");
+                    else if (next.length === 1) update("vocabularyLevel", next[0] as AppSettings["vocabularyLevel"]);
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${active ? "border-accent bg-accent text-white" : "border-black/10 bg-white text-secondary-label hover:border-accent/30 dark:border-white/10 dark:bg-white/[0.06]"}`}
+                >
+                  {labelMap[target]}
+                </button>
+              );
+            })}
+            {(settings.examTargets?.length ?? 0) > 0 && (
+              <button type="button" onClick={() => { update("examTargets", []); update("vocabularyLevel", "AUTO"); }} className="rounded-full border border-black/10 px-3 py-1.5 text-xs text-tertiary-label hover:text-secondary-label dark:border-white/10">
+                清空
+              </button>
+            )}
+          </div>
+          {(settings.examTargets?.length ?? 0) === 0 && <p className="mt-2 text-xs text-tertiary-label">当前：自适应</p>}
         </CardContent>
       </Card>
 

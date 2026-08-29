@@ -3,6 +3,9 @@ import type { InitializationProviderId } from "./core";
 export const VOCABULARY_LEVELS = ["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"] as const;
 export type VocabularyLevel = (typeof VOCABULARY_LEVELS)[number];
 
+export const EXAM_TARGETS = ["CET4", "CET6", "KY", "IELTS", "TOEFL"] as const;
+export type ExamTarget = (typeof EXAM_TARGETS)[number];
+
 export interface AppSettings {
   dailyNewWords: number; dailyWrongWordLimit: number; dailyDueReviewLimit: number; targetRetentionRate: number; choiceRevealDelaySeconds: number;
   defaultAccent: "US" | "UK"; wordSpeed: number; phraseSpeed: number; sentenceSpeed: number; autoPlayPronunciation: boolean;
@@ -11,6 +14,7 @@ export interface AppSettings {
   tencentTranslateEnabled: boolean; tencentTranslateSecretId: string; tencentTranslateSecretKey: string; tencentTranslateProjectId: number;
   youdaoEnabled: boolean; icibaEnabled: boolean; translationProviderOrder: InitializationProviderId[]; llmConfig: LlmConfig;
   vocabularyLevel: VocabularyLevel;
+  examTargets: ExamTarget[];
 }
 
 export interface LlmProviderConfig {

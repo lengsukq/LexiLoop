@@ -1,26 +1,52 @@
-import type { VocabularyLevel } from "@/lib/types";
+import type { ExamTarget, VocabularyLevel } from "@/lib/types";
 
-const LEVEL_HINT: Record<VocabularyLevel, string> = {
-  AUTO: "根据用户的已知词情况自适应判断；常见基础词不要选。",
-  CET4: "用户约 CET-4 水平：A1-B1 基础词视为已知，不选；重点选 B2 及以上。",
-  CET6: "用户约 CET-6 水平：B1 及以下视为已知，不选；重点选 B2-C1。",
-  KY: "用户约考研水平：B1 及以下视为已知，不选；重点选 B2-C1 学术/形近易混词。",
-  IELTS: "用户约雅思 6.5+ 水平：B2 及以下视为已知，不选；重点选 C1-C2 与学术词汇。",
-  TOEFL: "用户约托福 90+ 水平：B2 及以下视为已知，不选；重点选 C1-C2 学术与低频词。",
+const AUTO_HINT = "根据用户的已知词情况自适应判断；常见基础词不要选。";
+
+const EXAM_HINT: Record<ExamTarget, string> = {
+  CET4: "CET-4：A1-B1 基础词视为已知，不选；重点选 B2 及以上。",
+  CET6: "CET-6：B1 及以下视为已知，不选；重点选 B2-C1。",
+  KY: "考研：B1 及以下视为已知，不选；重点选 B2-C1 学术/形近易混词。",
+  IELTS: "雅思 6.5+：B2 及以下视为已知，不选；重点选 C1-C2 与学术词汇。",
+  TOEFL: "托福 90+：B2 及以下视为已知，不选；重点选 C1-C2 学术与低频词。",
 };
+
+const LEGACY_LEVEL_HINT: Record<VocabularyLevel, string> = {
+  AUTO: AUTO_HINT,
+  CET4: EXAM_HINT.CET4,
+  CET6: EXAM_HINT.CET6,
+  KY: EXAM_HINT.KY,
+  IELTS: EXAM_HINT.IELTS,
+  TOEFL: EXAM_HINT.TOEFL,
+};
+
+function normalizeExamTargets(input: { examTargets?: ExamTarget[]; vocabularyLevel?: VocabularyLevel }): ExamTarget[] {
+  if (Array.isArray(input.examTargets) && input.examTargets.length > 0) return input.examTargets;
+  if (Array.isArray(input.examTargets) && input.examTargets.length === 0) return [];
+  if (input.vocabularyLevel && input.vocabularyLevel !== "AUTO") return [input.vocabularyLevel as ExamTarget];
+  return [];
+}
+
+function buildLevelLine(examTargets: ExamTarget[]): string {
+  if (examTargets.length === 0) return `用户水平：自适应 — ${AUTO_HINT}`;
+  const labels = examTargets.join("、");
+  const hints = examTargets.map((t) => EXAM_HINT[t]).join("；");
+  return `用户备考：${labels} — ${hints} 需同时覆盖各档位对应的生词区间，兼顾低档基础词与高档学术/低频词。`;
+}
 
 export function buildArticleSelectionPrompt(input: {
   articleText: string;
   candidates: Array<{ term: string; normalizedTerm: string; occurrences: number; sourceSentence?: string | null }>;
   knownSample: string[];
   totalKnown: number;
-  vocabularyLevel: VocabularyLevel;
+  examTargets?: ExamTarget[];
+  vocabularyLevel?: VocabularyLevel;
 }): { systemPrompt: string; userPrompt: string } {
+  const examTargets = normalizeExamTargets(input);
   const systemPrompt = "只输出有效 JSON，不要输出任何解释或 markdown。";
   const articleSnippet = input.articleText.slice(0, 8000);
   const userPrompt = [
     "你是词汇与句法筛选助手。结合文章语境与候选词，选出值得该用户学习的单词、短语与句子。",
-    `用户水平：${input.vocabularyLevel} — ${LEVEL_HINT[input.vocabularyLevel]}`,
+    buildLevelLine(examTargets),
     `用户已掌握词数：${input.totalKnown}，示例：${input.knownSample.slice(0, 30).join(", ") || "无"}`,
     "规则：已掌握/过于常见/停用词不选；优先选对理解文章关键且对该水平有学习价值的内容；每个 reason/nuance 不超过 24 字。",
     "输出 JSON 格式（严格 JSON，无 trailing comma）：",
@@ -34,6 +60,8 @@ export function buildArticleSelectionPrompt(input: {
   ].join("\n");
   return { systemPrompt, userPrompt };
 }
+
+export { LEGACY_LEVEL_HINT as LEVEL_HINT };
 
 export function parseJsonLoose(text: string): unknown | null {
   const trimmed = text.trim();

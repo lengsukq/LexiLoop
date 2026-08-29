@@ -12,7 +12,7 @@ import {
   MAX_ARTICLE_CHARS,
   MIN_ARTICLE_CHARS,
 } from "@/lib/config";
-import type { ArticleCandidate, ArticleImportPreview, ArticleStats, VocabularyLevel } from "@/lib/types";
+import type { ArticleCandidate, ArticleImportPreview, ArticleStats, ExamTarget, VocabularyLevel } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { aiSelectTerms } from "./ai-select";
 import { extractArticleTerms, extractSentences } from "./extract";
@@ -52,6 +52,7 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
 
   const settings = await getSettings();
   const vocabularyLevel = (settings.vocabularyLevel ?? "AUTO") as VocabularyLevel;
+  const examTargets = (settings.examTargets ?? (vocabularyLevel !== "AUTO" ? [vocabularyLevel as unknown as ExamTarget] : [])) as ExamTarget[];
 
   const knownSample = existingRows.slice(0, 30).map((row) => row.normalized_term);
   const totalKnown = existingRows.length;
@@ -109,6 +110,7 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
       candidates: aiCandidates,
       knownSample,
       totalKnown,
+      examTargets,
       vocabularyLevel,
     });
     if (result.applied) {

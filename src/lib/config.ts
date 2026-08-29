@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   icibaEnabled: true,
   translationProviderOrder: ["youdao", "iciba", "merriam-webster", "dictionaryapi.dev", "tencent-translate", "mymemory"] as InitializationProviderId[],
   vocabularyLevel: "AUTO",
+  examTargets: [],
   llmConfig: DEFAULT_LLM_CONFIG,
 };
 

@@ -1,4 +1,4 @@
-import type { AppSettings, InitializationProviderId, LlmConfig } from "@/lib/types";
+import type { AppSettings, InitializationProviderId, LlmConfig, QuestionTypeConfig } from "@/lib/types";
 import { MINUTE_MS } from "@/lib/time";
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
@@ -14,6 +14,17 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = {
     },
   ],
   ai: { enabled: false, providerId: "", model: "", thinkingEnabled: false },
+};
+
+export const DEFAULT_QUESTION_TYPE_CONFIG: QuestionTypeConfig = {
+  EN_TO_ZH: { enabled: true, weight: 5 },
+  EN_TO_ZH_CHOICE: { enabled: true, weight: 5 },
+  ZH_TO_EN_CHOICE: { enabled: true, weight: 5 },
+  ZH_TO_EN_SPELLING: { enabled: true, weight: 5 },
+  LISTENING_SPELLING: { enabled: true, weight: 5 },
+  CLOZE_SENTENCE: { enabled: true, weight: 5 },
+  LISTENING_CHOICE: { enabled: true, weight: 5 },
+  LETTER_BANK: { enabled: true, weight: 5 },
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -44,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vocabularyLevel: "AUTO",
   examTargets: [],
   llmConfig: DEFAULT_LLM_CONFIG,
+  questionTypeConfig: DEFAULT_QUESTION_TYPE_CONFIG,
 };
 
 export const IMPORT_PREVIEW_TTL_MS = 30 * MINUTE_MS;

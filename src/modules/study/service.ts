@@ -1,4 +1,7 @@
 import { sqlite } from "@/db/client";
+import { DEFAULT_QUESTION_TYPE_CONFIG } from "@/lib/config";
+import { getSettings } from "@/modules/settings/service";
+import { normalizeQuestionTypeConfig, resolveQuestionType } from "./question-type-config";
 import { ApiError } from "@/lib/api";
 import type { QuestionType, StudyMode } from "@/lib/types";
 import { closeStudySessionWithActiveDuration } from "@/modules/reviews/duration";
@@ -47,17 +50,48 @@ export async function startStudySession(mode: StudyMode, resume = true, continuo
   if (mode === "DAILY" && continuous && selected.length === 0) selected = await continuousCandidates(10, now);
   const due = new Set(pools.due.map((item) => item.id)); const wrong = new Set(pools.wrong.map((item) => item.id));
   const persistedMode = mode === "AI_RECOMMENDED" ? "WRONG_WORDS" : mode === "SENTENCE_REVIEW" ? "DUE_REVIEW" : mode; const sourceType = mode === "AI_RECOMMENDED" || mode === "SENTENCE_REVIEW" ? mode : null;
+  const settings = await getSettings();
+  const questionTypeConfig = normalizeQuestionTypeConfig(settings.questionTypeConfig ?? DEFAULT_QUESTION_TYPE_CONFIG);
+  const hasExampleMap = await buildHasExampleMap(selected.map((candidate) => candidate.id));
+  const resolvedQuestions = selected.map((candidate, index) => {
+    const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong });
+    const extra = { term: candidate.term, hasExample: hasExampleMap.get(candidate.id) ?? false };
+    const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType;
+    const fallbackQuestion = questionFor(mode, taskType, index, candidate.mastery_score ?? undefined, extra, questionTypeConfig);
+    return {
+      taskType,
+      questionType: recommendedQuestion
+        ? resolveQuestionType({ preferred: recommendedQuestion, mode: mode === "AI_RECOMMENDED" ? "DAILY" : mode, taskType, extra, config: questionTypeConfig })
+        : fallbackQuestion,
+    };
+  });
   const sessionId = await sqlite.transaction(async () => {
     const session = await sqlite.prepare("INSERT INTO study_sessions (session_type, source_type, started_at, completed_at, planned_count, completed_count, correct_count, wrong_count, skipped_count, created_at) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?)").run(persistedMode, sourceType, now, selected.length === 0 ? now : null, selected.length, now);
     const id = Number(session.lastInsertRowid); const insert = sqlite.prepare("INSERT INTO study_session_items (study_session_id, position, word_id, task_type, question_type, status, created_at) VALUES (?, ?, ?, ?, ?, 'PENDING', ?)");
     for (const [index, candidate] of selected.entries()) {
-      const taskType = taskFor(mode === "AI_RECOMMENDED" ? "DAILY" : mode, candidate, { due, wrong });
-      const recommendedQuestion = (candidate as StudyCandidate & { recommendedQuestionType?: QuestionType }).recommendedQuestionType;
-      await insert.run(id, index, candidate.id, taskType, recommendedQuestion ?? questionFor(mode, taskType, index, candidate.mastery_score ?? undefined, { term: candidate.term }), now);
+      const resolved = resolvedQuestions[index]!;
+      await insert.run(id, index, candidate.id, resolved.taskType, resolved.questionType, now);
     }
     return id;
   }).immediate();
   return getStudySession(sessionId, false);
+}
+
+async function buildHasExampleMap(wordIds: number[]): Promise<Map<number, boolean>> {
+  if (!wordIds.length) return new Map();
+  const placeholders = wordIds.map(() => "?").join(",");
+  const rows = await sqlite.prepare(`SELECT word_id, examples_json FROM word_contents WHERE word_id IN (${placeholders})`).all(...wordIds) as Array<{ word_id: number; examples_json: string | null }>;
+  const map = new Map<number, boolean>();
+  for (const row of rows) {
+    try {
+      const parsed = row.examples_json ? (JSON.parse(row.examples_json) as unknown[]) : [];
+      map.set(row.word_id, Array.isArray(parsed) && parsed.some((item) => typeof (item as { sentence?: unknown }).sentence === "string" && String((item as { sentence: string }).sentence).trim().length > 0));
+    } catch {
+      map.set(row.word_id, false);
+    }
+  }
+  for (const id of wordIds) if (!map.has(id)) map.set(id, false);
+  return map;
 }
 
 export async function skipStudyItem(sessionId: number, itemId: number, reason = "LATER") {

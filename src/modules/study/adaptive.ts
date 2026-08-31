@@ -1,5 +1,8 @@
 import type { EntryType, QuestionType, ReviewRating } from "@/lib/types";
 import { sqlite } from "@/db/client";
+import { DEFAULT_QUESTION_TYPE_CONFIG } from "@/lib/config";
+import { getSettings } from "@/modules/settings/service";
+import { normalizeQuestionTypeConfig, resolveAdaptiveQuestionType } from "./question-type-config";
 
 const MAX_FOLLOW_UPS_PER_WORD = 2;
 // 递增间隔检索：首次做错 5 题后快速复现（拯救工作记忆），二次做错 10 题后拉长间隔复现（加深长时记忆）
@@ -22,6 +25,17 @@ function nextQuestionType(current: QuestionType, entryType: EntryType): Question
   if (current === "LETTER_BANK") return "ZH_TO_EN_SPELLING";
   if (current === "LISTENING_SPELLING") return "LISTENING_CHOICE";
   return "ZH_TO_EN_SPELLING";
+}
+
+async function hasWordExample(wordId: number): Promise<boolean> {
+  const row = await sqlite.prepare("SELECT examples_json FROM word_contents WHERE word_id = ?").get(wordId) as { examples_json: string | null } | undefined;
+  if (!row?.examples_json) return false;
+  try {
+    const parsed = JSON.parse(row.examples_json) as unknown[];
+    return Array.isArray(parsed) && parsed.some((item) => typeof (item as { sentence?: unknown }).sentence === "string" && String((item as { sentence: string }).sentence).trim().length > 0);
+  } catch {
+    return false;
+  }
 }
 
 function isExcludedSession(sourceType: string | null): boolean {
@@ -93,7 +107,17 @@ export async function scheduleAdaptiveFollowUp(input: {
       WHERE study_session_id = ?`).get(input.sessionId) as { position: number | null };
     position = (last?.position ?? current.position) + 1;
   }
-  const questionType = nextQuestionType(input.currentQuestionType, input.entryType);
+  const settings = await getSettings();
+  const questionTypeConfig = normalizeQuestionTypeConfig(settings.questionTypeConfig ?? DEFAULT_QUESTION_TYPE_CONFIG);
+  const preferred = nextQuestionType(input.currentQuestionType, input.entryType);
+  const wordRow = await sqlite.prepare("SELECT term FROM words WHERE id = ?").get(input.wordId) as { term: string } | undefined;
+  const hasExample = await hasWordExample(input.wordId);
+  const questionType = resolveAdaptiveQuestionType({
+    preferred,
+    entryType: input.entryType,
+    extra: { term: wordRow?.term, hasExample },
+    config: questionTypeConfig,
+  });
   const now = input.now ?? Date.now();
 
   await sqlite.prepare(`INSERT INTO study_session_items

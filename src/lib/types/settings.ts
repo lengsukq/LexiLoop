@@ -1,4 +1,6 @@
-import type { InitializationProviderId } from "./core";
+import type { InitializationProviderId, QuestionType } from "./core";
+
+export type QuestionTypeConfig = Record<QuestionType, { enabled: boolean; weight: number }>;
 
 export const VOCABULARY_LEVELS = ["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"] as const;
 export type VocabularyLevel = (typeof VOCABULARY_LEVELS)[number];
@@ -15,6 +17,7 @@ export interface AppSettings {
   youdaoEnabled: boolean; icibaEnabled: boolean; translationProviderOrder: InitializationProviderId[]; llmConfig: LlmConfig;
   vocabularyLevel: VocabularyLevel;
   examTargets: ExamTarget[];
+  questionTypeConfig: QuestionTypeConfig;
 }
 
 export interface LlmProviderConfig {

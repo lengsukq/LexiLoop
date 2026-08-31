@@ -1,4 +1,7 @@
 import { sqlite } from "@/db/client";
+import { DEFAULT_QUESTION_TYPE_CONFIG } from "@/lib/config";
+import { getSettings } from "@/modules/settings/service";
+import { normalizeQuestionTypeConfig, isQuestionTypeEligible } from "@/modules/study/question-type-config";
 import type { QuestionType } from "@/lib/types";
 import { DAY_MS } from "./date";
 import { preferredDefinitionText } from "@/modules/dictionary/content";
@@ -47,12 +50,26 @@ function accumulator(map: Map<number, CandidateAccumulator>, wordId: number): Ca
   map.set(wordId, created);
   return created;
 }
-function mostUsefulQuestion(candidate: CandidateAccumulator): QuestionType {
-  const weakest = [...candidate.questionErrors.entries()]
-    .sort((left, right) => right[1] - left[1])[0]?.[0];
-  if (weakest && VALID_QUESTION_TYPES.has(weakest as QuestionType)) return weakest as QuestionType;
-  if (candidate.wrongActive || candidate.incorrect > 0) return "ZH_TO_EN_SPELLING";
-  return "EN_TO_ZH";
+async function mostUsefulQuestion(candidate: CandidateAccumulator): Promise<QuestionType> {
+  const settings = await getSettings();
+  const config = normalizeQuestionTypeConfig(settings.questionTypeConfig ?? DEFAULT_QUESTION_TYPE_CONFIG);
+  const sortedWeakest = [...candidate.questionErrors.entries()].sort((left, right) => right[1] - left[1]);
+  for (const [type] of sortedWeakest) {
+    if (VALID_QUESTION_TYPES.has(type as QuestionType) && config[type as QuestionType]?.enabled) {
+      return type as QuestionType;
+    }
+  }
+  const fallbacks: QuestionType[] = candidate.wrongActive || candidate.incorrect > 0
+    ? ["ZH_TO_EN_SPELLING", "ZH_TO_EN_CHOICE", "EN_TO_ZH_CHOICE", "LETTER_BANK", "EN_TO_ZH"]
+    : ["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE"];
+  for (const type of fallbacks) {
+    if (config[type]?.enabled && isQuestionTypeEligible(type, {})) return type;
+  }
+  for (const type of fallbacks) {
+    if (config[type]?.enabled) return type;
+  }
+  const anyEnabled = (Object.entries(config) as Array<[QuestionType, { enabled: boolean }]>).find(([, entry]) => entry.enabled);
+  return anyEnabled ? anyEnabled[0] : "EN_TO_ZH";
 }
 function reason(candidate: CandidateAccumulator, now: number): string {
   const parts: string[] = [];
@@ -177,6 +194,10 @@ export async function buildSuggestionCandidates(now: number, reviews: ReviewRow[
       definitions_json: string | null;
     }>;
   const words = new Map(rows.map((row) => [row.id, row]));
+  const resolvedTypes = new Map<number, QuestionType>();
+  for (const candidate of ranked) {
+    resolvedTypes.set(candidate.wordId, await mostUsefulQuestion(candidate));
+  }
   return ranked.flatMap((candidate) => {
     const word = words.get(candidate.wordId);
     if (!word) return [];
@@ -185,7 +206,7 @@ export async function buildSuggestionCandidates(now: number, reviews: ReviewRow[
       term: word.term,
       definition: preferredDefinitionText(word.definitions_json, word.target_language),
       reason: reason(candidate, now),
-      questionType: mostUsefulQuestion(candidate),
+      questionType: resolvedTypes.get(candidate.wordId)!, 
       score: score(candidate, now),
       attempts: candidate.attempts,
       incorrect: candidate.incorrect,

@@ -1,10 +1,12 @@
 import { sqlite } from "@/db/client";
 import type { EntryType, QuestionType, StudyMode } from "@/lib/types";
+import type { QuestionTypeConfig } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { getTodayRecommendedItems } from "@/modules/suggestions/service";
 import { DAY_MS, HOUR_MS } from "@/lib/time";
 import { startOfLocalDay } from "@/lib/date-key";
 import { definitionMeaningSql, summaryTranslationSql } from "@/modules/dictionary/availability";
+import { pickQuestionTypeWithConfig, type QuestionTypeRandom } from "./question-type-config";
 
 export interface StudyCandidate {
   id: number;
@@ -198,34 +200,49 @@ function isSimpleSpellingTerm(term: string): boolean {
   return /^[a-zA-Z]{3,14}$/.test(term);
 }
 
-export function questionFor(mode: StudyMode, taskType: string, position = 0, masteryScore?: number, extra?: { term?: string; hasExample?: boolean }): QuestionType {
-  if (mode === "SENTENCE_REVIEW") return taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING";
+export function questionFor(
+  mode: StudyMode,
+  taskType: string,
+  position = 0,
+  masteryScore?: number,
+  extra?: { term?: string; hasExample?: boolean },
+  config?: QuestionTypeConfig | null,
+  random?: QuestionTypeRandom,
+): QuestionType {
+  const normalizedConfig = config ?? null;
+  const resolvedExtra = extra ?? {};
+  const pick = (preferred: QuestionType): QuestionType =>
+    pickQuestionTypeWithConfig({ preferred, mode, taskType, extra: resolvedExtra, config: normalizedConfig, random });
+
+  if (mode === "SENTENCE_REVIEW") {
+    const preferred: QuestionType = taskType === "NEW" ? "EN_TO_ZH" : "ZH_TO_EN_SPELLING";
+    return pick(preferred);
+  }
   if (mode === "LISTENING") {
-    // Mix spelling and choice for variety: even positions use choice
-    if (position % 3 === 1 && masteryScore != null && masteryScore < 50) return "LISTENING_CHOICE";
-    if (position % 2 === 1) return "LISTENING_CHOICE";
-    return "LISTENING_SPELLING";
+    if (position % 3 === 1 && masteryScore != null && masteryScore < 50) return pick("LISTENING_CHOICE");
+    if (position % 2 === 1) return pick("LISTENING_CHOICE");
+    return pick("LISTENING_SPELLING");
   }
   if (mode === "SPELLING" || mode === "WRONG_WORDS" || taskType === "WRONG") {
-    if (extra?.term && isSimpleSpellingTerm(extra.term) && position % 3 === 0) return "LETTER_BANK";
-    return "ZH_TO_EN_SPELLING";
+    if (resolvedExtra.term && isSimpleSpellingTerm(resolvedExtra.term) && position % 3 === 0) return pick("LETTER_BANK");
+    return pick("ZH_TO_EN_SPELLING");
   }
   if (mode === "DAILY") {
-    if (taskType === "NEW") return "EN_TO_ZH";
-    const term = extra?.term ?? "";
-    const hasExample = extra?.hasExample ?? false;
+    if (taskType === "NEW") return pick("EN_TO_ZH");
+    const term = resolvedExtra.term ?? "";
+    const hasExample = resolvedExtra.hasExample ?? false;
     if (masteryScore != null) {
-      if (masteryScore < 35) return "EN_TO_ZH_CHOICE";
-      if (masteryScore < 55 && hasExample) return "CLOZE_SENTENCE";
-      if (masteryScore < 70) return "ZH_TO_EN_CHOICE";
-      if (isSimpleSpellingTerm(term) && position % 4 === 0) return "LETTER_BANK";
-      return "ZH_TO_EN_SPELLING";
+      if (masteryScore < 35) return pick("EN_TO_ZH_CHOICE");
+      if (masteryScore < 55 && hasExample) return pick("CLOZE_SENTENCE");
+      if (masteryScore < 70) return pick("ZH_TO_EN_CHOICE");
+      if (isSimpleSpellingTerm(term) && position % 4 === 0) return pick("LETTER_BANK");
+      return pick("ZH_TO_EN_SPELLING");
     }
-    if (position % 6 === 5 && hasExample) return "CLOZE_SENTENCE";
-    if (position % 4 === 3 && term && isSimpleSpellingTerm(term)) return "LETTER_BANK";
-    return position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE";
+    if (position % 6 === 5 && hasExample) return pick("CLOZE_SENTENCE");
+    if (position % 4 === 3 && term && isSimpleSpellingTerm(term)) return pick("LETTER_BANK");
+    return pick(position % 2 === 1 ? "ZH_TO_EN_CHOICE" : "EN_TO_ZH_CHOICE");
   }
-  return mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH";
+  return pick(mode === "DUE_REVIEW" || mode === "NEW_WORDS" ? "EN_TO_ZH_CHOICE" : "EN_TO_ZH");
 }
 export function taskFor(mode: StudyMode, candidate: StudyCandidate, sets: { due: Set<number>; wrong: Set<number> }): "NEW" | "REVIEW" | "WRONG" | "LISTENING" | "SPELLING" { if (mode === "LISTENING") return "LISTENING"; if (mode === "SPELLING") return "SPELLING"; if (mode === "DUE_REVIEW") return "REVIEW"; if (mode === "NEW_WORDS") return "NEW"; if (candidate.continuousTaskType) return candidate.continuousTaskType; if (sets.due.has(candidate.id)) return "REVIEW"; if (sets.wrong.has(candidate.id)) return "WRONG"; return "NEW"; }
 type PoolLimits = { due: number; wrong: number; fresh: number };

@@ -43,6 +43,18 @@ function coalesceLegacyLlmConfig(value: unknown): unknown {
   return { ...rest, ai: (picked as object) ?? { enabled: false, providerId: "", model: "", thinkingEnabled: false } };
 }
 
+const questionTypeEntrySchema = z.object({
+  enabled: z.boolean(),
+  weight: z.number().int().min(1).max(10),
+});
+
+const questionTypeConfigSchema = z.record(
+  z.enum(["EN_TO_ZH", "EN_TO_ZH_CHOICE", "ZH_TO_EN_CHOICE", "ZH_TO_EN_SPELLING", "LISTENING_SPELLING", "CLOZE_SENTENCE", "LISTENING_CHOICE", "LETTER_BANK"]),
+  questionTypeEntrySchema,
+).refine((value) => Object.values(value).some((entry) => entry.enabled), {
+  message: "至少启用一种题型",
+});
+
 const settingsSchema = z.object({
   vocabularyLevel: z.enum(["AUTO", "CET4", "CET6", "KY", "IELTS", "TOEFL"]).default("AUTO"),
   examTargets: z.array(z.enum(["CET4", "CET6", "KY", "IELTS", "TOEFL"])).max(5).default([]),
@@ -82,6 +94,16 @@ const settingsSchema = z.object({
     })),
     ai: aiConfigSchema,
   })),
+  questionTypeConfig: questionTypeConfigSchema.default({
+    EN_TO_ZH: { enabled: true, weight: 5 },
+    EN_TO_ZH_CHOICE: { enabled: true, weight: 5 },
+    ZH_TO_EN_CHOICE: { enabled: true, weight: 5 },
+    ZH_TO_EN_SPELLING: { enabled: true, weight: 5 },
+    LISTENING_SPELLING: { enabled: true, weight: 5 },
+    CLOZE_SENTENCE: { enabled: true, weight: 5 },
+    LISTENING_CHOICE: { enabled: true, weight: 5 },
+    LETTER_BANK: { enabled: true, weight: 5 },
+  }),
 });
 
 export const partialSettingsSchema = z.preprocess(
@@ -93,7 +115,15 @@ export const partialSettingsSchema = z.preprocess(
     }
     return value;
   },
-  settingsSchema.partial().strict(),
+  settingsSchema.partial().strict().superRefine((value, ctx) => {
+    if (value.questionTypeConfig) {
+      const entries = Object.values(value.questionTypeConfig as Record<string, { enabled?: boolean }>);
+      const hasEnabled = entries.some((entry) => entry?.enabled);
+      if (entries.length > 0 && !hasEnabled) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["questionTypeConfig"], message: "至少启用一种题型" });
+      }
+    }
+  }),
 );
 
 const SETTINGS_CACHE_TTL_MS = 30_000;

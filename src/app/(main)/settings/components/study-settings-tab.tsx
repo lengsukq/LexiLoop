@@ -4,6 +4,7 @@ import type { AppSettings, ExamTarget, InitializationProviderId } from "@/lib/ty
 import { EXAM_TARGETS } from "@/lib/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select } from "@/components/ui";
 import { Toggle, type SettingsUpdater, type TestState } from "../settings-shared";
+import { QuestionTypeSettings } from "./question-type-settings";
 import { StudyPlanSettings } from "./study-plan-settings";
 
 const PROVIDER_LABELS: Record<InitializationProviderId, string> = {
@@ -90,6 +91,7 @@ export function StudySettingsTab({
   return (
     <div className="space-y-5">
       <StudyPlanSettings settings={settings} update={update} />
+      <QuestionTypeSettings settings={settings} update={update} />
 
       <Card>
         <CardHeader><CardTitle>文章导词 · 考试目标</CardTitle></CardHeader>

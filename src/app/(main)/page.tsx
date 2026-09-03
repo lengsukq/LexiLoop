@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { errorMessage } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, AudioLines, Blocks, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, Hammer, Headphones, Layers, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowRight, AudioLines, Blocks, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, GraduationCap, Hammer, Headphones, Layers, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 import { DailyAiSuggestion } from "./daily-ai-suggestion";
@@ -206,6 +206,36 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="animate-fade-up stagger-5">
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-[10px] bg-gradient-to-br from-[#5856d6] to-[#00c7be] text-white"><GraduationCap className="size-4.5" /></span>
+            <div><CardTitle>音标学习</CardTitle><p className="mt-0.5 text-xs text-quaternary-label">48 音标 · 讲透会区分 + 美英对照</p></div>
+          </div>
+          <Link href="/phonetics" className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-accent">查看全部<ArrowRight className="size-3.5" /></Link>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Link href="/phonetics" className="ios-press group flex items-center gap-3 rounded-[16px] border border-accent/15 bg-accent/[0.06] p-3.5 hover:bg-accent/[0.08]">
+              <span className="grid size-10 place-items-center rounded-[12px] bg-gradient-to-br from-[#5856d6] to-accent text-white"><GraduationCap className="size-5" /></span>
+              <span className="min-w-0 flex-1 text-left"><b className="block text-[14px]">音标学习专区</b><small className="text-xs text-secondary-label">48 音标 · 逐个讲透 + 跟读</small></span>
+              <ArrowRight className="size-4 text-accent transition group-hover:translate-x-0.5" />
+            </Link>
+            <Link href="/phonetics" className="ios-press group flex items-center gap-3 rounded-[16px] bg-black/[0.03] p-3.5 hover:bg-black/[0.05] dark:bg-white/[0.04]">
+              <span className="grid size-10 place-items-center rounded-[12px] bg-[#00c7be]/10 text-[#00a59d]"><Layers className="size-5" /></span>
+              <span className="min-w-0 flex-1 text-left"><b className="block text-[14px]">音素表</b><small className="text-xs text-quaternary-label">分类卡片 · 搜 /æ/ /θ/ 试听</small></span>
+              <ArrowRight className="size-4 text-quaternary-label" />
+            </Link>
+            <Link href="/phonetics" className="ios-press group flex items-center gap-3 rounded-[16px] bg-black/[0.03] p-3.5 hover:bg-black/[0.05] dark:bg-white/[0.04]">
+              <span className="grid size-10 place-items-center rounded-[12px] bg-warning/10 text-warning"><Headphones className="size-5" /></span>
+              <span className="min-w-0 flex-1 text-left"><b className="block text-[14px]">易混对比</b><small className="text-xs text-quaternary-label">最小对立 · 盲听分辨</small></span>
+              <ArrowRight className="size-4 text-quaternary-label" />
+            </Link>
+          </div>
+          <Link href="/phonetics" className="ios-press flex sm:hidden w-full items-center justify-center gap-1 rounded-[12px] border border-black/[0.06] bg-white/70 py-2.5 text-sm font-semibold text-accent dark:border-white/[0.08] dark:bg-white/[0.05]">进入音标学习专区<ArrowRight className="size-4" /></Link>
+        </CardContent>
+      </Card>
 
       <Card className="animate-fade-up stagger-5">
         <CardHeader className="flex-row items-center justify-between gap-3">

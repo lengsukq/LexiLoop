@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BarChart3, BookMarked, Home, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
+import { AudioLines, BarChart3, BookMarked, Home, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Logo } from "./logo";
 import { BackgroundKeepalive } from "@/components/background-keepalive";
@@ -12,6 +12,7 @@ const navigation = [
   { label: "今日", href: "/", icon: Home },
   { label: "复习", href: "/study", icon: PlayCircle },
   { label: "单词本", href: "/words", icon: BookMarked },
+  { label: "音标", href: "/phonetics", icon: AudioLines },
   { label: "添加", href: "/add", icon: PlusCircle },
   { label: "初始化", href: "/initialize", icon: RefreshCw },
   { label: "统计", href: "/statistics", icon: BarChart3 },

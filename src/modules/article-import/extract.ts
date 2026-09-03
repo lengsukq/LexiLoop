@@ -69,3 +69,91 @@ export function extractArticleTerms(articleText: string, sourceLanguage = "en", 
 
   return { cleaned, wordCount, extracted };
 }
+
+
+export interface ParagraphSegment {
+  id: string;
+  index: number;
+  text: string;
+  charCount: number;
+}
+
+function splitIntoParagraphs(normalized: string): string[] {
+  const withParagraphs = normalized.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  if (withParagraphs.length > 1) return withParagraphs;
+  // single block but with single newlines: treat each non-empty line as paragraph
+  const lines = normalized.split(/\n/).map((s) => s.trim()).filter(Boolean);
+  if (lines.length >= 2 && normalized.includes("\n")) return lines;
+  return [normalized.trim()].filter(Boolean);
+}
+
+export function segmentArticleParagraphs(articleText: string, opts?: { maxSegments?: number; targetChars?: number; maxChars?: number; minChars?: number }): ParagraphSegment[] {
+  const maxSegments = opts?.maxSegments ?? 20;
+  const targetChars = opts?.targetChars ?? 2200;
+  const maxChars = opts?.maxChars ?? 4000;
+  const minChars = opts?.minChars ?? 400;
+  const raw = articleText.normalize("NFKC").replace(/\r\n/g, "\n").trim();
+  if (!raw) return [];
+  let paras = splitIntoParagraphs(raw);
+  // 轻量合并：仅当末段极短（<60字符）时拼到前一段，避免极短尾段单独请求
+  // 尊重用户按空行划分的段落意图，不对中间段落做激进合并
+  const TAIL_MERGE_THRESHOLD = 60;
+  while (paras.length > 1 && paras[paras.length - 1]!.length < TAIL_MERGE_THRESHOLD) {
+    const tail = paras.pop()!;
+    paras[paras.length - 1] = paras[paras.length - 1]! + "\n\n" + tail;
+  }
+  // split overlong paragraphs by sentences
+  const out: string[] = [];
+  for (const para of paras) {
+    if (para.length <= maxChars) {
+      out.push(para);
+      continue;
+    }
+    const sentences = extractSentences(para);
+    if (sentences.length <= 1) {
+      // hard slice by targetChars
+      for (let i = 0; i < para.length; i += targetChars) out.push(para.slice(i, i + targetChars).trim());
+      continue;
+    }
+    let buf = "";
+    for (const s of sentences) {
+      if (buf.length + s.length + 1 > targetChars && buf) {
+        out.push(buf.trim());
+        buf = s;
+      } else {
+        buf = buf ? buf + " " + s : s;
+      }
+      if (buf.length >= maxChars) {
+        out.push(buf.trim());
+        buf = "";
+      }
+    }
+    if (buf.trim()) out.push(buf.trim());
+  }
+  // cap to maxSegments by merging smallest neighbors
+  let segments = out.map((text, index) => ({ id: `seg-${index + 1}`, index, text, charCount: text.length }));
+  while (segments.length > maxSegments) {
+    let minIdx = 0;
+    let minSum = Infinity;
+    for (let i = 0; i < segments.length - 1; i++) {
+      const sum = segments[i]!.charCount + segments[i + 1]!.charCount;
+      if (sum < minSum) { minSum = sum; minIdx = i; }
+    }
+    const a = segments[minIdx]!;
+    const b = segments[minIdx + 1]!;
+    const mergedSeg = { id: a.id, index: a.index, text: a.text + "\n\n" + b.text, charCount: a.charCount + 2 + b.charCount };
+    segments = [...segments.slice(0, minIdx), mergedSeg, ...segments.slice(minIdx + 2)].map((s, idx) => ({ ...s, index: idx, id: `seg-${idx + 1}` }));
+  }
+  return segments.map((s, idx) => ({ ...s, index: idx, id: `seg-${idx + 1}` }));
+}
+
+export function batchesForSegments(segments: ParagraphSegment[], segmentsPerBatch: number): Array<{ batchIndex: number; segmentIds: string[]; charCount: number }> {
+  const perBatch = Math.max(1, Math.min(10, segmentsPerBatch));
+  const batches: Array<{ batchIndex: number; segmentIds: string[]; charCount: number }> = [];
+  for (let i = 0; i < segments.length; i += perBatch) {
+    const slice = segments.slice(i, i + perBatch);
+    batches.push({ batchIndex: batches.length, segmentIds: slice.map((s) => s.id), charCount: slice.reduce((a, s) => a + s.charCount, 0) });
+  }
+  return batches;
+}
+

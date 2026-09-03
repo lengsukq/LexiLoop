@@ -3,6 +3,7 @@ import { sqlite } from "@/db/client";
 import { ApiError } from "@/lib/api";
 import {
   ARTICLE_AI_CANDIDATE_LIMIT,
+  ARTICLE_MAX_SEGMENTS,
   ARTICLE_PHRASE_LIMIT,
   ARTICLE_SENTENCE_LIMIT,
   ARTICLE_SENTENCE_MIN_CHARS,
@@ -12,6 +13,7 @@ import {
   MAX_ARTICLE_CHARS,
   MIN_ARTICLE_CHARS,
 } from "@/lib/config";
+import { batchesForSegments, segmentArticleParagraphs } from "./extract";
 import type { ArticleCandidate, ArticleImportPreview, ArticleStats, ExamTarget, VocabularyLevel } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { aiSelectTerms } from "./ai-select";
@@ -252,6 +254,175 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
     aiError,
     totalCandidates: candidates.length,
     knownCount: articleStats.knownCount,
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
+export function planArticleSegments(articleText: string, segmentsPerBatch: number) {
+  const clamped = articleText.normalize("NFKC");
+  if (clamped.trim().length < MIN_ARTICLE_CHARS) throw new ApiError("VALIDATION_ERROR", `文章至少需要 ${MIN_ARTICLE_CHARS} 个字符。`);
+  if (clamped.length > MAX_ARTICLE_CHARS) throw new ApiError("VALIDATION_ERROR", `文章不能超过 ${MAX_ARTICLE_CHARS} 字符。`);
+  const segments = segmentArticleParagraphs(clamped, { maxSegments: ARTICLE_MAX_SEGMENTS });
+  const perBatch = Math.max(1, Math.min(10, Math.floor(segmentsPerBatch) || 1));
+  const batches = batchesForSegments(segments, perBatch);
+  return {
+    segments: segments.map((s) => ({ id: s.id, index: s.index, charCount: s.charCount, preview: s.text.slice(0, 120) })),
+    totalSegments: segments.length,
+    totalChars: clamped.length,
+    suggestedBatches: Math.ceil(segments.length / Math.max(1, Math.min(10, 2))),
+    batches,
+    rawSegments: segments,
+  };
+}
+
+export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImportPreview> {
+  if (!tokens.length) throw new ApiError("VALIDATION_ERROR", "请选择至少一个段落预览进行合并。");
+  if (tokens.length > ARTICLE_MAX_SEGMENTS) throw new ApiError("VALIDATION_ERROR", `最多合并 ${ARTICLE_MAX_SEGMENTS} 个段落。`);
+  const now = Date.now();
+  type Row = { token: string; filename: string; file_hash: string; rows_json: string; expires_at: number };
+  const rows: Row[] = [];
+  for (const token of tokens) {
+    const row = await sqlite.prepare("SELECT token, filename, file_hash, rows_json, expires_at FROM import_previews WHERE token = ? AND expires_at > ? LIMIT 1").get(token, now) as Row | undefined;
+    if (!row) throw new ApiError("IMPORT_PREVIEW_EXPIRED", `段落预览已过期或不存在：${token.slice(0, 8)}`);
+    rows.push(row);
+  }
+  // Parse candidates from rows_json (ImportPreviewRow shape with _article)
+  const allCandidates: ArticleCandidate[] = [];
+  let aiApplied = false;
+  const aiErrors: string[] = [];
+  let sourceLanguage = "en";
+  let targetLanguage = "zh-CN";
+  let sourceLanguageName = "英语";
+  let targetLanguageName = "简体中文";
+  let totalWordCount = 0;
+  let totalCharCount = 0;
+  let fileHashBase = "";
+  for (const row of rows) {
+    const parsed = JSON.parse(row.rows_json) as Array<{ term: string; normalizedTerm: string; sourceLanguage: string; targetLanguage: string; sourceLanguageName: string; targetLanguageName: string; entryType: string; status: string; _article?: { occurrences: number; aiReason: string | null; difficulty: number | null; cefrLevel: string | null; frequency: string | null; entryType: string; sourceSentence: string | null; aiCard: ArticleAiCard | null } }>;
+    if (parsed.length === 0) continue;
+    // capture langs from first row
+    if (rows.indexOf(row) === 0) {
+      sourceLanguage = parsed[0]!.sourceLanguage ?? "en";
+      targetLanguage = parsed[0]!.targetLanguage ?? "zh-CN";
+      sourceLanguageName = parsed[0]!.sourceLanguageName ?? "英语";
+      targetLanguageName = parsed[0]!.targetLanguageName ?? "简体中文";
+      fileHashBase = row.file_hash;
+    }
+    for (const r of parsed) {
+      const a = r._article;
+      allCandidates.push({
+        term: r.term,
+        normalizedTerm: r.normalizedTerm,
+        occurrences: a?.occurrences ?? 1,
+        status: r.status === "EXISTING" ? "KNOWN" : "CANDIDATE",
+        entryType: (a?.entryType ?? r.entryType ?? "WORD") as ArticleCandidate["entryType"],
+        sourceSentence: a?.sourceSentence ?? null,
+        aiReason: a?.aiReason ?? null,
+        difficulty: a?.difficulty ?? null,
+        cefrLevel: a?.cefrLevel ?? null,
+        frequency: a?.frequency ?? null,
+        aiCard: a?.aiCard ?? null,
+      });
+    }
+    // also need to recover preview-level aiApplied/recommendedTerms: infer from candidates with aiReason
+    // and from separate in-memory: we stored recommendedTerms/recommendedKeys only in preview response, not in rows_json.
+    // So we reconstruct: candidates with aiReason/difficulty are considered recommended.
+  }
+  // Dedupe by entryType\0normalizedTerm lower
+  const dedup = new Map<string, ArticleCandidate>();
+  for (const c of allCandidates) {
+    const key = `${(c.entryType ?? "WORD").toLowerCase()}\u0000${c.normalizedTerm.toLowerCase()}`;
+    const existing = dedup.get(key);
+    if (!existing) dedup.set(key, { ...c });
+    else {
+      existing.occurrences += c.occurrences;
+      if ((c.difficulty ?? 0) > (existing.difficulty ?? 0)) {
+        existing.difficulty = c.difficulty;
+        existing.cefrLevel = c.cefrLevel ?? existing.cefrLevel;
+        existing.frequency = c.frequency ?? existing.frequency;
+      }
+      if (!existing.aiReason && c.aiReason) existing.aiReason = c.aiReason;
+      if (!existing.sourceSentence && c.sourceSentence) existing.sourceSentence = c.sourceSentence;
+      if (!existing.aiCard && c.aiCard) existing.aiCard = c.aiCard;
+      if (existing.status === "KNOWN" && c.status === "CANDIDATE") {
+        // keep KNOWN if any segment marked known? Actually if word exists in DB, all segments mark KNOWN; otherwise CANDIDATE.
+        // Keep CANDIDATE only if all are CANDIDATE, so don't downgrade.
+      }
+      if (c.status === "KNOWN") existing.status = "KNOWN";
+    }
+  }
+  let merged = [...dedup.values()];
+  // Re-evaluate KNOWN against DB (in case dedup mixed)
+  const existingRows = await sqlite.prepare("SELECT normalized_term, content_type FROM words WHERE source_language = ? AND target_language = ?").all(sourceLanguage, targetLanguage) as Array<{ normalized_term: string; content_type: string }>;
+  const existingByKey = new Set(existingRows.map((r) => `${r.content_type ?? "WORD"}\u0000${r.normalized_term.toLowerCase()}`));
+  for (const c of merged) {
+    const k = `${c.entryType ?? "WORD"}\u0000${c.normalizedTerm.toLowerCase()}`;
+    if (existingByKey.has(k) || existingByKey.has(`WORD\u0000${c.normalizedTerm.toLowerCase()}`) && c.entryType === "WORD") {
+      c.status = "KNOWN";
+    }
+  }
+  // Cap phrases/sentences globally by difficulty
+  const words = merged.filter((c) => (c.entryType ?? "WORD") === "WORD");
+  let phrases = merged.filter((c) => c.entryType === "PHRASE").sort((a, b) => (b.difficulty ?? 0) - (a.difficulty ?? 0));
+  let sentences = merged.filter((c) => c.entryType === "SENTENCE").sort((a, b) => (b.difficulty ?? 0) - (a.difficulty ?? 0));
+  if (phrases.length > ARTICLE_PHRASE_LIMIT) phrases = phrases.slice(0, ARTICLE_PHRASE_LIMIT);
+  if (sentences.length > ARTICLE_SENTENCE_LIMIT) sentences = sentences.slice(0, ARTICLE_SENTENCE_LIMIT);
+  merged = [...words, ...phrases, ...sentences];
+  // Stats
+  const knownCount = merged.filter((c) => c.status === "KNOWN").length;
+  const phraseCount = phrases.length;
+  const sentenceCount = sentences.length;
+  // wordCount/charCount: sum across segments (approximate via occurrences for wordCount, use charCount from merged text lengths)
+  // Use allCandidates occurrences sum as wordCount proxy
+  totalWordCount = allCandidates.filter((c) => (c.entryType ?? "WORD") === "WORD").reduce((a, c) => a + c.occurrences, 0);
+  totalCharCount = rows.reduce((a, r) => {
+    try { const p = JSON.parse(r.rows_json) as Array<{ _article?: { sourceSentence?: string | null } }>; return a + p.length * 6; } catch { return a; }
+  }, 0);
+  // Fallback: compute from dedup text
+  if (totalCharCount < 100) totalCharCount = merged.reduce((a, c) => a + c.term.length + 2, 0);
+  aiApplied = merged.some((c) => c.aiReason != null || c.aiCard != null);
+  const recommendedTerms = merged.filter((c) => c.status === "CANDIDATE" && c.entryType === "WORD" && c.aiReason).map((c) => c.normalizedTerm.toLowerCase());
+  const fallbackRecommended = recommendedTerms.length ? recommendedTerms : merged.filter((c) => c.status === "CANDIDATE" && c.entryType === "WORD").map((c) => c.normalizedTerm.toLowerCase()).slice(0, 20);
+  const recommendedKeys = merged.filter((c) => c.status === "CANDIDATE" && fallbackRecommended.includes(c.normalizedTerm.toLowerCase()) && c.entryType === "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`).concat(merged.filter((c) => c.status === "CANDIDATE" && c.entryType !== "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`));
+  const uniqueCount = merged.filter((c) => (c.entryType ?? "WORD") === "WORD").length || dedup.size;
+  const articleStats: ArticleStats = {
+    charCount: totalCharCount,
+    wordCount: totalWordCount || uniqueCount * 2,
+    uniqueCount,
+    knownCount,
+    unknownCount: merged.filter((c) => c.status === "CANDIDATE").length,
+    phraseCount,
+    sentenceCount,
+  };
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(now + IMPORT_PREVIEW_TTL_MS);
+  const filename = `article-merge:${crypto.createHash("sha256").update(fileHashBase + tokens.join("|")).digest("hex").slice(0, 8)}`;
+  const rowsForImport = merged.map((c, index) => ({
+    rowNumber: index + 1,
+    term: c.term,
+    normalizedTerm: c.normalizedTerm,
+    sourceLanguage,
+    targetLanguage,
+    sourceLanguageName,
+    targetLanguageName,
+    entryType: c.entryType,
+    sourceCreatedAt: null,
+    status: c.status === "KNOWN" ? ("EXISTING" as const) : ("NEW" as const),
+    errors: [] as string[],
+    _article: { occurrences: c.occurrences, aiReason: c.aiReason, difficulty: c.difficulty, cefrLevel: c.cefrLevel, frequency: c.frequency, entryType: c.entryType, sourceSentence: c.sourceSentence ?? null, aiCard: c.aiCard ?? null },
+  }));
+  await sqlite.prepare("INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(token, filename, crypto.createHash("sha256").update(rowsForImport.map((r) => r.normalizedTerm).join("|")).digest("hex"), JSON.stringify(rowsForImport), expiresAt.getTime(), now);
+  return {
+    previewToken: token,
+    filename,
+    articleStats,
+    candidates: merged,
+    recommendedTerms: fallbackRecommended,
+    recommendedKeys,
+    aiApplied,
+    aiError: aiErrors.length ? aiErrors.join("；") : null,
+    totalCandidates: merged.length,
+    knownCount,
     expiresAt: expiresAt.toISOString(),
   };
 }

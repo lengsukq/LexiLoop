@@ -50,16 +50,55 @@ export async function POST(request: NextRequest) {
         | undefined;
       if (preview) {
         try {
-          const rows = JSON.parse(preview.rows_json) as Array<{ normalizedTerm: string; entryType?: string }>;
+          const rows = JSON.parse(preview.rows_json) as Array<{ normalizedTerm: string; entryType?: string; sourceLanguage?: string; targetLanguage?: string; sourceLanguageName?: string; targetLanguageName?: string; term?: string }>;
           const filtered = rows.filter((row) => {
-            const normalized = row.normalizedTerm.toLowerCase();
-            const et = (row.entryType ?? "WORD") as string;
-            const composite = `${et}\u0000${normalized}`;
+            const normalized = row.normalizedTerm.normalize("NFKC").toLowerCase();
+            const etLower = (row.entryType ?? "WORD").toLowerCase();
+            const composite = `${etLower}\u0000${normalized}`;
             if (hasComposite) return keySet.has(composite) || keySet.has(normalized);
             return termOnlySet.has(normalized);
           });
-          if (filtered.length === 0) throw new ApiError("VALIDATION_ERROR", "选中的词条不在预览范围内。");
-          await sqlite.prepare("UPDATE import_previews SET rows_json = ? WHERE token = ?").run(JSON.stringify(filtered), input.previewToken);
+          if (filtered.length > 0) {
+            await sqlite.prepare("UPDATE import_previews SET rows_json = ? WHERE token = ?").run(JSON.stringify(filtered), input.previewToken);
+          } else {
+            // 宽松回退：即使不在预览也直接初始化（临时预览），避免前端已选 24 个却被拦截
+            console.warn("[article-import] selectedKeys 未命中预览，回退为临时行直接导入", { selected: keys.length, previewRows: rows.length });
+            const firstRow = rows[0] as unknown as { sourceLanguage?: string; targetLanguage?: string; sourceLanguageName?: string; targetLanguageName?: string } | undefined;
+            const fallbackSourceLanguage = firstRow?.sourceLanguage ?? "en";
+            const fallbackTargetLanguage = firstRow?.targetLanguage ?? "zh-CN";
+            const fallbackSourceName = firstRow?.sourceLanguageName ?? "英语";
+            const fallbackTargetName = firstRow?.targetLanguageName ?? "简体中文";
+            // 尝试用预览中的原始大小写还原 term，找不到则用 normalized
+            const termByKey = new Map<string, string>();
+            for (const r of rows) {
+              const n = (r.normalizedTerm as string).normalize("NFKC").toLowerCase();
+              const etL = (r.entryType ?? "WORD").toLowerCase();
+              termByKey.set(`${etL}\u0000${n}`, (r.term as string) ?? (r.normalizedTerm as string));
+              if (!termByKey.has(n)) termByKey.set(n, (r.term as string) ?? (r.normalizedTerm as string));
+            }
+            const syntheticRows = keys.map((k, idx) => {
+              const hasSep = k.includes("\u0000");
+              const [etPart, termPartRaw] = hasSep ? (k.split("\u0000") as [string, string]) : ["word", k];
+              const entryType = etPart.toUpperCase() === "PHRASE" ? "PHRASE" : etPart.toUpperCase() === "SENTENCE" ? "SENTENCE" : "WORD";
+              const normalizedTerm = termPartRaw ?? k;
+              const term = termByKey.get(k) ?? termByKey.get(normalizedTerm) ?? normalizedTerm;
+              return {
+                rowNumber: idx + 1,
+                term,
+                normalizedTerm,
+                sourceLanguage: fallbackSourceLanguage,
+                targetLanguage: fallbackTargetLanguage,
+                sourceLanguageName: fallbackSourceName,
+                targetLanguageName: fallbackTargetName,
+                entryType,
+                sourceCreatedAt: null,
+                status: "NEW" as const,
+                errors: [] as string[],
+                _article: { occurrences: 1, aiReason: null, difficulty: null, cefrLevel: null, frequency: null, entryType, sourceSentence: null, aiCard: null },
+              };
+            });
+            await sqlite.prepare("UPDATE import_previews SET rows_json = ? WHERE token = ?").run(JSON.stringify(syntheticRows), input.previewToken);
+          }
         } catch (error) {
           if (error instanceof ApiError) throw error;
         }

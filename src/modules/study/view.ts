@@ -206,7 +206,7 @@ function buildClozeExtra(term: string, content: DictionaryContent): { sentence: 
   const candidates = (content.examples ?? [])
     .map((ex) => ({ sentence: String(ex.sentence ?? "").trim(), translation: (ex.translation as string | null) ?? null }))
     .filter((ex) => ex.sentence);
-  let chosen = candidates.find((ex) => new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(ex.sentence)) ?? candidates[0] ?? null;
+  const chosen = candidates.find((ex) => new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(ex.sentence)) ?? candidates[0] ?? null;
   if (!chosen) return null;
   const blankedSentence = chosen.sentence.replace(new RegExp(`\\b${escapeRegExp(term)}\\b`, "gi"), "____");
   return { sentence: chosen.sentence, translation: chosen.translation, blankedSentence: blankedSentence === chosen.sentence ? chosen.sentence.replace(term, "____") : blankedSentence };

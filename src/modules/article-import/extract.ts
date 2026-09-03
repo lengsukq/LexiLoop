@@ -1,3 +1,4 @@
+import { ARTICLE_MAX_SEGMENTS, ARTICLE_SEGMENTS_PER_BATCH_MAX, ARTICLE_SEGMENT_MAX_CHARS, ARTICLE_SEGMENT_TARGET_CHARS } from "@/lib/config";
 import { normalizeTerm, identityKey } from "@/modules/imports/normalizer";
 
 export const STOPWORDS = new Set([
@@ -87,14 +88,13 @@ function splitIntoParagraphs(normalized: string): string[] {
   return [normalized.trim()].filter(Boolean);
 }
 
-export function segmentArticleParagraphs(articleText: string, opts?: { maxSegments?: number; targetChars?: number; maxChars?: number; minChars?: number }): ParagraphSegment[] {
-  const maxSegments = opts?.maxSegments ?? 20;
-  const targetChars = opts?.targetChars ?? 2200;
-  const maxChars = opts?.maxChars ?? 4000;
-  const minChars = opts?.minChars ?? 400;
+export function segmentArticleParagraphs(articleText: string, opts?: { maxSegments?: number; targetChars?: number; maxChars?: number }): ParagraphSegment[] {
+  const maxSegments = opts?.maxSegments ?? ARTICLE_MAX_SEGMENTS;
+  const targetChars = opts?.targetChars ?? ARTICLE_SEGMENT_TARGET_CHARS;
+  const maxChars = opts?.maxChars ?? ARTICLE_SEGMENT_MAX_CHARS;
   const raw = articleText.normalize("NFKC").replace(/\r\n/g, "\n").trim();
   if (!raw) return [];
-  let paras = splitIntoParagraphs(raw);
+  const paras = splitIntoParagraphs(raw);
   // 轻量合并：仅当末段极短（<60字符）时拼到前一段，避免极短尾段单独请求
   // 尊重用户按空行划分的段落意图，不对中间段落做激进合并
   const TAIL_MERGE_THRESHOLD = 60;
@@ -148,7 +148,7 @@ export function segmentArticleParagraphs(articleText: string, opts?: { maxSegmen
 }
 
 export function batchesForSegments(segments: ParagraphSegment[], segmentsPerBatch: number): Array<{ batchIndex: number; segmentIds: string[]; charCount: number }> {
-  const perBatch = Math.max(1, Math.min(10, segmentsPerBatch));
+  const perBatch = Math.max(1, Math.min(ARTICLE_SEGMENTS_PER_BATCH_MAX, segmentsPerBatch));
   const batches: Array<{ batchIndex: number; segmentIds: string[]; charCount: number }> = [];
   for (let i = 0; i < segments.length; i += perBatch) {
     const slice = segments.slice(i, i + perBatch);

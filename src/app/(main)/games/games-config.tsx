@@ -3,8 +3,9 @@ import { Blocks, Brain, Hammer, Headphones, Layers, Puzzle } from "lucide-react"
 import type { LeaderboardSummary } from "@/lib/types";
 import type { GameItem } from "./types";
 
-export const GAME_MODES = ["WORD_BUILDER", "LISTENING_PICK", "MEANING_BLITZ", "WHACK_A_MOLE", "WORD_STACK", "WORD_TETRIS"] as const;
-export type GameMode = (typeof GAME_MODES)[number];
+import { GAME_MODES, type GameMode } from "@/modules/games/service";
+
+export { GAME_MODES, type GameMode };
 
 export interface GameSession {
   sessionId: number;
@@ -28,13 +29,15 @@ export interface GameResult {
   leaderboard?: LeaderboardSummary;
 }
 
-export const GAME_CONFIG: Record<GameMode, {
+export interface GameConfigEntry {
   title: string;
   subtitle: string;
   rule: string;
   icon: ReactNode;
   gradient: string;
-}> = {
+}
+
+export const GAME_CONFIG = {
   WORD_BUILDER: {
     title: "单词拼图",
     subtitle: "根据释义组合字母",
@@ -77,8 +80,12 @@ export const GAME_CONFIG: Record<GameMode, {
     icon: <Blocks className="size-7" />,
     gradient: "from-[#5856d6] to-purple",
   },
-};
+} satisfies Record<GameMode, GameConfigEntry>;
 
 export function validMode(value: string | null): value is GameMode {
   return Boolean(value && GAME_MODES.includes(value as GameMode));
+}
+
+export function getGameConfig(mode: GameMode): GameConfigEntry {
+  return GAME_CONFIG[mode];
 }

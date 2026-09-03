@@ -13,7 +13,7 @@ import type { GameAnswerState, GamePhase } from "@/lib/game-types";
 import { Badge, Card, CardContent, Progress, buttonClass } from "@/components/ui";
 import type { SummaryItem } from "@/components/game-summary";
 import { GameErrorBanner, GamePlayHeader, GameSavingOverlay } from "@/components/game-hud";
-import { GAME_CONFIG, validMode, type GameMode, type GameResult, type GameSession } from "./games-config";
+import { getGameConfig, validMode, type GameMode, type GameResult, type GameSession } from "./games-config";
 import { GamesSetup } from "./games-setup";
 import { GamesResultView } from "./games-result";
 import { WordBuilder } from "./word-builder";
@@ -270,7 +270,7 @@ function GamesPageContent() {
   }
 
   if (!session || !current || !mode) return null;
-  const config = GAME_CONFIG[mode];
+  const config = getGameConfig(mode);
   const progress = index / Math.max(1, session.items.length) * 100;
 
   return <div className="mx-auto max-w-3xl space-y-3 pb-3 sm:space-y-5 sm:py-4">

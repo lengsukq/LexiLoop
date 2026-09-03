@@ -56,19 +56,4 @@ export interface ArticleSegment {
   error?: string | null;
   previewToken?: string | null;
 }
-export interface ArticleSegmentPlan {
-  segments: Array<{ id: string; index: number; charCount: number; preview: string }>;
-  totalSegments: number;
-  totalChars: number;
-  suggestedBatches: number;
-  batches: Array<{ batchIndex: number; segmentIds: string[]; charCount: number }>;
-}
-export interface ArticleSegmentBatchRequest {
-  articleText: string;
-  segmentIds?: string[];
-  examTargets?: Array<"CET4" | "CET6" | "KY" | "IELTS" | "TOEFL">;
-}
-export interface ArticleMergeRequest {
-  tokens: string[];
-}
 

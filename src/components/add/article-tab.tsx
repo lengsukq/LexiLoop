@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, CheckCircle2, FileText, Loader2, Sparkles, Wand2, BookOpen, Layers, MessageSquareText, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
+import { entryTypeLabel } from "@/lib/entry-type-label";
 import { errorMessage } from "@/lib/format";
-import { MAX_ARTICLE_CHARS, MIN_ARTICLE_CHARS, ARTICLE_MAX_SEGMENTS } from "@/lib/config";
+import { MAX_ARTICLE_CHARS, MIN_ARTICLE_CHARS, ARTICLE_MAX_SEGMENTS, ARTICLE_SEGMENTS_PER_BATCH_MAX, ARTICLE_SEGMENT_CONCURRENCY, ARTICLE_SEGMENT_PREVIEW_CHARS } from "@/lib/config";
 import type { AppSettings, ArticleCandidate, ArticleImportPreview, ExamTarget, ImportMode } from "@/lib/types";
 import { EXAM_TARGETS } from "@/lib/types";
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, buttonClass, toast } from "@/components/ui";
+import { articleCandidateKey as candidateKey, fallbackRecommendedTerms, initialSelectionKeys, mergeArticleCandidates, recommendedCandidateKeys } from "@/modules/article-import/candidates";
 import { segmentArticleParagraphs, batchesForSegments } from "@/modules/article-import/extract";
 
 interface CommitResult {
@@ -43,13 +45,8 @@ const SAMPLE_ARTICLE =
 
 const EXAM_LABEL: Record<ExamTarget, string> = { CET4: "CET-4", CET6: "CET-6", KY: "考研", IELTS: "雅思", TOEFL: "托福" };
 
-function candidateKey(c: ArticleCandidate): string {
-  const normalized = c.normalizedTerm.toLowerCase();
-  const et = (c.entryType ?? "WORD") as string;
-  return `${et}\u0000${normalized}`;
-}
 function keyLabel(et: string): string {
-  return et === "PHRASE" ? "短语" : et === "SENTENCE" ? "句子" : "单词";
+  return entryTypeLabel(et);
 }
 function keyTone(et: string): "slate" | "blue" | "purple" {
   return et === "PHRASE" ? "blue" : et === "SENTENCE" ? "purple" : "slate";
@@ -58,35 +55,15 @@ function keyTone(et: string): "slate" | "blue" | "purple" {
 function mergePreviews(previews: ArticleImportPreview[]): ArticleImportPreview | null {
   if (previews.length === 0) return null;
   if (previews.length === 1) return previews[0]!;
-  const allCandidates = previews.flatMap((p) => p.candidates);
-  const dedup = new Map<string, ArticleCandidate>();
-  for (const c of allCandidates) {
-    const key = `${(c.entryType ?? "WORD").toLowerCase()}\u0000${c.normalizedTerm.toLowerCase()}`;
-    const existing = dedup.get(key);
-    if (!existing) dedup.set(key, { ...c });
-    else {
-      existing.occurrences += c.occurrences;
-      if ((c.difficulty ?? 0) > (existing.difficulty ?? 0)) {
-        existing.difficulty = c.difficulty;
-        existing.cefrLevel = c.cefrLevel ?? existing.cefrLevel;
-        existing.frequency = c.frequency ?? existing.frequency;
-      }
-      if (!existing.aiReason && c.aiReason) existing.aiReason = c.aiReason;
-      if (!existing.sourceSentence && c.sourceSentence) existing.sourceSentence = c.sourceSentence;
-      if (!existing.aiCard && c.aiCard) existing.aiCard = c.aiCard;
-      if (c.status === "KNOWN") existing.status = "KNOWN";
-    }
-  }
-  const merged = [...dedup.values()];
+  const merged = mergeArticleCandidates(previews.flatMap((p) => p.candidates));
   const phraseCount = merged.filter((c) => c.entryType === "PHRASE").length;
   const sentenceCount = merged.filter((c) => c.entryType === "SENTENCE").length;
   const knownCount = merged.filter((c) => c.status === "KNOWN").length;
   const first = previews[0]!;
   const aiApplied = previews.some((p) => p.aiApplied) || merged.some((c) => c.aiReason != null || c.aiCard != null);
-  const recommendedTerms = merged.filter((c) => c.status === "CANDIDATE" && c.entryType === "WORD" && c.aiReason).map((c) => c.normalizedTerm.toLowerCase());
-  const fallback = recommendedTerms.length ? recommendedTerms : merged.filter((c) => c.status === "CANDIDATE" && c.entryType === "WORD").map((c) => c.normalizedTerm.toLowerCase()).slice(0, 20);
-  const recommendedKeys = merged.filter((c) => c.status === "CANDIDATE" && fallback.includes(c.normalizedTerm.toLowerCase()) && c.entryType === "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`).concat(merged.filter((c) => c.status === "CANDIDATE" && c.entryType !== "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`));
-  const uniqueCount = merged.filter((c) => (c.entryType ?? "WORD") === "WORD").length || dedup.size;
+  const fallback = fallbackRecommendedTerms(merged);
+  const recommendedKeys = recommendedCandidateKeys(merged, fallback);
+  const uniqueCount = merged.filter((c) => (c.entryType ?? "WORD") === "WORD").length || merged.length;
   const totalWordCount = previews.reduce((a, p) => a + p.articleStats.wordCount, 0);
   const totalCharCount = previews.reduce((a, p) => a + p.articleStats.charCount, 0);
   return {
@@ -141,10 +118,10 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
     try {
       const segs = segmentArticleParagraphs(articleText, { maxSegments: ARTICLE_MAX_SEGMENTS });
       if (segs.length === 0) return null;
-      const perBatch = Math.max(1, Math.min(10, segmentsPerBatch));
+      const perBatch = Math.max(1, Math.min(ARTICLE_SEGMENTS_PER_BATCH_MAX, segmentsPerBatch));
       const batches = batchesForSegments(segs, perBatch);
       return {
-        segments: segs.map((s) => ({ id: s.id, index: s.index, charCount: s.charCount, preview: s.text.slice(0, 120) })),
+        segments: segs.map((s) => ({ id: s.id, index: s.index, charCount: s.charCount, preview: s.text.slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS) })),
         totalSegments: segs.length,
         totalChars: articleText.length,
         batches,
@@ -234,13 +211,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
   }, [mergedFromSegments, finalToken]);
 
   function applyPreviewSelection(data: ArticleImportPreview) {
-    const initialKeys = data.recommendedKeys?.length
-      ? data.recommendedKeys.map((k) => k.toLowerCase())
-      : data.candidates.filter((c) => data.recommendedTerms.map((t) => t.toLowerCase()).includes(c.normalizedTerm.toLowerCase())).map((c) => candidateKey(c).toLowerCase());
-    const aiCandidateKeys = new Set(initialKeys);
-    for (const c of data.candidates) {
-      if ((c.entryType === "PHRASE" || c.entryType === "SENTENCE") && c.status === "CANDIDATE") aiCandidateKeys.add(candidateKey(c).toLowerCase());
-    }
+    const aiCandidateKeys = initialSelectionKeys(data);
     setSelected((prev) => {
       if (prev.size === 0) return aiCandidateKeys;
       const next = new Set(prev);
@@ -268,14 +239,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
       });
       setPreview(data);
       setFinalToken(data.previewToken);
-      const initialKeys = data.recommendedKeys?.length
-        ? data.recommendedKeys.map((k) => k.toLowerCase())
-        : data.candidates.filter((c) => data.recommendedTerms.map((t) => t.toLowerCase()).includes(c.normalizedTerm.toLowerCase())).map((c) => candidateKey(c).toLowerCase());
-      const aiCandidateKeys = new Set(initialKeys);
-      for (const c of data.candidates) {
-        if ((c.entryType === "PHRASE" || c.entryType === "SENTENCE") && c.status === "CANDIDATE") aiCandidateKeys.add(candidateKey(c).toLowerCase());
-      }
-      setSelected(aiCandidateKeys);
+      setSelected(initialSelectionKeys(data));
       const phraseOrSentenceCount = data.candidates.filter((c) => c.entryType === "PHRASE" || c.entryType === "SENTENCE").length;
       setShowRecommendedOnly(Boolean(data.aiApplied && phraseOrSentenceCount === 0 && data.recommendedTerms.length > 0 && data.recommendedTerms.length < data.candidates.filter((c) => c.status === "CANDIDATE").length));
       setStep("preview");
@@ -306,7 +270,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
       index: s.index,
       text: s.text,
       charCount: s.charCount,
-      previewText: s.text.slice(0, 120),
+      previewText: s.text.slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS),
       status: "idle" as SegmentStatus,
       preview: null,
       error: null,
@@ -314,7 +278,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
     setSegments(segs);
     setUseSegmented(true);
     setStep("analyzing");
-    const perBatch = Math.max(1, Math.min(10, segmentsPerBatch));
+    const perBatch = Math.max(1, Math.min(ARTICLE_SEGMENTS_PER_BATCH_MAX, segmentsPerBatch));
     const batches = batchesForSegments(plan.rawSegments, perBatch);
     setBatchProgress({ done: 0, total: batches.length, failed: 0 });
 
@@ -330,7 +294,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
     };
 
     // concurrency 3
-    const concurrency = 3;
+    const concurrency = ARTICLE_SEGMENT_CONCURRENCY;
     let nextBatchIdx = 0;
     let done = 0;
     let failed = 0;
@@ -649,7 +613,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
                           第 {batch.batchIndex + 1} 批 · {batchSegs.length} 段 · {batch.charCount} 字符
                         </p>
                         <p className="mt-0.5 truncate text-xs text-secondary-label">
-                          {batchSegs.map((s) => s.previewText).join(" ｜ ").slice(0, 120)}
+                          {batchSegs.map((s) => s.previewText).join(" ｜ ").slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS)}
                         </p>
                         {isError && batchSegs.find((s) => s.error) && (
                           <p className="mt-1 text-xs text-danger">{batchSegs.find((s) => s.error)?.error}</p>
@@ -947,7 +911,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
                   <div key={batch.batchIndex} className={`flex items-center justify-between gap-3 rounded-[14px] border p-3 ${isError ? "border-danger/30 bg-danger/[0.04]" : isSuccess ? "border-success/20 bg-success/[0.04]" : "border-black/[0.06] bg-white/60 dark:border-white/[0.08] dark:bg-white/[0.04]"}`}>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">第 {batch.batchIndex + 1} 批 · {batchSegs.length} 段 · {batch.charCount} 字符</p>
-                      <p className="mt-0.5 truncate text-xs text-secondary-label">{batchSegs.map((s) => s.previewText).join(" ｜ ").slice(0, 100)}</p>
+                      <p className="mt-0.5 truncate text-xs text-secondary-label">{batchSegs.map((s) => s.previewText).join(" ｜ ").slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS)}</p>
                       {isError && <p className="mt-1 text-xs text-danger">{batchSegs.find((s) => s.error)?.error}</p>}
                     </div>
                     <div className="shrink-0">
@@ -1083,7 +1047,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {segmentPlan.segments.slice(0, 6).map((seg) => (
                       <span key={seg.id} className="rounded-full bg-black/[0.06] px-2.5 py-1 text-[11px] text-secondary-label dark:bg-white/[0.08]">
-                        {seg.id} · {seg.charCount}字 · {seg.preview.slice(0, 24)}…
+                        {seg.id} · {seg.charCount}字 · {seg.preview.slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS)}…
                       </span>
                     ))}
                     {segmentPlan.totalSegments > 6 && <span className="px-2 py-1 text-xs text-tertiary-label">+{segmentPlan.totalSegments - 6} 段</span>}
@@ -1096,7 +1060,7 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
                     <p className="text-[11px] text-tertiary-label">{segmentsPerBatch} 段 / 批 · 共 {totalBatches} 批</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input type="range" min={1} max={10} value={segmentsPerBatch} onChange={(e) => setSegmentsPerBatch(Math.max(1, Math.min(10, Number(e.target.value))))} className="h-2 w-28 accent-accent" />
+                    <input type="range" min={1} max={ARTICLE_SEGMENTS_PER_BATCH_MAX} value={segmentsPerBatch} onChange={(e) => setSegmentsPerBatch(Math.max(1, Math.min(ARTICLE_SEGMENTS_PER_BATCH_MAX, Number(e.target.value))))} className="h-2 w-28 accent-accent" />
                     <span className="w-8 text-center text-sm font-semibold">{segmentsPerBatch}</span>
                   </div>
                 </div>

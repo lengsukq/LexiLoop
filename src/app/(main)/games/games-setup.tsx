@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, AudioLines, Gamepad2, Loader2, Zap } from "lucide-react";
 import { Badge, Card, CardContent, buttonClass } from "@/components/ui";
 import { GameErrorBanner } from "@/components/game-hud";
-import { GAME_CONFIG, GAME_MODES, type GameMode } from "./games-config";
+import { getGameConfig, GAME_MODES, type GameMode } from "./games-config";
 
 const ENTRY_LINKS = [
   {
@@ -51,7 +51,7 @@ export function GamesSetup({ loading, loadingMode, error, onStart }: {
               </Link>
             ))}
             {GAME_MODES.map((gameMode) => {
-              const config = GAME_CONFIG[gameMode];
+              const config = getGameConfig(gameMode);
               return (
                 <button key={gameMode} type="button" onClick={() => onStart(gameMode)} disabled={loading} className="ios-press group flex items-center gap-3.5 rounded-[16px] border border-black/[0.08] bg-white/60 p-3.5 text-left transition-all hover:bg-white hover:border-accent/40 disabled:opacity-50 dark:border-white/[0.09] dark:bg-white/[0.04]">
                   <span className={`grid size-11 shrink-0 place-items-center rounded-[13px] bg-gradient-to-br ${config.gradient} text-white shadow-xs`}>

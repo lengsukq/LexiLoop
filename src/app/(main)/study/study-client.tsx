@@ -107,6 +107,7 @@ export function StudyClient() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [error, setError] = useState("");
   const [choiceRevealDelaySeconds, setChoiceRevealDelaySeconds] = useState(2);
+  const choiceRevealDelaySecondsRef = useRef(2);
   const choiceRevealTimerRef = useRef<number | null>(null);
   const [hintLevel, setHintLevel] = useState(0);
   const [usedHint, setUsedHint] = useState(false);
@@ -121,7 +122,9 @@ export function StudyClient() {
     void apiFetch<{ choiceRevealDelaySeconds?: number }>("/api/settings")
       .then((settings) => {
         if (!cancelled && typeof settings.choiceRevealDelaySeconds === "number") {
-          setChoiceRevealDelaySeconds(Math.max(0, settings.choiceRevealDelaySeconds));
+          const delay = Math.max(0, settings.choiceRevealDelaySeconds);
+          choiceRevealDelaySecondsRef.current = delay;
+          setChoiceRevealDelaySeconds(delay);
         }
       })
       .catch(() => {
@@ -137,8 +140,57 @@ export function StudyClient() {
     if (active instanceof HTMLElement) active.blur();
   }, []);
 
+  function clearChoiceRevealTimers() {
+    if (choiceRevealTimerRef.current !== null) {
+      window.clearTimeout(choiceRevealTimerRef.current);
+      choiceRevealTimerRef.current = null;
+    }
+    if (choiceProgressTimerRef.current !== null) {
+      window.clearInterval(choiceProgressTimerRef.current);
+      choiceProgressTimerRef.current = null;
+    }
+  }
+
+  const current = data?.items[index] ?? null;
+  const { reset: resetQuestionTimer, capture: captureActiveQuestionDuration } = useActiveStopwatch(Boolean(current && !revealed && !submitting));
+
+  // Runs on every question transition (event handler, not an effect): resets
+  // per-question state, restarts the stopwatch, and arms the choice delay.
+  const beginQuestion = useCallback((questionType: QuestionType | null) => {
+    questionDurationRef.current = null;
+    resetQuestionTimer();
+    answerIdRef.current = clientId();
+    clearChoiceRevealTimers();
+    setHintLevel(0);
+    setUsedHint(false);
+    setRevealSections({ mnemonic: true, roots: false, grammar: false, example: false });
+    setBuiltLetterIds([]);
+    if (!questionType) return;
+    const isChoiceQuestion = questionType === "EN_TO_ZH_CHOICE" || questionType === "ZH_TO_EN_CHOICE" || questionType === "LISTENING_CHOICE";
+    const delayMs = Math.max(0, choiceRevealDelaySecondsRef.current) * 1000;
+    if (isChoiceQuestion && delayMs > 0) {
+      setChoicesVisible(false);
+      setChoiceRevealProgress(0);
+      const startedAt = Date.now();
+      choiceProgressTimerRef.current = window.setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        setChoiceRevealProgress(Math.min(1, elapsed / delayMs));
+      }, 80);
+      choiceRevealTimerRef.current = window.setTimeout(() => {
+        choiceRevealTimerRef.current = null;
+        clearChoiceRevealTimers();
+        setChoiceRevealProgress(1);
+        setChoicesVisible(true);
+      }, delayMs) as unknown as number;
+    } else {
+      setChoicesVisible(true);
+      setChoiceRevealProgress(1);
+    }
+  }, [resetQuestionTimer]);
+
   const applySession = useCallback((session: SessionData) => {
     dismissKeyboard();
+    beginQuestion(session.items[session.resumeIndex]?.questionType ?? null);
     setData(session);
     setIndex(session.resumeIndex);
     setRevealed(false);
@@ -146,13 +198,7 @@ export function StudyClient() {
     setIntervals([]);
     setLastResult(null);
     setSelectedChoice(null);
-    setChoicesVisible(false);
-    setChoiceRevealProgress(0);
-    setHintLevel(0);
-    setUsedHint(false);
-    setRevealSections({ mnemonic: true, roots: false, grammar: false, example: false });
-    setBuiltLetterIds([]);
-  }, [dismissKeyboard]);
+  }, [beginQuestion, dismissKeyboard]);
 
   const start = useCallback(async (forceNew = false) => {
     setError(""); setData(null); setIndex(0); setRevealed(false); setUserAnswer(""); setLastResult(null); setSelectedChoice(null); setChoicesVisible(false);
@@ -171,9 +217,6 @@ export function StudyClient() {
     } catch (reason) { setError(errorMessage(reason, "创建会话失败")); }
   }, [applySession, mode]);
   useEffect(() => { if (!started.current) { started.current = true; void start(); } }, [start]);
-
-  const current = data?.items[index] ?? null;
-  const { reset: resetQuestionTimer, capture: captureActiveQuestionDuration } = useActiveStopwatch(Boolean(current && !revealed && !submitting));
   useEffect(() => {
     if (!data) return;
     void preloadTtsBatch(data.items.slice(index, index + 5).map((item) => ({ text: item.word.term, accent: "US" })));
@@ -184,52 +227,17 @@ export function StudyClient() {
     return questionDurationRef.current;
   }, [captureActiveQuestionDuration]);
 
-  useEffect(() => {
-    if (current) {
-      questionDurationRef.current = null;
-      resetQuestionTimer();
-      answerIdRef.current = clientId();
-      setHintLevel(0);
-      setUsedHint(false);
-      setRevealSections({ mnemonic: true, roots: false, grammar: false, example: false });
-      setBuiltLetterIds([]);
-      const isChoiceQuestion = current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE";
-      const delayMs = Math.max(0, choiceRevealDelaySeconds) * 1000;
-      if (isChoiceQuestion && delayMs > 0) {
-        setChoicesVisible(false);
-        setChoiceRevealProgress(0);
-        const startedAt = Date.now();
-        choiceProgressTimerRef.current = window.setInterval(() => {
-          const elapsed = Date.now() - startedAt;
-          setChoiceRevealProgress(Math.min(1, elapsed / delayMs));
-        }, 80);
-        choiceRevealTimerRef.current = window.setTimeout(() => {
-          choiceRevealTimerRef.current = null;
-          if (choiceProgressTimerRef.current !== null) {
-            window.clearInterval(choiceProgressTimerRef.current);
-            choiceProgressTimerRef.current = null;
-          }
-          setChoiceRevealProgress(1);
-          setChoicesVisible(true);
-        }, delayMs) as unknown as number;
-      } else {
-        setChoicesVisible(!isChoiceQuestion || delayMs === 0 ? true : false);
-        if (!isChoiceQuestion) setChoiceRevealProgress(1);
-        else setChoiceRevealProgress(delayMs === 0 ? 1 : 0);
-        if (!isChoiceQuestion) setChoicesVisible(true);
-      }
+  // Timers are armed per question in beginQuestion; this only cleans up on unmount.
+  useEffect(() => () => {
+    if (choiceRevealTimerRef.current !== null) {
+      window.clearTimeout(choiceRevealTimerRef.current);
+      choiceRevealTimerRef.current = null;
     }
-    return () => {
-      if (choiceRevealTimerRef.current !== null) {
-        window.clearTimeout(choiceRevealTimerRef.current);
-        choiceRevealTimerRef.current = null;
-      }
-      if (choiceProgressTimerRef.current !== null) {
-        window.clearInterval(choiceProgressTimerRef.current);
-        choiceProgressTimerRef.current = null;
-      }
-    };
-  }, [choiceRevealDelaySeconds, current, resetQuestionTimer]);
+    if (choiceProgressTimerRef.current !== null) {
+      window.clearInterval(choiceProgressTimerRef.current);
+      choiceProgressTimerRef.current = null;
+    }
+  }, []);
   useEffect(() => {
     if (!current) return;
     if (revealed) return;
@@ -407,15 +415,12 @@ export function StudyClient() {
       } else {
         // No structural change to the session: advance locally instead of
         // re-fetching the whole session (which would cost extra round trips).
+        const nextQuestionType = data.items[index + 1]?.questionType ?? null;
+        beginQuestion(nextQuestionType);
         setRevealed(false);
         setUserAnswer("");
         setLastResult(null);
         setSelectedChoice(null);
-        setChoicesVisible(false);
-        setChoiceRevealProgress(0);
-        setHintLevel(0);
-        setUsedHint(false);
-        setBuiltLetterIds([]);
         setData((prev) => {
           if (!prev) return prev;
           const isLast = index >= prev.items.length - 1;
@@ -435,7 +440,7 @@ export function StudyClient() {
       }
     } catch (reason) { setError(errorMessage(reason, "提交答案失败")); }
     finally { setSubmitting(false); }
-  }, [captureQuestionDuration, current, data, exactLocal, index, reloadSession, selectedChoice, usedHint, userAnswer]);
+  }, [beginQuestion, builtLetterIds, captureQuestionDuration, current, data, exactLocal, index, reloadSession, selectedChoice, usedHint, userAnswer]);
 
   const skip = useCallback(async () => {
     if (!current || !data) return;

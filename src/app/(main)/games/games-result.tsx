@@ -5,7 +5,7 @@ import { GameSummary, type SummaryItem } from "@/components/game-summary";
 import { GameMistakeCallout, GameResultAccuracy, GameResultHero, GameResultStats } from "@/components/game-result";
 import { GameMistakeFlashcards } from "@/components/game-mistake-flashcards";
 import { LeaderboardPanel } from "@/components/leaderboard-panel";
-import { GAME_CONFIG, type GameMode, type GameResult } from "./games-config";
+import { getGameConfig, type GameMode, type GameResult } from "./games-config";
 
 export function GamesResultView({ mode, result, summaryItems, onReplay, onChooseOther }: {
   mode: GameMode;
@@ -15,7 +15,7 @@ export function GamesResultView({ mode, result, summaryItems, onReplay, onChoose
   onChooseOther: () => void;
 }) {
   const [showFlashcards, setShowFlashcards] = useState(false);
-  const config = GAME_CONFIG[mode];
+  const config = getGameConfig(mode);
   const mistakeItems = summaryItems.filter((item) => item.status !== "correct");
 
   return (

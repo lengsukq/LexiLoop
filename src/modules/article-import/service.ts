@@ -14,7 +14,7 @@ import {
   MIN_ARTICLE_CHARS,
 } from "@/lib/config";
 import { extractArticleTerms, extractSentences } from "./extract";
-import { fallbackRecommendedTerms, mergeArticleCandidates, recommendedCandidateKeys } from "./candidates";
+import { fallbackRecommendedTerms, mergeAiErrors, mergeArticleCandidates, recommendedCandidateKeys } from "./candidates";
 import type { ArticleCandidate, ArticleImportPreview, ArticleStats, ExamTarget, VocabularyLevel } from "@/lib/types";
 import { getSettings } from "@/modules/settings/service";
 import { aiSelectTerms } from "./ai-select";
@@ -228,6 +228,22 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
     _article: { occurrences: c.occurrences, aiReason: c.aiReason, difficulty: c.difficulty, cefrLevel: c.cefrLevel, frequency: c.frequency, entryType: c.entryType, sourceSentence: c.sourceSentence ?? null, aiCard: c.aiCard ?? null },
   }));
 
+  const recommendedKeys = candidates
+    .filter((c) => c.status === "CANDIDATE" && recommendedTerms.includes(c.normalizedTerm.toLowerCase()) && c.entryType === "WORD")
+    .map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`)
+    .concat(candidates.filter((c) => c.status === "CANDIDATE" && c.entryType !== "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`));
+
+  // 预览级 AI 状态随行存进 rows_json 首行 _meta，供 merge 恢复 aiError/推荐词。
+  // 不新增列，避免迁移；CSV 预览 rows 无 _meta，读取时按缺省处理。
+  (rowsForImport[0] as unknown as { _meta?: unknown })._meta = {
+    aiApplied,
+    aiError,
+    recommendedTerms,
+    recommendedKeys,
+    wordCount,
+    charCount: rawText.length,
+  };
+
   await sqlite.prepare(
     "INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
   ).run(
@@ -239,10 +255,6 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
     now,
   );
 
-  const recommendedKeys = candidates
-    .filter((c) => c.status === "CANDIDATE" && recommendedTerms.includes(c.normalizedTerm.toLowerCase()) && c.entryType === "WORD")
-    .map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`)
-    .concat(candidates.filter((c) => c.status === "CANDIDATE" && c.entryType !== "WORD").map((c) => `${c.entryType}\u0000${c.normalizedTerm.toLowerCase()}`));
   return {
     previewToken: token,
     filename,
@@ -269,28 +281,36 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
     if (!row) throw new ApiError("IMPORT_PREVIEW_EXPIRED", `段落预览已过期或不存在：${token.slice(0, 8)}`);
     rows.push(row);
   }
-  // Parse candidates from rows_json (ImportPreviewRow shape with _article)
+  // Parse candidates from rows_json (ImportPreviewRow shape with _article).
+  // Preview-level AI state (aiApplied/aiError/recommendedTerms/wordCount/charCount)
+  // rides along in the first row's `_meta` (written by createArticlePreview).
+  interface PreviewMeta {
+    aiApplied?: boolean;
+    aiError?: string | null;
+    recommendedTerms?: string[];
+    recommendedKeys?: string[];
+    wordCount?: number;
+    charCount?: number;
+  }
   const allCandidates: ArticleCandidate[] = [];
-  let aiApplied = false;
-  const aiErrors: string[] = [];
+  const previewMetas: Array<{ token: string; meta: PreviewMeta }> = [];
   let sourceLanguage = "en";
   let targetLanguage = "zh-CN";
   let sourceLanguageName = "英语";
   let targetLanguageName = "简体中文";
-  let totalWordCount = 0;
-  let totalCharCount = 0;
   let fileHashBase = "";
-  for (const row of rows) {
-    const parsed = JSON.parse(row.rows_json) as Array<{ term: string; normalizedTerm: string; sourceLanguage: string; targetLanguage: string; sourceLanguageName: string; targetLanguageName: string; entryType: string; status: string; _article?: { occurrences: number; aiReason: string | null; difficulty: number | null; cefrLevel: string | null; frequency: string | null; entryType: string; sourceSentence: string | null; aiCard: ArticleAiCard | null } }>;
+  for (const [rowIndex, row] of rows.entries()) {
+    const parsed = JSON.parse(row.rows_json) as Array<{ term: string; normalizedTerm: string; sourceLanguage: string; targetLanguage: string; sourceLanguageName: string; targetLanguageName: string; entryType: string; status: string; _meta?: PreviewMeta; _article?: { occurrences: number; aiReason: string | null; difficulty: number | null; cefrLevel: string | null; frequency: string | null; entryType: string; sourceSentence: string | null; aiCard: ArticleAiCard | null } }>;
     if (parsed.length === 0) continue;
     // capture langs from first row
-    if (rows.indexOf(row) === 0) {
+    if (rowIndex === 0) {
       sourceLanguage = parsed[0]!.sourceLanguage ?? "en";
       targetLanguage = parsed[0]!.targetLanguage ?? "zh-CN";
       sourceLanguageName = parsed[0]!.sourceLanguageName ?? "英语";
       targetLanguageName = parsed[0]!.targetLanguageName ?? "简体中文";
       fileHashBase = row.file_hash;
     }
+    if (parsed[0]?._meta) previewMetas.push({ token: row.token, meta: parsed[0]._meta });
     for (const r of parsed) {
       const a = r._article;
       allCandidates.push({
@@ -307,9 +327,6 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
         aiCard: a?.aiCard ?? null,
       });
     }
-    // also need to recover preview-level aiApplied/recommendedTerms: infer from candidates with aiReason
-    // and from separate in-memory: we stored recommendedTerms/recommendedKeys only in preview response, not in rows_json.
-    // So we reconstruct: candidates with aiReason/difficulty are considered recommended.
   }
   const deduped = mergeArticleCandidates(allCandidates);
   // Re-evaluate KNOWN against DB (in case dedup mixed)
@@ -328,20 +345,24 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
   if (phrases.length > ARTICLE_PHRASE_LIMIT) phrases = phrases.slice(0, ARTICLE_PHRASE_LIMIT);
   if (sentences.length > ARTICLE_SENTENCE_LIMIT) sentences = sentences.slice(0, ARTICLE_SENTENCE_LIMIT);
   const merged = [...words, ...phrases, ...sentences];
-  // Stats
   const knownCount = merged.filter((c) => c.status === "KNOWN").length;
   const phraseCount = phrases.length;
   const sentenceCount = sentences.length;
-  // wordCount/charCount: sum across segments (approximate via occurrences for wordCount, use charCount from merged text lengths)
-  // Use allCandidates occurrences sum as wordCount proxy
-  totalWordCount = allCandidates.filter((c) => (c.entryType ?? "WORD") === "WORD").reduce((a, c) => a + c.occurrences, 0);
-  totalCharCount = rows.reduce((a, r) => {
-    try { const p = JSON.parse(r.rows_json) as Array<{ _article?: { sourceSentence?: string | null } }>; return a + p.length * 6; } catch { return a; }
-  }, 0);
-  // Fallback: compute from dedup text
-  if (totalCharCount < 100) totalCharCount = merged.reduce((a, c) => a + c.term.length + 2, 0);
-  aiApplied = merged.some((c) => c.aiReason != null || c.aiCard != null);
-  const fallbackRecommended = fallbackRecommendedTerms(merged);
+  // Stats: prefer the exact per-batch word/char counts stored in _meta;
+  // fall back to the old occurrences approximation for legacy previews.
+  const totalWordCount = previewMetas.length > 0
+    ? previewMetas.reduce((a, p) => a + (p.meta.wordCount ?? 0), 0)
+    : allCandidates.filter((c) => (c.entryType ?? "WORD") === "WORD").reduce((a, c) => a + c.occurrences, 0);
+  const totalCharCount = previewMetas.length > 0
+    ? previewMetas.reduce((a, p) => a + (p.meta.charCount ?? 0), 0)
+    : merged.reduce((a, c) => a + c.term.length + 2, 0);
+  // Preview-level AI state comes from _meta first, candidates second.
+  const metaAiApplied = previewMetas.some((p) => p.meta.aiApplied);
+  const aiApplied = metaAiApplied || merged.some((c) => c.aiReason != null || c.aiCard != null);
+  const mergedAiError = mergeAiErrors(previewMetas.map((p) => ({ previewToken: p.token, aiError: p.meta.aiError ?? null })));
+  const metaRecommended = [...new Set(previewMetas.flatMap((p) => p.meta.recommendedTerms ?? []).map((t) => t.toLowerCase()))]
+    .filter((t) => merged.some((c) => (c.entryType ?? "WORD") === "WORD" && c.normalizedTerm.toLowerCase() === t));
+  const fallbackRecommended = metaRecommended.length > 0 ? metaRecommended : fallbackRecommendedTerms(merged);
   const recommendedKeys = recommendedCandidateKeys(merged, fallbackRecommended);
   const uniqueCount = merged.filter((c) => (c.entryType ?? "WORD") === "WORD").length || merged.length;
   const articleStats: ArticleStats = {
@@ -370,6 +391,17 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
     errors: [] as string[],
     _article: { occurrences: c.occurrences, aiReason: c.aiReason, difficulty: c.difficulty, cefrLevel: c.cefrLevel, frequency: c.frequency, entryType: c.entryType, sourceSentence: c.sourceSentence ?? null, aiCard: c.aiCard ?? null },
   }));
+  // 合并产物也带上 _meta：后续再次合并、以及提交页刷新时 AI 状态不丢失。
+  if (rowsForImport.length > 0) {
+    (rowsForImport[0] as unknown as { _meta?: unknown })._meta = {
+      aiApplied,
+      aiError: mergedAiError,
+      recommendedTerms: fallbackRecommended,
+      recommendedKeys,
+      wordCount: totalWordCount,
+      charCount: totalCharCount,
+    };
+  }
   await sqlite.prepare("INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(token, filename, crypto.createHash("sha256").update(rowsForImport.map((r) => r.normalizedTerm).join("|")).digest("hex"), JSON.stringify(rowsForImport), expiresAt.getTime(), now);
   return {
     previewToken: token,
@@ -379,7 +411,7 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
     recommendedTerms: fallbackRecommended,
     recommendedKeys,
     aiApplied,
-    aiError: aiErrors.length ? aiErrors.join("；") : null,
+    aiError: mergedAiError,
     totalCandidates: merged.length,
     knownCount,
     expiresAt: expiresAt.toISOString(),

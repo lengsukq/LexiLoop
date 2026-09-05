@@ -2,7 +2,7 @@ import { callLlmWithFallback, resolveLlmProviders } from "@/modules/llm/client";
 import { getSettings } from "@/modules/settings/service";
 import type { ExamTarget, VocabularyLevel } from "@/lib/types";
 import { buildArticleSelectionPrompt, parseJsonLoose } from "./prompt";
-import { normalizeLegacyResponse } from "./schema";
+import { normalizeLegacyResponse, AI_SELECTION_JSON_SCHEMA } from "./schema";
 
 export interface AiSelectInput {
   articleText: string;
@@ -52,6 +52,8 @@ export async function aiSelectTerms(input: AiSelectInput): Promise<AiSelectResul
       thinkingEnabled: purpose.thinkingEnabled ?? false,
       thinkingBudgetTokens: purpose.thinkingBudgetTokens,
       reasoningEffort: purpose.reasoningEffort,
+      // 支持结构化输出的模型走 json_schema 约束；不支持的自动降级为纯文本。
+      jsonSchema: AI_SELECTION_JSON_SCHEMA,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 请求失败";

@@ -3,10 +3,12 @@ import {
   articleCandidateKey,
   fallbackRecommendedTerms,
   initialSelectionKeys,
+  mergeAiErrors,
   mergeArticleCandidates,
+  mergeArticlePreviews,
   recommendedCandidateKeys,
 } from "@/modules/article-import/candidates";
-import type { ArticleCandidate } from "@/lib/types/article-import";
+import type { ArticleCandidate, ArticleImportPreview } from "@/lib/types/article-import";
 
 function candidate(overrides: Partial<ArticleCandidate> & { term: string; normalizedTerm: string }): ArticleCandidate {
   return {
@@ -103,5 +105,87 @@ describe("initialSelectionKeys", () => {
       ],
     });
     expect(keys.size).toBe(2);
+  });
+});
+
+function preview(overrides: Partial<ArticleImportPreview> & { previewToken: string }): ArticleImportPreview {
+  return {
+    filename: "article:test",
+    articleStats: { charCount: 100, wordCount: 20, uniqueCount: 10, knownCount: 0, unknownCount: 10, phraseCount: 0, sentenceCount: 0 },
+    candidates: [],
+    recommendedTerms: [],
+    recommendedKeys: [],
+    aiApplied: false,
+    aiError: null,
+    totalCandidates: 0,
+    knownCount: 0,
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    ...overrides,
+  };
+}
+
+describe("mergeAiErrors", () => {
+  it("keeps one message per failing token (shared-batch segments dedupe)", () => {
+    const token = "11111111-1111-1111-1111-111111111111";
+    const message = "AI 返回格式不符合预期，已回退为本地筛选。";
+    const merged = mergeAiErrors([
+      { previewToken: token, aiError: message },
+      { previewToken: token, aiError: message },
+      { previewToken: token, aiError: message },
+      { previewToken: token, aiError: message },
+    ]);
+    expect(merged).toBe(message);
+  });
+
+  it("joins distinct messages and ignores empty errors", () => {
+    const merged = mergeAiErrors([
+      { previewToken: "22222222-2222-2222-2222-222222222222", aiError: "超时" },
+      { previewToken: "33333333-3333-3333-3333-333333333333", aiError: null },
+      { previewToken: "44444444-4444-4444-4444-444444444444", aiError: "格式错误" },
+    ]);
+    expect(merged).toBe("超时；格式错误");
+  });
+});
+
+describe("mergeArticlePreviews", () => {
+  it("dedupes by previewToken so shared-batch previews do not double stats or errors", () => {
+    const token = "55555555-5555-5555-5555-555555555555";
+    const message = "AI 返回格式不符合预期，已回退为本地筛选。";
+    const shared = preview({
+      previewToken: token,
+      aiError: message,
+      articleStats: { charCount: 3000, wordCount: 500, uniqueCount: 40, knownCount: 2, unknownCount: 38, phraseCount: 1, sentenceCount: 1 },
+      candidates: [
+        candidate({ term: "apple", normalizedTerm: "apple", occurrences: 2 }),
+        candidate({ term: "take off", normalizedTerm: "take off", entryType: "PHRASE", occurrences: 1 }),
+      ],
+    });
+    const merged = mergeArticlePreviews([shared, shared, shared, shared]);
+    expect(merged).not.toBeNull();
+    expect(merged!.articleStats.charCount).toBe(3000);
+    expect(merged!.articleStats.wordCount).toBe(500);
+    expect(merged!.candidates.find((c) => c.entryType === "WORD")?.occurrences).toBe(2);
+    expect(merged!.aiError).toBe(message);
+  });
+
+  it("merges distinct tokens summing stats and joining errors", () => {
+    const message = "AI 返回格式不符合预期，已回退为本地筛选。";
+    const a = preview({
+      previewToken: "66666666-6666-6666-6666-666666666666",
+      aiError: message,
+      articleStats: { charCount: 2000, wordCount: 300, uniqueCount: 20, knownCount: 0, unknownCount: 20, phraseCount: 0, sentenceCount: 0 },
+      candidates: [candidate({ term: "apple", normalizedTerm: "apple", occurrences: 3 })],
+    });
+    const b = preview({
+      previewToken: "77777777-7777-7777-7777-777777777777",
+      aiError: message,
+      articleStats: { charCount: 1500, wordCount: 200, uniqueCount: 15, knownCount: 1, unknownCount: 14, phraseCount: 0, sentenceCount: 0 },
+      candidates: [candidate({ term: "Apple", normalizedTerm: "apple", occurrences: 4 })],
+    });
+    const merged = mergeArticlePreviews([a, b]);
+    expect(merged!.articleStats.charCount).toBe(3500);
+    expect(merged!.articleStats.wordCount).toBe(500);
+    expect(merged!.candidates.find((c) => c.entryType === "WORD")?.occurrences).toBe(7);
+    expect(merged!.aiError).toBe(`${message}（2 批）`);
   });
 });

@@ -10,7 +10,7 @@ import { MAX_ARTICLE_CHARS, MIN_ARTICLE_CHARS, ARTICLE_MAX_SEGMENTS, ARTICLE_SEG
 import type { AppSettings, ArticleCandidate, ArticleImportPreview, ExamTarget, ImportMode } from "@/lib/types";
 import { EXAM_TARGETS } from "@/lib/types";
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, buttonClass, toast } from "@/components/ui";
-import { articleCandidateKey as candidateKey, fallbackRecommendedTerms, initialSelectionKeys, mergeArticleCandidates, recommendedCandidateKeys } from "@/modules/article-import/candidates";
+import { articleCandidateKey as candidateKey, initialSelectionKeys, mergeArticlePreviews } from "@/modules/article-import/candidates";
 import { segmentArticleParagraphs, batchesForSegments } from "@/modules/article-import/extract";
 
 interface CommitResult {
@@ -53,40 +53,8 @@ function keyTone(et: string): "slate" | "blue" | "purple" {
 }
 
 function mergePreviews(previews: ArticleImportPreview[]): ArticleImportPreview | null {
-  if (previews.length === 0) return null;
-  if (previews.length === 1) return previews[0]!;
-  const merged = mergeArticleCandidates(previews.flatMap((p) => p.candidates));
-  const phraseCount = merged.filter((c) => c.entryType === "PHRASE").length;
-  const sentenceCount = merged.filter((c) => c.entryType === "SENTENCE").length;
-  const knownCount = merged.filter((c) => c.status === "KNOWN").length;
-  const first = previews[0]!;
-  const aiApplied = previews.some((p) => p.aiApplied) || merged.some((c) => c.aiReason != null || c.aiCard != null);
-  const fallback = fallbackRecommendedTerms(merged);
-  const recommendedKeys = recommendedCandidateKeys(merged, fallback);
-  const uniqueCount = merged.filter((c) => (c.entryType ?? "WORD") === "WORD").length || merged.length;
-  const totalWordCount = previews.reduce((a, p) => a + p.articleStats.wordCount, 0);
-  const totalCharCount = previews.reduce((a, p) => a + p.articleStats.charCount, 0);
-  return {
-    previewToken: first.previewToken,
-    filename: first.filename,
-    articleStats: {
-      charCount: totalCharCount,
-      wordCount: totalWordCount || uniqueCount * 2,
-      uniqueCount,
-      knownCount,
-      unknownCount: merged.filter((c) => c.status === "CANDIDATE").length,
-      phraseCount,
-      sentenceCount,
-    },
-    candidates: merged,
-    recommendedTerms: fallback,
-    recommendedKeys,
-    aiApplied,
-    aiError: previews.map((p) => p.aiError).filter(Boolean).join("；") || null,
-    totalCandidates: merged.length,
-    knownCount,
-    expiresAt: first.expiresAt,
-  };
+  // 共用 candidates.ts 的合并（含 aiError 按 token 去重），避免增量/重试/服务端三处漂移。
+  return mergeArticlePreviews(previews);
 }
 
 export default function ArticleTab({ onImported }: { onImported?: () => void }) {
@@ -397,11 +365,8 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
         body: JSON.stringify({ articleText: combinedText, examTargets: examTargets.length ? examTargets : undefined }),
       });
       setSegments((prev) => prev.map((s) => (batch.segmentIds.includes(s.id) ? { ...s, status: "success" as SegmentStatus, preview: data, error: null } : s)));
-      // re-merge all success previews + new one
-      const successPreviews = segments.filter((s) => s.status === "success" && s.preview).map((s) => s.preview!);
-      // include the just-fetched one (segments state hasn't updated yet in this closure, so add manually)
-      void [...successPreviews.filter((p) => !batchSegs.some((bs) => bs.preview?.previewToken === p.previewToken)), data];
-      // also include other batches success that are not in this batch
+      // re-merge all success previews + new one (segments state is stale in this closure, so take
+      // other batches' previews from state and add the just-fetched one manually)
       const otherSuccess = segments.filter((s) => s.status === "success" && s.preview && !batch.segmentIds.includes(s.id)).map((s) => s.preview!);
       const dedupTokens = new Map<string, ArticleImportPreview>();
       for (const p of [...otherSuccess, data]) dedupTokens.set(p.previewToken, p);
@@ -444,6 +409,21 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
       if (b) failedBatchIndices.add(b.batchIndex);
     }
     for (const idx of failedBatchIndices) await retryBatch(idx);
+  }
+
+  /** AI 回退的批次：请求成功但 aiError 非空（AI 筛选失败，降级为本地结果）。 */
+  function aiFallbackBatchIndices(): number[] {
+    const indices = new Set<number>();
+    for (const s of segments) {
+      if (s.status !== "success" || !s.preview?.aiError) continue;
+      const b = localPlan?.batches.find((batch) => batch.segmentIds.includes(s.id));
+      if (b) indices.add(b.batchIndex);
+    }
+    return [...indices];
+  }
+
+  async function retryAiFallbackBatches() {
+    for (const idx of aiFallbackBatchIndices()) await retryBatch(idx);
   }
 
   function toggleKey(key: string) {
@@ -892,13 +872,21 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-sm">
-                <span>分段 · {segments.filter((s) => s.status === "success").length}/{segments.length} 段成功{segments.some((s) => s.status === "error") ? ` · ${segments.filter((s) => s.status === "error").length} 段失败` : ""}</span>
-                {segments.some((s) => s.status === "error") && (
-                  <Button variant="outline" size="sm" onClick={() => void retryFailedBatches()}>
-                    <RefreshCw className="size-4" />
-                    重试失败
-                  </Button>
-                )}
+                <span>分段 · {segments.filter((s) => s.status === "success").length}/{segments.length} 段成功{segments.some((s) => s.status === "error") ? ` · ${segments.filter((s) => s.status === "error").length} 段失败` : ""}{aiFallbackBatchIndices().length > 0 ? ` · ${aiFallbackBatchIndices().length} 批 AI 回退` : ""}</span>
+                <div className="flex gap-2">
+                  {aiFallbackBatchIndices().length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => void retryAiFallbackBatches()}>
+                      <Sparkles className="size-4" />
+                      重试 AI 回退
+                    </Button>
+                  )}
+                  {segments.some((s) => s.status === "error") && (
+                    <Button variant="outline" size="sm" onClick={() => void retryFailedBatches()}>
+                      <RefreshCw className="size-4" />
+                      重试失败
+                    </Button>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -907,16 +895,24 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
                 const isLoading = batchSegs.some((s) => s.status === "loading");
                 const isError = batchSegs.some((s) => s.status === "error");
                 const isSuccess = batchSegs.length > 0 && batchSegs.every((s) => s.status === "success");
+                const hasAiFallback = isSuccess && batchSegs.some((s) => s.preview?.aiError);
                 return (
                   <div key={batch.batchIndex} className={`flex items-center justify-between gap-3 rounded-[14px] border p-3 ${isError ? "border-danger/30 bg-danger/[0.04]" : isSuccess ? "border-success/20 bg-success/[0.04]" : "border-black/[0.06] bg-white/60 dark:border-white/[0.08] dark:bg-white/[0.04]"}`}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">第 {batch.batchIndex + 1} 批 · {batchSegs.length} 段 · {batch.charCount} 字符</p>
+                      <p className="text-sm font-medium">第 {batch.batchIndex + 1} 批 · {batchSegs.length} 段 · {batch.charCount} 字符{hasAiFallback ? " · AI 回退" : ""}</p>
                       <p className="mt-0.5 truncate text-xs text-secondary-label">{batchSegs.map((s) => s.previewText).join(" ｜ ").slice(0, ARTICLE_SEGMENT_PREVIEW_CHARS)}</p>
                       {isError && <p className="mt-1 text-xs text-danger">{batchSegs.find((s) => s.error)?.error}</p>}
+                      {hasAiFallback && <p className="mt-1 truncate text-xs text-warning">{batchSegs.find((s) => s.preview?.aiError)?.preview?.aiError}</p>}
                     </div>
                     <div className="shrink-0">
                       {isLoading && <Loader2 className="size-5 animate-spin text-accent" />}
-                      {isSuccess && <CheckCircle2 className="size-5 text-success" />}
+                      {isSuccess && !hasAiFallback && <CheckCircle2 className="size-5 text-success" />}
+                      {hasAiFallback && (
+                        <Button variant="outline" size="sm" onClick={() => void retryBatch(batch.batchIndex)}>
+                          <Sparkles className="size-4" />
+                          重试 AI
+                        </Button>
+                      )}
                       {isError && <Button variant="outline" size="sm" onClick={() => void retryBatch(batch.batchIndex)}>重试</Button>}
                     </div>
                   </div>
@@ -961,7 +957,20 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
             </div>
             {effectivePreview.aiError && (
               <Alert tone="info" icon={<AlertCircle className="size-4" />} className="mt-4">
-                {effectivePreview.aiError} 已回退为展示单词与本地切句，你仍可手动勾选。
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{effectivePreview.aiError} 已回退为展示单词与本地切句，你仍可手动勾选。</span>
+                  {useSegmented && aiFallbackBatchIndices().length > 0 ? (
+                    <Button variant="outline" size="sm" onClick={() => void retryAiFallbackBatches()}>
+                      <Sparkles className="size-4" />
+                      重试 AI 回退
+                    </Button>
+                  ) : !useSegmented ? (
+                    <Button variant="outline" size="sm" onClick={() => void analyzeSingle()}>
+                      <Sparkles className="size-4" />
+                      重试 AI 筛选
+                    </Button>
+                  ) : null}
+                </div>
               </Alert>
             )}
             {!effectivePreview.aiApplied && !effectivePreview.aiError && (

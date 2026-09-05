@@ -13,10 +13,10 @@ import type {
   PracticeCandidateRow,
   PracticeTaskType,
 } from "@/modules/practice/types";
-export { completeGameSession } from "./completion";
+import { GAME_MODES, type GameMode } from "./modes";
 
-export const GAME_MODES = ["WORD_BUILDER", "LISTENING_PICK", "MEANING_BLITZ", "WHACK_A_MOLE", "WORD_STACK", "WORD_TETRIS"] as const;
-export type GameMode = (typeof GAME_MODES)[number];
+export { completeGameSession } from "./completion";
+export { GAME_MODES, type GameMode };
 
 const MINIMUM_GAME_ITEMS = 4;
 const CHOICE_COUNT = 4;

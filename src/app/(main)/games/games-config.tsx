@@ -3,7 +3,7 @@ import { Blocks, Brain, Hammer, Headphones, Layers, Puzzle } from "lucide-react"
 import type { LeaderboardSummary } from "@/lib/types";
 import type { GameItem } from "./types";
 
-import { GAME_MODES, type GameMode } from "@/modules/games/service";
+import { GAME_MODES, type GameMode } from "@/modules/games/modes";
 
 export { GAME_MODES, type GameMode };
 

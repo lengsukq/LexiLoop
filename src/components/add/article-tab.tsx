@@ -161,22 +161,15 @@ export default function ArticleTab({ onImported }: { onImported?: () => void }) 
     return list;
   }, [displayPreview, filter, showRecommendedOnly, recommendedKeys]);
 
-  const successSegments = segments.filter((s) => s.status === "success" && s.preview);
+  // 依赖必须是 segments 本身：若直接在渲染期 filter 出新数组，useMemo 每次渲染都会
+  // 重新合并出新对象，与下方 effect（已移除）形成无限重渲染循环，卡死整页。
+  const successSegments = useMemo(() => segments.filter((s) => s.status === "success" && s.preview), [segments]);
   const mergedFromSegments = useMemo(() => {
     if (!useSegmented || successSegments.length === 0) return null;
     return mergePreviews(successSegments.map((s) => s.preview!));
   }, [useSegmented, successSegments]);
 
   const effectivePreview = mergedFromSegments ?? displayPreview;
-
-  useEffect(() => {
-    if (mergedFromSegments) {
-      setMergedPreview(mergedFromSegments);
-      if (finalToken == null && mergedFromSegments.previewToken) {
-        // finalToken will be set after merge call; for incremental display we keep first token as previewToken
-      }
-    }
-  }, [mergedFromSegments, finalToken]);
 
   function applyPreviewSelection(data: ArticleImportPreview) {
     const aiCandidateKeys = initialSelectionKeys(data);

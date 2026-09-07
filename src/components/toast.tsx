@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+import { motion, AnimatePresence } from "framer-motion";
+
 export type ToastType = "success" | "error" | "info";
 
 export interface ToastMessage {
@@ -65,43 +67,48 @@ export function ToastContainer() {
     return () => window.removeEventListener(TOAST_EVENT, handleToast);
   }, []);
 
-  if (toasts.length === 0) return null;
-
   return (
     <div
       aria-live="polite"
       className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4 sm:top-4.5"
     >
-      {toasts.map((item) => (
-        <div
-          key={item.id}
-          className={cn(
-            "pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-[16px] p-3 shadow-[0_10px_30px_-4px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-2xl transition-all animate-fade-down sm:max-w-md sm:px-3.5 sm:py-2.5",
-            "liquid-glass border border-black/[0.08] dark:border-white/15 dark:bg-[#1c1c1e]/90",
-            item.type === "success" && "border-success/25",
-            item.type === "error" && "border-danger/25",
-            item.type === "info" && "border-accent/25",
-          )}
-        >
-          <div className="shrink-0">
-            {item.type === "success" && <CheckCircle2 className="size-4.5 text-success" />}
-            {item.type === "error" && <AlertCircle className="size-4.5 text-danger" />}
-            {item.type === "info" && <Info className="size-4.5 text-accent" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            {item.title && <p className="text-xs font-semibold text-label">{item.title}</p>}
-            <p className="text-[13px] font-medium leading-snug text-label">{item.message}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToasts((prev) => prev.filter((t) => t.id !== item.id))}
-            className="ios-press -mr-0.5 grid size-6 shrink-0 place-items-center rounded-full text-tertiary-label hover:bg-black/[0.05] hover:text-label dark:hover:bg-white/[0.08]"
-            aria-label="关闭提示"
+      <AnimatePresence mode="popLayout">
+        {toasts.map((item) => (
+          <motion.div
+            key={item.id}
+            layout
+            initial={{ opacity: 0, y: -16, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92, y: -10 }}
+            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            className={cn(
+              "pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-[16px] p-3 shadow-[0_12px_36px_-4px_rgba(0,0,0,0.14),0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-2xl sm:max-w-md sm:px-3.5 sm:py-2.5",
+              "liquid-glass border border-black/[0.08] dark:border-white/15 dark:bg-[#1c1c1e]/90",
+              item.type === "success" && "border-success/25",
+              item.type === "error" && "border-danger/25",
+              item.type === "info" && "border-accent/25",
+            )}
           >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      ))}
+            <div className="shrink-0">
+              {item.type === "success" && <CheckCircle2 className="size-4.5 text-success" />}
+              {item.type === "error" && <AlertCircle className="size-4.5 text-danger" />}
+              {item.type === "info" && <Info className="size-4.5 text-accent" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              {item.title && <p className="text-xs font-semibold text-label">{item.title}</p>}
+              <p className="text-[13px] font-medium leading-snug text-label">{item.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== item.id))}
+              className="ios-press -mr-0.5 grid size-6 shrink-0 place-items-center rounded-full text-tertiary-label hover:bg-black/[0.05] hover:text-label dark:hover:bg-white/[0.08]"
+              aria-label="关闭提示"
+            >
+              <X className="size-3.5" />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

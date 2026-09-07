@@ -65,16 +65,90 @@ function attachTransient(error: ApiError, status: number, timeout: boolean): voi
   (error as ApiError & { transient?: boolean; originalStatus?: number }).originalStatus = status;
 }
 
-/** 从 OpenAI / Anthropic 两种响应体里提取文本（空或非对象时返回空串）。 */
+/** 空响应按可重试处理：主模型偶发空回时自动切备用，重试一次无额外成本。 */
+function emptyResponseError(): ApiError {
+  const error = new ApiError("AI_EMPTY_RESPONSE", undefined, 502);
+  (error as ApiError & { transient?: boolean }).transient = true;
+  return error;
+}
+
+/**
+ * 网关返回了 200 但不是模型响应（如把 baseUrl 配成了控制台地址，
+ * 缺 /v1 后缀时会拿到 HTML 页面）。这是配置问题，重试无意义，直接抛清楚原因。
+ */
+function badGatewayBodyError(baseUrl: string, detail: string): ApiError {
+  const error = new ApiError(
+    "AI_REQUEST_FAILED",
+    `AI 网关 ${baseUrl} 返回了非模型响应（${detail}）。请检查 Provider 的 baseUrl 是否正确（如自建网关缺 /v1 后缀会返回控制台页面）。`,
+    502,
+  );
+  (error as ApiError & { transient?: boolean }).transient = false;
+  return error;
+}
+
+function refusalError(refusal: string): ApiError {
+  const error = new ApiError("AI_REQUEST_FAILED", `模型拒绝回答：${refusal.slice(0, 200)}`, 502);
+  (error as ApiError & { transient?: boolean }).transient = false;
+  return error;
+}
+
+function truncationError(): ApiError {
+  const error = new ApiError("AI_REQUEST_FAILED", "AI 输出被截断（max_tokens 不足），请调大输出上限或缩短文章后重试。", 502);
+  (error as ApiError & { transient?: boolean }).transient = false;
+  return error;
+}
+
+/** OpenAI 兼容响应的 finish_reason（结构化循环的文本分支也要识别 length 截断）。 */
+function openAiFinishReason(body: unknown): string | null {
+  const record = (body ?? {}) as Record<string, unknown>;
+  const choices = Array.isArray(record.choices) ? (record.choices as Array<Record<string, unknown>>) : [];
+  const reason = choices[0]?.finish_reason;
+  return typeof reason === "string" && reason ? reason : null;
+}
+
+/** 兼容网关把错误包在 200 响应体里的写法：{ error: string | { message } }。 */
+function embeddedBodyError(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const err = (body as Record<string, unknown>).error;
+  if (typeof err === "string" && err.trim()) return err.trim().slice(0, 300);
+  if (err && typeof err === "object") {
+    const message = (err as Record<string, unknown>).message;
+    if (typeof message === "string" && message.trim()) return message.trim().slice(0, 300);
+  }
+  return null;
+}
+
+/** 文本块可能是 string，也可能是 { value } / { content } 包裹的嵌套对象。 */
+function partText(item: unknown): string {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return "";
+  const text = (item as Record<string, unknown>).text;
+  if (typeof text === "string") return text;
+  if (text && typeof text === "object") {
+    const nested = text as Record<string, unknown>;
+    if (typeof nested.value === "string") return nested.value;
+    if (typeof nested.content === "string") return nested.content;
+  }
+  return "";
+}
+
+/** OpenAI 兼容网关的内容审查拒答（有 refusal 时 content 通常为空）。 */
+function openAiRefusal(body: unknown): string | null {
+  const record = (body ?? {}) as Record<string, unknown>;
+  const choices = Array.isArray(record.choices) ? (record.choices as Array<Record<string, unknown>>) : [];
+  const message = choices[0]?.message;
+  if (!message || typeof message !== "object") return null;
+  const refusal = (message as Record<string, unknown>).refusal;
+  return typeof refusal === "string" && refusal.trim() ? refusal.trim() : null;
+}
+
+/** 从 OpenAI / Anthropic 两种响应体里提取文本（空或非对象时返回空串，由调用方判空抛错）。 */
 function extractText(body: unknown, apiType: "openai" | "anthropic"): string {
   if (!body || typeof body !== "object") return "";
   const record = body as Record<string, unknown>;
   if (apiType === "anthropic") {
     const content = Array.isArray(record.content) ? record.content : [];
-    return content
-      .map((item) => (typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : ""))
-      .join("")
-      .trim();
+    return content.map((item) => partText(item)).join("").trim();
   }
   const choices = Array.isArray(record.choices) ? (record.choices as Array<Record<string, unknown>>) : [];
   const message = choices[0]?.message;
@@ -82,12 +156,28 @@ function extractText(body: unknown, apiType: "openai" | "anthropic"): string {
   if (typeof content === "string") return content.trim();
   if (Array.isArray(content)) {
     return content
-      .map((item) => (typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : ""))
+      .map((item) => partText(item))
       .join("")
       .trim();
   }
   if (content && typeof content === "object") return JSON.stringify(content).trim();
   return "";
+}
+
+/** 200 响应体却不是模型响应（HTML 页面/网关错误包体）时抛错；否则返回空串。 */
+function assertModelBody(body: unknown, baseUrl: string, rawSnippet: string, apiType: "openai" | "anthropic"): void {
+  const embedded = embeddedBodyError(body);
+  if (embedded) {
+    const error = new ApiError("AI_REQUEST_FAILED", `AI 网关返回错误：${embedded}`, 502);
+    (error as ApiError & { transient?: boolean }).transient = false;
+    throw error;
+  }
+  if (!body || typeof body !== "object") throw badGatewayBodyError(baseUrl, rawSnippet || "空响应");
+  const record = body as Record<string, unknown>;
+  const hasChoices = Array.isArray(record.choices);
+  const hasContent = Array.isArray(record.content);
+  if (apiType === "openai" && !hasChoices) throw badGatewayBodyError(baseUrl, rawSnippet || "缺少 choices");
+  if (apiType === "anthropic" && !hasContent) throw badGatewayBodyError(baseUrl, rawSnippet || "缺少 content");
 }
 
 function parseOpenAiResponse(body: Record<string, unknown> | null): ModelResponse {
@@ -99,7 +189,7 @@ function parseOpenAiResponse(body: Record<string, unknown> | null): ModelRespons
     typeof content === "string"
       ? content
       : Array.isArray(content)
-        ? content.map((item) => (typeof item === "object" && item ? String((item as Record<string, unknown>).text ?? "") : "")).join("")
+        ? content.map((item) => partText(item)).join("")
         : content && typeof content === "object"
           ? JSON.stringify(content)
           : "";
@@ -114,7 +204,7 @@ function parseOpenAiResponse(body: Record<string, unknown> | null): ModelRespons
 
 function parseAnthropicResponse(body: Record<string, unknown> | null): ModelResponse {
   const content = Array.isArray(body?.content) ? (body.content as Array<Record<string, unknown>>) : [];
-  const text = content.map((item) => (item.type === "text" ? String(item.text ?? "") : "")).join("");
+  const text = content.map((item) => (item.type === "text" ? partText(item) : "")).join("");
   const usage = body?.usage && typeof body.usage === "object" ? (body.usage as Record<string, unknown>) : {};
   return {
     text: text.trim(),
@@ -126,8 +216,10 @@ function parseAnthropicResponse(body: Record<string, unknown> | null): ModelResp
 
 /**
  * 统一发起 LLM 请求，消除各业务模块里重复的 fetch + 响应解析 + 错误处理。
- * - 成功：返回提取出的模型文本（可能为空，由调用方决定空响应语义）；returnMetadata=true 时返回 ModelResponse。
- * - 失败（HTTP 非 2xx / 网络超时）：抛 `ApiError("AI_REQUEST_FAILED")`，错误信息经 `formatAiProviderError` 归一化，并附 `transient` 标记供 fallback 使用。
+ * - 成功：返回提取出的模型文本（空响应直接抛 `AI_EMPTY_RESPONSE`，不再返回空串）；
+ *   returnMetadata=true 时返回 ModelResponse。
+ * - 失败（HTTP 非 2xx / 网络超时 / 网关返回 HTML / 模型拒答）：抛 `ApiError`，
+ *   错误信息经 `formatAiProviderError` 归一化，并附 `transient` 标记供 fallback 使用。
  * - 思考默认关闭，仅当 `thinkingEnabled` 显式开启时才发送思考参数，避免 Vercel 免费版超时。
  * - 传入 `jsonSchema` 时（词典初始化）自动走结构化输出 3 档降级。
  */
@@ -232,8 +324,15 @@ export async function callLlm(
     } catch {
       /* empty */
     }
-    if (options.returnMetadata) return parseAnthropicResponse(body as Record<string, unknown> | null);
-    return extractText(body, "anthropic");
+    assertModelBody(body, baseUrl, raw.replace(/\s+/g, " ").slice(0, 120), "anthropic");
+    if (options.returnMetadata) {
+      const parsed = parseAnthropicResponse(body as Record<string, unknown> | null);
+      if (!parsed.text) throw emptyResponseError();
+      return parsed;
+    }
+    const text = extractText(body, "anthropic");
+    if (!text) throw emptyResponseError();
+    return text;
   }
 
   // OpenAI path — with structured output loop when jsonSchema is provided
@@ -317,18 +416,32 @@ export async function callLlm(
       }
 
       if (options.returnMetadata) {
+        assertModelBody(body, baseUrl, rawText.replace(/\s+/g, " ").slice(0, 120), "openai");
         const parsed = parseOpenAiResponse(body as Record<string, unknown> | null);
+        const refusal = openAiRefusal(body);
+        if (refusal) throw refusalError(refusal);
         if (!parsed.text) {
-          const apiErr = new ApiError("AI_REQUEST_FAILED", "返回空内容", 502);
-          (apiErr as unknown as Record<string, unknown>).transient = false;
-          throw apiErr;
+          if (parsed.finishReason === "length") throw truncationError();
+          lastError = "该档返回空内容";
+          continue;
         }
         return parsed;
       }
-      return extractText(body, "openai");
+      assertModelBody(body, baseUrl, rawText.replace(/\s+/g, " ").slice(0, 120), "openai");
+      const refusal = openAiRefusal(body);
+      if (refusal) throw refusalError(refusal);
+      if (openAiFinishReason(body) === "length") throw truncationError();
+      const text = extractText(body, "openai");
+      // 结构化三档降级：本档回了空内容就试下一档（免费网关常吞掉 strict 档的输出）。
+      if (!text) {
+        lastError = "该档返回空内容";
+        continue;
+      }
+      return text;
     }
+    if (lastError === "该档返回空内容") throw emptyResponseError();
     const apiErr = new ApiError("AI_REQUEST_FAILED", lastError, 502);
-    (apiErr as unknown as Record<string, unknown>).transient = false;
+    (apiErr as unknown as Record<string, unknown>).transient = true;
     throw apiErr;
   }
 
@@ -378,14 +491,26 @@ export async function callLlm(
     } catch {
       /* empty */
     }
-    if (options.returnMetadata) return parseOpenAiResponse(body as Record<string, unknown> | null);
-    return extractText(body, "openai");
+    assertModelBody(body, baseUrl, raw.replace(/\s+/g, " ").slice(0, 120), "openai");
+    if (options.returnMetadata) {
+      const parsed = parseOpenAiResponse(body as Record<string, unknown> | null);
+      const refusal = openAiRefusal(body);
+      if (refusal) throw refusalError(refusal);
+      if (!parsed.text) throw emptyResponseError();
+      return parsed;
+    }
+    const refusal = openAiRefusal(body);
+    if (refusal) throw refusalError(refusal);
+    if (openAiFinishReason(body) === "length") throw truncationError();
+    const text = extractText(body, "openai");
+    if (!text) throw emptyResponseError();
+    return text;
   }
 }
 
 /**
  * 同一次请求内的主备自动切换：主失败且为可重试错误时立即用备用重发。
- * 仅 transient（超时/网络/429/5xx/408/409）会触发切换，避免把鉴权/格式错误误切到备用上浪费配额。
+ * 仅 transient（超时/网络/空返回/429/5xx/408/409）会触发切换，避免把鉴权/格式错误误切到备用上浪费配额。
  */
 export async function callLlmWithFallback(
   primary: LlmProviderRequest,

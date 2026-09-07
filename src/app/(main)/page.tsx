@@ -4,7 +4,7 @@ import { errorMessage } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, AudioLines, Blocks, BookOpen, Brain, CheckCircle2, Clock3, Gamepad2, GraduationCap, Hammer, Headphones, Layers, Loader2, MessageSquareText, PenLine, Puzzle, RefreshCw, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { apiFetch } from "@/lib/client-api";
-import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
+import { AnimatedCounter, Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonClass } from "@/components/ui";
 import { DailyAiSuggestion } from "./daily-ai-suggestion";
 
 interface Dashboard {
@@ -92,21 +92,22 @@ export default function HomePage() {
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* Hero Card */}
-      <section className="animate-fade-up relative overflow-hidden rounded-[24px] bg-gradient-to-br from-[#007aff] via-[#5856d6] to-[#af52de] p-5 text-white shadow-[0_12px_40px_-8px_rgba(0,122,255,0.32),inset_0_1.5px_0_rgba(255,255,255,0.3)] sm:rounded-[28px] sm:p-8">
-        <div className="absolute -right-16 -top-16 size-52 rounded-full bg-white/[0.12] blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-14 -left-14 size-40 rounded-full bg-white/[0.08] blur-xl pointer-events-none" />
+      <section className="relative overflow-hidden rounded-[24px] liquid-glass-elevated liquid-glass-specular p-5 sm:rounded-[28px] sm:p-7 shadow-[0_16px_40px_-12px_rgba(0,122,255,0.12)]">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-accent/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 size-48 rounded-full bg-purple/15 blur-3xl" />
+
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="glass">今日学习</Badge>
+              <Badge tone="blue">今日学习</Badge>
               {completedToday >= (data.todayGoalTotal || 1) && data.todayGoalTotal > 0 && (
-                <Badge tone="glass" className="border-success/40 bg-success/20 text-white">今日目标已达成 🎉</Badge>
+                <Badge tone="green">今日目标已达成 🎉</Badge>
               )}
             </div>
-            <h1 className="mt-2.5 text-[22px] font-bold leading-tight tracking-tight sm:mt-3.5 sm:text-[28px]">
+            <h1 className="mt-2 text-[22px] font-bold leading-tight tracking-tight sm:mt-3 sm:text-[26px] text-label">
               保持词汇循环，不让记忆掉队
             </h1>
-            <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-white/75 sm:text-[14.5px]">
+            <p className="mt-1.5 max-w-xl text-[14px] leading-relaxed text-secondary-label sm:text-[14.5px]">
               {completedToday >= data.todayGoalTotal && data.todayGoalTotal > 0
                 ? `今日计划任务已全部完成！已处理 ${completedToday} 个任务，继续保持。`
                 : `今天还剩 ${data.plan.plannedTotal} 个任务，预计 ${data.plan.estimatedMinutes} 分钟。`}
@@ -114,21 +115,24 @@ export default function HomePage() {
           </div>
           <Link
             href="/study?mode=DAILY"
-            className="ios-press inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-6 text-[15px] font-semibold text-accent shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all hover:bg-white/95 sm:h-[48px] sm:w-auto sm:px-7 sm:text-[16px]"
+            className="ios-press inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-accent px-6 text-[15px] font-semibold text-white shadow-[0_4px_16px_rgba(0,122,255,0.3)] transition-all hover:brightness-105 active:brightness-95 sm:h-[48px] sm:w-auto sm:px-7 sm:text-[15.5px]"
           >
             <Sparkles className="size-4.5" />
             {completedToday >= data.todayGoalTotal && data.todayGoalTotal > 0 ? "继续无限学习" : "开始学习"}
             <ArrowRight className="size-4.5" />
           </Link>
         </div>
+
         <div className="relative mt-5 sm:mt-6">
-          <div className="mb-2 flex justify-between text-xs font-medium text-white/70">
+          <div className="mb-2 flex justify-between text-xs font-medium text-secondary-label">
             <span>今日完成度</span>
-            <span className="num-tabular">{completedToday}/{data.todayGoalTotal} ({Math.round(planProgress)}%)</span>
+            <span className="num-tabular">
+              <AnimatedCounter value={completedToday} />/<AnimatedCounter value={data.todayGoalTotal} /> ({Math.round(planProgress)}%)
+            </span>
           </div>
-          <div className="h-[6px] overflow-hidden rounded-full bg-white/[0.2] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]">
+          <div className="h-[7px] overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
             <div
-              className="h-full rounded-full bg-white shadow-[0_1px_4px_rgba(255,255,255,0.4)] transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-gradient-to-r from-accent to-[#5ac8fa] shadow-[0_1px_4px_rgba(0,122,255,0.3)] transition-all duration-700 ease-out"
               style={{ width: `${Math.min(100, planProgress)}%` }}
             />
           </div>
@@ -136,7 +140,7 @@ export default function HomePage() {
       </section>
 
       {data.resumeSession && (
-        <Link href={`/study?mode=${encodeURIComponent(data.resumeSession.sessionType)}`} className="ios-press glass-inner flex items-center gap-3 rounded-[18px] p-3.5 transition-shadow hover:shadow-[0_8px_24px_rgba(0,122,255,0.08)] sm:rounded-[20px] sm:p-4.5">
+        <Link href={`/study?mode=${encodeURIComponent(data.resumeSession.sessionType)}`} className="ios-press liquid-glass-subtle flex items-center gap-3 rounded-[18px] p-3.5 transition-shadow hover:shadow-[0_8px_24px_rgba(0,122,255,0.08)] sm:rounded-[20px] sm:p-4.5">
           <span className="grid size-9.5 shrink-0 place-items-center rounded-[12px] bg-accent/10 text-accent"><Clock3 className="size-4.5" /></span>
           <span className="min-w-0 flex-1"><b className="block text-[14.5px] font-semibold">继续上次学习</b><small className="mt-0.5 block text-[13px] text-secondary-label">{sessionLabel(data.resumeSession.sessionType)} · 还剩 {data.resumeSession.remainingCount} 题</small></span>
           <span className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-accent">继续<ArrowRight className="size-4" /></span>
@@ -164,14 +168,16 @@ export default function HomePage() {
             { label: "今日已处理", value: data.todayProcessed, detail: data.todayAccuracy === null ? `${data.todaySkipped} 个稍后再学` : `${data.todayAccuracy}% 正确率`, icon: Brain, gradient: "from-purple to-[#bf5af2]" },
             { label: "初始化异常", value: data.failedWords, detail: data.failedWords ? "建议前往处理" : "状态正常", icon: AlertCircle, gradient: data.failedWords ? "from-danger to-[#ff6961]" : "from-quaternary-label to-tertiary-label" },
           ].map((item, index) => (
-            <Card key={item.label} className={`ios-lift animate-fade-up stagger-${index + 1}`}>
+            <Card key={item.label} className={`liquid-glass-interactive animate-fade-up stagger-${index + 1}`}>
               <CardContent className="flex items-center gap-3 pt-3.5 sm:gap-3.5 sm:pt-4.5">
                 <div className={`grid size-9.5 place-items-center rounded-[11px] bg-gradient-to-br ${item.gradient} text-white shadow-sm sm:size-11 sm:rounded-[13px]`}>
                   <item.icon className="size-4.5 sm:size-5" />
                 </div>
                 <div>
                   <p className="text-[12px] font-medium text-quaternary-label dark:text-[#636366]">{item.label}</p>
-                  <p className="num-tabular text-[20px] font-bold tracking-tight sm:text-[24px]">{item.value}</p>
+                  <p className="num-tabular text-[20px] font-bold tracking-tight sm:text-[24px]">
+                    <AnimatedCounter value={item.value} />
+                  </p>
                   <p className="hidden text-xs text-tertiary-label dark:text-[#545458] sm:block">{item.detail}</p>
                 </div>
               </CardContent>
@@ -260,12 +266,20 @@ function QueueCard({ icon, label, count, planned, href, gradient }: {
   icon: React.ReactNode; label: string; count: number; planned: number; href: string; gradient: string;
 }) {
   return (
-    <Link href={href} className="ios-press group glass-inner flex items-center gap-3 rounded-[16px] p-3 transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.2)] sm:block sm:rounded-[18px] sm:p-4.5">
+    <Link href={href} className="ios-press group liquid-glass-subtle liquid-glass-interactive flex items-center gap-3 rounded-[16px] p-3.5 transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,122,255,0.06)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] sm:block sm:rounded-[18px] sm:p-4.5">
       <div className="flex shrink-0 items-center justify-between sm:justify-between">
         <span className={`grid size-9.5 place-items-center rounded-[12px] bg-gradient-to-br ${gradient} text-white shadow-xs`}>{icon}</span>
         <ArrowRight className="hidden size-4 text-[#c7c7cc] transition-transform duration-200 group-hover:translate-x-1 sm:block dark:text-[#545458]" />
       </div>
-      <div className="min-w-0 flex-1 sm:mt-4"><p className="num-tabular text-[22px] font-bold leading-none tracking-tight sm:text-[26px]">{planned}</p><p className="mt-1 text-[13px] font-semibold text-label">{label}</p><p className="mt-0.5 text-xs text-tertiary-label dark:text-[#545458]">共 {count} 个待处理</p></div>
+      <div className="min-w-0 flex-1 sm:mt-4">
+        <p className="num-tabular text-[22px] font-bold leading-none tracking-tight sm:text-[26px]">
+          <AnimatedCounter value={planned} />
+        </p>
+        <p className="mt-1.5 text-[13.5px] font-semibold text-label">{label}</p>
+        <p className="mt-0.5 text-xs text-tertiary-label dark:text-[#545458]">
+          共 <AnimatedCounter value={count} /> 个待处理
+        </p>
+      </div>
       <ArrowRight className="size-4 shrink-0 text-[#c7c7cc] transition-transform duration-200 group-hover:translate-x-1 sm:hidden dark:text-[#545458]" />
     </Link>
   );

@@ -7,6 +7,8 @@ import { ManualTab } from "@/components/add/manual-tab";
 import { CsvTab } from "@/components/add/csv-tab";
 import ArticleTab from "@/components/add/article-tab";
 
+import { motion, AnimatePresence } from "framer-motion";
+
 type AddTab = "manual" | "csv" | "article";
 
 function AddPageInner() {
@@ -36,9 +38,19 @@ function AddPageInner() {
       onChange={setActive}
       className="w-full sm:w-auto"
     />
-    {active === "manual" && <ManualTab />}
-    {active === "csv" && <CsvTab key={`csv-${historyTick}`} onImported={onImported} />}
-    {active === "article" && <ArticleTab key={`article-${historyTick}`} onImported={onImported} />}
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={active}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+      >
+        {active === "manual" && <ManualTab />}
+        {active === "csv" && <CsvTab key={`csv-${historyTick}`} onImported={onImported} />}
+        {active === "article" && <ArticleTab key={`article-${historyTick}`} onImported={onImported} />}
+      </motion.div>
+    </AnimatePresence>
   </div>;
 }
 

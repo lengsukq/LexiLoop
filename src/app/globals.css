@@ -26,6 +26,14 @@
   --color-purple-deep: var(--ll-purple-deep);
   --color-separator: var(--ll-separator);
   --color-fill: var(--ll-fill);
+  --color-border-subtle: var(--ll-border-subtle);
+  --color-border-default: var(--ll-border-default);
+  --color-border-strong: var(--ll-border-strong);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
 }
 
 :root {
@@ -47,6 +55,9 @@
   --ll-purple-deep: #8944ab;
   --ll-separator: rgba(60, 60, 67, 0.12);
   --ll-fill: rgba(120, 120, 128, 0.12);
+  --ll-border-subtle: rgba(60, 60, 67, 0.08);
+  --ll-border-default: rgba(60, 60, 67, 0.14);
+  --ll-border-strong: rgba(60, 60, 67, 0.24);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -68,6 +79,9 @@
     --ll-purple-deep: #bf5af2;
     --ll-separator: rgba(84, 84, 88, 0.34);
     --ll-fill: rgba(120, 120, 128, 0.24);
+    --ll-border-subtle: rgba(255, 255, 255, 0.08);
+    --ll-border-default: rgba(255, 255, 255, 0.14);
+    --ll-border-strong: rgba(255, 255, 255, 0.24);
   }
 }
 

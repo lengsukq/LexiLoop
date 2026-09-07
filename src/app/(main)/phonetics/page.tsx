@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Badge, Card, CardContent, Progress, Segmented, buttonClass } from "@/components/ui";
 import { GameErrorBanner, GamePlayHeader, GameSavingOverlay } from "@/components/game-hud";
 import { PhoneticLearn } from "./phonetic-learn";
@@ -36,23 +37,37 @@ export default function PhoneticsPage() {
         <Progress value={progress} />
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-[#00c7be] via-accent to-[#5856d6] px-5 py-4 text-white sm:px-7">
-          <div className="flex items-center justify-between gap-3">
-            <div><b className="block text-[16px]">音标辨音训练营</b><small className="text-white/75">{game.accent === "US" ? "美式发音" : "英式发音"} · 声音、音标和拼写联动</small></div>
-            <Badge tone="glass">{game.accent}</Badge>
+      <Card className="liquid-glass-elevated liquid-glass-specular overflow-hidden border-border/80 shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
+        <div className="relative overflow-hidden border-b border-white/20 bg-gradient-to-r from-accent/12 via-[#00c7be]/12 to-[#5856d6]/15 px-5 py-4.5 backdrop-blur-xl sm:px-7 dark:border-white/[0.08] dark:from-accent/20 dark:via-[#00c7be]/20 dark:to-[#5856d6]/20">
+          <div className="pointer-events-none absolute -right-12 -top-12 size-36 rounded-full bg-accent/20 blur-2xl" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div>
+              <b className="block text-[16px] font-bold text-label">音标辨音训练营</b>
+              <small className="text-secondary-label">{game.accent === "US" ? "美式发音" : "英式发音"} · 声音、音标和拼写联动</small>
+            </div>
+            <Badge tone="blue" className="font-semibold">{game.accent}</Badge>
           </div>
         </div>
         <CardContent className="min-h-[430px] py-6 sm:px-8 sm:py-8">
-          <PhoneticQuestion
-            item={game.current}
-            wrongChoice={game.wrongChoice}
-            correctFeedback={game.correctFeedback}
-            audioError={game.audioError}
-            onChoose={game.choose}
-            onPlay={game.playCurrent}
-            onSkip={game.skip}
-          />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={game.index}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <PhoneticQuestion
+                item={game.current}
+                wrongChoice={game.wrongChoice}
+                correctFeedback={game.correctFeedback}
+                audioError={game.audioError}
+                onChoose={game.choose}
+                onPlay={game.playCurrent}
+                onSkip={game.skip}
+              />
+            </motion.div>
+          </AnimatePresence>
         </CardContent>
       </Card>
 

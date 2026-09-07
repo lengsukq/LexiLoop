@@ -211,27 +211,44 @@ export default function MatchPage() {
         <Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />返回</Link>
         <Badge tone="purple"><Gamepad2 className="size-3.5" />趣味练习</Badge>
       </div>
-      <Card className="overflow-hidden rounded-[24px]">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#af52de] via-[#5856d6] to-[#007aff] px-5 py-7 text-white shadow-[inset_0_1.5px_0_rgba(255,255,255,0.3)] sm:px-8 sm:py-9">
-          <div className="absolute -right-12 -top-12 size-40 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+      <Card className="liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[24px] border-border/80 shadow-[0_16px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_20px_48px_rgba(0,0,0,0.35)]">
+        <div className="relative overflow-hidden border-b border-white/20 bg-gradient-to-br from-[#af52de]/12 via-[#5856d6]/15 to-[#007aff]/15 px-5 py-7 text-center shadow-[inset_0_1.5px_0_rgba(255,255,255,0.4)] backdrop-blur-xl sm:px-8 sm:py-9 dark:border-white/[0.08] dark:from-[#af52de]/20 dark:via-[#5856d6]/20 dark:to-[#007aff]/20">
+          <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-accent/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-12 -bottom-12 size-40 rounded-full bg-[#af52de]/15 blur-3xl" />
           <div className="relative text-center">
-            <span className="mx-auto grid size-13 place-items-center rounded-[16px] bg-white/20 shadow-xs backdrop-blur-md"><Zap className="size-6.5" /></span>
-            <h1 className="mt-3.5 text-xl font-bold tracking-tight sm:text-2xl">限时词汇配对</h1>
-            <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed text-white/80 sm:text-[13.5px]">将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。</p>
+            <span className="mx-auto grid size-13 place-items-center rounded-[16px] border border-white/40 bg-white/50 text-accent shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-[#0a84ff]">
+              <Zap className="size-6.5" />
+            </span>
+            <h1 className="mt-3.5 text-xl font-bold tracking-tight text-label sm:text-2xl">限时词汇配对</h1>
+            <p className="mx-auto mt-1.5 max-w-lg text-xs leading-relaxed text-secondary-label sm:text-[13.5px]">将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。</p>
           </div>
         </div>
         <CardContent className="space-y-4 py-4 sm:px-7 sm:py-6">
           <div className="grid gap-2.5 sm:grid-cols-3">
             {PRESETS.map((item) => {
               const active = presetId === item.id;
-              return <button key={item.id} type="button" onClick={() => setPresetId(item.id)} className={`ios-press rounded-[16px] border p-3.5 text-left transition-all ${active ? "border-accent/50 bg-accent/[0.08] shadow-[0_4px_16px_rgba(0,122,255,0.10)]" : "border-black/[0.08] bg-white/60 hover:bg-white hover:border-black/[0.12] dark:border-white/[0.09] dark:bg-white/[0.04]"}`}>
-                <div className="flex items-center justify-between"><b className="text-[14px] font-semibold">{item.name}</b>{active && <CheckCircle2 className="size-4 text-accent" />}</div>
-                <p className="mt-1.5 text-xs text-quaternary-label num-tabular">{item.pairs} 组 · {item.seconds} 秒</p>
-                <p className="mt-0.5 text-[11px] text-tertiary-label">{item.desc}</p>
-              </button>;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setPresetId(item.id)}
+                  className={`ios-press rounded-[16px] border p-3.5 text-left transition-all ${
+                    active
+                      ? "border-accent/60 bg-accent/[0.09] shadow-[0_4px_16px_rgba(0,122,255,0.12)] ring-1 ring-accent/30"
+                      : "liquid-glass-subtle border-border/80 hover:border-accent/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <b className="text-[14px] font-semibold text-label">{item.name}</b>
+                    {active && <CheckCircle2 className="size-4 text-accent" />}
+                  </div>
+                  <p className="mt-1.5 text-xs text-quaternary-label num-tabular">{item.pairs} 组 · {item.seconds} 秒</p>
+                  <p className="mt-0.5 text-[11px] text-tertiary-label">{item.desc}</p>
+                </button>
+              );
             })}
           </div>
-          <div className="grid grid-cols-3 gap-2 rounded-[14px] bg-black/[0.03] p-2.5 text-center dark:bg-white/[0.04]">
+          <div className="grid grid-cols-3 gap-2 rounded-[14px] border border-border/60 bg-black/[0.025] p-2.5 text-center dark:bg-white/[0.03]">
             <div><p className="num-tabular text-base font-bold sm:text-lg">{preset.pairs}</p><p className="text-[11px] text-quaternary-label">词汇组数</p></div>
             <div><p className="num-tabular text-base font-bold sm:text-lg">{preset.seconds}s</p><p className="text-[11px] text-quaternary-label">限时时间</p></div>
             <div><p className="text-base font-bold text-danger sm:text-lg">优先</p><p className="text-[11px] text-quaternary-label">错词加入</p></div>
@@ -301,9 +318,11 @@ export default function MatchPage() {
       <Progress value={progress} />
     </div>
 
-    <Card className="overflow-hidden rounded-[24px]">
-      <CardHeader className="pb-2"><CardTitle>点击英文与对应释义</CardTitle></CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2 pb-4 sm:gap-3.5 sm:px-6 sm:pb-6">
+    <Card className="liquid-glass-elevated liquid-glass-specular overflow-hidden rounded-[24px] border-border/80 shadow-[0_12px_36px_rgba(0,0,0,0.06)] dark:shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
+      <CardHeader className="border-b border-border/60 pb-3">
+        <CardTitle className="text-base font-bold text-label">点击英文与对应释义</CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 gap-2 pb-4 pt-4 sm:gap-3.5 sm:px-6 sm:pb-6 sm:pt-5">
         <div className="space-y-2 sm:space-y-2.5">
           {words.map((item) => <MatchCard key={item.itemId} side="word" item={item} selected={selected} matched={matched.has(item.itemId)} wrong={wrongFlash.has(`word:${item.itemId}`)} onClick={() => selectCard("word", item)} />)}
         </div>
@@ -328,10 +347,32 @@ function MatchCard({ side, item, selected, matched, wrong, onClick }: {
 }) {
   const active = selected?.side === side && selected.itemId === item.itemId;
   const priority = side === "word" && item.priority !== "NORMAL";
-  return <button type="button" disabled={matched} onClick={onClick} className={`ios-press relative flex min-h-[54px] w-full items-center rounded-[14px] border px-3 py-2 text-left transition-all duration-200 sm:min-h-[62px] sm:rounded-[16px] sm:px-3.5 ${matched ? "pointer-events-none scale-95 opacity-0 duration-300" : wrong ? "animate-shake border-danger/50 bg-danger/[0.08] text-danger-deep" : active ? "border-accent bg-accent/[0.09] shadow-[0_2px_12px_rgba(0,122,255,0.18)] scale-[1.01]" : "border-black/[0.08] bg-white/70 hover:bg-white hover:border-accent/40 dark:border-white/[0.09] dark:bg-white/[0.05] dark:hover:bg-white/[0.09]"}`}>
-    {side === "word" ? <span className="min-w-0"><b className="block break-words text-[15px] font-semibold sm:text-[16px]">{item.term}</b>{priority && <small className="mt-0.5 block text-[10px] font-semibold text-danger">重点复习</small>}</span> : <span className="line-clamp-3 break-words text-[13px] leading-snug sm:text-[13.5px] text-secondary-label">{item.definition}</span>}
-    {active && <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent" />}
-    {wrong && <XCircle className="absolute right-2.5 top-2.5 size-4 text-danger" />}
-  </button>;
+  return (
+    <button
+      type="button"
+      disabled={matched}
+      onClick={onClick}
+      className={`ios-press relative flex min-h-[54px] w-full items-center rounded-[14px] border px-3 py-2 text-left transition-all duration-200 sm:min-h-[62px] sm:rounded-[16px] sm:px-3.5 ${
+        matched
+          ? "pointer-events-none scale-95 opacity-0 duration-300"
+          : wrong
+            ? "animate-soft-shake border-danger bg-danger/[0.1] text-danger-deep shadow-[0_4px_16px_rgba(255,59,48,0.12)]"
+            : active
+              ? "scale-[1.015] border-accent bg-accent/[0.1] shadow-[0_4px_18px_rgba(0,122,255,0.2)] ring-1 ring-accent/40"
+              : "liquid-glass-subtle border-border/80 hover:scale-[1.012] hover:border-accent/40 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:hover:shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+      }`}
+    >
+      {side === "word" ? (
+        <span className="min-w-0">
+          <b className="block break-words text-[15px] font-semibold text-label sm:text-[16px]">{item.term}</b>
+          {priority && <small className="mt-0.5 block text-[10px] font-semibold text-danger">重点复习</small>}
+        </span>
+      ) : (
+        <span className="line-clamp-3 break-words text-[13px] leading-snug text-secondary-label sm:text-[13.5px]">{item.definition}</span>
+      )}
+      {active && <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-accent ring-4 ring-accent/20" />}
+      {wrong && <XCircle className="absolute right-2.5 top-2.5 size-4 text-danger animate-fade-down" />}
+    </button>
+  );
 }
 

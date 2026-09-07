@@ -1,5 +1,8 @@
-import { useEffect, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+"use client";
+
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/cn";
 
 export function buttonClass(
@@ -8,7 +11,7 @@ export function buttonClass(
 ) {
   return cn(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl font-medium tracking-tight transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-40 ios-press",
-    size === "sm" ? "h-9 px-3.5 text-[13px]" : size === "lg" ? "h-[52px] px-7 text-[16px] font-semibold" : "h-10 px-4.5 text-[14px]",
+    size === "sm" ? "h-9 px-3.5 text-[13px]" : size === "lg" ? "h-[50px] px-7 text-[16px] font-semibold" : "h-10 px-4.5 text-[14px]",
     variant === "primary" && "bg-accent text-white shadow-[0_2px_8px_rgba(0,122,255,0.25),inset_0_1px_0_rgba(255,255,255,0.28)] hover:shadow-[0_4px_16px_rgba(0,122,255,0.35)] hover:brightness-105 active:brightness-95",
     variant === "secondary" && "bg-accent/10 text-accent hover:bg-accent/[0.14] dark:bg-accent/[0.14] dark:hover:bg-accent/20",
     variant === "outline" && "border border-black/[0.08] bg-white/70 text-label shadow-[0_1px_2px_rgba(0,0,0,0.02)] backdrop-blur-xl hover:bg-white hover:border-black/[0.12] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)] dark:border-white/[0.1] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]",
@@ -18,6 +21,71 @@ export function buttonClass(
 }
 
 export { toast, ToastContainer } from "./toast";
+
+/**
+ * 带有 Apple Spring 物理效果的平滑数字递增动画组件
+ */
+export function AnimatedCounter({
+  value,
+  duration = 0.65,
+  className,
+  prefix = "",
+  suffix = "",
+}: {
+  value: number;
+  duration?: number;
+  className?: string;
+  prefix?: string;
+  suffix?: string;
+}) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    const start = prevRef.current;
+    const end = value;
+    prevRef.current = end;
+    if (start === end) return;
+
+    const startTime = performance.now();
+    const durationMs = duration * 1000;
+
+    let rafId: number;
+    const update = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+      // Apple-like cubic ease out
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(start + (end - start) * eased);
+      setDisplay(current);
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(update);
+      } else {
+        setDisplay(end);
+      }
+    };
+
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [value, duration]);
+
+  return <span className={cn("num-tabular", className)}>{prefix}{display.toLocaleString()}{suffix}</span>;
+}
+
+/**
+ * 实时发音波形律动组件（用于发音播报状态展示）
+ */
+export function AudioWave({ active = false, className }: { active?: boolean; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-end gap-[2px] h-3.5 w-3.5 py-0.5", className)} aria-hidden="true">
+      <span className={cn("w-[2px] rounded-full bg-current transition-all", active ? "animate-wave-1" : "h-[30%]")} />
+      <span className={cn("w-[2px] rounded-full bg-current transition-all", active ? "animate-wave-2" : "h-[70%]")} />
+      <span className={cn("w-[2px] rounded-full bg-current transition-all", active ? "animate-wave-3" : "h-[45%]")} />
+      <span className={cn("w-[2px] rounded-full bg-current transition-all", active ? "animate-wave-4" : "h-[85%]")} />
+    </span>
+  );
+}
 
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -137,14 +205,24 @@ export function Select({ className, compact = false, ...props }: React.SelectHTM
   );
 }
 
-export function Segmented<T extends string>({ options, value, onChange, className }: {
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+  id,
+}: {
   options: Array<{ value: T; label: string }>;
   value: T;
   onChange: (value: T) => void;
   className?: string;
+  id?: string;
 }) {
+  const autoId = useId();
+  const gliderId = id ?? autoId;
+
   return (
-    <div className={cn("inline-flex gap-0.5 rounded-[14px] bg-black/[0.04] p-1 backdrop-blur-xl dark:bg-white/[0.06]", className)} role="tablist">
+    <div className={cn("relative inline-flex gap-1 rounded-[14px] bg-black/[0.04] p-1 backdrop-blur-xl dark:bg-white/[0.06]", className)} role="tablist">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -155,13 +233,20 @@ export function Segmented<T extends string>({ options, value, onChange, classNam
             aria-selected={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "ios-press flex-1 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] font-medium transition-all duration-200",
+              "relative flex-1 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] font-medium transition-colors duration-200 focus-visible:outline-none",
               active
-                ? "bg-white text-[#1c1c1e] shadow-[0_1px_4px_rgba(0,0,0,0.08)] dark:bg-white/[0.14] dark:text-white"
+                ? "text-[#1c1c1e] font-semibold dark:text-white"
                 : "text-secondary-label hover:text-[#1c1c1e] dark:text-secondary-label dark:hover:text-white",
             )}
           >
-            {option.label}
+            {active && (
+              <motion.div
+                layoutId={`segmented-glider-${gliderId}`}
+                className="absolute inset-0 rounded-[10px] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.04)] dark:bg-white/[0.16] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                transition={{ type: "spring", stiffness: 500, damping: 36 }}
+              />
+            )}
+            <span className="relative z-10">{option.label}</span>
           </button>
         );
       })}
@@ -218,20 +303,46 @@ export function Dialog({ open, onClose, title, children, maxWidth = "max-w-lg", 
       document.body.style.overflow = previousOverflow;
     };
   }, [open, onClose]);
+
   if (!open && !keepMounted) return null;
+
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${open ? "" : "hidden"}`}>
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-200" onClick={onClose} />
-      <div className={`liquid-glass-elevated liquid-glass-specular animate-scale-in relative z-10 max-h-[85vh] w-full ${maxWidth} overflow-y-auto rounded-[26px] p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.18)]`}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold tracking-tight text-label">{title}</h2>
-          <button onClick={onClose} className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.05] text-secondary-label hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]">
-            <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/25 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ type: "spring", duration: 0.32, bounce: 0.12 }}
+            className={cn(
+              "liquid-glass-elevated liquid-glass-specular relative z-10 max-h-[85vh] w-full overflow-y-auto rounded-[24px] p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.22)] sm:rounded-[26px]",
+              maxWidth,
+            )}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight text-label">{title}</h2>
+              <button
+                onClick={onClose}
+                className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.05] text-secondary-label hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
+                aria-label="关闭对话框"
+              >
+                <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            {children}
+          </motion.div>
         </div>
-        {children}
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }
 

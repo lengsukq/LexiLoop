@@ -1,6 +1,6 @@
 import type { ExamTarget, VocabularyLevel } from "@/lib/types";
 
-const AUTO_HINT = "根据用户的已知词情况自适应判断；常见基础词不要选。";
+const AUTO_HINT = "自适应档默认按 CET-4 及以上水平要求：A1-A2 基础词一律视为已知，不选；日常生活极常见词（如 water、snow、eat、big 之类小学词汇）无论出现多少次都不选；只选 B1 及以上、对理解文章关键且有学习价值的词。出现次数多不代表值得学，高频基础词直接排除。";
 
 const EXAM_HINT: Record<ExamTarget, string> = {
   CET4: "CET-4：A1-B1 基础词视为已知，不选；重点选 B2 及以上。",
@@ -30,7 +30,7 @@ function buildLevelLine(examTargets: ExamTarget[]): string {
   if (examTargets.length === 0) return `用户水平：自适应 — ${AUTO_HINT}`;
   const labels = examTargets.join("、");
   const hints = examTargets.map((t) => EXAM_HINT[t]).join("；");
-  return `用户备考：${labels} — ${hints} 需同时覆盖各档位对应的生词区间，兼顾低档基础词与高档学术/低频词。`;
+  return `用户备考：${labels} — ${hints} 多档位时就高不就低，按最高档位划线，低档基础词不选；高频基础词无论出现多少次都不选。`;
 }
 
 export function buildArticleSelectionPrompt(input: {
@@ -48,7 +48,7 @@ export function buildArticleSelectionPrompt(input: {
     "你是词汇与句法筛选助手。结合文章语境与候选词，选出值得该用户学习的单词、短语与句子。",
     buildLevelLine(examTargets),
     `用户已掌握词数：${input.totalKnown}，示例：${input.knownSample.slice(0, 30).join(", ") || "无"}`,
-    "规则：已掌握/过于常见/停用词不选；优先选对理解文章关键且对该水平有学习价值的内容；每个 reason/nuance 不超过 24 字。",
+    "规则：已掌握/过于常见/停用词不选；出现次数多不代表值得学，高频基础词直接排除；优先选对理解文章关键且对该水平有学习价值的内容；每个 reason/nuance 不超过 24 字。选出的单词 words 必须带上准确的 cefrLevel 与 frequency，便于按水平过滤；拿不准是 A1/A2 基础词时宁可不选。",
     "输出 JSON 格式（严格 JSON，无 trailing comma）：",
     '{"words":[{"term":string,"reason":string,"difficulty":1-5,"cefrLevel":"A1"|"A2"|"B1"|"B2"|"C1"|"C2"|null,"frequency":"VERY_COMMON"|"COMMON"|"NORMAL"|"RARE"|null}],'
     + '"phrases":[{"term":string,"reason":string,"difficulty":1-5,"cefrLevel":string|null,"literalTranslation":string,"freeTranslation":string,"keyVocab":[{"term":string,"pos":string|null,"meaning":string}],"grammar":{"pattern":string|null,"notes":string[]},"nuance":string|null}],'

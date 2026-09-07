@@ -9,7 +9,8 @@ import { playCachedTts, playEntryTts, preloadTtsBatch } from "@/lib/tts-client";
 import { useActiveStopwatch } from "@/lib/use-active-stopwatch";
 import type { AffixItem, DictionaryContent, QuestionType, RelatedWordItem, ReviewRating, RootItem, StudyMode } from "@/lib/types";
 import { entryTypeLabel } from "@/lib/entry-type-label";
-import { Badge, Button, Card, CardContent, Kbd, Progress, buttonClass } from "@/components/ui";
+import { AudioWave, Badge, Button, Card, CardContent, Kbd, Progress, buttonClass } from "@/components/ui";
+import { motion } from "framer-motion";
 import { SentenceDiff, TermDiff } from "@/components/answer-diff";
 
 function clientId(): string {
@@ -552,9 +553,15 @@ export function StudyClient() {
   return <div className="animate-fade-up mx-auto max-w-3xl space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><Link href="/" className={buttonClass("ghost", "sm")}><ArrowLeft className="size-4" />退出</Link><div className="text-center"><div className="flex items-center justify-center gap-2"><p className="text-[15px] font-bold">{MODE_LABELS[activeMode]}</p>{data.resumed && <Badge tone="amber">继续上次</Badge>}</div><p className="text-xs text-tertiary-label">已处理 {data.session.completedCount} / {data.session.plannedCount}</p></div><Badge tone={current.taskType === "WRONG" ? "red" : current.taskType === "NEW" ? "purple" : "blue"}>{current.taskType}</Badge></div>
     <Progress value={progress} />
-    <Card className="h-[calc(100dvh-7.25rem)] max-h-[720px] min-h-[260px] overflow-hidden rounded-[24px] sm:h-[calc(100dvh-8rem)] sm:min-h-[420px] lg:h-[calc(100dvh-9.5rem)]"><CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-3 sm:px-8 sm:py-4">
+    <Card className="liquid-glass-elevated liquid-glass-specular h-[calc(100dvh-7.25rem)] max-h-[720px] min-h-[260px] overflow-hidden rounded-[24px] shadow-[0_16px_40px_-12px_rgba(0,122,255,0.08)] sm:h-[calc(100dvh-8rem)] sm:min-h-[420px] lg:h-[calc(100dvh-9.5rem)]"><CardContent className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-3 sm:px-8 sm:py-4">
       <div className="flex items-center justify-between text-xs text-tertiary-label"><span>{entryTypeLabel(current.word.entryType)}</span><span>{current.word.sourceLanguage} → {current.word.targetLanguage}</span></div>
-      <div className="min-h-0 overflow-y-auto overscroll-contain">
+      <motion.div
+        key={`${current.itemId}-${revealed ? "rev" : "q"}`}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="min-h-0 overflow-y-auto overscroll-contain"
+      >
         <div className={`flex min-h-full w-full flex-col items-center px-1 text-center ${revealed ? "justify-start py-[clamp(0.5rem,2vh,1.25rem)]" : "justify-center py-[clamp(1rem,4vh,3rem)]"}`}>
         {current.questionType === "CLOZE_SENTENCE" ? <>
           {revealed ? <div className="w-full max-w-xl">
@@ -869,7 +876,7 @@ export function StudyClient() {
         {lastResult && <div className={`mt-3 flex items-center gap-1.5 text-[14px] font-semibold ${lastResult.rating === "EASY" || lastResult.isCorrect ? "text-success" : "text-danger"}`}>{lastResult.rating === "EASY" || lastResult.isCorrect ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}{lastResult.rating === "EASY" ? "已掌握，近期不会再出现" : lastResult.isCorrect ? "已记录" : lastResult.adaptiveFollowUp ? "已加入错词强化，稍后会再次出现" : "已加入错词强化"}</div>}
         {error && <div className="mt-3 rounded-[12px] bg-danger/[0.06] p-2.5 text-xs text-danger-deep">{error}</div>}
         </div>
-      </div>
+      </motion.div>
       <div className="shrink-0 pt-1.5 sm:pt-2.5">
       {!revealed ? (current.questionType === "EN_TO_ZH_CHOICE" || current.questionType === "LISTENING_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击上方选项或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "ZH_TO_EN_CHOICE" ? <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><div className="self-center text-center text-xs text-tertiary-label">{hasChoices ? (choicesVisible ? "点击候选单词或按 1-4 作答" : choiceOptionsDelayLabel(choiceRevealDelaySeconds)) : "该词条暂无释义，可稍后再学"}</div></div> : current.questionType === "CLOZE_SENTENCE" || current.questionType === "LETTER_BANK" || current.questionType === "ZH_TO_EN_SPELLING" || current.questionType === "LISTENING_SPELLING" ? <div className="flex flex-wrap gap-1.5 sm:gap-2"><Button variant="outline" size="lg" onClick={() => void skip()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] sm:w-auto`}><Clock3 className="size-4 shrink-0" /><span>稍后再学</span><Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button variant="outline" size="lg" onClick={() => void reveal()} disabled={submitting} className={`${studyActionClass} w-[calc(50%-3px)] border-danger/20 text-danger hover:bg-danger/[0.06] sm:w-auto`}><XCircle className="size-4 shrink-0" />忘记<Kbd className="hidden sm:inline-flex ml-1">1</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full sm:flex-1`} onClick={() => void reveal()} disabled={submitting || (current.questionType === "LETTER_BANK" ? !builtLetterIds.length : !userAnswer.trim())}><Sparkles className="size-4 shrink-0" /><span>检查答案</span><Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div> : <div className="grid grid-cols-[auto_1fr] gap-1.5 sm:gap-2"><Button variant="outline" size="lg" className={studyActionClass} onClick={() => void skip()} disabled={submitting}><Clock3 className="size-4.5" />稍后再学<Kbd className="hidden sm:inline-flex ml-1">S</Kbd></Button><Button size="lg" className={`${studyActionClass} w-full`} onClick={() => void reveal()} disabled={submitting}><Sparkles className="size-4.5" />显示答案<Kbd className="hidden sm:inline-flex ml-1 bg-white/20 text-white border-white/30">Space</Kbd></Button></div>) : <div className="border-t border-black/[0.05] pt-2 sm:pt-2.5 dark:border-white/[0.06]">
         {(current.questionType === "ZH_TO_EN_CHOICE" || current.questionType === "LISTENING_CHOICE" || current.questionType === "EN_TO_ZH_CHOICE") && <p className="mb-1.5 text-center text-[11px] text-quaternary-label sm:mb-2 sm:text-xs">已按“{exactLocal === true ? "认识" : "忘记"}”记录，按数字键或点击熟悉度直接进入下一题</p>}
@@ -936,7 +943,8 @@ function Pronunciation({ item }: { item: Item }) {
         </button>)}
       </div>
       <button type="button" onClick={play} className={`ios-press inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${playing ? "bg-accent text-white shadow-[0_0_20px_rgba(0,122,255,0.4)] scale-105" : "bg-accent/[0.08] text-accent hover:bg-accent/[0.12] dark:bg-[#0a84ff]/[0.12] dark:text-[#0a84ff]"}`}>
-        <Volume2 className={`size-4 ${playing ? "animate-pulse" : ""}`} />{current?.phonetic || "播放发音"}<Kbd className="hidden sm:inline-flex ml-1 text-[10px]">R</Kbd>
+        {playing ? <AudioWave active className="size-4" /> : <Volume2 className="size-4" />}
+        {current?.phonetic || "播放发音"}<Kbd className="hidden sm:inline-flex ml-1 text-[10px]">R</Kbd>
       </button>
     </div>
     {ttsTip && <p className="mt-1.5 text-xs text-warning dark:text-warning">{ttsTip}</p>}

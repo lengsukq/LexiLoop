@@ -111,6 +111,12 @@ const int masteryWeightSpeed = 10;
 /// 罚分上限，避免负分无限下探。
 const int masteryPenaltyCap = 25;
 
+/// 熟练度「近期 AGAIN」统计窗口：30 天。
+const int masteryWindowMs = 30 * dayMs;
+
+/// 表现统计窗口（近 14 天答错 / 模糊 / AGAIN）：14 天。
+const int performanceWindowMs = 14 * dayMs;
+
 /// 稳定性归一化分母（天）。
 const double masteryStabilityFullDays = 365;
 
@@ -180,6 +186,26 @@ const int spellingFuzzyMinLength = 7;
 /// 允许的最大编辑距离。
 const int spellingFuzzyMaxDistance = 1;
 
+/// 句子判分启用编辑距离容错的最短长度。
+///
+/// 短句容错会误判，故仅对长句放宽。
+const int sentenceFuzzyMinLength = 20;
+
+/// 句子判分允许的编辑距离占期望答案长度的比例。
+const double sentenceFuzzyRatio = 0.08;
+
+/// 句子判分允许的最小编辑距离。
+///
+/// 比例算出的距离可能为 0，但既然已超过 [sentenceFuzzyMinLength]，
+/// 至少容忍 1 个字符的手误。
+const int sentenceFuzzyMinDistance = 1;
+
+/// 释义题选项总数（1 个正确项 + 干扰项）。
+const int meaningChoiceCount = 4;
+
+/// 释义题需要的干扰项数量。
+const int meaningDistractorCount = meaningChoiceCount - 1;
+
 // ═══════════════════════════════════════════════════════════════
 // 错词本（对应旧版 modules/reviews/wrong-state.ts 与 background/maintenance.ts）
 // ═══════════════════════════════════════════════════════════════
@@ -217,6 +243,44 @@ const double questionTypeRandomCeiling = 0.999999;
 /// `LETTER_BANK` 题型适用的词条模式：3–14 个纯字母。
 const String letterBankTermPattern = r'^[a-zA-Z]{3,14}$';
 
+/// 听力题中「熟练分低于此值时改用选择题」的阈值。
+///
+/// 拼写太难会打击信心，先降低作答门槛。
+const int listeningWeakMasteryScore = 50;
+
+/// 听力题中按此间隔插入一道选择题（其余为拼写题）。
+const int listeningChoiceEvery = 2;
+
+/// 听力题中「弱项」判定使用的取模基数。
+const int listeningWeakMasteryEvery = 3;
+
+/// 听力题中「弱项」判定使用的余数。
+const int listeningWeakMasteryOffset = 1;
+
+/// 拼写类学习中按此间隔插入一道字母拼图。
+const int spellingLetterBankEvery = 3;
+
+/// 每日学习中「熟练分低于此值只用选择题」的阈值。
+const int dailyLowMasteryScore = 35;
+
+/// 每日学习中「熟练分低于此值且例句可用时改用填空题」的阈值。
+const int dailyMediumMasteryScore = 55;
+
+/// 每日学习中「熟练分低于此值改用看汉选英」的阈值。
+const int dailyHighMasteryScore = 70;
+
+/// 每日学习中按此间隔插入一道字母拼图。
+const int dailyLetterBankEvery = 4;
+
+/// 每日学习中字母拼图插入位置的余数。
+const int dailyLetterBankOffset = 3;
+
+/// 每日学习中按此间隔插入一道填空题。
+const int dailyClozeEvery = 6;
+
+/// 每日学习中填空题插入位置的余数。
+const int dailyClozeOffset = 5;
+
 // ═══════════════════════════════════════════════════════════════
 // 每日学习队列（对应旧版 modules/study/candidates.ts 与 study/plan.ts）
 // ═══════════════════════════════════════════════════════════════
@@ -251,6 +315,35 @@ const double dailyQuotaGraceRatio = 0.2;
 /// 交错组队时向前预看的候选数量。
 const int categoryLookahead = 6;
 
+/// 混合抽题时错词相对到期复习的权重加成。
+///
+/// 错词是用户已经暴露的薄弱点，同等数量下应比普通到期卡更早出现。
+const double wrongCandidateWeightBonus = 1.25;
+
+/// 加权抽题时单项权重下限，避免除零。
+const double candidateWeightFloor = 0.001;
+
+/// 加权抽题取值上限，避免 `cursor` 恰好落在边界外。
+const double candidateRandomCeiling = 0.999999;
+
+/// 候选池下标：到期复习。
+const int poolIndexDue = 0;
+
+/// 候选池下标：错词。
+const int poolIndexWrong = 1;
+
+/// 候选池下标：新词。
+const int poolIndexFresh = 2;
+
+/// 交错组队配比 [到期, 错词, 新词]：听力模式。
+const List<int> interleaveRatioListening = <int>[5, 2, 2];
+
+/// 交错组队配比 [到期, 错词, 新词]：拼写模式。
+const List<int> interleaveRatioSpelling = <int>[5, 3, 1];
+
+/// 交错组队配比 [到期, 错词, 新词]：默认（句子复习）。
+const List<int> interleaveRatioDefault = <int>[4, 2, 1];
+
 /// 预估单题耗时（秒）：复习题。
 const int estimatedSecondsPerReview = 35;
 
@@ -268,6 +361,15 @@ const int defaultDailyWrongWordLimit = 10;
 
 /// 每日默认到期复习配额。
 const int defaultDailyDueReviewLimit = 30;
+
+/// 每日新词配额上限。
+const int maxDailyNewWords = 100;
+
+/// 每日错词配额上限。
+const int maxDailyWrongWordLimit = 100;
+
+/// 每日到期复习配额上限。
+const int maxDailyDueReviewLimit = 500;
 
 // ═══════════════════════════════════════════════════════════════
 // 自适应插题（对应旧版 modules/study/adaptive.ts）
@@ -287,6 +389,31 @@ const int secondFollowUpDelay = 10;
 /// 旧版取相邻两项位置的中点，但 `position` 是浮点且带唯一索引，
 /// 反复取中点会逼近浮点精度极限。改为确定性步长，避免相等冲突。
 const double sessionItemPositionStep = 0.5;
+
+// ═══════════════════════════════════════════════════════════════
+// 干扰项与题目构造（对应旧版 modules/study/view.ts）
+// ═══════════════════════════════════════════════════════════════
+
+/// 全局干扰项池的容量。
+///
+/// 旧版每题都跑一次 `ORDER BY RANDOM()`，题量大时是全表扫描。
+/// 改为按批取池、池内消费。
+const int distractorPoolSize = 80;
+
+/// 每次从全局池中取出的候选数量（含大量重复释义，需要多取）。
+const int distractorTakeSize = 12;
+
+/// 从「易混词」中取干扰项时的查询上限。
+const int specificDistractorLimit = 6;
+
+/// 从「活跃错词」中取干扰项时的查询上限。
+const int activeWrongDistractorLimit = 8;
+
+/// 填空题的占位符。
+const String clozeBlankToken = '____';
+
+/// 答案文本的分隔符（多条释义并列）。
+const String definitionSeparator = '；';
 
 // ═══════════════════════════════════════════════════════════════
 // 学习计时（对应旧版 modules/reviews/duration.ts）
@@ -518,8 +645,17 @@ const int ttsTimeoutMs = 15 * secondMs;
 // 界面交互（对应旧版 lib/config.ts 与各组件内联值）
 // ═══════════════════════════════════════════════════════════════
 
-/// 选择题揭示答案前的延迟（秒）。
-const int choiceRevealDelaySeconds = 2;
+/// 选择题揭示答案前的默认延迟（秒）。
+const int defaultChoiceRevealDelaySeconds = 2;
+
+/// 选择题揭示答案延迟的上限（秒）。
+const int maxChoiceRevealDelaySeconds = 60;
+
+/// 语音朗读语速下限。
+const double minSpeechRate = 0.5;
+
+/// 语音朗读语速上限。
+const double maxSpeechRate = 2;
 
 /// 侧边栏布局的启用宽度断点。
 ///

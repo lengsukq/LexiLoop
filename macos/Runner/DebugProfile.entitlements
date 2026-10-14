@@ -4,9 +4,17 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- debug/profile 模式的热重载依赖 JIT 与入站连接，不可移除 -->
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- 出站网络：AI 初始化与在线词典。缺此项会报
+	     SocketException: Operation not permitted, errno = 1，且为静默失败 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- 文件选择器读写用户选中的 CSV 与备份文件 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>

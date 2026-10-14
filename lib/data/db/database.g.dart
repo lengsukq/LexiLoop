@@ -2256,7 +2256,7 @@ class $WordReviewStatsTable extends WordReviewStats
   );
   @override
   late final GeneratedColumn<int> recentAgain30d = GeneratedColumn<int>(
-    'recent_again30d',
+    'recent_again_30d',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -2268,7 +2268,7 @@ class $WordReviewStatsTable extends WordReviewStats
   );
   @override
   late final GeneratedColumn<int> recentAgain14d = GeneratedColumn<int>(
-    'recent_again14d',
+    'recent_again_14d',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -2280,7 +2280,7 @@ class $WordReviewStatsTable extends WordReviewStats
   );
   @override
   late final GeneratedColumn<int> recentWrong14d = GeneratedColumn<int>(
-    'recent_wrong14d',
+    'recent_wrong_14d',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -2292,7 +2292,7 @@ class $WordReviewStatsTable extends WordReviewStats
   );
   @override
   late final GeneratedColumn<int> recentHard14d = GeneratedColumn<int>(
-    'recent_hard14d',
+    'recent_hard_14d',
     aliasedName,
     false,
     type: DriftSqlType.int,
@@ -2396,38 +2396,38 @@ class $WordReviewStatsTable extends WordReviewStats
         ),
       );
     }
-    if (data.containsKey('recent_again30d')) {
+    if (data.containsKey('recent_again_30d')) {
       context.handle(
         _recentAgain30dMeta,
         recentAgain30d.isAcceptableOrUnknown(
-          data['recent_again30d']!,
+          data['recent_again_30d']!,
           _recentAgain30dMeta,
         ),
       );
     }
-    if (data.containsKey('recent_again14d')) {
+    if (data.containsKey('recent_again_14d')) {
       context.handle(
         _recentAgain14dMeta,
         recentAgain14d.isAcceptableOrUnknown(
-          data['recent_again14d']!,
+          data['recent_again_14d']!,
           _recentAgain14dMeta,
         ),
       );
     }
-    if (data.containsKey('recent_wrong14d')) {
+    if (data.containsKey('recent_wrong_14d')) {
       context.handle(
         _recentWrong14dMeta,
         recentWrong14d.isAcceptableOrUnknown(
-          data['recent_wrong14d']!,
+          data['recent_wrong_14d']!,
           _recentWrong14dMeta,
         ),
       );
     }
-    if (data.containsKey('recent_hard14d')) {
+    if (data.containsKey('recent_hard_14d')) {
       context.handle(
         _recentHard14dMeta,
         recentHard14d.isAcceptableOrUnknown(
-          data['recent_hard14d']!,
+          data['recent_hard_14d']!,
           _recentHard14dMeta,
         ),
       );
@@ -2488,19 +2488,19 @@ class $WordReviewStatsTable extends WordReviewStats
       )!,
       recentAgain30d: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}recent_again30d'],
+        data['${effectivePrefix}recent_again_30d'],
       )!,
       recentAgain14d: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}recent_again14d'],
+        data['${effectivePrefix}recent_again_14d'],
       )!,
       recentWrong14d: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}recent_wrong14d'],
+        data['${effectivePrefix}recent_wrong_14d'],
       )!,
       recentHard14d: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}recent_hard14d'],
+        data['${effectivePrefix}recent_hard_14d'],
       )!,
       totalDurationMs: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2559,10 +2559,10 @@ class WordReviewStatRow extends DataClass
     map['word_id'] = Variable<int>(wordId);
     map['total_reviews'] = Variable<int>(totalReviews);
     map['correct_reviews'] = Variable<int>(correctReviews);
-    map['recent_again30d'] = Variable<int>(recentAgain30d);
-    map['recent_again14d'] = Variable<int>(recentAgain14d);
-    map['recent_wrong14d'] = Variable<int>(recentWrong14d);
-    map['recent_hard14d'] = Variable<int>(recentHard14d);
+    map['recent_again_30d'] = Variable<int>(recentAgain30d);
+    map['recent_again_14d'] = Variable<int>(recentAgain14d);
+    map['recent_wrong_14d'] = Variable<int>(recentWrong14d);
+    map['recent_hard_14d'] = Variable<int>(recentHard14d);
     map['total_duration_ms'] = Variable<int>(totalDurationMs);
     map['duration_count'] = Variable<int>(durationCount);
     if (!nullToAbsent || lastReviewedAt != null) {
@@ -2792,10 +2792,10 @@ class WordReviewStatsCompanion extends UpdateCompanion<WordReviewStatRow> {
       if (wordId != null) 'word_id': wordId,
       if (totalReviews != null) 'total_reviews': totalReviews,
       if (correctReviews != null) 'correct_reviews': correctReviews,
-      if (recentAgain30d != null) 'recent_again30d': recentAgain30d,
-      if (recentAgain14d != null) 'recent_again14d': recentAgain14d,
-      if (recentWrong14d != null) 'recent_wrong14d': recentWrong14d,
-      if (recentHard14d != null) 'recent_hard14d': recentHard14d,
+      if (recentAgain30d != null) 'recent_again_30d': recentAgain30d,
+      if (recentAgain14d != null) 'recent_again_14d': recentAgain14d,
+      if (recentWrong14d != null) 'recent_wrong_14d': recentWrong14d,
+      if (recentHard14d != null) 'recent_hard_14d': recentHard14d,
       if (totalDurationMs != null) 'total_duration_ms': totalDurationMs,
       if (durationCount != null) 'duration_count': durationCount,
       if (lastReviewedAt != null) 'last_reviewed_at': lastReviewedAt,
@@ -2844,16 +2844,16 @@ class WordReviewStatsCompanion extends UpdateCompanion<WordReviewStatRow> {
       map['correct_reviews'] = Variable<int>(correctReviews.value);
     }
     if (recentAgain30d.present) {
-      map['recent_again30d'] = Variable<int>(recentAgain30d.value);
+      map['recent_again_30d'] = Variable<int>(recentAgain30d.value);
     }
     if (recentAgain14d.present) {
-      map['recent_again14d'] = Variable<int>(recentAgain14d.value);
+      map['recent_again_14d'] = Variable<int>(recentAgain14d.value);
     }
     if (recentWrong14d.present) {
-      map['recent_wrong14d'] = Variable<int>(recentWrong14d.value);
+      map['recent_wrong_14d'] = Variable<int>(recentWrong14d.value);
     }
     if (recentHard14d.present) {
-      map['recent_hard14d'] = Variable<int>(recentHard14d.value);
+      map['recent_hard_14d'] = Variable<int>(recentHard14d.value);
     }
     if (totalDurationMs.present) {
       map['total_duration_ms'] = Variable<int>(totalDurationMs.value);

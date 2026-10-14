@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/features/placeholder/placeholder_page.dart';
+import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/ui/adaptive_shell.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 
@@ -39,8 +40,11 @@ GoRouter _createRouter() {
 }
 
 Widget _pageFor(AppDestination destination) {
-  if (destination.path == '/') return const DashboardPage();
-  return PlaceholderPage(destination: destination);
+  return switch (destination.path) {
+    '/' => const DashboardPage(),
+    '/words' => const WordsPage(),
+    _ => PlaceholderPage(destination: destination),
+  };
 }
 
 /// 子路由。

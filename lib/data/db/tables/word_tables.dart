@@ -132,10 +132,19 @@ class WordReviewStats extends Table {
       integer().references(Words, #id, onDelete: KeyAction.cascade)();
   IntColumn get totalReviews => integer().withDefault(const Constant(0))();
   IntColumn get correctReviews => integer().withDefault(const Constant(0))();
-  IntColumn get recentAgain30d => integer().withDefault(const Constant(0))();
-  IntColumn get recentAgain14d => integer().withDefault(const Constant(0))();
-  IntColumn get recentWrong14d => integer().withDefault(const Constant(0))();
-  IntColumn get recentHard14d => integer().withDefault(const Constant(0))();
+
+  // 这四列必须显式指定列名：Drift 的驼峰转下划线不会在数字前插下划线
+  // （`recentAgain30d` → `recent_again30d`），而旧版 PG 用的是
+  // `recent_again_30d`。不一致会破坏备份的直接列映射。
+  IntColumn get recentAgain30d =>
+      integer().named('recent_again_30d').withDefault(const Constant(0))();
+  IntColumn get recentAgain14d =>
+      integer().named('recent_again_14d').withDefault(const Constant(0))();
+  IntColumn get recentWrong14d =>
+      integer().named('recent_wrong_14d').withDefault(const Constant(0))();
+  IntColumn get recentHard14d =>
+      integer().named('recent_hard_14d').withDefault(const Constant(0))();
+
   IntColumn get totalDurationMs => integer().withDefault(const Constant(0))();
   IntColumn get durationCount => integer().withDefault(const Constant(0))();
   IntColumn get lastReviewedAt => integer().nullable()();

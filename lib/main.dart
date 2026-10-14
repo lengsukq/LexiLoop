@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/app.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
@@ -17,7 +18,8 @@ Future<void> main() async {
     await _configureDesktopWindow();
   }
 
-  runApp(const LexiLoopApp());
+  // ProviderScope 必须包在根部：数据库实例等依赖由它持有与释放。
+  runApp(const ProviderScope(child: LexiLoopApp()));
 }
 
 /// 设定 macOS 窗口的初始尺寸与最小尺寸。

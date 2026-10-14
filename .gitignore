@@ -1,40 +1,61 @@
-node_modules/
-.next/
-out/
-coverage/
-test-results/
-playwright-report/
-.env
-.env.local
+# Miscellaneous
+*.class
 *.log
-*.tsbuildinfo
-
-# Database & personal data
-data/*.sqlite
-data/*.sqlite-*
-data/*.db
-data/backups/*
-data/reference/*
-!data/.gitkeep
-!data/backups/.gitkeep
-!data/reference/.gitkeep
-*.sqlite
-*.sqlite-*
-
-# Test artifacts
-test-screenshots/
-
-# Local coding-agent artifacts
-.zcode/
-
-# Private deploy to Queen (personal server, never commit)
-scripts/deploy-queen.sh
-
+*.pyc
+*.swp
 .DS_Store
-.vercel
-.env*
-# Private self-hosted deploy (keep Queen infra local)
-Dockerfile
-docker-compose.yml
-.dockerignore
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
 .idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Widget Preview related
+.widget_preview/
+
+# ── 项目私有：绝不提交 ──
+# 含 DATABASE_URL / LLM API Key 等凭据
+.env
+.env.*
+!.env.example
+
+# 本地工具与构建产物
+.vercel/
+.zcode/
+.claude/
+*.tsbuildinfo
+test-results/

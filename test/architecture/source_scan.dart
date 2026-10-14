@@ -13,7 +13,7 @@ import 'dart:io';
 /// 一个源码文件及其行。
 class SourceFile {
   /// 从路径与内容构造。
-  SourceFile(this.path, this.lines);
+  new(this.path, this.lines);
 
   /// 相对仓库根目录的路径。
   final String path;
@@ -67,7 +67,7 @@ String _relative(String path) {
 /// 一段被大括号包裹的代码块（函数、方法或构造函数）。
 class CodeBlock {
   /// 从签名行与结束行构造。
-  CodeBlock({
+  new({
     required this.file,
     required this.startLine,
     required this.endLine,

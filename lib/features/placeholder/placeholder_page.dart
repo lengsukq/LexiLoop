@@ -12,7 +12,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 /// 标注「待实现」的页面占位。
 class PlaceholderPage extends StatelessWidget {
   /// 创建占位页。
-  const PlaceholderPage({required this.destination, super.key});
+  const new({required this.destination, super.key});
 
   /// 该页面所属的导航目的地。
   final AppDestination destination;

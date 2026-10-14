@@ -16,7 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 /// 首页。
 class DashboardPage extends StatelessWidget {
   /// 创建首页。
-  const DashboardPage({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +62,7 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
+  const new(this.text);
 
   final String text;
 
@@ -82,7 +82,7 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _PlatformCard extends StatelessWidget {
-  const _PlatformCard();
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -141,11 +141,7 @@ class _PlatformCard extends StatelessWidget {
 }
 
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({
-    required this.label,
-    required this.value,
-    required this.ok,
-  });
+  const new({required this.label, required this.value, required this.ok});
 
   final String label;
   final String value;
@@ -193,7 +189,7 @@ class _StatusRow extends StatelessWidget {
 }
 
 class _GlassShowcaseCard extends StatelessWidget {
-  const _GlassShowcaseCard();
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +262,7 @@ class _GlassShowcaseCard extends StatelessWidget {
 }
 
 class _PaletteCard extends StatelessWidget {
-  const _PaletteCard();
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +336,7 @@ class _PaletteCard extends StatelessWidget {
 }
 
 class _RoadmapCard extends StatelessWidget {
-  const _RoadmapCard();
+  const new();
 
   @override
   Widget build(BuildContext context) {

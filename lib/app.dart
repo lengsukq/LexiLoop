@@ -28,7 +28,7 @@ const List<LogicalKeyboardKey> _digitKeys = <LogicalKeyboardKey>[
 /// LexiLoop 应用根组件。
 class LexiLoopApp extends StatelessWidget {
   /// 创建应用根组件。
-  const LexiLoopApp({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,7 @@ class LexiLoopApp extends StatelessWidget {
 ///
 /// 同时绑定 `⌘`（macOS）与 `Ctrl`（其他平台），避免平台分支。
 class _GlobalShortcuts extends StatelessWidget {
-  const _GlobalShortcuts({required this.child});
+  const new({required this.child});
 
   final Widget? child;
 

@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 @immutable
 class LexiColors extends ThemeExtension<LexiColors> {
   /// 创建一份色板。
-  const LexiColors({
+  const new({
     required this.surface,
     required this.label,
     required this.secondaryLabel,

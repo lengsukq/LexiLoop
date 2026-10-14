@@ -235,7 +235,7 @@ enum AppErrorCode {
   autoRetry('AUTO_RETRY', '任务自动重试。');
 
   // 枚举构造函数隐式为 const，无需显式标注。
-  AppErrorCode(this.code, this.defaultMessage);
+  new(this.code, this.defaultMessage);
 
   /// 机器可读的错误码，用于日志与持久化。
   final String code;
@@ -260,7 +260,7 @@ enum AppErrorCode {
 /// 在每个 switch 处报错，避免遗漏处理。
 sealed class AppError implements Exception {
   /// 以错误码构造。
-  const AppError(this.code, {this.details});
+  const new(this.code, {this.details});
 
   /// 错误码。
   final AppErrorCode code;
@@ -284,19 +284,19 @@ sealed class AppError implements Exception {
 /// 输入或参数不合法——重试无意义。
 final class ValidationError extends AppError {
   /// 以错误码构造。
-  const ValidationError(super.code, {super.details});
+  const new(super.code, {super.details});
 }
 
 /// 目标不存在。
 final class NotFoundError extends AppError {
   /// 以错误码构造。
-  const NotFoundError(super.code, {super.details});
+  const new(super.code, {super.details});
 }
 
 /// 状态冲突，通常是并发或重复操作。
 final class ConflictError extends AppError {
   /// 以错误码构造。
-  const ConflictError(super.code, {super.details});
+  const new(super.code, {super.details});
 }
 
 /// 外部服务（AI、词典、翻译）失败。
@@ -306,11 +306,7 @@ final class ConflictError extends AppError {
 /// 鉴权失败与响应格式错误切换无意义。
 final class ExternalServiceError extends AppError {
   /// 以错误码与可重试性构造。
-  const ExternalServiceError(
-    super.code, {
-    this.isTransient = false,
-    super.details,
-  });
+  const new(super.code, {this.isTransient = false, super.details});
 
   @override
   final bool isTransient;
@@ -319,7 +315,7 @@ final class ExternalServiceError extends AppError {
 /// 本地平台能力不可用（如系统 TTS 缺少语音包）。
 final class PlatformCapabilityError extends AppError {
   /// 以错误码构造。
-  const PlatformCapabilityError(super.code, {super.details});
+  const new(super.code, {super.details});
 }
 
 /// 把任意异常归一化为 [AppError]。

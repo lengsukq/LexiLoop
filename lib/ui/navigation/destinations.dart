@@ -14,7 +14,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 @immutable
 class AppDestination {
   /// 创建导航目的地。
-  const AppDestination({
+  const new({
     required this.path,
     required this.label,
     required this.icon,

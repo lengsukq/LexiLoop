@@ -59,9 +59,8 @@ linter:
     sort_pub_dependencies: false
 
     # 该规则会把 `const Foo({super.key})` 改写为 Dart 3.10 的声明式构造
-    # `const new({super.key})`。语法合法，但对多数 Dart 开发者相当陌生，
-    # 可读性收益为负，故关闭。
-    unnecessary_type_name_in_constructor: false
+    # `const new({super.key})`。这是语言的演进方向，采纳 lint 的立场。
+    unnecessary_type_name_in_constructor: true
 
     # ── 导入规范：统一 package 导入，便于架构守卫按路径断言 ──
     always_use_package_imports: true

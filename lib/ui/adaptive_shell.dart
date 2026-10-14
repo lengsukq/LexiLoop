@@ -16,7 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 /// 承载 8 个分支的自适应外壳。
 class AdaptiveShell extends StatelessWidget {
   /// 创建外壳。
-  const AdaptiveShell({required this.navigationShell, super.key});
+  const new({required this.navigationShell, super.key});
 
   /// go_router 的分支导航状态。
   final StatefulNavigationShell navigationShell;
@@ -66,7 +66,7 @@ class AdaptiveShell extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.navigationShell});
+  const new({required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
@@ -116,7 +116,7 @@ class _Sidebar extends StatelessWidget {
 }
 
 class _SidebarBrand extends StatelessWidget {
-  const _SidebarBrand();
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +140,7 @@ class _SidebarBrand extends StatelessWidget {
 }
 
 class _SidebarItem extends StatelessWidget {
-  const _SidebarItem({
+  const new({
     required this.destination,
     required this.active,
     required this.onTap,
@@ -203,7 +203,7 @@ class _SidebarItem extends StatelessWidget {
 /// **注意**：旧版这里写的是「自托管运行中」加绿色呼吸点。纯本地版没有
 /// 自托管概念，那行文案是错误信息，此处改为反映本地数据库状态。
 class _SidebarFooter extends StatelessWidget {
-  const _SidebarFooter();
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +275,7 @@ class _SidebarFooter extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.navigationShell});
+  const new({required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
@@ -356,7 +356,7 @@ class _BottomBar extends StatelessWidget {
 }
 
 class _BottomBarItem extends StatelessWidget {
-  const _BottomBarItem({
+  const new({
     required this.destination,
     required this.active,
     required this.onTap,
@@ -397,7 +397,7 @@ class _BottomBarItem extends StatelessWidget {
 }
 
 class _MoreButton extends StatelessWidget {
-  const _MoreButton({required this.active, required this.onTap});
+  const new({required this.active, required this.onTap});
 
   final bool active;
   final VoidCallback onTap;
@@ -433,7 +433,7 @@ class _MoreButton extends StatelessWidget {
 }
 
 class _MoreSheet extends StatelessWidget {
-  const _MoreSheet({required this.destinations, required this.onSelect});
+  const new({required this.destinations, required this.onSelect});
 
   final List<AppDestination> destinations;
   final ValueChanged<AppDestination> onSelect;
@@ -490,7 +490,7 @@ class _MoreSheet extends StatelessWidget {
 }
 
 class _MoreSheetItem extends StatelessWidget {
-  const _MoreSheetItem({required this.destination, required this.onTap});
+  const new({required this.destination, required this.onTap});
 
   final AppDestination destination;
   final VoidCallback onTap;

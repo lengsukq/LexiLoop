@@ -31,7 +31,7 @@ enum GlassLevel {
   /// 芯片、次级面板、输入容器（旧版 `.liquid-glass-subtle`，blur 14 / saturate 150%）。
   subtle(blurSigma: 14, saturation: 1.5);
 
-  GlassLevel({required this.blurSigma, required this.saturation});
+  new({required this.blurSigma, required this.saturation});
 
   /// 高斯模糊的标准差。
   ///
@@ -90,7 +90,7 @@ abstract final class _GlassPalette {
 /// 典型用法是作为侧边栏、Tab Bar、卡片或对话框的容器。
 class LiquidGlass extends StatelessWidget {
   /// 创建液态玻璃面板。
-  const LiquidGlass({
+  const new({
     required this.child,
     this.level = GlassLevel.base,
     this.borderRadius,
@@ -254,7 +254,7 @@ class LiquidGlass extends StatelessWidget {
 /// 视觉等效而无需每帧做一次全屏高斯模糊。
 class AmbientBackground extends StatelessWidget {
   /// 创建环境光背景。
-  const AmbientBackground({required this.child, super.key});
+  const new({required this.child, super.key});
 
   /// 背景之上的内容。
   final Widget child;
@@ -295,7 +295,7 @@ class AmbientBackground extends StatelessWidget {
 }
 
 class _Spot extends StatelessWidget {
-  const _Spot({required this.color, required this.size});
+  const new({required this.color, required this.size});
 
   final Color color;
   final double size;
@@ -327,7 +327,7 @@ class _Spot extends StatelessWidget {
 /// 而旧版 `glass.css` 的描边正是「上亮下暗」（.55 → .25），
 /// 用渐变描边既绕开该限制，又比逐边硬切更接近原设计。
 class _GlassBorderPainter extends CustomPainter {
-  const _GlassBorderPainter({
+  const new({
     required this.radius,
     required this.topColor,
     required this.bottomColor,

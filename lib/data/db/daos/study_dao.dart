@@ -16,7 +16,6 @@
 /// raw 字符串里 `$` 天然是字面量，JSON 路径无需逐处转义。
 library;
 
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
@@ -27,6 +26,7 @@ import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/daos/review_dao.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
@@ -1111,7 +1111,7 @@ LIMIT ?''',
           )
           .get();
       for (final row in rows) {
-        result[row.read<int>('word_id')] = _hasExample(
+        result[row.read<int>('word_id')] = hasExampleIn(
           row.readNullable<String>('examples_json'),
         );
       }
@@ -1501,11 +1501,11 @@ $_learnableSql$_meaningSql
     definitions: parseDefinitionsJson(
       row.readNullable<String>('definitions_json'),
     ),
-    pronunciations: _parsePronunciations(
+    pronunciations: parsePronunciations(
       row.readNullable<String>('pronunciations_json'),
     ),
-    examples: _parseExamples(row.readNullable<String>('examples_json')),
-    translation: _summaryTranslation(row.readNullable<String>('summary_json')),
+    examples: parseExamples(row.readNullable<String>('examples_json')),
+    translation: summaryTranslationOf(row.readNullable<String>('summary_json')),
   );
 }
 
@@ -1645,10 +1645,8 @@ StudyCandidate _withRecommendedType(
 /// 元素形如 `wordId` + `questionType` 的对象；未知题型记为 `null`，
 /// 由调用方回退到常规题型选择，而不是丢弃整条推荐。
 List<_RecommendedItem> _parseRecommendedItems(String raw) {
-  final decoded = _decodeJson(raw);
-  if (decoded is! List) return const <_RecommendedItem>[];
   final result = <_RecommendedItem>[];
-  for (final item in decoded) {
+  for (final item in decodeJsonList(raw)) {
     if (item is! Map) continue;
     final wordId = item['wordId'];
     if (wordId is! num) continue;
@@ -1671,91 +1669,13 @@ List<_RecommendedItem> _parseRecommendedItems(String raw) {
 /// `normalizeRelatedItems` 同时接受两种形态，历史数据里两种都有。
 List<String> _parseConfusedTerms(String? raw) {
   final result = <String>[];
-  for (final item in _decodeList(raw)) {
+  for (final item in decodeJsonList(raw)) {
     final term = item is String
         ? item.trim()
         : (item is Map ? _cleanText(item['word']) : '');
     if (term.isNotEmpty) result.add(term);
   }
   return result;
-}
-
-/// 解析发音列表（`pronunciations_json`）。
-///
-/// 只保留有音标的条目，与旧版 `normalizePronunciations` 一致：
-/// 没有音标的条目在朗读界面显示为空白行，属于噪音数据。
-List<PronunciationView> _parsePronunciations(String? raw) {
-  final result = <PronunciationView>[];
-  for (final item in _decodeList(raw)) {
-    if (item is! Map) continue;
-    final phonetic = _cleanText(item['phonetic']);
-    if (phonetic.isEmpty) continue;
-    final audioUrl = _cleanText(item['audioUrl']);
-    result.add(
-      PronunciationView(
-        accent: item['accent'] == Accent.uk.wire ? Accent.uk : Accent.us,
-        phonetic: phonetic,
-        audioUrl: audioUrl.isEmpty ? null : audioUrl,
-      ),
-    );
-  }
-  return result;
-}
-
-/// 解析例句列表（`examples_json`），跳过句子为空的条目。
-List<ExampleView> _parseExamples(String? raw) {
-  final result = <ExampleView>[];
-  for (final item in _decodeList(raw)) {
-    if (item is! Map) continue;
-    final sentence = _cleanText(item['sentence']);
-    if (sentence.isEmpty) continue;
-    final translation = _cleanText(item['translation']);
-    result.add(
-      ExampleView(
-        sentence: sentence,
-        translation: translation.isEmpty ? null : translation,
-      ),
-    );
-  }
-  return result;
-}
-
-/// `examples_json` 里是否至少有一条带非空句子的例句。
-bool _hasExample(String? raw) {
-  for (final item in _decodeList(raw)) {
-    if (item is Map && _cleanText(item['sentence']).isNotEmpty) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/// 句子类词条的整句翻译（`summary.translation`）。
-String? _summaryTranslation(String? raw) {
-  final decoded = _decodeJson(raw ?? '');
-  if (decoded is! Map) return null;
-  final translation = _cleanText(decoded['translation']);
-  return translation.isEmpty ? null : translation;
-}
-
-/// 解析 JSON；非法内容返回 `null`。
-///
-/// 只吞 `FormatException`（`jsonDecode` 的契约），其他异常继续上抛——
-/// 用空 `catch` 会把真实缺陷一起吞掉。
-Object? _decodeJson(String raw) {
-  if (raw.isEmpty) return null;
-  try {
-    return jsonDecode(raw);
-  } on FormatException {
-    return null;
-  }
-}
-
-/// 解析 JSON 数组；非法内容或非数组返回空列表。
-List<Object?> _decodeList(String? raw) {
-  if (raw == null || raw.isEmpty) return const <Object?>[];
-  final decoded = _decodeJson(raw);
-  return decoded is List ? decoded : const <Object?>[];
 }
 
 /// 取字符串字段并 trim；非字符串返回空串。

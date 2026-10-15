@@ -349,6 +349,10 @@ WordTetrisState _tap(WordTetrisState state, String word) {
 }
 
 /// 处理本帧落地的方块。
+///
+/// 命中正确方块时**立刻返回**：此时已经进入下一题，继续遍历上一题的
+/// 其余方块会把它们的落地也记到新题的堆叠上（同一帧内多个方块同时落地
+/// 时必然发生）。
 WordTetrisState _resolveLandings(WordTetrisState state) {
   var next = state;
   for (final block in state.board.blocks) {
@@ -358,22 +362,18 @@ WordTetrisState _resolveLandings(WordTetrisState state) {
       danger: next.danger + 1,
     );
     if (next.isStackFull) return next.copyWith(core: next.core.finish());
-    next = _failIfCorrectLanded(next, block.word);
+    final question = next.current;
+    if (question == null || block.word != question.answer) continue;
+    return advanceWordTetris(
+      next.copyWith(
+        core: next.core.recordMissed(
+          itemId: question.itemId,
+          answerMs: next.itemElapsedMs,
+        ),
+      ),
+    );
   }
   return next;
-}
-
-WordTetrisState _failIfCorrectLanded(WordTetrisState state, String word) {
-  final question = state.current;
-  if (question == null || word != question.answer) return state;
-  return advanceWordTetris(
-    state.copyWith(
-      core: state.core.recordMissed(
-        itemId: question.itemId,
-        answerMs: state.itemElapsedMs,
-      ),
-    ),
-  );
 }
 
 TetrisBlock? _blockFor(WordTetrisState state, String word) {

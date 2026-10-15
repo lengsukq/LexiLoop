@@ -158,7 +158,11 @@ class _Stat extends StatelessWidget {
 /// 空态：题库不足或功能不可用时的中文提示。
 class GameEmptyView extends StatelessWidget {
   /// 以提示与图标构造。
-  const new({required this.message, this.icon = Icons.inbox_rounded, super.key});
+  const new({
+    required this.message,
+    this.icon = Icons.inbox_rounded,
+    super.key,
+  });
 
   /// 提示文案。
   final String message;

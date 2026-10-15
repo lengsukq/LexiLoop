@@ -257,9 +257,11 @@ String _mnemonicPrompt(_SupplementalWord word) {
     'term': word.term,
     'mnemonic': '...',
   });
-  return '为英文词条「${word.term}」写一条简体中文助记词（至少 8 个汉字），'
-      '用联想、拆词或谐音帮助记忆，不要复述释义。只输出一个 JSON 对象： '
-      '$example。没有自然联想时把 mnemonic 设为 null。';
+  return '''
+为英文词条「${word.term}」写一条简体中文助记词（至少 8 个汉字），用联想、拆词或谐音帮助记忆，不要复述释义。
+只输出一个 JSON 对象： $example
+没有自然联想时把 mnemonic 设为 null。
+''';
 }
 
 String _translationPrompt(

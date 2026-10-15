@@ -15,10 +15,16 @@ final Provider<WordEditService> wordEditServiceProvider =
 
 /// 可选语言（代码 → 中文名）。
 ///
-/// 只列旧版实际支持的语言，避免用户填进一个词典 provider 都认不出的代码。
+/// 代码取值与旧版 `lib/language.ts` 的 `LANGUAGE_MAP` 一致，**不是裸 ISO 639-1**：
+/// 中文用 `zh-CN` 而不是 `zh`。这一点很关键——真实备份里
+/// `words.target_language` 全是 `zh-CN`，而 `definitions_json` 里每条释义的
+/// `language` 也是 `zh-CN`，判题时靠它筛「目标语言释义」。若这里写成 `zh`，
+/// 手动添加的词条会与整库的语言代码不一致，释义将永远匹配不上。
 const Map<String, String> supportedLanguages = <String, String>{
   'en': '英语',
-  'zh': '中文',
+  'zh-CN': '简体中文',
+  'zh-TW': '繁体中文',
+  'nl': '荷兰语',
   'ja': '日语',
   'ko': '韩语',
   'fr': '法语',
@@ -29,14 +35,22 @@ const Map<String, String> supportedLanguages = <String, String>{
   'ru': '俄语',
 };
 
+/// 默认目标语言。
+///
+/// 与真实备份一致（见 [supportedLanguages] 的说明）。
+const String defaultTargetLanguage = 'zh-CN';
+
+/// 默认源语言。
+const String defaultSourceLanguage = 'en';
+
 /// 手动录入表单的状态。
 class ManualEntryState {
   /// 以各字段构造。
   const new({
     this.term = '',
     this.contentType = LexicalContentType.word,
-    this.sourceLanguage = 'en',
-    this.targetLanguage = 'zh',
+    this.sourceLanguage = defaultSourceLanguage,
+    this.targetLanguage = defaultTargetLanguage,
     this.definitionsText = '',
     this.phonetic = '',
     this.examplesText = '',

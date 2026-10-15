@@ -9,7 +9,7 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
-/// 复习历史卡片：最近 [reviewHistoryLimit] 条作答记录。
+/// 复习历史卡片：最近 `reviewHistoryLimit` 条作答记录。
 class ReviewHistoryCard extends ConsumerWidget {
   /// 以词条 ID 构造。
   const new({required this.wordId, super.key});

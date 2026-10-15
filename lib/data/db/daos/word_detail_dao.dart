@@ -10,12 +10,12 @@
 /// 避免在只读 DAO 里混入写路径。
 library;
 
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/date_key.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
@@ -24,7 +24,6 @@ import 'package:lexiloop/domain/models/study_models.dart';
 ///
 /// 详情页是一屏概览而非流水账；超过 20 条后用户关心的是趋势而不是逐条记录。
 /// 该值属于界面展示口径，待 `lib/core/constants.dart` 增设界面小节时迁入。
-const int reviewHistoryLimit = 20;
 
 // ═══════════════════════════════════════════════════════════════
 // 视图数据类
@@ -773,10 +772,10 @@ class WordDetailDao {
     definitions: parseDefinitionsJson(
       row.readNullable<String>('definitions_json'),
     ),
-    pronunciations: _parsePronunciations(
+    pronunciations: parsePronunciations(
       row.readNullable<String>('pronunciations_json'),
     ),
-    examples: _parseExamples(row.readNullable<String>('examples_json')),
+    examples: parseExamples(row.readNullable<String>('examples_json')),
     phrases: _parsePhrases(row.readNullable<String>('phrases_json')),
     forms: _parseForms(row.readNullable<String>('forms_json')),
     synonyms: _parseRelated(row.readNullable<String>('synonyms_json')),
@@ -792,7 +791,7 @@ class WordDetailDao {
     sentenceAnalysis: _parseSentenceAnalysis(
       row.readNullable<String>('sentence_analysis_json'),
     ),
-    tags: _parseTextList(_decodeJson(row.readNullable<String>('tags_json'))),
+    tags: parseTextList(decodeJson(row.readNullable<String>('tags_json'))),
     providerMetadataJson: row.readNullable<String>('provider_metadata_json'),
     contentSource:
         wireLookup(
@@ -827,116 +826,20 @@ class WordDetailDao {
 // 两种形态都会遇到。缺少必需字段的元素一律丢弃，而不是渲染半行空白。
 // ═══════════════════════════════════════════════════════════════
 
-/// 对象形态下依次尝试的文本键。
-///
-/// 顺序即优先级：`text`/`value` 是最通用的载荷键，其余按各字段的实际命名。
-const List<String> _textKeys = <String>[
-  'text',
-  'value',
-  'word',
-  'sentence',
-  'phrase',
-  'form',
-  'expression',
-  'name',
-  'label',
-  'term',
-  'level',
-];
-
-/// 解析 JSON；非法内容返回 `null`。
-///
-/// 只吞 `FormatException`（`jsonDecode` 的契约），其余异常继续上抛——
-/// 空 `catch` 会把真实缺陷一起吞掉。
-Object? _decodeJson(String? raw) {
-  if (raw == null || raw.isEmpty) return null;
-  try {
-    return jsonDecode(raw);
-  } on FormatException {
-    return null;
-  }
-}
-
-/// 解析 JSON 数组；非法内容或非数组返回空列表。
-List<Object?> _decodeList(String? raw) {
-  final decoded = _decodeJson(raw);
-  return decoded is List ? decoded : const <Object?>[];
-}
-
-/// 解析 JSON 对象；非法内容或非对象返回空 Map。
-Map<Object?, Object?> _decodeMap(String? raw) {
-  final decoded = _decodeJson(raw);
-  return decoded is Map ? decoded : const <Object?, Object?>{};
-}
-
-/// 取文本：接受字符串、数字，或含 [_textKeys] 中任一键的对象。
-String _textOf(Object? value) {
-  if (value is String) return value.trim();
-  if (value is num) return value.toString();
-  if (value is Map) {
-    for (final key in _textKeys) {
-      final nested = value[key];
-      if (nested is String && nested.trim().isNotEmpty) {
-        return nested.trim();
-      }
-    }
-  }
-  return '';
-}
-
-/// 取可空文本；空串归一为 `null`，避免界面出现空行。
-String? _nullableTextOf(Object? value) {
-  final text = _textOf(value);
-  return text.isEmpty ? null : text;
-}
-
-/// 从对象元素里取一个可空文本字段；非对象元素返回 `null`。
-String? _fieldOf(Object? item, String key) =>
-    item is Map ? _nullableTextOf(item[key]) : null;
-
-/// 解析文本列表字段；元素可能是字符串、数字或对象。
-///
-/// 单个字符串也接受（历史数据里 `commonMistakes` 有写成字符串的形态）。
-List<String> _parseTextList(Object? value) {
-  if (value is String) {
-    final text = value.trim();
-    return text.isEmpty ? const <String>[] : <String>[text];
-  }
-  if (value is! List) return const <String>[];
-  final result = <String>[];
-  for (final item in value) {
-    final text = _textOf(item);
-    if (text.isNotEmpty) result.add(text);
-  }
-  return result;
-}
-
-/// 取相关词条元素的词条文本。
-///
-/// 对象形态优先读 `word` 键；读不到时退回通用文本键，
-/// 使 `{term: "apple"}` 这类变体也不至于整条丢失。
-String _relatedWord(Object? item) {
-  if (item is Map) {
-    final word = _textOf(item['word']);
-    return word.isNotEmpty ? word : _textOf(item);
-  }
-  return _textOf(item);
-}
-
 /// 解析相关词条列表（同义词 / 反义词 / 词族 / 易混词）。
 List<RelatedWordView> _parseRelated(String? raw) {
   final result = <RelatedWordView>[];
-  for (final item in _decodeList(raw)) {
-    final word = _relatedWord(item);
+  for (final item in decodeJsonList(raw)) {
+    final word = relatedWordOf(item);
     if (word.isEmpty) continue;
     result.add(
       RelatedWordView(
         word: word,
-        translation: _fieldOf(item, 'translation'),
-        partOfSpeech: _fieldOf(item, 'partOfSpeech'),
-        relation: _fieldOf(item, 'relation'),
-        source: _fieldOf(item, 'source'),
-        difference: _fieldOf(item, 'difference'),
+        translation: fieldOf(item, 'translation'),
+        partOfSpeech: fieldOf(item, 'partOfSpeech'),
+        relation: fieldOf(item, 'relation'),
+        source: fieldOf(item, 'source'),
+        difference: fieldOf(item, 'difference'),
       ),
     );
   }
@@ -946,14 +849,14 @@ List<RelatedWordView> _parseRelated(String? raw) {
 /// 解析短语列表，跳过短语文本为空的条目。
 List<PhraseView> _parsePhrases(String? raw) {
   final result = <PhraseView>[];
-  for (final item in _decodeList(raw)) {
-    final phrase = _textOf(item);
+  for (final item in decodeJsonList(raw)) {
+    final phrase = textOf(item);
     if (phrase.isEmpty) continue;
     result.add(
       PhraseView(
         phrase: phrase,
-        translation: _fieldOf(item, 'translation'),
-        source: _fieldOf(item, 'source'),
+        translation: fieldOf(item, 'translation'),
+        source: fieldOf(item, 'source'),
       ),
     );
   }
@@ -963,14 +866,14 @@ List<PhraseView> _parsePhrases(String? raw) {
 /// 解析词形变化列表，跳过形态为空的条目。
 List<FormView> _parseForms(String? raw) {
   final result = <FormView>[];
-  for (final item in _decodeList(raw)) {
-    final form = _textOf(item);
+  for (final item in decodeJsonList(raw)) {
+    final form = textOf(item);
     if (form.isEmpty) continue;
     result.add(
       FormView(
         form: form,
-        label: _fieldOf(item, 'type') ?? _fieldOf(item, 'label'),
-        translation: _fieldOf(item, 'translation'),
+        label: fieldOf(item, 'type') ?? fieldOf(item, 'label'),
+        translation: fieldOf(item, 'translation'),
       ),
     );
   }
@@ -980,17 +883,17 @@ List<FormView> _parseForms(String? raw) {
 /// 解析词根列表；缺 `root` 或 `meaning` 的条目丢弃。
 List<RootView> _parseRoots(String? raw) {
   final result = <RootView>[];
-  for (final item in _decodeList(raw)) {
+  for (final item in decodeJsonList(raw)) {
     if (item is! Map) continue;
-    final root = _textOf(item['root']);
-    final meaning = _textOf(item['meaning']);
+    final root = textOf(item['root']);
+    final meaning = textOf(item['meaning']);
     if (root.isEmpty || meaning.isEmpty) continue;
     result.add(
       RootView(
         root: root,
         meaning: meaning,
-        origin: _nullableTextOf(item['origin']),
-        source: _nullableTextOf(item['source']),
+        origin: nullableTextOf(item['origin']),
+        source: nullableTextOf(item['source']),
       ),
     );
   }
@@ -1003,13 +906,13 @@ List<RootView> _parseRoots(String? raw) {
 /// 归错区的词缀比不显示更糟。
 List<AffixView> _parseAffixes(String? raw) {
   final result = <AffixView>[];
-  for (final item in _decodeList(raw)) {
+  for (final item in decodeJsonList(raw)) {
     if (item is! Map) continue;
-    final value = _textOf(item['value']);
-    final meaning = _textOf(item['meaning']);
+    final value = textOf(item['value']);
+    final meaning = textOf(item['meaning']);
     final kind = wireLookup(
       AffixKind.values,
-      _textOf(item['type']).toUpperCase(),
+      textOf(item['type']).toUpperCase(),
     );
     if (value.isEmpty || meaning.isEmpty || kind == null) continue;
     result.add(
@@ -1017,48 +920,7 @@ List<AffixView> _parseAffixes(String? raw) {
         value: value,
         meaning: meaning,
         kind: kind,
-        source: _nullableTextOf(item['source']),
-      ),
-    );
-  }
-  return result;
-}
-
-/// 解析发音列表，跳过无音标的条目。
-///
-/// 与 `StudyDao` 的同名解析重复，但那是私有实现；待词典内容解析
-/// 统一迁到 `lib/domain/dictionary/` 后合并（见交付说明）。
-List<PronunciationView> _parsePronunciations(String? raw) {
-  final result = <PronunciationView>[];
-  for (final item in _decodeList(raw)) {
-    if (item is! Map) continue;
-    final phonetic = _textOf(item['phonetic']);
-    if (phonetic.isEmpty) continue;
-    final audioUrl = _textOf(item['audioUrl']);
-    result.add(
-      PronunciationView(
-        accent: _textOf(item['accent']).toUpperCase() == Accent.uk.wire
-            ? Accent.uk
-            : Accent.us,
-        phonetic: phonetic,
-        audioUrl: audioUrl.isEmpty ? null : audioUrl,
-      ),
-    );
-  }
-  return result;
-}
-
-/// 解析例句列表，跳过句子为空的条目。
-List<ExampleView> _parseExamples(String? raw) {
-  final result = <ExampleView>[];
-  for (final item in _decodeList(raw)) {
-    if (item is! Map) continue;
-    final sentence = _textOf(item['sentence']);
-    if (sentence.isEmpty) continue;
-    result.add(
-      ExampleView(
-        sentence: sentence,
-        translation: _nullableTextOf(item['translation']),
+        source: nullableTextOf(item['source']),
       ),
     );
   }
@@ -1067,32 +929,32 @@ List<ExampleView> _parseExamples(String? raw) {
 
 /// 解析摘要对象；解析失败时返回空结构。
 SummaryView _parseSummary(String? raw) {
-  final map = _decodeMap(raw);
+  final map = decodeJsonMap(raw);
   return SummaryView(
-    shortDefinition: _nullableTextOf(map['shortDefinition']),
-    translation: _nullableTextOf(map['translation']),
-    cefrLevel: _nullableTextOf(map['cefrLevel']),
-    frequency: _nullableTextOf(map['frequency']),
+    shortDefinition: nullableTextOf(map['shortDefinition']),
+    translation: nullableTextOf(map['translation']),
+    cefrLevel: nullableTextOf(map['cefrLevel']),
+    frequency: nullableTextOf(map['frequency']),
   );
 }
 
 /// 解析学习辅助对象；解析失败时返回空结构。
 LearningView _parseLearning(String? raw) {
-  final map = _decodeMap(raw);
+  final map = decodeJsonMap(raw);
   return LearningView(
-    pronunciationTip: _nullableTextOf(map['pronunciationTip']),
-    mnemonic: _nullableTextOf(map['mnemonic']),
-    commonMistakes: _parseTextList(map['commonMistakes']),
+    pronunciationTip: nullableTextOf(map['pronunciationTip']),
+    mnemonic: nullableTextOf(map['mnemonic']),
+    commonMistakes: parseTextList(map['commonMistakes']),
   );
 }
 
 /// 解析句子分析对象；解析失败时返回空结构。
 SentenceAnalysisView _parseSentenceAnalysis(String? raw) {
-  final map = _decodeMap(raw);
+  final map = decodeJsonMap(raw);
   return SentenceAnalysisView(
-    grammarPattern: _nullableTextOf(map['grammarPattern']),
-    grammarExplanation: _nullableTextOf(map['grammarExplanation']),
-    grammarNotes: _parseTextList(map['grammarNotes']),
+    grammarPattern: nullableTextOf(map['grammarPattern']),
+    grammarExplanation: nullableTextOf(map['grammarExplanation']),
+    grammarNotes: parseTextList(map['grammarNotes']),
     keyExpressions: _parseAnalysisItems(map['keyExpressions']),
     similarExamples: _parseAnalysisItems(map['similarExamples']),
     variations: _parseAnalysisItems(map['variations']),
@@ -1104,13 +966,13 @@ List<SentenceAnalysisItem> _parseAnalysisItems(Object? value) {
   if (value is! List) return const <SentenceAnalysisItem>[];
   final result = <SentenceAnalysisItem>[];
   for (final item in value) {
-    final text = _textOf(item);
+    final text = textOf(item);
     if (text.isEmpty) continue;
     result.add(
       SentenceAnalysisItem(
         text: text,
-        label: _fieldOf(item, 'type') ?? _fieldOf(item, 'label'),
-        translation: _fieldOf(item, 'translation'),
+        label: fieldOf(item, 'type') ?? fieldOf(item, 'label'),
+        translation: fieldOf(item, 'translation'),
       ),
     );
   }

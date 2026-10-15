@@ -416,9 +416,11 @@ _ListFilter _listFilter(InitializationStatus? status, String search) {
         .replaceAll(r'\', r'\\')
         .replaceAll('%', r'\%')
         .replaceAll('_', r'\_');
-    variables.add(Variable<String>('%$escaped%'));
-    variables.add(const Variable<String>(r'\'));
-    variables.add(Variable<String>('%$escaped%'));
+    variables.addAll(<Variable<Object>>[
+      Variable<String>('%$escaped%'),
+      const Variable<String>(r'\'),
+      Variable<String>('%$escaped%'),
+    ]);
   }
   if (status != null) {
     conditions.add('AND $_aggregateStatus = ?');

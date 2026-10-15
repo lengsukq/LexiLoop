@@ -96,7 +96,30 @@ class _BatchTileState extends ConsumerState<_BatchTile> {
   bool _busy = false;
 
   Future<void> _rollback() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await _confirmRollback();
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(csvImportServiceProvider)
+          .rollback(
+            batchId: widget.batch.id,
+            now: DateTime.now().millisecondsSinceEpoch,
+          );
+      _refresh();
+      messenger.showSnackBar(const SnackBar(content: Text('已撤销该批次。')));
+    } on AppError catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 二次确认：撤销会删除词条，不能一键完成。
+  Future<bool?> _confirmRollback() {
+    return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('撤销这次导入？'),
@@ -116,24 +139,13 @@ class _BatchTileState extends ConsumerState<_BatchTile> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+  }
 
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(csvImportServiceProvider)
-          .rollback(
-            batchId: widget.batch.id,
-            now: DateTime.now().millisecondsSinceEpoch,
-          );
-      ref.invalidate(importHistoryProvider);
-      messenger.showSnackBar(const SnackBar(content: Text('已撤销该批次。')));
-    } on AppError catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  /// 撤销会把行的 `word_id` 置空，历史与明细都要重新取。
+  void _refresh() {
+    ref
+      ..invalidate(importHistoryProvider)
+      ..invalidate(importBatchRowsProvider(widget.batch.id));
   }
 
   @override

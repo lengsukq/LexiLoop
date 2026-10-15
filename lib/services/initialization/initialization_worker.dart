@@ -138,7 +138,7 @@ class InitializationWorker {
           'ORDER BY priority DESC, available_at ASC, id ASC LIMIT ?',
           variables: <Variable<Object>>[
             Variable<int>(now),
-            Variable<int>(defaultMaxJobsPerTick),
+            const Variable<int>(defaultMaxJobsPerTick),
           ],
         )
         .get();
@@ -156,7 +156,7 @@ class InitializationWorker {
     if (job.status == InitializationStatus.running) return job;
     if (job.status != InitializationStatus.queued) return null;
     if (!await _markRunning(job.id, now)) return null;
-    return _loadJob(job.id);
+    return await _loadJob(job.id);
   }
 
   Future<bool> _markRunning(int jobId, int now) async {
@@ -499,7 +499,7 @@ class InitializationWorker {
           (item) =>
               item['language'] == targetLanguage &&
               item['text'] is String &&
-              (item['text'] as String).trim().isNotEmpty,
+              (item['text']! as String).trim().isNotEmpty,
         );
   }
 
@@ -621,7 +621,7 @@ class InitializationWorker {
     ];
     final variables = <Variable<Object>>[
       Variable<int>(wordId),
-      for (final column in columns.keys) Variable<String>(columns[column]!),
+      for (final column in columns.keys) Variable<String>(columns[column]),
       Variable<String>(
         jsonEncode(<Object?>[
           for (final attempt in attempts) _attemptJson(attempt),
@@ -639,7 +639,8 @@ class InitializationWorker {
       for (final name in names)
         if (name != 'word_id' && name != 'content_version')
           '$name = excluded.$name',
-    ]..add('content_version = word_contents.content_version + 1');
+      'content_version = word_contents.content_version + 1',
+    ];
 
     await _db.customUpdate(
       'INSERT INTO word_contents (${names.join(', ')}) '

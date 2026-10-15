@@ -10,16 +10,13 @@ import 'package:lexiloop/domain/enums.dart';
 /// 「导入历史」一次展示的批次数。
 ///
 /// 与旧版 `app/imports/page.tsx` 的 `limit: 20` 一致。
-const int recentImportBatchLimit = 20;
 
 /// 批次行明细分页的每页条数。
-const int importRowPageSize = 50;
 
 /// 预览表格最多渲染的行数。
 ///
 /// 旧版 `import/page.tsx` 取 `slice(0, 200)`：一次渲染两万行会让
 /// 列表首帧就卡住，而用户真正要看的只是前几十行与「有没有问题行」。
-const int importPreviewDisplayLimit = 200;
 
 /// 一次预览的完整结果。
 class ImportPreview {

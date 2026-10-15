@@ -405,5 +405,10 @@ const List<String> llmThinkingRejectionKeywords = <String>[
 /// 少于 8 个汉字通常是模型把英文解释直接塞进了助记字段。
 const int aiMnemonicMinChineseChars = 8;
 
+/// 百分数换算基数。
+///
+/// `lib/services` 禁止裸数字字面量，而正确率 / 完成率到处要 `* 100`。
+const int percentScale = 100;
+
 /// 结构化输出中 JSON Schema 的名字。
 const String llmJsonSchemaName = 'lexiloop_lexical_content';

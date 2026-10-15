@@ -5,6 +5,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
@@ -245,6 +246,11 @@ class _WordList extends StatelessWidget {
   }
 }
 
+/// 词条详情页的路径前缀。
+///
+/// 集中一处：路由表与本页都引用它，改名时不会只改一边。
+const String wordDetailPathPrefix = '/words/';
+
 class _WordTile extends StatelessWidget {
   const new({required this.entry});
 
@@ -253,53 +259,57 @@ class _WordTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.md),
-      showSpecular: true,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  entry.term,
-                  style: TextStyle(
-                    color: colors.label,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (entry.meaning != null) ...<Widget>[
-                  const SizedBox(height: 3),
+    return GestureDetector(
+      onTap: () => context.go('$wordDetailPathPrefix${entry.id}'),
+      behavior: HitTestBehavior.opaque,
+      child: LiquidGlass(
+        level: GlassLevel.elevated,
+        borderRadius: BorderRadius.circular(LexiRadius.md),
+        showSpecular: true,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
                   Text(
-                    entry.meaning!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    entry.term,
                     style: TextStyle(
-                      color: colors.secondaryLabel,
-                      fontSize: 13,
+                      color: colors.label,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (entry.meaning != null) ...<Widget>[
+                    const SizedBox(height: 3),
+                    Text(
+                      entry.meaning!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.secondaryLabel,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                MasteryBadge(
+                  level: entry.masteryLevel,
+                  score: entry.masteryScore,
+                ),
+                const SizedBox(height: 4),
+                InitializationBadge(status: entry.initializationStatus),
               ],
             ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              MasteryBadge(
-                level: entry.masteryLevel,
-                score: entry.masteryScore,
-              ),
-              const SizedBox(height: 4),
-              InitializationBadge(status: entry.initializationStatus),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

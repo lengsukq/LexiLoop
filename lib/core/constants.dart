@@ -469,6 +469,18 @@ const int importBatchExpiryMs = dayMs;
 /// 撤销导入时回显的受阻词条上限。
 const int rollbackBlockedTermLimit = 30;
 
+/// 导入历史一次展示的批次数。
+const int recentImportBatchLimit = 20;
+
+/// 导入批次行明细的分页大小。
+const int importRowPageSize = 50;
+
+/// 导入预览表格最多渲染的行数。
+///
+/// 两万行全渲染会让首帧卡住数秒；预览的目的是「确认列映射对不对」，
+/// 前若干行足够。
+const int importPreviewDisplayLimit = 200;
+
 // ═══════════════════════════════════════════════════════════════
 // 文章导入（对应旧版 lib/config.ts 与 modules/article-import/extract.ts）
 // ═══════════════════════════════════════════════════════════════
@@ -683,6 +695,9 @@ const int recentResultsLimit = 20;
 
 /// 统计页「学习时长」的分钟换算基数。
 const int statsMinutesPerHour = 60;
+
+/// 词条详情页「复习历史」展示的条数上限。
+const int reviewHistoryLimit = 20;
 
 // 界面交互（对应旧版 lib/config.ts 与各组件内联值）
 // ═══════════════════════════════════════════════════════════════

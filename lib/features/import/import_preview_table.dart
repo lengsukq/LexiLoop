@@ -1,11 +1,12 @@
 /// 导入预览表格。
 ///
-/// 一次最多渲染 [importPreviewDisplayLimit] 行：预览可能有上万行，
+/// 一次最多渲染 `importPreviewDisplayLimit` 行：预览可能有上万行，
 /// 全量塞进 `ListView` 会让首帧直接卡住，而用户真正关心的是
 /// 「前几十行长什么样」与「有多少行有问题」。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/import/csv_parser.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';

@@ -15,9 +15,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/game_dao.dart';
+import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
+import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/domain/games/game_runtime.dart';
+import 'package:lexiloop/features/games/game_ticker.dart';
 import 'package:lexiloop/services/game_service.dart';
 
 /// 倒计时刷新间隔（毫秒）。
@@ -80,6 +83,9 @@ final class GamesPlaying extends GamesState {
 
   /// 计分内核。
   GameCoreState get core => runtime.core;
+
+  /// 当前题目。
+  GameQuestion? get current => runtime.current;
 }
 
 /// 结算中。
@@ -94,13 +100,20 @@ final class GamesSaving extends GamesState {
 /// 结算完成。
 final class GamesFinished extends GamesState {
   /// 以各字段构造。
-  const new({required this.result, required this.outcomes});
+  const new({
+    required this.result,
+    required this.outcomes,
+    required this.questions,
+  });
 
   /// 结算结果。
   final GameResult result;
 
   /// 逐题结果（顺序与题目一致）。
   final List<GameOutcome> outcomes;
+
+  /// 本局题目（结算页据此列出失误词条）。
+  final List<GameQuestion> questions;
 }
 
 /// 保存失败。
@@ -117,15 +130,19 @@ final class GamesSaveFailed extends GamesState {
 
 /// 小游戏控制器。
 class GamesController extends Notifier<GamesState> {
-  Timer? _ticker;
+  late final GameTicker _ticker = GameTicker(_onTick);
   Timer? _advanceTimer;
-  final Stopwatch _stopwatch = Stopwatch();
-  int _lastElapsedMs = 0;
 
   @override
   GamesState build() {
     ref.onDispose(_stopAll);
     return const GamesSetup();
+  }
+
+  void _onTick(int deltaMs) {
+    final current = state;
+    if (current is! GamesPlaying) return;
+    dispatch(tickActionFor(current.session.mode, deltaMs));
   }
 
   /// 选择模式（不开始）。
@@ -150,7 +167,7 @@ class GamesController extends Notifier<GamesState> {
         random: math.Random().nextDouble,
       );
       state = GamesPlaying(session: session, runtime: runtime);
-      _startTicker();
+      _ticker.start();
     } on Object catch (error) {
       state = GamesSetup(
         selectedMode: mode,
@@ -186,30 +203,7 @@ class GamesController extends Notifier<GamesState> {
     final current = state;
     if (current is! GamesSaveFailed) return;
     state = current.previous;
-    _startTicker();
-  }
-
-  /// 时间增量由真实时钟给出，避免应用卡顿时倒计时变慢。
-  void _startTicker() {
-    _stopwatch
-      ..reset()
-      ..start();
-    _lastElapsedMs = 0;
-    _ticker?.cancel();
-    _ticker = Timer.periodic(
-      const Duration(milliseconds: gameTickMs),
-      (_) => _onTick(),
-    );
-  }
-
-  void _onTick() {
-    final current = state;
-    if (current is! GamesPlaying) return;
-    final elapsed = _stopwatch.elapsedMilliseconds;
-    final delta = elapsed - _lastElapsedMs;
-    _lastElapsedMs = elapsed;
-    if (delta <= 0) return;
-    dispatch(tickActionFor(current.session.mode, delta));
+    _ticker.start();
   }
 
   /// 一局结束后同步外部状态：结束则结算，判定完成则安排自动推进。
@@ -247,6 +241,7 @@ class GamesController extends Notifier<GamesState> {
         outcomes: <GameOutcome>[
           for (final question in questions) core.outcomeFor(question.itemId),
         ],
+        questions: questions,
       );
     } on Object catch (error) {
       state = GamesSaveFailed(
@@ -257,11 +252,9 @@ class GamesController extends Notifier<GamesState> {
   }
 
   void _stopAll() {
-    _ticker?.cancel();
-    _ticker = null;
+    _ticker.stop();
     _advanceTimer?.cancel();
     _advanceTimer = null;
-    _stopwatch.stop();
   }
 
   int _now() => DateTime.now().millisecondsSinceEpoch;

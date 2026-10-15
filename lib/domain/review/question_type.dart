@@ -100,18 +100,25 @@ const List<QuestionType> adaptiveListeningPool = <QuestionType>[
 ];
 
 /// 首选题型不可用时，按学习模式回退的池子。
+///
+/// **分支顺序是语义的一部分**，与旧版逐条对齐：听力优先于「错词任务」，
+/// 因为听力会话里的错词仍然要按听力题型练，而不是变成拼写题。
 List<QuestionType> modeFallbackPool(StudyMode mode, StudyTaskType taskType) {
-  if (taskType == StudyTaskType.wrong) return spellingFallbackPool;
-  return switch (mode) {
-    StudyMode.listening => listeningFallbackPool,
-    StudyMode.spelling || StudyMode.wrongWords => spellingFallbackPool,
-    StudyMode.sentenceReview =>
-      taskType == StudyTaskType.newWord
-          ? sentenceNewFallbackPool
-          : sentenceReviewFallbackPool,
-    StudyMode.dueReview || StudyMode.newWords => reviewFallbackPool,
-    StudyMode.daily || StudyMode.aiRecommended => globalFallbackPool,
-  };
+  if (mode == StudyMode.listening) return listeningFallbackPool;
+  if (mode == StudyMode.spelling ||
+      mode == StudyMode.wrongWords ||
+      taskType == StudyTaskType.wrong) {
+    return spellingFallbackPool;
+  }
+  if (mode == StudyMode.sentenceReview) {
+    return taskType == StudyTaskType.newWord
+        ? sentenceNewFallbackPool
+        : sentenceReviewFallbackPool;
+  }
+  if (mode == StudyMode.dueReview || mode == StudyMode.newWords) {
+    return reviewFallbackPool;
+  }
+  return globalFallbackPool;
 }
 
 /// 按权重从池中抽一个可用题型；池内无可用项时返回 `null`。
@@ -203,6 +210,10 @@ QuestionType resolveAdaptiveQuestionType({
 ///
 /// `position` 参与取模是为了让同一会话内题型**交替出现**——连续 10 道
 /// 选择题会让用户进入机械作答状态，失去检索练习的意义。
+///
+/// **分支顺序是语义的一部分**，与旧版逐条对齐：
+/// 1. 句子复习与听力先于「错词任务」判定——听力会话里的错词仍按听力练；
+/// 2. 「错词任务」先于「每日」判定——每日队列里补进来的错词要用拼写题。
 QuestionType questionFor({
   required StudyMode mode,
   required StudyTaskType taskType,
@@ -221,34 +232,70 @@ QuestionType questionFor({
     random: random,
   );
 
-  switch (mode) {
-    case StudyMode.sentenceReview:
-      return pick(
-        taskType == StudyTaskType.newWord
-            ? QuestionType.enToZh
-            : QuestionType.zhToEnSpelling,
-      );
-    case StudyMode.listening:
-      if (position % listeningWeakMasteryEvery == listeningWeakMasteryOffset &&
-          masteryScore != null &&
-          masteryScore < listeningWeakMasteryScore) {
-        return pick(QuestionType.listeningChoice);
-      }
-      // listeningChoiceEvery 为 2，等价于「奇数位置出选择题」。
-      if (position.isOdd) {
-        return pick(QuestionType.listeningChoice);
-      }
-      return pick(QuestionType.listeningSpelling);
-    case StudyMode.spelling:
-    case StudyMode.wrongWords:
-      return _spellingQuestion(pick, context, position);
-    case StudyMode.daily:
-    case StudyMode.aiRecommended:
-      return _dailyQuestion(pick, taskType, context, position, masteryScore);
-    case StudyMode.dueReview:
-    case StudyMode.newWords:
-      return pick(QuestionType.enToZhChoice);
+  if (mode == StudyMode.sentenceReview) {
+    return pick(
+      taskType == StudyTaskType.newWord
+          ? QuestionType.enToZh
+          : QuestionType.zhToEnSpelling,
+    );
   }
+  if (mode == StudyMode.listening) {
+    return _listeningQuestion(pick, position, masteryScore);
+  }
+  if (mode == StudyMode.spelling ||
+      mode == StudyMode.wrongWords ||
+      taskType == StudyTaskType.wrong) {
+    return _spellingQuestion(pick, context, position);
+  }
+  if (mode == StudyMode.daily) {
+    return _dailyQuestion(pick, taskType, context, position, masteryScore);
+  }
+  if (mode == StudyMode.dueReview || mode == StudyMode.newWords) {
+    return pick(QuestionType.enToZhChoice);
+  }
+  return pick(QuestionType.enToZh);
+}
+
+/// 听力题的题型分配。
+///
+/// 熟练分偏低的词条在特定位置降级为选择题：拼写太难会打击信心，
+/// 先保证「能听出来」再要求「能拼对」。
+QuestionType _listeningQuestion(
+  QuestionType Function(QuestionType) pick,
+  int position,
+  int? masteryScore,
+) {
+  final weak = masteryScore != null && masteryScore < listeningWeakMasteryScore;
+  if (weak &&
+      position % listeningWeakMasteryEvery == listeningWeakMasteryOffset) {
+    return pick(QuestionType.listeningChoice);
+  }
+  // listeningChoiceEvery 为 2，等价于「奇数位置出选择题」。
+  if (position.isOdd) return pick(QuestionType.listeningChoice);
+  return pick(QuestionType.listeningSpelling);
+}
+
+/// 追问的题型递进：从当前题型走向更需要主动回忆的形式。
+///
+/// 答错一次说明「认得出但想不起来」，追问就要求主动产出（拼写），
+/// 而不是再认一次。句子类词条只能整句拼写。
+QuestionType nextAdaptiveQuestionType(
+  QuestionType current,
+  LexicalContentType entryType,
+) {
+  if (entryType == LexicalContentType.sentence) {
+    return QuestionType.zhToEnSpelling;
+  }
+  return switch (current) {
+    QuestionType.enToZh => QuestionType.enToZhChoice,
+    QuestionType.enToZhChoice => QuestionType.zhToEnSpelling,
+    QuestionType.zhToEnChoice => QuestionType.zhToEnSpelling,
+    QuestionType.clozeSentence => QuestionType.zhToEnSpelling,
+    QuestionType.letterBank => QuestionType.zhToEnSpelling,
+    QuestionType.listeningChoice => QuestionType.listeningSpelling,
+    QuestionType.listeningSpelling => QuestionType.listeningChoice,
+    QuestionType.zhToEnSpelling => QuestionType.zhToEnSpelling,
+  };
 }
 
 /// 判定候选词条的任务类型。

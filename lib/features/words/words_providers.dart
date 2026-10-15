@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
@@ -10,11 +11,6 @@ import 'package:lexiloop/services/backup_service.dart';
 
 /// 每页条数。
 const int wordPageSize = 40;
-
-/// 词条查询数据源。
-final Provider<WordDao> wordDaoProvider = Provider<WordDao>(
-  (ref) => WordDao(ref.watch(databaseProvider)),
-);
 
 /// 备份导入服务。
 final Provider<BackupService> backupServiceProvider = Provider<BackupService>(

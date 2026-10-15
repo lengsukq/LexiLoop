@@ -19,6 +19,7 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/review/duration.dart';
+import 'package:lexiloop/domain/review/wrong_state.dart';
 
 /// 已存在的复习日志（幂等命中时回显）。
 class ExistingReviewLog {
@@ -53,6 +54,18 @@ class ExistingReviewLog {
 
   /// 期望答案。
   final String? expectedAnswer;
+}
+
+/// 词条当前的熟练度（幂等回显时读取）。
+class MasterySnapshot {
+  /// 以各字段构造。
+  const new({required this.score, required this.level});
+
+  /// 熟练分。
+  final int score;
+
+  /// 掌握等级。
+  final MasteryLevel level;
 }
 
 /// 一次复习所需的全部上下文。
@@ -270,6 +283,59 @@ FROM word_review_stats WHERE word_id = ?''',
       averageDurationMs: durationCount > 0
           ? row.read<int>('total_duration_ms') / durationCount
           : null,
+    );
+  }
+
+  /// 读取词条的熟练度；词条不存在时返回 `null`。
+  Future<MasterySnapshot?> findMastery(int wordId) async {
+    final row = await _db
+        .customSelect(
+          'SELECT mastery_score, mastery_level FROM words WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return MasterySnapshot(
+      score: row.read<int>('mastery_score'),
+      level:
+          wireLookup(MasteryLevel.values, row.read<String>('mastery_level')) ??
+          MasteryLevel.newWord,
+    );
+  }
+
+  /// 写入错词状态（不存在则插入）。
+  Future<void> saveWrongState(
+    int wordId,
+    WrongStateTransition transition,
+    int now,
+  ) async {
+    await _db.customInsert(
+      '''
+INSERT INTO wrong_word_states
+  (word_id, active, wrong_count, hard_count, consecutive_correct,
+   last_wrong_at, last_correct_at, resolved_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(word_id) DO UPDATE SET
+  active = excluded.active,
+  wrong_count = excluded.wrong_count,
+  hard_count = excluded.hard_count,
+  consecutive_correct = excluded.consecutive_correct,
+  last_wrong_at = excluded.last_wrong_at,
+  last_correct_at = excluded.last_correct_at,
+  resolved_at = excluded.resolved_at,
+  updated_at = excluded.updated_at''',
+      variables: <Variable<Object>>[
+        Variable<int>(wordId),
+        Variable<int>(transition.active ? 1 : 0),
+        Variable<int>(transition.wrongCount),
+        Variable<int>(transition.hardCount),
+        Variable<int>(transition.consecutiveCorrect),
+        Variable<int>(transition.lastWrongAt),
+        Variable<int>(transition.lastCorrectAt),
+        Variable<int>(transition.resolvedAt),
+        Variable<int>(now),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{_db.wrongWordStates},
     );
   }
 

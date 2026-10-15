@@ -74,6 +74,23 @@ const double defaultRetentionRate = 0.9;
 /// FSRS 最大复习间隔（天）。
 const int fsrsMaximumIntervalDays = 3650;
 
+/// FSRS 内部状态序号：新卡（对应 `ts-fsrs` 的 `State.New`）。
+///
+/// Dart 版 `package:fsrs` 的 `State` 枚举**没有** `New` 取值
+/// （只有 learning/review/relearning），但 `review_cards.fsrs_state`
+/// 沿用旧版 0–3 的序号，备份回放要逐字段比对卡片快照，所以这个 0 必须具名。
+/// 约定：`fsrsState == fsrsStateNew` ⟺ 学习态且从未复习过。
+const int fsrsStateNew = 0;
+
+/// FSRS 内部状态序号：学习态。
+const int fsrsStateLearning = 1;
+
+/// FSRS 内部状态序号：复习态。
+const int fsrsStateReview = 2;
+
+/// FSRS 内部状态序号：重学态。
+const int fsrsStateRelearning = 3;
+
 /// 可提取性（retrievability）的下限。
 const double retrievabilityFloor = 0.05;
 
@@ -353,6 +370,11 @@ const int estimatedSecondsPerWrong = 55;
 /// 预估单题耗时（秒）：新词题。
 const int estimatedSecondsPerNew = 70;
 
+/// 连续学习时，每日队列抽空后一次补齐的题量。
+///
+/// 不设太大：补题是为了「点进来别只有 2 道题」，而不是把新词全部塞给用户。
+const int continuousBatchSize = 10;
+
 /// 每日默认新词配额。
 const int defaultDailyNewWords = 10;
 
@@ -384,11 +406,15 @@ const int firstFollowUpDelay = 5;
 /// 二次答错后，隔多少题复现（加深长时记忆）。
 const int secondFollowUpDelay = 10;
 
-/// 自适应插题的位置步长。
+/// 自适应插题时，在相邻两项之间取位置的插值比例（0.5 = 中点）。
 ///
-/// 旧版取相邻两项位置的中点，但 `position` 是浮点且带唯一索引，
-/// 反复取中点会逼近浮点精度极限。改为确定性步长，避免相等冲突。
+/// `position` 是浮点且带 `(study_session_id, position)` 唯一索引。
+/// 反复在同一间隙取中点会逼近浮点精度极限，因此插入前必须校验
+/// 插值结果严格落在两端点之间，否则退化为追加到队尾。
 const double sessionItemPositionStep = 0.5;
+
+/// 自适应插题追加到队尾时的位置步长。
+const double sessionItemAppendStep = 1;
 
 // ═══════════════════════════════════════════════════════════════
 // 干扰项与题目构造（对应旧版 modules/study/view.ts）

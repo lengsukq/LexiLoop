@@ -66,6 +66,29 @@ flutter build macos --debug
   `lib/features/settings/data_invalidation.dart` 的 `dataBackedProviders`，
   否则恢复后该页面会显示导入前的快照。
 
+### 从旧版服务器搬数据到本机
+
+正常路径是应用内「设置 → 数据管理 → 导入备份」。要脚本化（或在没有图形
+界面时）验证，可以用两条命令——旧版导出走登录 Cookie，本机导入走
+`BackupImporter`（与界面同一条路径）：
+
+```bash
+# 1. 从旧版（Next.js）导出：先登录拿 Cookie，再下载 JSON
+curl -s -c /tmp/lexi-cookies.txt -X POST http://<旧版地址>/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"password":"<LEXILOOP_PASSWORD>"}'
+curl -s -b /tmp/lexi-cookies.txt -o /tmp/backup.json \
+  http://<旧版地址>/api/backups/json
+
+# 2. 用真实备份跑导入器（内存库，只校验解析与统计重算）
+LEXILOOP_BACKUP_PATH=/tmp/backup.json \
+  flutter test test/data/backup/backup_import_test.dart
+```
+
+导入到本机应用的数据库文件属于**破坏性操作**（全量替换），所以没有常驻
+脚本：应用内导入是唯一的一等入口。确需直接写库时，先退出应用，并把原库
+复制一份再操作——应用数据库在
+`~/Library/Containers/com.lexiloop.lexiloop/Data/Library/Application Support/com.lexiloop.lexiloop/lexiloop.sqlite`。
+
 ## Web 构建的已知限制
 
 Web 端只用于**自测与验收**，不是主要交付形态：

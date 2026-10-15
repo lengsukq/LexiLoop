@@ -139,6 +139,10 @@ bool _looksLikeSignature(String line) {
   final trimmed = line.trimLeft();
   if (trimmed.startsWith('//') || trimmed.startsWith('///')) return false;
   if (trimmed.startsWith('*')) return false;
+  // 以 `}` 开头的是**上一个块的续行**（`} else if (...) {`、
+  // `} on Foo catch (e) {`、`} finally {`）。它们含括号也以 `{` 结尾，
+  // 但绝不是函数签名；不排除的话会把整个后续块算成一个「超长函数」。
+  if (trimmed.startsWith('}')) return false;
   if (!trimmed.endsWith('{')) return false;
   // 函数签名一定含参数列表；排除 `if (x) {`、`for (...) {` 等控制流。
   if (!trimmed.contains('(')) return false;
@@ -155,6 +159,8 @@ bool _looksLikeSignature(String line) {
     'catch(',
     'else ',
     'try ',
+    'on ',
+    'finally ',
   ];
   for (final keyword in controlKeywords) {
     if (trimmed.startsWith(keyword)) return false;

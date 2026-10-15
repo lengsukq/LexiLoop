@@ -17,7 +17,6 @@ import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/games/game_constants.dart';
-import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_runtime.dart';
 import 'package:lexiloop/domain/games/scoring.dart';
@@ -305,7 +304,7 @@ void main() {
         answers: core.answerRecords(session.questions),
         now: now + 5000,
       );
-      final scores = await (db.select(db.gameHighScores)).get();
+      final scores = await db.select(db.gameHighScores).get();
       expect(scores.length, 1);
       expect(scores.single.gameMode, 'WHACK_A_MOLE');
       expect(scores.single.score, result.score);

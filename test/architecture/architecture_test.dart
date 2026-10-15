@@ -269,7 +269,8 @@ bool _isWhitespace(String char) =>
 List<String> _bareNumbers(String line) {
   final code = _stripStringsAndComments(line);
   final result = <String>[];
-  final pattern = RegExp(r'(?<![\w.])(\d+(?:\.\d+)?)(?![\w.])');
+  // 排除 `$` 前缀：`limits.$2` 里的 `2` 是记录字段名的一部分，不是数字字面量。
+  final pattern = RegExp(r'(?<![\w.\$])(\d+(?:\.\d+)?)(?![\w.])');
 
   for (final match in pattern.allMatches(code)) {
     final value = match.group(1)!;

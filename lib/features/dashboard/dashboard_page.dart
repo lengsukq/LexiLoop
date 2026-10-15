@@ -14,6 +14,7 @@ import 'package:lexiloop/features/dashboard/cards/platform_card.dart';
 import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/dashboard/cards/reminders_card.dart';
 import 'package:lexiloop/features/dashboard/cards/statistics_card.dart';
+import 'package:lexiloop/features/dashboard/cards/suggestion_card.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
@@ -48,6 +49,8 @@ class DashboardPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const TodayPlanCard(),
+            const SizedBox(height: 10),
+            const SuggestionCard(),
             const SizedBox(height: 10),
             const StatisticsCard(),
             const SizedBox(height: 10),

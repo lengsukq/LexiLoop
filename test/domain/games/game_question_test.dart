@@ -51,7 +51,7 @@ void main() {
         correct: 'cat',
         pool: <String>['dog', 'pig', 'cow'],
         size: gameChoiceCount,
-        random: constantRandom(0),
+        random: constantRandom(),
       );
       final b = createChoicePool(
         correct: 'cat',

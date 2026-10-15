@@ -267,7 +267,7 @@ void main() {
           .insert(
             WrongWordStatesCompanion.insert(
               wordId: Value<int>(wrongId),
-              active: Value<bool>(true),
+              active: const Value<bool>(true),
               updatedAt: now,
             ),
           );
@@ -276,7 +276,7 @@ void main() {
           .insert(
             WordReviewStatsCompanion.insert(
               wordId: Value<int>(recentId),
-              recentAgain14d: Value<int>(2),
+              recentAgain14d: const Value<int>(2),
               updatedAt: Value<int>(now),
             ),
           );

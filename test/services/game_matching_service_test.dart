@@ -18,7 +18,6 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/matching.dart';
-import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/services/matching_service.dart';
 import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/settings_service.dart';
@@ -215,7 +214,7 @@ void main() {
     expect(sessionRow.correctCount, 4);
     expect(sessionRow.durationMs, greaterThan(0));
 
-    final scores = await (db.select(db.gameHighScores)).get();
+    final scores = await db.select(db.gameHighScores).get();
     expect(scores.single.gameMode, 'MATCH');
     expect(scores.single.score, result.score);
   });

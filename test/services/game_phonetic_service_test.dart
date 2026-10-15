@@ -18,7 +18,6 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/phonetics/quiz.dart';
-import 'package:lexiloop/domain/phonetics/selection.dart';
 import 'package:lexiloop/services/phonetic_service.dart';
 
 import '../domain/games/random_source.dart';
@@ -272,7 +271,7 @@ void main() {
     expect(sessionRow.correctCount, 1);
     expect(sessionRow.durationMs, greaterThan(0));
 
-    final scores = await (db.select(db.gameHighScores)).get();
+    final scores = await db.select(db.gameHighScores).get();
     expect(scores.single.gameMode, 'PHONETICS');
     expect(scores.single.score, result.score);
   });
@@ -290,7 +289,7 @@ void main() {
     );
     quiz = phoneticQuizNext(
       quiz,
-      TickPhoneticQuiz(phoneticDurationSeconds * 1000),
+      const TickPhoneticQuiz(phoneticDurationSeconds * 1000),
     );
     expect(quiz.core.isFinished, isTrue);
     await service.complete(session: session, state: quiz, now: now + 75000);

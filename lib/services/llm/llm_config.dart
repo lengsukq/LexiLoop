@@ -210,46 +210,54 @@ LlmAiConfig _ai(Object? raw) {
   if (raw is! Map) {
     return const LlmAiConfig(enabled: false, providerId: '', model: '');
   }
+  final limits = _aiLimits(raw);
   return LlmAiConfig(
     enabled: raw['enabled'] == true,
     providerId: _text(raw['providerId']),
     model: _text(raw['model']),
     retryProviderId: _text(raw['retryProviderId']),
     retryModel: _text(raw['retryModel']),
-    temperature: _clampDouble(
-      raw['temperature'],
-      defaultLlmTemperature,
-      minLlmTemperature,
-      maxLlmTemperature,
-    ),
-    maxOutputTokens: _clampInt(
-      raw['maxOutputTokens'],
-      defaultLlmMaxOutputTokens,
-      minLlmMaxOutputTokens,
-      maxLlmMaxOutputTokens,
-    ),
-    timeoutMs: _clampInt(
-      raw['timeoutMs'],
-      defaultLlmTimeoutMs,
-      minLlmTimeoutMs,
-      maxLlmTimeoutMs,
-    ),
     thinkingEnabled: raw['thinkingEnabled'] == true,
-    thinkingBudgetTokens: _clampInt(
-      raw['thinkingBudgetTokens'],
-      defaultThinkingBudgetTokens,
-      minThinkingBudgetTokens,
-      maxThinkingBudgetTokens,
-    ),
     reasoningEffort: _text(raw['reasoningEffort']),
-    retryCount: _clampInt(
-      raw['aiRetryCount'],
-      defaultAiRetryCount,
-      1,
-      maxAiRetryCount,
-    ),
+    temperature: limits.$1,
+    maxOutputTokens: limits.$2,
+    timeoutMs: limits.$3,
+    thinkingBudgetTokens: limits.$4,
+    retryCount: limits.$5,
   );
 }
+
+/// 数值字段的取值夹取。
+///
+/// 单独成函数是因为这里集中了 5 组「区间 + 默认值」，
+/// 混在结构解析里会让 `_ai` 越过 40 行上限。
+(double, int, int, int, int) _aiLimits(Map<dynamic, dynamic> raw) => (
+  _clampDouble(
+    raw['temperature'],
+    defaultLlmTemperature,
+    minLlmTemperature,
+    maxLlmTemperature,
+  ),
+  _clampInt(
+    raw['maxOutputTokens'],
+    defaultLlmMaxOutputTokens,
+    minLlmMaxOutputTokens,
+    maxLlmMaxOutputTokens,
+  ),
+  _clampInt(
+    raw['timeoutMs'],
+    defaultLlmTimeoutMs,
+    minLlmTimeoutMs,
+    maxLlmTimeoutMs,
+  ),
+  _clampInt(
+    raw['thinkingBudgetTokens'],
+    defaultThinkingBudgetTokens,
+    minThinkingBudgetTokens,
+    maxThinkingBudgetTokens,
+  ),
+  _clampInt(raw['aiRetryCount'], defaultAiRetryCount, 1, maxAiRetryCount),
+);
 
 /// 去掉基址的尾部斜杠，避免拼出 `//chat/completions`。
 String normalizeBaseUrl(String value) {

@@ -144,6 +144,16 @@ class YoudaoProvider implements DictionaryProvider {
           outcome,
     ];
     if (candidates.isEmpty) return _emptyOrThrow(attempts);
+    return _buildResult(candidates, attempts, primary, request);
+  }
+
+  /// 择优并合并两个端点的结果。
+  ProviderResult _buildResult(
+    List<_EndpointOutcome> candidates,
+    List<_EndpointAttempt> attempts,
+    _Endpoint primary,
+    ProviderRequest request,
+  ) {
     candidates.sort(
       (left, right) => _scoreContent(
         right.fields!,

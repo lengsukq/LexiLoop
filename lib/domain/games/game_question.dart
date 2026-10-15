@@ -8,6 +8,7 @@
 /// 交给调用方传入，服务层负责把池子填满，领域层只负责去重、打乱与截断。
 library;
 
+import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/question_payload.dart';
@@ -46,7 +47,7 @@ class GameChoices {
   final Map<String, String> definitions;
 
   /// 该题是否可用于作答（选项不足时判为不可用，界面据此提示）。
-  bool get isUsable => options.length >= 2;
+  bool get isUsable => options.length >= gameMinimumChoiceCount;
 }
 
 /// 一道完整的游戏题目。

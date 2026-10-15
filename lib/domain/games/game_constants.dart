@@ -27,6 +27,11 @@ const int gameMinimumItemCount = 4; // guard:allow-magic
 /// 选择题的选项数量（旧版 `CHOICE_COUNT`）。
 const int gameChoiceCount = 4; // guard:allow-magic
 
+/// 一道题至少要有几个选项才算可用。
+///
+/// 只有 1 个选项的题没有判别意义（选不选都是它），界面据此提示题库不足。
+const int gameMinimumChoiceCount = 2; // guard:allow-magic
+
 /// 候选池一次取用的行数上限（旧版 `CANDIDATE_QUERY_LIMIT`）。
 ///
 /// 旧版每次开局都跑一次全表排序再截断；这里是同一策略的显式上限，

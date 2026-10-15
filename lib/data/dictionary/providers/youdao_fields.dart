@@ -284,26 +284,40 @@ List<Map<String, Object?>> parseYoudaoPhrases(List<String> lines) {
       continue;
     }
     final next = index + 1 < lines.length ? lines[index + 1].trim() : '';
-    final inline = RegExp(r'^(.+?)([\u3400-\u9fff].+)$').firstMatch(line);
-    final phrase = (inline?.group(1) ?? line)
-        .replaceAll(RegExp(r'^[-•]\s*'), '')
-        .trim();
-    final translation =
-        (inline?.group(2) ??
-                (RegExp(r'^[\u3400-\u9fff]').hasMatch(next) ? next : ''))
-            .replaceAll(RegExp(r'^[；;，,、\s]+'), '')
-            .trim();
-    final consumedNext = inline?.group(2) == null && translation.isNotEmpty;
-    if (_acceptsPhrase(phrase, translation)) {
-      result.add(<String, Object?>{
-        'phrase': phrase,
-        'translation': translation.isEmpty ? null : translation,
-        'source': source,
-      });
-    }
-    index += consumedNext ? 2 : 1;
+    final parsed = _parsePhraseLine(line, next, source);
+    if (parsed.entry != null) result.add(parsed.entry!);
+    index += parsed.consumedNext ? 2 : 1;
   }
   return result;
+}
+
+/// 单行短语解析结果。
+class _PhraseLine {
+  const new(this.entry, {required this.consumedNext});
+
+  final Map<String, Object?>? entry;
+  final bool consumedNext;
+}
+
+_PhraseLine _parsePhraseLine(String line, String next, String source) {
+  final inline = RegExp(r'^(.+?)([\u3400-\u9fff].+)$').firstMatch(line);
+  final phrase = (inline?.group(1) ?? line)
+      .replaceAll(RegExp(r'^[-•]\s*'), '')
+      .trim();
+  final translation =
+      (inline?.group(2) ??
+              (RegExp(r'^[\u3400-\u9fff]').hasMatch(next) ? next : ''))
+          .replaceAll(RegExp(r'^[；;，,、\s]+'), '')
+          .trim();
+  final consumedNext = inline?.group(2) == null && translation.isNotEmpty;
+  if (!_acceptsPhrase(phrase, translation)) {
+    return _PhraseLine(null, consumedNext: consumedNext);
+  }
+  return _PhraseLine(<String, Object?>{
+    'phrase': phrase,
+    'translation': translation.isEmpty ? null : translation,
+    'source': source,
+  }, consumedNext: consumedNext);
 }
 
 bool _acceptsPhrase(String phrase, String translation) {
@@ -570,27 +584,34 @@ List<Map<String, Object?>> parseYoudaoWordFamilyFromHtml(String html) {
       currentPos = pos;
       continue;
     }
-    if (!inner.contains('<a')) continue;
-    final anchor = RegExp('<a[^>]*>([^<]+)</a>').firstMatch(inner);
-    final word = anchor == null
-        ? ''
-        : decodeHtmlEntities(anchor.group(1)!.trim());
-    if (!RegExp(r"^[a-zA-Z][a-zA-Z'-]*$").hasMatch(word)) continue;
-    if (!seen.add('${word.toLowerCase()}|${currentPos ?? ''}')) continue;
-    final tail = inner.substring(anchor!.end);
-    final translation = decodeHtmlEntities(stripHtmlTags(tail))
-        .replaceAll(RegExp(r'^[；;，,、\s]+'), '')
-        .trim();
-    result.add(<String, Object?>{
-      'word': word,
-      'translation': translation.isEmpty ? null : translation,
-      'partOfSpeech': currentPos,
-      'relation': 'WORD_FAMILY',
-      'source': youdaoWordFamilySource,
-      'difference': null,
-    });
+    final entry = _wordFamilyEntry(inner, currentPos);
+    if (entry == null) continue;
+    final key = '${entry['word']}'.toLowerCase();
+    if (!seen.add('$key|${currentPos ?? ''}')) continue;
+    result.add(entry);
   }
   return result;
+}
+
+/// 解析同根词区块里的一段 `<p class="wordGroup">`。
+Map<String, Object?>? _wordFamilyEntry(String inner, String? currentPos) {
+  if (!inner.contains('<a')) return null;
+  final anchor = RegExp('<a[^>]*>([^<]+)</a>').firstMatch(inner);
+  final word = anchor == null
+      ? ''
+      : decodeHtmlEntities(anchor.group(1)!.trim());
+  if (!RegExp(r"^[a-zA-Z][a-zA-Z'-]*$").hasMatch(word)) return null;
+  final translation = decodeHtmlEntities(
+    stripHtmlTags(inner.substring(anchor!.end)),
+  ).replaceAll(RegExp(r'^[；;，,、\s]+'), '').trim();
+  return <String, Object?>{
+    'word': word,
+    'translation': translation.isEmpty ? null : translation,
+    'partOfSpeech': currentPos,
+    'relation': 'WORD_FAMILY',
+    'source': youdaoWordFamilySource,
+    'difference': null,
+  };
 }
 
 String? _posFromLine(String text) {

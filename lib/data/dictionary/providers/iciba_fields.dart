@@ -253,6 +253,19 @@ List<Map<String, Object?>> parseIcibaForms(Map<String, Object?> info) {
 List<Map<String, Object?>> parseIcibaExamples(Map<String, Object?> info) {
   final result = <Map<String, Object?>>[];
   final seen = <String>{};
+  _appendPrimaryExamples(result, seen, info);
+  _appendSecondaryExamples(result, seen, info);
+  return result.length > _maxIcibaExamples
+      ? result.sublist(0, _maxIcibaExamples)
+      : result;
+}
+
+/// 简明 / 详细 / 英英释义里的例句。
+void _appendPrimaryExamples(
+  List<Map<String, Object?>> result,
+  Set<String> seen,
+  Map<String, Object?> info,
+) {
   _appendExamples(
     result,
     seen,
@@ -269,6 +282,14 @@ List<Map<String, Object?>> parseIcibaExamples(Map<String, Object?> info) {
     sentenceKey: 'sentence',
     translationKey: null,
   );
+}
+
+/// 新例句 / 柯林斯例句 / 短语例句。
+void _appendSecondaryExamples(
+  List<Map<String, Object?>> result,
+  Set<String> seen,
+  Map<String, Object?> info,
+) {
   for (final block in _list(info['new_sentence'])) {
     _appendSentencePairs(
       result,
@@ -300,9 +321,6 @@ List<Map<String, Object?>> parseIcibaExamples(Map<String, Object?> info) {
       );
     }
   }
-  return result.length > _maxIcibaExamples
-      ? result.sublist(0, _maxIcibaExamples)
-      : result;
 }
 
 /// 例句数量上限——爱词霸会返回上百条，全部落库没有意义。

@@ -2343,6 +2343,9 @@ const List<AccentDiff> accentDiffs = <AccentDiff>[
 ];
 
 /// 学习路径（旧版 `LEARNING_PATH`）：7 步，从「音标是什么」到「回到词中练」。
+///
+/// `step` 的序号是数据本身（1–7），逐行用 `// guard:allow-magic` 豁免
+/// 魔法数字守卫——为 7 个序号各造一个常量只会让数据更难读。
 const List<LearningStep> learningPath = <LearningStep>[
   LearningStep(
     step: 1,
@@ -2355,7 +2358,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 2,
+    step: 2, // guard:allow-magic
     title: '元音打底：12 单元音',
     subtitle: 'Monophthongs',
     points: <String>[
@@ -2365,7 +2368,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 3,
+    step: 3, // guard:allow-magic
     title: '滑音：8 双元音',
     subtitle: 'Diphthongs',
     points: <String>[
@@ -2375,7 +2378,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 4,
+    step: 4, // guard:allow-magic
     title: '辅音：按发音方法分组',
     subtitle: 'Consonants',
     points: <String>[
@@ -2385,7 +2388,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 5,
+    step: 5, // guard:allow-magic
     title: '易混对比：最小对立',
     subtitle: 'Minimal Pairs',
     points: <String>[
@@ -2395,7 +2398,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 6,
+    step: 6, // guard:allow-magic
     title: '美英分流与拼写规律',
     subtitle: 'Accent & Spelling',
     points: <String>[
@@ -2405,7 +2408,7 @@ const List<LearningStep> learningPath = <LearningStep>[
     ],
   ),
   LearningStep(
-    step: 7,
+    step: 7, // guard:allow-magic
     title: '回到词中练',
     subtitle: 'Practice in Words',
     points: <String>[

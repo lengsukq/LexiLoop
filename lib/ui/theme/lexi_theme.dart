@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 构建 LexiLoop 的浅色与深色主题。
@@ -35,6 +36,13 @@ abstract final class LexiTheme {
       splashFactory: isDark
           ? InkSparkle.splashFactory
           : InkRipple.splashFactory,
+      // 键盘焦点与 hover 的底色。
+      //
+      // 桌面端（macOS）用户会大量用键盘，`focusColor` 是唯一的焦点提示；
+      // HIG 的 `focus-and-selection.md` 要求焦点必须清晰可见且不依赖颜色
+      // 单独表意，所以这里给的是 accent 的淡底 + 组件自身的 focus ring。
+      focusColor: colors.accent.withValues(alpha: LexiTint.tint),
+      hoverColor: colors.label.withValues(alpha: LexiTint.group),
       dividerTheme: DividerThemeData(
         color: colors.separator,
         thickness: 1,
@@ -205,35 +213,34 @@ abstract final class LexiTheme {
     );
   }
 
+  /// 把 Material 的 `TextTheme` 槽位映射到 [LexiType] 的九档。
+  ///
+  /// **为什么必须显式映射**：不写 `fontSize` 时，每个槽位会用 Material 自带的
+  /// 尺寸（labelSmall 11 / labelMedium 12 / bodySmall 12 / labelLarge 14 /
+  /// titleSmall 14 / titleMedium 16 / titleLarge 22 / headlineSmall 24 …）。
+  /// 于是「全应用只有 9 种字号」这句话在 `textTheme` 这一层就被推翻了——
+  /// 而 `fontSize` 守卫看不见这些尺寸，它们长在 Flutter 内部。
+  ///
+  /// 这里按**角色**对齐，不按尺寸硬凑：display 系列归 `hero`，headline 系列
+  /// 逐级落到 `display`/`page`/`title2`，title 系列落到 `title`，body 与
+  /// label 落到 `body`/`callout`/`footnote`/`caption`。
   static TextTheme _textTheme(LexiColors colors) {
     return TextTheme(
-      displayLarge: TextStyle(color: colors.label, fontWeight: FontWeight.w700),
-      displayMedium: TextStyle(
-        color: colors.label,
-        fontWeight: FontWeight.w700,
-      ),
-      displaySmall: TextStyle(color: colors.label, fontWeight: FontWeight.w700),
-      headlineLarge: TextStyle(
-        color: colors.label,
-        fontWeight: FontWeight.w700,
-      ),
-      headlineMedium: TextStyle(
-        color: colors.label,
-        fontWeight: FontWeight.w600,
-      ),
-      headlineSmall: TextStyle(
-        color: colors.label,
-        fontWeight: FontWeight.w600,
-      ),
-      titleLarge: TextStyle(color: colors.label, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: colors.label, fontWeight: FontWeight.w600),
-      titleSmall: TextStyle(color: colors.label, fontWeight: FontWeight.w600),
-      bodyLarge: TextStyle(color: colors.label),
-      bodyMedium: TextStyle(color: colors.label),
-      bodySmall: TextStyle(color: colors.secondaryLabel),
-      labelLarge: TextStyle(color: colors.label, fontWeight: FontWeight.w600),
-      labelMedium: TextStyle(color: colors.secondaryLabel),
-      labelSmall: TextStyle(color: colors.tertiaryLabel),
+      displayLarge: LexiType.hero.copyWith(color: colors.label),
+      displayMedium: LexiType.hero.copyWith(color: colors.label),
+      displaySmall: LexiType.hero.copyWith(color: colors.label),
+      headlineLarge: LexiType.display.copyWith(color: colors.label),
+      headlineMedium: LexiType.page.copyWith(color: colors.label),
+      headlineSmall: LexiType.title2.copyWith(color: colors.label),
+      titleLarge: LexiType.title2.copyWith(color: colors.label),
+      titleMedium: LexiType.title.copyWith(color: colors.label),
+      titleSmall: LexiType.callout.copyWith(color: colors.label),
+      bodyLarge: LexiType.callout.copyWith(color: colors.label),
+      bodyMedium: LexiType.body.copyWith(color: colors.label),
+      bodySmall: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+      labelLarge: LexiType.callout.copyWith(color: colors.label),
+      labelMedium: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+      labelSmall: LexiType.caption.copyWith(color: colors.tertiaryLabel),
     );
   }
 }

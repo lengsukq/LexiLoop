@@ -146,6 +146,57 @@ void main() {
         ),
       );
 
+  /// 写一行错词状态。
+  Future<void> insertWrongState(
+    int wordId, {
+    required bool active,
+    int wrongCount = 0,
+    int hardCount = 0,
+    int consecutiveCorrect = 0,
+    int? lastWrongAt,
+    int? lastCorrectAt,
+  }) => db
+      .into(db.wrongWordStates)
+      .insert(
+        WrongWordStatesCompanion.insert(
+          wordId: Value<int>(wordId),
+          active: Value<bool>(active),
+          wrongCount: Value<int>(wrongCount),
+          hardCount: Value<int>(hardCount),
+          consecutiveCorrect: Value<int>(consecutiveCorrect),
+          lastWrongAt: Value<int?>(lastWrongAt),
+          lastCorrectAt: Value<int?>(lastCorrectAt),
+          updatedAt: now,
+        ),
+      );
+
+  /// 写一条数据源调用记录。
+  Future<void> insertAttempt(
+    int wordId, {
+    required String providerId,
+    required ProviderAttemptStatus status,
+    int? createdAt,
+    int? durationMs,
+    String? fieldsReturnedJson,
+    String? metadataJson,
+    String? errorCode,
+    String? errorMessage,
+  }) => db
+      .into(db.providerAttempts)
+      .insert(
+        ProviderAttemptsCompanion.insert(
+          wordId: wordId,
+          providerId: providerId,
+          status: status,
+          durationMs: Value<int?>(durationMs),
+          fieldsReturnedJson: Value<String?>(fieldsReturnedJson),
+          metadataJson: Value<String?>(metadataJson),
+          errorCode: Value<String?>(errorCode),
+          errorMessage: Value<String?>(errorMessage),
+          createdAt: createdAt ?? now,
+        ),
+      );
+
   group('find', () {
     test('词条不存在时返回 null', () async {
       expect(await dao.find(9999), isNull);
@@ -299,6 +350,32 @@ void main() {
       expect(analysis.variations.single.label, '被动');
       expect(analysis.variations.single.text, 'It was taken off.');
     });
+
+    test('读回数据源时间与最后更新时间', () async {
+      final id = await insertWord(term: 'apple');
+
+      await (db.update(db.words)..where((row) => row.id.equals(id))).write(
+        const WordsCompanion(
+          sourceCreatedAt: Value<int>(1546300800000),
+          updatedAt: Value<int>(1772000000000),
+        ),
+      );
+
+      final detail = await dao.find(id);
+
+      expect(detail!.createdAt, now);
+      expect(detail.sourceCreatedAt, 1546300800000);
+      expect(detail.updatedAt, 1772000000000);
+    });
+
+    test('没有 source_created_at 时保持 null 而不是回落到 created_at', () async {
+      final id = await insertWord(term: 'apple');
+
+      final detail = await dao.find(id);
+
+      expect(detail!.sourceCreatedAt, isNull);
+      expect(detail.updatedAt, now);
+    });
   });
 
   group('learningSnapshot', () {
@@ -329,6 +406,245 @@ void main() {
       expect(snapshot.fsrsState, fsrsStateReview);
       expect(snapshot.totalReviews, 10);
       expect(snapshot.accuracy, closeTo(0.8, 0.0001));
+    });
+
+    test('没有 wrong_word_states 行时错词状态全为空', () async {
+      final id = await insertWord(term: 'apple');
+      await insertCard(id, dueAt: now);
+
+      final snapshot = await dao.learningSnapshot(id);
+
+      expect(snapshot.isUntouched, isTrue);
+      expect(snapshot.isWrongWord, isFalse);
+      expect(snapshot.wrongCount, 0);
+      expect(snapshot.lastWrongAt, isNull);
+    });
+
+    test('读回错误次数、困难次数与连续答对', () async {
+      final id = await insertWord(term: 'raise');
+      await insertWrongState(
+        id,
+        active: true,
+        wrongCount: 3,
+        hardCount: 2,
+        lastWrongAt: now - hourMs,
+      );
+
+      final snapshot = await dao.learningSnapshot(id);
+
+      expect(snapshot.isUntouched, isFalse);
+      expect(snapshot.isWrongWord, isTrue);
+      expect(snapshot.wrongCount, 3);
+      expect(snapshot.hardCount, 2);
+      expect(snapshot.consecutiveCorrect, 0);
+      expect(snapshot.lastWrongAt, now - hourMs);
+    });
+
+    test('已解除的错词仍保留历史错误次数', () async {
+      final id = await insertWord(term: 'raise');
+      await insertWrongState(
+        id,
+        active: false,
+        wrongCount: 4,
+        consecutiveCorrect: 3,
+        lastCorrectAt: now,
+      );
+
+      final snapshot = await dao.learningSnapshot(id);
+
+      expect(snapshot.isWrongWord, isFalse);
+      expect(snapshot.wrongCount, 4);
+      expect(snapshot.consecutiveCorrect, 3);
+    });
+  });
+
+  group('providerAttempts', () {
+    test('没有调用记录时返回空列表', () async {
+      final id = await insertWord(term: 'apple');
+
+      expect(await dao.providerAttempts(id), isEmpty);
+    });
+
+    test('读出卡片要渲染的每一个字段', () async {
+      final id = await insertWord(term: 'raise');
+      await insertAttempt(
+        id,
+        providerId: 'ai:opencode-zen:deepseek-v4-flash-free',
+        status: ProviderAttemptStatus.success,
+        durationMs: 2142,
+        fieldsReturnedJson: '["definitions","examples"]',
+        metadataJson: '{"model":"deepseek-v4","qualityScore":79}',
+      );
+
+      final attempt = (await dao.providerAttempts(id)).single;
+
+      expect(attempt.providerId, 'ai:opencode-zen:deepseek-v4-flash-free');
+      expect(attempt.status, ProviderAttemptStatus.success);
+      expect(attempt.qualityScore, 79);
+      expect(attempt.durationMs, 2142);
+      expect(attempt.fieldsReturned, <String>['definitions', 'examples']);
+      expect(attempt.errorMessage, isNull);
+      expect(attempt.createdAt, now);
+    });
+
+    test('失败记录带上错误码与错误说明', () async {
+      final id = await insertWord(term: 'raise');
+      await insertAttempt(
+        id,
+        providerId: 'youdao',
+        status: ProviderAttemptStatus.failed,
+        errorCode: 'PROVIDER_TRANSIENT_FAILURE',
+        errorMessage: '连接超时',
+      );
+
+      final attempt = (await dao.providerAttempts(id)).single;
+
+      expect(attempt.status, ProviderAttemptStatus.failed);
+      expect(attempt.errorCode, 'PROVIDER_TRANSIENT_FAILURE');
+      expect(attempt.errorMessage, '连接超时');
+      expect(attempt.qualityScore, isNull);
+    });
+
+    test('按时间倒序并受 limit 限制', () async {
+      final id = await insertWord(term: 'raise');
+      await insertAttempt(
+        id,
+        providerId: 'ecdict',
+        status: ProviderAttemptStatus.success,
+        createdAt: now - 2 * dayMs,
+      );
+      await insertAttempt(
+        id,
+        providerId: 'youdao',
+        status: ProviderAttemptStatus.success,
+        createdAt: now,
+      );
+      await insertAttempt(
+        id,
+        providerId: 'merriam-webster',
+        status: ProviderAttemptStatus.empty,
+        createdAt: now - dayMs,
+      );
+
+      final limited = await dao.providerAttempts(id, limit: 2);
+
+      expect(limited.map((one) => one.providerId), <String>[
+        'youdao',
+        'merriam-webster',
+      ]);
+    });
+
+    test('只返回该词条的记录', () async {
+      final first = await insertWord(term: 'apple');
+      final second = await insertWord(term: 'banana');
+      await insertAttempt(
+        first,
+        providerId: 'ecdict',
+        status: ProviderAttemptStatus.success,
+      );
+      await insertAttempt(
+        second,
+        providerId: 'youdao',
+        status: ProviderAttemptStatus.success,
+      );
+
+      final attempts = await dao.providerAttempts(second);
+
+      expect(attempts, hasLength(1));
+      expect(attempts.single.providerId, 'youdao');
+    });
+
+    test('未知状态退化为「无内容」而不是丢弃该行', () async {
+      final id = await insertWord(term: 'raise');
+      await db
+          .into(db.providerAttempts)
+          .insert(
+            ProviderAttemptsCompanion.insert(
+              wordId: id,
+              providerId: 'legacy-provider',
+              status: ProviderAttemptStatus.success,
+              createdAt: now,
+            ),
+          );
+      await db.customUpdate(
+        "UPDATE provider_attempts SET status = 'PARTIAL' WHERE word_id = ?",
+        variables: <Variable<Object>>[Variable<int>(id)],
+        updateKind: UpdateKind.update,
+      );
+
+      final attempt = (await dao.providerAttempts(id)).single;
+
+      expect(attempt.status, ProviderAttemptStatus.empty);
+    });
+  });
+
+  group('元数据补平', () {
+    /// 真实备份（`lexiloop-backup-20261014-222752.json`，word_id = 163，raise）
+    /// 的原始 JSON，原样贴进来：这些字段如果被解析层丢掉，界面就再也拿不回来，
+    /// 而合成 fixture 很容易「顺手」把字段名写对，掩盖真实的键名差异。
+    test('释义的 usageNote / senseId / register 逐字读回', () async {
+      final id = await insertWord(term: 'raise');
+      await insertContents(id, definitionsJson: _realDefinitionsJson);
+
+      final definitions = (await dao.find(id))!.definitions;
+
+      expect(definitions, hasLength(2));
+      expect(definitions.first.usageNote, contains('raising children'));
+      expect(definitions.first.senseId, 'raise_v_bring_up');
+      expect(definitions.first.register, 'NEUTRAL');
+      expect(definitions.last.usageNote, contains('formal discussions'));
+    });
+
+    test('例句的 difficulty / senseId 逐字读回', () async {
+      final id = await insertWord(term: 'raise');
+      await insertContents(id, examplesJson: _realExamplesJson);
+
+      final examples = (await dao.find(id))!.examples;
+
+      expect(examples, hasLength(2));
+      expect(examples.first.difficulty, 'EASY');
+      expect(examples.first.senseId, 'raise_v_lift');
+      expect(examples.first.translation, '她举手提问。');
+      expect(examples.last.difficulty, 'NORMAL');
+    });
+
+    test('关键表达的 meaning / note 与相似例句的 translation / focus 不丢', () async {
+      final id = await insertWord(term: 'raise');
+      await insertContents(id, sentenceAnalysisJson: _realSentenceAnalysisJson);
+
+      final analysis = (await dao.find(id))!.sentenceAnalysis;
+
+      final key = analysis.keyExpressions;
+      expect(key, hasLength(2));
+      expect(key.first.text, 'raise the flag');
+      expect(key.first.meaning, '升旗');
+      expect(key.first.note, 'Can be literal or symbolic.');
+
+      final similar = analysis.similarExamples;
+      expect(similar, hasLength(2));
+      expect(similar.first.text, 'She raised her voice to be heard.');
+      expect(similar.first.translation, '她提高嗓门以便被听到。');
+      expect(similar.first.focus, 'raise + voice');
+
+      expect(
+        analysis.variations.single.text,
+        'The flag was raised by the soldiers.',
+      );
+    });
+
+    test('详情页与删除接口对例句的可见集合判定一致', () async {
+      // 原始数组里混了「非对象」与「空句子」，界面只渲染后面三条；
+      // 删除接口必须按同一套规则换算下标，否则会删错条目。
+      const raw =
+          '[{"sentence":"a"},null,{"sentence":""},'
+          '{"sentence":"b"},{"sentence":"c"}]';
+
+      expect(parseDetailExamples(raw).map((one) => one.sentence), <String>[
+        'a',
+        'b',
+        'c',
+      ]);
+      expect(detailExamplePositions(raw), <int>[0, 3, 4]);
     });
   });
 
@@ -493,3 +809,69 @@ void main() {
     );
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 真实备份 fixture
+//
+// 三段 JSON 逐字摘自 `lexiloop-backup-20261014-222752.json`
+// 中 word_id = 163（raise）的 `word_contents` 行。
+//
+// **为什么要贴原文而不是手写一个「同形」的 fixture**：这些字段名
+// （`usageNote` / `senseId` / `register` / `focus`）来自旧版服务端，
+// 手写 fixture 时人很容易按直觉写成 `usage_note` / `sense_id`，
+// 测试照样绿，但真实备份照样解析不出来——那正是这个 fixture 要防的事。
+// ═══════════════════════════════════════════════════════════════
+
+/// 真实备份里的 `definitions_json`（前两条）。
+const String _realDefinitionsJson =
+    '[{"partOfSpeech":"verb", '
+    '"source":"ai:opencode-zen:deepseek-v4-flash-free", '
+    '"isUserEdited":false,"senseId":"raise_v_bring_up", '
+    '"register":"NEUTRAL", '
+    '"usageNote":"Used for raising children or animals; '
+    'often implies long-term care.", '
+    '"language":"en", '
+    '"text":"To take care of and educate a child until they are grown up; '
+    'to breed or keep animals."}, '
+    '{"partOfSpeech":"verb", '
+    '"source":"ai:opencode-zen:deepseek-v4-flash-free", '
+    '"isUserEdited":false,"senseId":"raise_v_mention", '
+    '"register":"NEUTRAL", '
+    '"usageNote":"Common in formal discussions, meetings, and debates.", '
+    '"language":"en", '
+    '"text":"To mention or bring up a subject, question, '
+    'or issue for discussion."}]';
+
+/// 真实备份里的 `examples_json`（前两条）。
+const String _realExamplesJson =
+    '[{"sentence":"She raised her hand to ask a question.", '
+    '"translation":"她举手提问。", '
+    '"source":"ai:opencode-zen:deepseek-v4-flash-free", '
+    '"isUserAdded":false,"senseId":"raise_v_lift","difficulty":"EASY"}, '
+    '{"sentence":"He raised the heavy box onto the shelf.", '
+    '"translation":"他把沉重的箱子举到架子上。", '
+    '"source":"ai:opencode-zen:deepseek-v4-flash-free", '
+    '"isUserAdded":false,"senseId":"raise_v_lift",'
+    '"difficulty":"NORMAL"}]';
+
+/// 真实备份里的 `sentence_analysis_json`（截取三个分组）。
+const String _realSentenceAnalysisJson = '''
+{
+  "grammarPattern": "Subject + raise + Object",
+  "keyExpressions": [
+    {"expression": "raise the flag", "meaning": "升旗",
+     "note": "Can be literal or symbolic."},
+    {"expression": "raise a toast", "meaning": "举杯祝酒",
+     "note": "Used when proposing a drink in honour of someone."}
+  ],
+  "similarExamples": [
+    {"sentence": "She raised her voice to be heard.",
+     "translation": "她提高嗓门以便被听到。", "focus": "raise + voice"},
+    {"sentence": "They raised money for charity.",
+     "translation": "他们为慈善筹款。", "focus": "raise + money"}
+  ],
+  "variations": [
+    {"sentence": "The flag was raised by the soldiers.",
+     "translation": "士兵们升起了旗帜。"}
+  ]
+}''';

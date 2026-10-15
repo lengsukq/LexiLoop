@@ -6,62 +6,90 @@ import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/backup_service.dart';
 
-/// 每页条数。
-const int wordPageSize = 40;
+/// 手动添加词条页的路径。
+///
+/// 与 `appDestinations` 里的 `/add` 对应；集中具名是为了让「入口按钮」
+/// 与「路由断言」写的是同一个字符串。
+const String addWordPath = '/add';
+
+/// CSV 导入页的路径（与 `app/router.dart` 的顶层路由同名）。
+const String csvImportPath = '/import';
+
+/// 统计页的路径。
+const String statisticsPath = '/statistics';
 
 /// 备份导入服务。
 final Provider<BackupService> backupServiceProvider = Provider<BackupService>(
   (ref) => BackupService(BackupImporter(ref.watch(databaseProvider))),
 );
 
-/// 当前列表的查询条件。
+/// 关键词、筛选、排序与分页的控制器。
+///
+/// **所有会改变结果集的入口都走 [_apply]**，由它统一把页码复位到第一页。
+/// 漏掉一次的后果很具体：用户在第 5 页改了筛选，结果只剩 2 条，
+/// 分页条会显示「第 5 / 1 页」而列表是空的，看起来像应用坏了。
 class WordQueryNotifier extends Notifier<WordQuery> {
   @override
   WordQuery build() => const WordQuery();
 
-  /// 更新关键词搜索，并回到第一页。
-  void setSearch(String search) {
-    state = WordQuery(
-      search: search,
-      masteryLevel: state.masteryLevel,
-      initializationStatus: state.initializationStatus,
-      limit: state.limit,
-    );
-  }
+  /// 更新关键词搜索。
+  void setSearch(String search) => _apply(state.copyWith(search: search));
 
   /// 切换掌握等级筛选（传 `null` 表示不筛选）。
-  void setMasteryLevel(MasteryLevel? level) {
-    state = WordQuery(
-      search: state.search,
-      masteryLevel: level,
-      initializationStatus: state.initializationStatus,
-      limit: state.limit,
-    );
-  }
+  void setMasteryLevel(MasteryLevel? level) => _apply(
+    state.copyWith(masteryLevel: level, clearMasteryLevel: level == null),
+  );
 
   /// 切换初始化状态筛选（传 `null` 表示不筛选）。
-  void setInitializationStatus(InitializationStatus? status) {
-    state = WordQuery(
-      search: state.search,
-      masteryLevel: state.masteryLevel,
+  void setInitializationStatus(InitializationStatus? status) => _apply(
+    state.copyWith(
       initializationStatus: status,
-      limit: state.limit,
-    );
+      clearInitializationStatus: status == null,
+    ),
+  );
+
+  /// 只看 / 不看活跃错词。
+  void setWrongOnly({required bool enabled}) =>
+      _apply(state.copyWith(wrongOnly: enabled));
+
+  /// 只看 / 不看到期复习。
+  void setDueOnly({required bool enabled}) =>
+      _apply(state.copyWith(dueOnly: enabled));
+
+  /// 只看 / 不看已暂停的词条。
+  void setSuspendedOnly({required bool enabled}) =>
+      _apply(state.copyWith(suspendedOnly: enabled));
+
+  /// 切换排序方式。
+  void setSort(WordSort sort) => _apply(state.copyWith(sort: sort));
+
+  /// 清除全部筛选并恢复默认排序（保留关键词）。
+  ///
+  /// 保留关键词是有意的：用户在窄屏筛选面板里点「清除筛选」，
+  /// 期望的是「筛选条件没生效」，而不是把刚打上去的搜索词也抹掉。
+  void clearFilters() => _apply(
+    state.copyWith(
+      clearMasteryLevel: true,
+      clearInitializationStatus: true,
+      wrongOnly: false,
+      dueOnly: false,
+      suspendedOnly: false,
+      sort: WordSort.createdAt,
+    ),
+  );
+
+  /// 翻到指定页（1 起）。
+  void goToPage(int page) {
+    if (page < 1) return;
+    state = state.copyWith(offset: (page - 1) * state.limit);
   }
 
-  /// 翻到指定页（0 起）。
-  void goToPage(int page) {
-    state = WordQuery(
-      search: state.search,
-      masteryLevel: state.masteryLevel,
-      initializationStatus: state.initializationStatus,
-      limit: state.limit,
-      offset: page * state.limit,
-    );
-  }
+  /// 改完筛选条件后把页码复位。
+  void _apply(WordQuery next) => state = next.copyWith(offset: 0);
 }
 
 /// 查询条件提供者。
@@ -86,3 +114,39 @@ final FutureProvider<Map<MasteryLevel, int>> masterySummaryProvider =
     FutureProvider<Map<MasteryLevel, int>>(
       (ref) => ref.watch(wordDaoProvider).countByMastery(),
     );
+
+/// 词库整体的掌握概览，供页首那条进度带使用。
+class MasteryOverview {
+  /// 以总数与已掌握数构造。
+  const new({required this.total, required this.mastered});
+
+  /// 词条总数。
+  final int total;
+
+  /// 已掌握的词条数。
+  final int mastered;
+
+  /// 还有多少个词条待继续学习。
+  int get remaining => total - mastered < 0 ? 0 : total - mastered;
+
+  /// 掌握百分比（0–100）。
+  int get percent => total == 0 ? 0 : (mastered * percentScale / total).round();
+}
+
+/// 页首「掌握概览」的数值。
+///
+/// **与当前筛选无关**：概览回答的是「我这个词库学得怎么样」，
+/// 跟着搜索词一起缩水会让进度条忽上忽下，读起来像数据出错。
+///
+/// **为什么不用 `DashboardOverview`**：那份概览由 `word_detail_dao.dart`
+/// 提供，而掌握分布本来就有一条现成的聚合查询；多引一个跨模块依赖只会让
+/// 两边算出两个口径不同的「已掌握」。这里的折算与旧版 `/api/dashboard`
+/// 的 `masteredWords` 同口径：总数是各等级之和，已掌握取 `MASTERED`。
+final FutureProvider<MasteryOverview> masteryOverviewProvider =
+    FutureProvider<MasteryOverview>((ref) async {
+      final summary = await ref.watch(masterySummaryProvider.future);
+      return MasteryOverview(
+        total: summary.values.fold(0, (sum, count) => sum + count),
+        mastered: summary[MasteryLevel.mastered] ?? 0,
+      );
+    });

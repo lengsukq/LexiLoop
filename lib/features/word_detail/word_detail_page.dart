@@ -7,6 +7,7 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/cards/definitions_card.dart';
 import 'package:lexiloop/features/word_detail/cards/examples_card.dart';
 import 'package:lexiloop/features/word_detail/cards/forms_card.dart';
+import 'package:lexiloop/features/word_detail/cards/initialization_quality_card.dart';
 import 'package:lexiloop/features/word_detail/cards/learning_snapshot_card.dart';
 import 'package:lexiloop/features/word_detail/cards/mnemonic_card.dart';
 import 'package:lexiloop/features/word_detail/cards/morphology_card.dart';
@@ -76,8 +77,13 @@ class _WordDetailBody extends StatelessWidget {
     if (!detail.summary.isEmpty || detail.tags.isNotEmpty)
       SummaryCard(summary: detail.summary, tags: detail.tags),
     if (detail.definitions.isNotEmpty)
-      DefinitionsCard(definitions: detail.definitions),
-    if (detail.examples.isNotEmpty) ExamplesCard(examples: detail.examples),
+      DefinitionsCard(wordId: detail.id, definitions: detail.definitions),
+    if (detail.examples.isNotEmpty)
+      ExamplesCard(
+        wordId: detail.id,
+        sourceLanguage: detail.sourceLanguage,
+        examples: detail.examples,
+      ),
     if (detail.phrases.isNotEmpty) PhrasesCard(phrases: detail.phrases),
     if (detail.forms.isNotEmpty) FormsCard(forms: detail.forms),
     if (detail.synonyms.isNotEmpty)
@@ -106,11 +112,14 @@ class _WordDetailBody extends StatelessWidget {
       ),
     if (detail.roots.isNotEmpty || detail.affixes.isNotEmpty)
       MorphologyCard(roots: detail.roots, affixes: detail.affixes),
-    if (!detail.learning.isEmpty || !detail.sentenceAnalysis.isEmpty)
-      MnemonicCard(
-        learning: detail.learning,
-        analysis: detail.sentenceAnalysis,
-      ),
+    // 助记卡**始终出现**：它同时是「生成助记」的入口，早期初始化完成的
+    // 词条 `learning` 与 `sentenceAnalysis` 都是空的，卡片跟着消失的话，
+    // 用户连去生成助记的地方都没有。
+    MnemonicCard(
+      wordId: detail.id,
+      learning: detail.learning,
+      analysis: detail.sentenceAnalysis,
+    ),
     if (detail.hasNoContent) const _NoContentCard(),
   ];
 
@@ -118,6 +127,7 @@ class _WordDetailBody extends StatelessWidget {
   List<Widget> _activitySections() => <Widget>[
     LearningSnapshotCard(wordId: detail.id),
     ReviewHistoryCard(wordId: detail.id),
+    InitializationQualityCard(wordId: detail.id),
     NoteCard(wordId: detail.id, initialNote: detail.userNote),
   ];
 

@@ -18,6 +18,9 @@ class DefinitionValue {
     this.partOfSpeech,
     this.source,
     this.isUserEdited = false,
+    this.senseId,
+    this.register,
+    this.usageNote,
   });
 
   /// 释义所用语言代码。
@@ -34,6 +37,20 @@ class DefinitionValue {
 
   /// 是否被用户手工编辑过。
   final bool isUserEdited;
+
+  /// 数据源给出的义项编号（如 `raise_v_bring_up`）。
+  ///
+  /// 同一个词的多条释义靠它区分义项；例句的 `senseId` 指向同一条，
+  /// 两者一起才能判断「这条例句在演示哪个义项」。
+  final String? senseId;
+
+  /// 语体标注（如 `NEUTRAL` / `FORMAL`）。
+  final String? register;
+
+  /// 用法说明（真实备份里约 200 条释义带此字段）。
+  ///
+  /// 只支持 [language] 与 [text] 的数据源不产出它，因此可空。
+  final String? usageNote;
 }
 
 /// 解析 `definitions_json`。
@@ -58,6 +75,9 @@ List<DefinitionValue> parseDefinitionsJson(String? raw) {
     final language = item['language'];
     final partOfSpeech = item['partOfSpeech'];
     final source = item['source'];
+    final senseId = item['senseId'];
+    final register = item['register'];
+    final usageNote = item['usageNote'];
     result.add(
       DefinitionValue(
         language: language is String ? language : '',
@@ -65,6 +85,9 @@ List<DefinitionValue> parseDefinitionsJson(String? raw) {
         partOfSpeech: partOfSpeech is String ? partOfSpeech : null,
         source: source is String ? source : null,
         isUserEdited: item['isUserEdited'] == true,
+        senseId: senseId is String ? senseId : null,
+        register: register is String ? register : null,
+        usageNote: usageNote is String ? usageNote : null,
       ),
     );
   }

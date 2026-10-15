@@ -5,6 +5,8 @@
 /// 缓存，构造两份就会出现「改了设置另一份看不到」）。
 library;
 
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/daos/review_dao.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
@@ -13,6 +15,11 @@ import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/services/audio/audio_cache.dart';
+import 'package:lexiloop/services/audio/audio_downloader.dart';
+import 'package:lexiloop/services/audio/audio_player_port.dart';
+import 'package:lexiloop/services/audio/just_audio_engine.dart';
+import 'package:lexiloop/services/audio/word_speaker.dart';
 import 'package:lexiloop/services/dictionary/lookup_service.dart';
 import 'package:lexiloop/services/initialization/initialization_maintenance.dart';
 import 'package:lexiloop/services/initialization/initialization_queries.dart';
@@ -73,6 +80,46 @@ final Provider<StudyDao> studyDaoProvider = Provider<StudyDao>(
 final Provider<TtsService> ttsServiceProvider = Provider<TtsService>(
   (ref) => TtsService(FlutterTtsEngine()),
 );
+
+/// 真人录音的下载器。
+///
+/// 界面层不要直接构造，测试里用 `overrideWithValue` 换成假下载器，
+/// 避免在测试进程里真的发网络请求。
+final Provider<AudioDownloadPort> audioDownloaderProvider =
+    Provider<AudioDownloadPort>((ref) => DioAudioDownloader());
+
+/// 真人录音的内存 LRU 缓存（必须单例）。
+///
+/// 缓存的价值全在「跨调用复用」上：构造多份等于每次播放都重新下载，
+/// 那就等于没有缓存。
+final Provider<AudioCache> audioCacheProvider = Provider<AudioCache>(
+  (ref) => AudioCache(ref.watch(audioDownloaderProvider)),
+);
+
+/// 音频播放器。
+///
+/// [WordSpeaker] 通过它构造，但**不拥有**它的生命周期：谁构造谁释放。
+/// 测试里覆盖这一个 provider 即可让整套发音链路不碰平台通道。
+final Provider<AudioPlayerPort> audioPlayerPortProvider =
+    Provider<AudioPlayerPort>((ref) {
+      final engine = JustAudioEngine();
+      ref.onDispose(() => unawaited(engine.dispose()));
+      return engine;
+    });
+
+/// 词条发音：真人录音优先，系统朗读兜底。
+///
+/// 与 [ttsServiceProvider] 一样，测试应覆盖本 provider（或它的依赖
+/// [audioCacheProvider] 与 [ttsServiceProvider]）而不是打到平台通道。
+final Provider<WordSpeaker> wordSpeakerProvider = Provider<WordSpeaker>((ref) {
+  final speaker = WordSpeaker(
+    ref.watch(audioPlayerPortProvider),
+    ref.watch(audioCacheProvider),
+    ref.watch(ttsServiceProvider),
+  );
+  ref.onDispose(() => unawaited(speaker.stop()));
+  return speaker;
+});
 
 /// 当前应用设置。
 final FutureProvider<AppSettings> appSettingsProvider =

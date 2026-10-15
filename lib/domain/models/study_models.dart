@@ -225,7 +225,12 @@ class LetterTile {
 /// 一条发音信息。
 class PronunciationView {
   /// 以各字段构造。
-  const new({required this.accent, required this.phonetic, this.audioUrl});
+  const new({
+    required this.accent,
+    required this.phonetic,
+    this.audioUrl,
+    this.source,
+  });
 
   /// 口音。
   final Accent accent;
@@ -235,18 +240,39 @@ class PronunciationView {
 
   /// 音频地址（词典提供时）。
   final String? audioUrl;
+
+  /// 提供这条发音的数据源标识（如 `youdao`、`merriam-webster`）。
+  ///
+  /// **为什么必须有它**：旧版详情页判断「是否优先播放有道真人发音」靠的是
+  /// `pronunciations[].source === "youdao"`，若这一列不落到视图模型上，
+  /// 新版就只能从 URL 形状反推来源——那既不可靠也不可读。
+  final String? source;
 }
 
 /// 一条例句。
 class ExampleView {
   /// 以各字段构造。
-  const new({required this.sentence, this.translation});
+  const new({
+    required this.sentence,
+    this.translation,
+    this.senseId,
+    this.difficulty,
+  });
 
   /// 例句原文。
   final String sentence;
 
   /// 例句翻译。
   final String? translation;
+
+  /// 本例句演示的义项编号，指向 `DefinitionValue.senseId`。
+  final String? senseId;
+
+  /// 难度分级（真实备份里取值 `EASY` / `NORMAL` / `ADVANCED`）。
+  ///
+  /// 只有 AI 渠道的例句带这个字段，词典例句为 `null`；按原始文本透传，
+  /// 不在本层做映射——未知取值不该被静默折叠成同一档。
+  final String? difficulty;
 }
 
 /// 学习界面需要的词条视图。

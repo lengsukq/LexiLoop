@@ -137,6 +137,7 @@ List<PronunciationView> parsePronunciations(String? raw) {
         accent: item['accent'] == Accent.uk.wire ? Accent.uk : Accent.us,
         phonetic: phonetic,
         audioUrl: fieldOf(item, 'audioUrl'),
+        source: fieldOf(item, 'source'),
       ),
     );
   }

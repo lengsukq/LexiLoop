@@ -795,6 +795,18 @@ const int statsMinutesPerHour = 60;
 /// 词条详情页「复习历史」展示的条数上限。
 const int reviewHistoryLimit = 20;
 
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 词库列表页（对应旧版 app/(main)/words/page.tsx）
+// ═══════════════════════════════════════════════════════════════
+
+/// 词库列表每页条数。
+///
+/// 与旧版 `page.tsx` 请求里的 `limit: "40"` 一致。放在这里而不是
+/// `features/words`：DAO 的 `WordQuery` 默认值与界面上的分页条是同一个数，
+/// 分成两处迟早会对不上（旧版就是请求与分页控件各写一份 40）。
+const int wordListPageSize = 40;
+
 // 界面交互（对应旧版 lib/config.ts 与各组件内联值）
 // ═══════════════════════════════════════════════════════════════
 
@@ -839,3 +851,29 @@ const String defaultAccent = 'US';
 
 /// 默认语速。
 const double defaultSpeechRate = 1;
+
+// ═══════════════════════════════════════════════════════════════
+// 词条详情页的写操作（对应旧版 modules/words/mutations.ts）
+// ═══════════════════════════════════════════════════════════════
+
+/// 用户手工撰写的那条释义的 `definitions_json[].source`。
+///
+/// **必须与旧版逐字符一致**：`updateManualDefinition` 按「来源 + 已编辑」
+/// 两个标记识别历史手工释义并整体替换，改字面量会让旧备份里的手工释义
+/// 永远删不掉，从而每次保存都多一条。
+const String userAuthoredDefinitionSource = 'user';
+
+/// 手工释义的长度上限（字符）。
+///
+/// 与旧版 `modules/words/mutations.ts` 的 `manualDefinitionSchema` 一致：
+/// 释义是要进选择题选项的，超长条目既撑破卡片也会让出题失去意义。
+const int manualDefinitionMaxLength = 2000;
+
+/// 手工释义的词性标注长度上限（字符）。
+const int manualDefinitionPartOfSpeechMaxLength = 50;
+
+/// 「初始化质量」卡展示的数据源调用记录条数上限。
+///
+/// 一个词条在多次重试下可能积累上百条调用记录，卡片是排查工具而不是流水账；
+/// 默认按时间倒序取最近这些条，够定位「是哪一次调用出的问题」。
+const int providerAttemptCardLimit = 50;

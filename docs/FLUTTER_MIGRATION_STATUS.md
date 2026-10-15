@@ -72,6 +72,7 @@ flutter build macos --debug
 
 | 模块 | 位置 | 要点 |
 |---|---|---|
+| 初始化后台维护 | `lib/services/initialization/{job_runner,initialization_maintenance}.dart`、`lib/app/maintenance_bootstrap.dart` | 启动回收 RUNNING、失败回收入队、每 10 分钟推进一批、重入保护；队列页另有「立即处理一批」 |
 | 学习会话页 | `lib/features/study/**` | 8 种题型的作答控件、四档自评即提交、反馈与总结；按职责拆成 13 个组件 |
 | 词条详情页 | `lib/features/word_detail/**` | 12 张卡片（释义/例句/短语/变形/同反义/词族/易混/词根词缀/学习情况/复习历史/笔记/助记） |
 | 仪表盘 | `lib/features/dashboard/**` | 今日计划、统计、到期与错词提醒、平台能力 |
@@ -79,7 +80,7 @@ flutter build macos --debug
 | 手动添加词条 | `lib/features/add/**` | 离线可用；不建服务端预览表 |
 | CSV 导入 | `lib/data/import/**`、`lib/services/csv_import_service.dart`、`lib/features/import/**` | EasyDict 列名别名、三种导入模式、批次撤销 |
 | 设置页 | `lib/features/settings/**` | 6 个 tab，即时保存 |
-| 朗读 | `lib/services/tts_service.dart` | 引擎抽象可测；学习页与详情页的朗读按钮待接 |
+| 朗读 | `lib/services/tts_service.dart` | 引擎抽象可测；学习页与详情页的朗读按钮已接 |
 | 词条写入 | `lib/services/word_edit_service.dart` | 创建/更新/暂停/笔记/删除/入队初始化 |
 
 ### 2.6 迁移中修正的旧版缺陷
@@ -118,8 +119,8 @@ flutter build macos --debug
 
 | 工作流 | 范围 |
 |---|---|
-| 词典 provider + 初始化队列 + LLM | `lib/data/dictionary/**`、`lib/services/dictionary|llm|initialization/**` |
-| 小游戏 + 配对 + 音标训练 | `lib/features/games|match|phonetics/**`、`lib/domain/games|phonetics/**` |
+| 词典 provider + LLM 的真实网络联调 | `lib/data/dictionary/**`、`lib/services/dictionary|llm/**`（解析器只有 fixture 级单测） |
+| 设置页模型选择对话框 | `lib/features/settings/**` |
 
 ---
 
@@ -127,9 +128,10 @@ flutter build macos --debug
 
 | 阶段 | 内容 |
 |---|---|
-| P4 | 初始化队列界面（`/initialize`）、每日 AI 建议接入界面、模型选择对话框 |
-| P6 | 学习页与详情页的朗读按钮接入 `TtsService`、液态玻璃打磨、双端 TTS 实测校准、打包与签名 |
+| P4 | 模型选择对话框 |
+| P6 | 液态玻璃打磨、双端 TTS 实测校准、打包与签名 |
 | — | Android 端实机验证（由用户负责；`flutter doctor --android-licenses` 尚未接受） |
+| — | 词典 provider 的真实网络联调（provider 已可达，解析器只验证过 fixture） |
 
 ---
 
@@ -141,3 +143,4 @@ flutter build macos --debug
 | 备份恢复 | 服务端 API | 本地文件选择 + 直接写库 | 无服务端 |
 | 音频缓存 | 服务端内存 LRU（200 条） | 未实现（macOS 不支持 `synthesizeToFile`） | 双端能力不对等 |
 | 幂等键 | 服务端唯一索引 | 本地唯一索引（同样强制） | 离线重放更需要 |
+| 初始化任务驱动 | 常驻服务端进程 + 定时任务 | 客户端 `Timer.periodic`（10 分钟）+ 队列页手动触发 | 没有服务端进程 |

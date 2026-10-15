@@ -15,9 +15,30 @@ import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/review_dao.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/data/dictionary/content.dart';
+import 'package:lexiloop/data/dictionary/content_normalize.dart';
+import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
+import 'package:lexiloop/services/dictionary/merge.dart';
+
+/// 界面下标定位到的例句原始位置。
+///
+/// 详情页渲染的是**过滤后**的例句列表（丢弃非对象与空句子），
+/// 而 `examples_json` 是未经过滤的数组。两个下标不一定相等，
+/// 所以删除与翻译都必须先经由本结构换算，不能直接拿界面下标去数组里取。
+class ExampleLocation {
+  /// 以原始元素列表与下标构造。
+  const new({required this.entries, required this.position});
+
+  /// `examples_json` 解码后的原始数组。
+  final List<Object?> entries;
+
+  /// 目标例句在该数组中的真实下标。
+  final int position;
+}
 
 /// 一条例句草稿。
 class WordExampleDraft {
@@ -296,6 +317,259 @@ WHERE word_id = ? AND status = ?''',
         updatedAt: Value<int>(now),
       ),
     );
+  }
+
+  /// 写入或替换用户手工撰写的那条释义。
+  ///
+  /// 对应旧版 `modules/words/mutations.ts` 的 `updateManualDefinition`：
+  /// 先摘掉全部历史手工释义，再把新的一条**前置**——用户刚写下的那句
+  /// 就是他现在最想看到的那句，排在词典释义后面等于让他先翻十几行。
+  ///
+  /// 识别「历史手工释义」用 [isUserProtectedItem]（`isUserEdited == true`）
+  /// 而不是旧版的「`source === 'user'` 且 `isUserEdited`」双条件：本项目
+  /// 手工录入路径写的是 [manualContentSource]，按旧条件永远删不掉，
+  /// 每保存一次就多出一条自己写的释义。用合并层同一套判定，两条路径的
+  /// 「谁算用户资产」才不会漂移。
+  ///
+  /// [definition] 传空白表示「撤掉我写的释义」；原本就没有手工释义且
+  /// 新内容也为空时不写库，避免把一次空操作记成一次编辑。
+  Future<void> updateManualDefinition({
+    required int wordId,
+    required String definition,
+    required int now,
+    String? partOfSpeech,
+  }) async {
+    final text = definition.trim();
+    _assertDefinitionLength(text, partOfSpeech);
+    final word = await _contentWord(wordId);
+    final content = await _loadContent(wordId);
+    final previous = content.records('definitions');
+    final kept = previous
+        .where((item) => !isUserProtectedItem('definitions', item))
+        .toList();
+    if (text.isEmpty && kept.length == previous.length) return;
+
+    final next = <Map<String, Object?>>[
+      if (text.isNotEmpty)
+        _userDefinition(word.targetLanguage, text, partOfSpeech),
+      ...kept,
+    ];
+    final status = contentStatus(
+      content.withField('definitions', next),
+      word.contentType,
+    );
+    await _db.transaction(() async {
+      await _writeDefinitions(wordId, next, now);
+      await (_db.update(
+        _db.words,
+      )..where((row) => row.id.equals(wordId))).write(
+        WordsCompanion(
+          initializationStatus: Value<InitializationStatus>(status),
+          updatedAt: Value<int>(now),
+        ),
+      );
+    });
+  }
+
+  /// 删除一条例句。
+  ///
+  /// [index] 是**界面渲染顺序**里的下标（详情页逐条渲染
+  /// `parseDetailExamples` 的结果），底层用 [detailExamplePositions] 换算回
+  /// `examples_json` 的真实下标——解析会丢弃「非对象」与「句子为空」的条目，
+  /// 两个下标并不总是相等，不换算就会删掉隔壁那条。
+  ///
+  /// 下标越界抛 [NotFoundError] 而不是静默返回：调用方是「用户点了第 N 条的
+  /// 删除」，若此时列表刚被别的改动刷新过，静默返回会让按钮看起来是坏的，
+  /// 而真正的原因（列表已变）根本不会被记录。
+  ///
+  /// 顺手重算内容状态：删掉最后一条例句后词条应从 `READY` 退到 `PARTIAL`，
+  /// 不重算的话界面上会一直显示「内容齐了」，而出填空题时又真的没有句子可用。
+  Future<void> deleteExample({
+    required int wordId,
+    required int index,
+    required int now,
+  }) async {
+    final target = await _exampleAt(wordId, index);
+    final kept = <Object?>[...target.entries]..removeAt(target.position);
+    final word = await _contentWord(wordId);
+    final status = contentStatus(
+      (await _loadContent(wordId)).withField('examples', kept),
+      word.contentType,
+    );
+    await _db.transaction(() async {
+      await _writeExamples(wordId, kept, now);
+      await (_db.update(
+        _db.words,
+      )..where((row) => row.id.equals(wordId))).write(
+        WordsCompanion(
+          initializationStatus: Value<InitializationStatus>(status),
+          updatedAt: Value<int>(now),
+        ),
+      );
+    });
+  }
+
+  /// 为一条例句排一个「AI 翻译」任务。
+  ///
+  /// **不在这里做翻译**：翻译由 `initialization_worker` 执行，本方法只负责
+  /// 入队。这样「翻译质量」与「翻译入口」解耦——界面、批量操作、导入回放
+  /// 都能触发同一个 worker 路径，不会出现两套翻译实现给出两种译文。
+  ///
+  /// 重复点击是幂等的：`initialization_jobs_active_word_task_unique` 保证
+  /// 同一词条的同一任务类型最多一个活跃任务，插入冲突被
+  /// `ON CONFLICT DO NOTHING` 吞掉。
+  Future<void> translateExample({
+    required int wordId,
+    required int index,
+    required int now,
+  }) async {
+    await _exampleAt(wordId, index);
+    await enqueueInitialization(
+      wordId: wordId,
+      now: now,
+      taskType: JobTaskType.exampleTranslations,
+    );
+  }
+
+  /// 定位界面下标对应的例句原始元素。
+  ///
+  /// 索引换算与越界判定都收在这里：两个调用方拿到的
+  /// [ExampleLocation.position] 一定是「用户指的那一条」在
+  /// `examples_json` 里的真实下标。
+  Future<ExampleLocation> _exampleAt(int wordId, int index) async {
+    final raw = await _contentColumn(wordId, contentColumnNames['examples']);
+    final positions = detailExamplePositions(raw);
+    if (index < 0 || index >= positions.length) {
+      throw const NotFoundError(AppErrorCode.exampleNotFound);
+    }
+    return ExampleLocation(
+      entries: decodeJsonList(raw),
+      position: positions[index],
+    );
+  }
+
+  /// 读单个内容列的 JSON 文本。
+  Future<String?> _contentColumn(int wordId, String? column) async {
+    if (column == null) return null;
+    final rows = await _db
+        .customSelect(
+          'SELECT $column FROM word_contents WHERE word_id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .get();
+    return rows.isEmpty ? null : rows.first.read<String>(column);
+  }
+
+  /// 读取词条的内容类型与目标语言；词条不存在时抛 [AppErrorCode.wordNotFound]。
+  ///
+  /// 手工释义要用目标语言作为 `language`，内容状态要按内容类型判定，
+  /// 两者都只能从 `words` 行取——`word_contents` 里没有这份信息。
+  Future<({LexicalContentType contentType, String targetLanguage})>
+  _contentWord(int wordId) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT content_type, target_language FROM words WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .get();
+    if (rows.isEmpty) throw const NotFoundError(AppErrorCode.wordNotFound);
+    return (
+      contentType:
+          wireLookup(
+            LexicalContentType.values,
+            rows.first.read<String>('content_type'),
+          ) ??
+          LexicalContentType.word,
+      targetLanguage: rows.first.read<String>('target_language'),
+    );
+  }
+
+  /// 读取该词条的完整内容；没有内容行时返回空内容。
+  Future<DictionaryContent> _loadContent(int wordId) async {
+    final columns = contentColumnNames.values.join(', ');
+    final rows = await _db
+        .customSelect(
+          'SELECT $columns FROM word_contents WHERE word_id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .get();
+    if (rows.isEmpty) return emptyDictionaryContent();
+    return dictionaryContentFromColumns(
+      rows.first.data.cast<String, Object?>(),
+    );
+  }
+
+  /// 覆写释义列并自增内容版本号。
+  ///
+  /// `content_version` 必须自增：它是并发冲突提示的依据，
+  /// 用 `excluded` 覆盖会永远停在 1。
+  Future<void> _writeDefinitions(
+    int wordId,
+    List<Map<String, Object?>> definitions,
+    int now,
+  ) => _db.customUpdate(
+    'UPDATE word_contents SET definitions_json = ?, '
+    'content_version = content_version + 1, updated_at = ? WHERE word_id = ?',
+    variables: <Variable<Object>>[
+      Variable<String>(jsonEncode(definitions)),
+      Variable<int>(now),
+      Variable<int>(wordId),
+    ],
+    updates: <ResultSetImplementation<dynamic, dynamic>>{_db.wordContents},
+    updateKind: UpdateKind.update,
+  );
+
+  /// 覆写例句列并自增内容版本号。
+  Future<void> _writeExamples(
+    int wordId,
+    List<Object?> examples,
+    int now,
+  ) => _db.customUpdate(
+    'UPDATE word_contents SET examples_json = ?, '
+    'content_version = content_version + 1, updated_at = ? WHERE word_id = ?',
+    variables: <Variable<Object>>[
+      Variable<String>(jsonEncode(examples)),
+      Variable<int>(now),
+      Variable<int>(wordId),
+    ],
+    updates: <ResultSetImplementation<dynamic, dynamic>>{_db.wordContents},
+    updateKind: UpdateKind.update,
+  );
+
+  /// 构造一条用户手工撰写的释义。
+  ///
+  /// `isUserEdited: true` 是「用户资产」的判据（[isUserProtectedItem]），
+  /// `source` 则让界面能一眼看出这条不是词典给的。
+  Map<String, Object?> _userDefinition(
+    String language,
+    String text,
+    String? partOfSpeech,
+  ) => <String, Object?>{
+    'language': language,
+    'partOfSpeech': _blankToNull(partOfSpeech),
+    'text': text,
+    'source': userAuthoredDefinitionSource,
+    'isUserEdited': true,
+  };
+
+  /// 手工释义与词性标注的长度校验。
+  ///
+  /// 复用一个错误码但各自写明原因：超长释义会让选择题选项撑破卡片，
+  /// 超长词性标注没有任何使用场景。
+  void _assertDefinitionLength(String text, String? partOfSpeech) {
+    if (text.length > manualDefinitionMaxLength) {
+      throw const ValidationError(
+        AppErrorCode.validationError,
+        details: '释义过长',
+      );
+    }
+    if ((partOfSpeech?.trim().length ?? 0) >
+        manualDefinitionPartOfSpeechMaxLength) {
+      throw const ValidationError(
+        AppErrorCode.validationError,
+        details: '词性标注过长',
+      );
+    }
   }
 
   /// 删除词条。

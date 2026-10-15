@@ -1,13 +1,13 @@
 /// 词条详情的只读查询。
 ///
-/// **为什么单独成文件**：详情页要读 `words` 的 13 列加 `word_contents` 的
-/// 16 个 JSON 列，再叠加卡片状态、统计与复习日志。旧版把这些查询散在
-/// `use-word-detail.ts`（343 行、约 40 个字段、横跨 6 个领域）与组件里，
-/// 同一份 JSON 解析写了两遍。这里把「取数」全部收在 DAO，
-/// 页面组件只接收已经解析好的数据类。
+/// **为什么单独成文件**：详情页要读 `words` 的 15 列加 `word_contents` 的
+/// 16 个 JSON 列，再叠加卡片状态、统计、错词状态、复习日志与数据源调用
+/// 审计。旧版把这些查询散在 `use-word-detail.ts`（343 行、约 40 个字段、
+/// 横跨 6 个领域）与组件里，同一份 JSON 解析写了两遍。这里把「取数」全部
+/// 收在 DAO，页面组件只接收已经解析好的数据类。
 ///
-/// **只读**：写操作（暂停、笔记、删除）由页面调用 Drift 的表 API，
-/// 避免在只读 DAO 里混入写路径。
+/// **只读**：写操作（暂停、笔记、删除、手工释义、例句增删）一律走
+/// `WordEditService`，避免在只读 DAO 里混入写路径。
 library;
 
 import 'package:drift/drift.dart';
@@ -210,9 +210,22 @@ class LearningView {
 }
 
 /// 句子分析里的一条条目（关键表达 / 相似例句 / 句式变换共用）。
+///
+/// 三类条目的 JSON 键名不同（`expression` / `sentence`），正文都能落到
+/// [text]；其余字段按各自的键单独保留，因为它们承载的是**不同的信息**：
+/// 关键表达的 `meaning` 是中文对释、`note` 是搭配提示，相似例句的
+/// `focus` 是「这条例句想演示什么」。把它们塞进同一个 `translation` 会让
+/// 界面只能说「有则显示」，说不清那行字到底在讲什么。
 class SentenceAnalysisItem {
   /// 以各字段构造。
-  const new({required this.text, this.label, this.translation});
+  const new({
+    required this.text,
+    this.label,
+    this.translation,
+    this.meaning,
+    this.note,
+    this.focus,
+  });
 
   /// 条目正文。
   final String text;
@@ -222,6 +235,15 @@ class SentenceAnalysisItem {
 
   /// 条目翻译或说明。
   final String? translation;
+
+  /// 关键表达的中文含义（`meaning`）。
+  final String? meaning;
+
+  /// 关键表达的使用提示（`note`）。
+  final String? note;
+
+  /// 相似例句的讲解重点（`focus`）。
+  final String? focus;
 }
 
 /// 句子分析（`sentence_analysis_json`）。
@@ -302,6 +324,8 @@ class WordDetail {
     this.userNote,
     this.providerMetadataJson,
     this.initializedAt,
+    this.sourceCreatedAt,
+    this.updatedAt,
   });
 
   /// 词条 ID。
@@ -342,6 +366,19 @@ class WordDetail {
 
   /// 创建时间（epoch 毫秒）。
   final int createdAt;
+
+  /// 数据源侧的原始创建时间（epoch 毫秒）；导入数据没有该值时为 `null`。
+  ///
+  /// 与 [createdAt] 分开：前者是「这条内容是什么时候生成的」（词典条目
+  /// 的出版时间），后者是「我什么时候把它加进来的」。合成天有时，
+  /// 用户看到 2019 年的词条却显示「今天创建」会以为时钟错了。
+  final int? sourceCreatedAt;
+
+  /// 词条行最后一次写入的时间（epoch 毫秒）。
+  ///
+  /// 用于回答「我刚才改的释义到底存进去没有」——[createdAt] 永远不变，
+  /// 拿它当「更新时间」会让任何一次编辑都看不出发生过。
+  final int? updatedAt;
 
   /// 释义（已解析、已过滤空文本）。
   final List<DefinitionValue> definitions;
@@ -435,6 +472,12 @@ class WordLearningSnapshot {
     this.lastReviewAt,
     this.totalReviews = 0,
     this.correctReviews = 0,
+    this.isWrongWord = false,
+    this.wrongCount = 0,
+    this.hardCount = 0,
+    this.consecutiveCorrect = 0,
+    this.lastWrongAt,
+    this.lastCorrectAt,
   });
 
   /// 掌握分。
@@ -479,6 +522,88 @@ class WordLearningSnapshot {
   /// 累计正确率；从未作答时为 `null`（而不是 0，避免显示成「全错」）。
   double? get accuracy =>
       totalReviews == 0 ? null : correctReviews / totalReviews;
+
+  /// 是否处于「活跃错词」状态（`wrong_word_states.active`）。
+  ///
+  /// 与 [wrongCount] 分开：错词被连续答对若干次后会**解除**，
+  /// 但历史错误次数仍然留着——「现在还在错」和「曾经错过」是两件事，
+  /// 合成一个数字会让已解除的词在卡片上突然变成 0 次。
+  final bool isWrongWord;
+
+  /// 累计错误次数。
+  final int wrongCount;
+
+  /// 累计「困难」次数（评分为「模糊」的作答）。
+  final int hardCount;
+
+  /// 连续答对次数；达到阈值后错词状态被解除。
+  final int consecutiveCorrect;
+
+  /// 最近一次答错时间；从未答错时为 `null`。
+  final int? lastWrongAt;
+
+  /// 最近一次答对时间；从未答对时为 `null`。
+  final int? lastCorrectAt;
+
+  /// 是否从未进入过错词状态。
+  ///
+  /// 用来区分「答错过 0 次」和「这张表里根本没有它的行」——
+  /// 后者让卡片显示空态而不是一排 0。
+  bool get isUntouched =>
+      !isWrongWord &&
+      wrongCount == 0 &&
+      hardCount == 0 &&
+      consecutiveCorrect == 0;
+}
+
+/// 一条数据源调用记录（详情页「初始化质量」卡的一行）。
+///
+/// 字段集与 `provider_attempts` 的列一一对应，唯独质量分来自
+/// `metadata_json.qualityScore`——它只在 AI 渠道的记录里出现，
+/// 词典渠道写的是 `sourceEndpoint` / `fallbackUsed`，拿不到就是 `null`。
+class ProviderAttemptView {
+  /// 以各字段构造。
+  const new({
+    required this.id,
+    required this.providerId,
+    required this.status,
+    required this.createdAt,
+    this.qualityScore,
+    this.durationMs,
+    this.fieldsReturned = const <String>[],
+    this.errorCode,
+    this.errorMessage,
+  });
+
+  /// 记录 ID。
+  final int id;
+
+  /// 数据源标识；AI 渠道带 `ai:<provider>:<model>` 前缀。
+  final String providerId;
+
+  /// 调用结果（成功 / 空 / 失败）。
+  final ProviderAttemptStatus status;
+
+  /// 质量分（0–100）；非 AI 渠道没有该值。
+  final int? qualityScore;
+
+  /// 调用耗时（毫秒）。
+  final int? durationMs;
+
+  /// 这次调用返回了哪些内容字段。
+  ///
+  /// 「SUCCESS 但一个字段都没返回」是最难排查的失败模式（请求成功、
+  /// 质量门也过了，但内容为空），因此单独展示而不是只给一个状态。
+  final List<String> fieldsReturned;
+
+  /// 失败时的错误码。
+  final String? errorCode;
+
+  /// 失败时的错误说明。
+  final String? errorMessage;
+
+  /// 调用时间（epoch 毫秒）。
+  final int createdAt;
 }
 
 /// 一条复习记录（详情页「复习历史」的一行）。
@@ -584,13 +709,14 @@ class DashboardOverview {
 /// 否则用户会看到一个「查不到」的空态，而词条其实存在。
 ///
 /// 这几条 SQL 都没有 `$`（JSON 路径），因此不用 `r'''` 前缀——
-/// 加了反而触发 `unnecessary_raw_strings`。将来若引入
-/// `json_extract(x, '$.text')`，必须改回 raw 字符串。
+/// 加了反而触发 `unnecessary_raw_strings`。只有真的取了 JSON 路径的
+/// [_providerAttemptsSql] 才用 raw 字符串。
 const String _detailSql = '''
 SELECT
   w.id, w.term, w.normalized_term, w.source_language, w.target_language,
   w.content_type, w.entry_type, w.initialization_status, w.mastery_level,
   w.mastery_score, w.is_suspended, w.user_note, w.created_at,
+  w.source_created_at, w.updated_at,
   c.definitions_json, c.pronunciations_json, c.examples_json,
   c.phrases_json, c.forms_json, c.synonyms_json, c.antonyms_json,
   c.word_family_json, c.confused_words_json, c.roots_json, c.affixes_json,
@@ -600,17 +726,43 @@ FROM words w
 LEFT JOIN word_contents c ON c.word_id = w.id
 WHERE w.id = ?''';
 
-/// 学习情况查询：卡片状态与累计统计一次取回。
+/// 学习情况查询：卡片状态、累计统计与错词状态一次取回。
+///
+/// `wrong_word_states` 是**按需展示**的：绝大多数词条从来没有答错过，
+/// 把错词状态内联进主查询会让每张详情卡都多一次 LEFT JOIN 的成本，
+/// 而错词状态本身也不是「学习进度」的一部分——它是「这个词难在哪」的
+/// 另一维度。
 const String _snapshotSql = '''
 SELECT
   w.mastery_score, w.mastery_level,
   rc.due_at, rc.stability, rc.difficulty, rc.scheduled_days, rc.reps,
   rc.lapses, rc.fsrs_state, rc.last_review_at,
-  s.total_reviews, s.correct_reviews
+  s.total_reviews, s.correct_reviews,
+  ws.active, ws.wrong_count, ws.hard_count, ws.consecutive_correct,
+  ws.last_wrong_at, ws.last_correct_at
 FROM words w
 LEFT JOIN review_cards rc ON rc.word_id = w.id
 LEFT JOIN word_review_stats s ON s.word_id = w.id
+LEFT JOIN wrong_word_states ws ON ws.word_id = w.id
 WHERE w.id = ?''';
+
+/// 初始化质量查询：某个词条最近的数据源调用记录。
+///
+/// **`provider_attempts` 之前完全没有读取路径**——worker 只写不读，
+/// 于是「AI 返回了内容却被质量门丢弃」这类问题在界面上没有任何线索。
+/// 这条 SQL 是那张表的第一个消费者。
+///
+/// 质量分不在列上而在 `metadata_json.qualityScore` 里（只有 AI 渠道写），
+/// 因此用 `json_extract` 取——这条 SQL 带 JSON 路径，用 raw 字符串。
+const String _providerAttemptsSql = r'''
+SELECT
+  id, provider_id, status, duration_ms, error_code, error_message,
+  fields_returned_json, created_at,
+  json_extract(metadata_json, '$.qualityScore') AS quality_score
+FROM provider_attempts
+WHERE word_id = ?
+ORDER BY created_at DESC, id DESC
+LIMIT ?''';
 
 /// 复习历史查询：按时间倒序，`LIMIT ?` 由调用方给定。
 const String _recentLogsSql = '''
@@ -686,7 +838,7 @@ class WordDetailDao {
     return row == null ? null : _mapDetail(row);
   }
 
-  /// 读取复习统计与 FSRS 卡片状态。
+  /// 读取复习统计、FSRS 卡片状态与错词状态。
   ///
   /// 词条不存在时返回全默认值而非 `null`：调用方（详情页）已经用
   /// [find] 判过存在性，这里再抛一个可空类型只会让卡片多写一层判空。
@@ -716,7 +868,33 @@ class WordDetailDao {
       lastReviewAt: row.readNullable<int>('last_review_at'),
       totalReviews: row.readNullable<int>('total_reviews') ?? 0,
       correctReviews: row.readNullable<int>('correct_reviews') ?? 0,
+      isWrongWord: row.readNullable<bool>('active') ?? false,
+      wrongCount: row.readNullable<int>('wrong_count') ?? 0,
+      hardCount: row.readNullable<int>('hard_count') ?? 0,
+      consecutiveCorrect: row.readNullable<int>('consecutive_correct') ?? 0,
+      lastWrongAt: row.readNullable<int>('last_wrong_at'),
+      lastCorrectAt: row.readNullable<int>('last_correct_at'),
     );
+  }
+
+  /// 读取某个词条最近的数据源调用记录，按调用时间倒序。
+  ///
+  /// [limit] 默认 [providerAttemptCardLimit]：卡片是排查工具，取最近若干条
+  /// 足以定位「哪一次调用出的问题」，全量拉取在重试过的词条上会到上百条。
+  Future<List<ProviderAttemptView>> providerAttempts(
+    int wordId, {
+    int limit = providerAttemptCardLimit,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          _providerAttemptsSql,
+          variables: <Variable<Object>>[
+            Variable<int>(wordId),
+            Variable<int>(limit),
+          ],
+        )
+        .get();
+    return rows.map(_mapAttempt).toList(growable: false);
   }
 
   /// 读取最近的复习记录，按时间倒序。
@@ -846,13 +1024,15 @@ class WordDetailDao {
     isSuspended: row.read<bool>('is_suspended'),
     userNote: row.readNullable<String>('user_note'),
     createdAt: row.read<int>('created_at'),
+    sourceCreatedAt: row.readNullable<int>('source_created_at'),
+    updatedAt: row.readNullable<int>('updated_at'),
     definitions: parseDefinitionsJson(
       row.readNullable<String>('definitions_json'),
     ),
     pronunciations: parsePronunciations(
       row.readNullable<String>('pronunciations_json'),
     ),
-    examples: parseExamples(row.readNullable<String>('examples_json')),
+    examples: parseDetailExamples(row.readNullable<String>('examples_json')),
     phrases: _parsePhrases(row.readNullable<String>('phrases_json')),
     forms: _parseForms(row.readNullable<String>('forms_json')),
     synonyms: _parseRelated(row.readNullable<String>('synonyms_json')),
@@ -892,6 +1072,42 @@ class WordDetailDao {
         QuestionType.enToZh,
     durationMs: row.readNullable<int>('duration_ms'),
   );
+
+  /// 映射一条数据源调用记录。
+  ///
+  /// 状态字面量不认识时**退化为 [ProviderAttemptStatus.empty]**而不是跳过：
+  /// 审计记录的价值恰恰在于「出现了没预料到的东西」，把它藏起来会让
+  /// 排查从零开始。
+  ProviderAttemptView _mapAttempt(QueryRow row) => ProviderAttemptView(
+    id: row.read<int>('id'),
+    providerId: row.read<String>('provider_id'),
+    status:
+        wireLookup(ProviderAttemptStatus.values, row.read<String>('status')) ??
+        ProviderAttemptStatus.empty,
+    qualityScore: _qualityScoreOf(row),
+    durationMs: row.readNullable<int>('duration_ms'),
+    fieldsReturned: parseTextList(
+      decodeJson(row.readNullable<String>('fields_returned_json')),
+    ),
+    errorCode: row.readNullable<String>('error_code'),
+    errorMessage: row.readNullable<String>('error_message'),
+    createdAt: row.read<int>('created_at'),
+  );
+
+  /// 质量分：只接受整数，脏值按「没有质量分」处理。
+  ///
+  /// `json_extract` 在路径不存在或值不是数字时返回 `null`，但脏数据里
+  /// 也可能出现字符串形式的分数；强行解析会让一张审计卡片因为一个字段
+  /// 整张渲染不出来。
+  ///
+  /// 读的是 `row.data` 而不是 `row.readNullable<Object>`：Drift 需要由
+  /// 列的类型推出 Dart 类型映射，而 `Object` 没有对应项，会在运行期抛
+  /// 「Could not find a matching SQL type for Object」。绕开类型映射、
+  /// 直接看原始值，才是这一列「可能是任意 JSON 标量」的正确读法。
+  int? _qualityScoreOf(QueryRow row) {
+    final raw = row.data['quality_score'];
+    return raw is int ? raw : null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -922,6 +1138,52 @@ List<RelatedWordView> _parseRelated(String? raw) {
   }
   return result;
 }
+
+/// 解析详情页例句列表（`examples_json`），跳过不可用的条目。
+///
+/// **不复用 `content_parse.dart` 的 `parseExamples`**：那一支是学习会话
+/// 的加载路径，按「一次会话只拖需要的字段」刻意做到最简；详情页要多展示
+/// 难度与义项编号。两条路径共用 `decodeJsonList` / `textOf` / `fieldOf`
+/// 这些原语，且**丢弃规则完全一致**（同一个 [isUsableExample]），
+/// 因此同一份 JSON 在两处解析出的例句集合永远相同。
+List<ExampleView> parseDetailExamples(String? raw) {
+  final result = <ExampleView>[];
+  for (final item in decodeJsonList(raw)) {
+    if (item is! Map) continue;
+    final sentence = textOf(item['sentence']);
+    if (sentence.isEmpty) continue;
+    result.add(
+      ExampleView(
+        sentence: sentence,
+        translation: fieldOf(item, 'translation'),
+        senseId: fieldOf(item, 'senseId'),
+        difficulty: fieldOf(item, 'difficulty'),
+      ),
+    );
+  }
+  return result;
+}
+
+/// 详情页可见的例句在原始 JSON 数组中的下标。
+///
+/// 界面按 [parseDetailExamples] 的结果逐条渲染，而该解析会丢弃
+/// 「非对象」与「句子为空」的条目——两个下标并不总是相等。删除与翻译
+/// 必须先用本函数把界面下标换算回真实下标，否则会作用到隔壁那条。
+List<int> detailExamplePositions(String? raw) {
+  final result = <int>[];
+  final items = decodeJsonList(raw);
+  for (var index = 0; index < items.length; index += 1) {
+    if (isUsableExample(items[index])) result.add(index);
+  }
+  return result;
+}
+
+/// 一条例句是否值得展示：必须是对象且句子非空。
+///
+/// 判据抽成具名函数而不是各写一遍：解析与下标换算必须永远一致，
+/// 一旦这里放宽了而那里没放宽，删除按钮就会删错条目。
+bool isUsableExample(Object? item) =>
+    item is Map && textOf(item['sentence']).isNotEmpty;
 
 /// 解析短语列表，跳过短语文本为空的条目。
 List<PhraseView> _parsePhrases(String? raw) {
@@ -1039,6 +1301,10 @@ SentenceAnalysisView _parseSentenceAnalysis(String? raw) {
 }
 
 /// 解析句子分析里的条目列表（字符串与对象两种形态都接受）。
+///
+/// 正文取 [textOf]，它按 `textKeys` 顺序扫描，因此真实备份里的
+/// `{"expression": ...}`（关键表达）与 `{"sentence": ...}`（相似例句 /
+/// 句式变换）都能取到正文；三个附注字段按各自的键单独读。
 List<SentenceAnalysisItem> _parseAnalysisItems(Object? value) {
   if (value is! List) return const <SentenceAnalysisItem>[];
   final result = <SentenceAnalysisItem>[];
@@ -1050,6 +1316,9 @@ List<SentenceAnalysisItem> _parseAnalysisItems(Object? value) {
         text: text,
         label: fieldOf(item, 'type') ?? fieldOf(item, 'label'),
         translation: fieldOf(item, 'translation'),
+        meaning: fieldOf(item, 'meaning'),
+        note: fieldOf(item, 'note'),
+        focus: fieldOf(item, 'focus'),
       ),
     );
   }

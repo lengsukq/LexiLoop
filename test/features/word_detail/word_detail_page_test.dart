@@ -14,6 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/word_detail/cards/definitions_card.dart';
+import 'package:lexiloop/features/word_detail/cards/note_card.dart';
 import 'package:lexiloop/features/word_detail/word_detail_page.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
@@ -39,9 +41,10 @@ void main() {
   /// 把测试画布调高，让整页卡片都被真实构建。
   ///
   /// `ListView` 只构建可见项，默认 800x600 的画布下「笔记」卡片不会被
-  /// inflate，`find.byType(TextField)` 自然找不到它。
+  /// inflate，`find.byType(TextField)` 自然找不到它。页面新增了「初始化质量」
+  /// 卡片后需要的高度又涨了一截。
   void useTallViewport(WidgetTester tester) {
-    tester.view.physicalSize = const Size(900, 2200);
+    tester.view.physicalSize = const Size(900, 3200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
   }
@@ -128,11 +131,11 @@ void main() {
     await tester.pumpWidget(wrap(WordDetailPage(wordId: id)));
     await tester.pumpAndSettle();
 
-    expect(
-      tester.widget<TextField>(find.byType(TextField)).controller!.text,
-      '旧笔记',
-    );
-    await tester.enterText(find.byType(TextField), '新笔记');
+    // 按 key 定位而不是按 `TextField` 类型：详情页现在有两个输入框
+    // （笔记与手工释义），按类型取到哪一个取决于渲染顺序。
+    final field = find.byKey(noteFieldKey);
+    expect(tester.widget<TextField>(field).controller!.text, '旧笔记');
+    await tester.enterText(field, '新笔记');
     await tester.ensureVisible(find.text('保存笔记'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('保存笔记'));
@@ -142,6 +145,26 @@ void main() {
       db.words,
     )..where((word) => word.id.equals(id))).getSingle();
     expect(row.userNote, '新笔记');
+  });
+
+  testWidgets('手工释义保存后前置到 definitions_json 首位', (tester) async {
+    useTallViewport(tester);
+    final id = await insertWord();
+
+    await tester.pumpWidget(wrap(WordDetailPage(wordId: id)));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(manualDefinitionFieldKey), '苹果树');
+    await tester.ensureVisible(find.text('保存释义'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存释义'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('苹果树'), findsNWidgets(2));
+    final row = await (db.select(
+      db.wordContents,
+    )..where((row) => row.wordId.equals(id))).getSingle();
+    expect(row.definitionsJson, contains('苹果树'));
   });
 
   testWidgets('删除词条需二次确认，确认后词条与内容一并消失', (tester) async {

@@ -16,6 +16,7 @@ import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/services/word_edit_service.dart';
 
 /// 词条详情查询。
 final Provider<WordDetailDao> wordDetailDaoProvider = Provider<WordDetailDao>(
@@ -48,6 +49,39 @@ final Provider<Accent> preferredAccentProvider = Provider<Accent>((ref) {
   final settings = ref.watch(appSettingsProvider).value;
   return settings?.playback.defaultAccent ?? Accent.us;
 });
+
+/// 详情页当前选中的发音口音（按词条 ID 记忆）。
+///
+/// **页面级状态而不是全局设置**：旧版详情页把 `selectedAccent` 放在页面
+/// 组件的 `useState` 里，切走就没了。这里同样按词条 ID 记忆，但活到
+/// 该词条的下一次详情会话为止——回到详情页时音标还是上次选的那一个，
+/// 不必每次都重新点一遍英音。
+///
+/// 用「词条 ID → 口音」的映射而不是 family notifier：Riverpod 3 的
+/// family notifier 要拿到参数得读内部 API，而这里的需求就是一张很小的
+/// 查表，用 family 换取的「自动 dispose」对这张表毫无价值。
+class AccentSelection extends Notifier<Map<int, Accent>> {
+  @override
+  Map<int, Accent> build() => const <int, Accent>{};
+
+  /// 记住用户在该词条上选过的口音。
+  void select(int wordId, Accent accent) =>
+      state = <int, Accent>{...state, wordId: accent};
+}
+
+/// 详情页口音选择状态。
+final NotifierProvider<AccentSelection, Map<int, Accent>>
+selectedAccentProvider = NotifierProvider<AccentSelection, Map<int, Accent>>(
+  AccentSelection.new,
+);
+
+/// 单个词条最近的数据源调用记录（详情页「初始化质量」卡）。
+final FutureProviderFamily<List<ProviderAttemptView>, int>
+wordProviderAttemptsProvider =
+    FutureProvider.family<List<ProviderAttemptView>, int>(
+      (ref, wordId) =>
+          ref.watch(wordDetailDaoProvider).providerAttempts(wordId),
+    );
 
 /// 词条详情的写操作入口。
 final Provider<WordDetailActions> wordDetailActionsProvider =
@@ -102,11 +136,61 @@ class WordDetailActions {
       ..invalidate(wordDetailProvider(wordId))
       ..invalidate(wordLearningSnapshotProvider(wordId))
       ..invalidate(recentReviewLogsProvider(wordId))
+      ..invalidate(wordProviderAttemptsProvider(wordId))
       ..invalidate(dashboardOverviewProvider)
       ..invalidate(wordListProvider)
       ..invalidate(wordCountProvider)
       ..invalidate(masterySummaryProvider);
   }
+
+  /// 保存用户手工撰写的释义。
+  ///
+  /// 释义与例句的写入全部下沉到 [WordEditService]：那里才知道「手工内容」
+  /// 的判定规则与 `content_version` 的自增口径，界面层再抄一遍必然漂移。
+  Future<void> updateManualDefinition(
+    int wordId,
+    String definition, {
+    String? partOfSpeech,
+  }) async {
+    await _edit.updateManualDefinition(
+      wordId: wordId,
+      definition: definition,
+      partOfSpeech: partOfSpeech,
+      now: _now(),
+    );
+    _invalidateWord(wordId);
+  }
+
+  /// 删除第 [index] 条例句。
+  Future<void> deleteExample(int wordId, int index) async {
+    await _edit.deleteExample(wordId: wordId, index: index, now: _now());
+    _invalidateWord(wordId);
+  }
+
+  /// 为第 [index] 条例句排一个 AI 翻译任务。
+  ///
+  /// 入队即返回：真正翻譯由 worker 在后台做，界面不该为了等一句译文
+  /// 把按钮按住——用户连点十几句也只会有一个活跃任务（部分唯一索引保证）。
+  Future<void> translateExample(int wordId, int index) async {
+    await _edit.translateExample(wordId: wordId, index: index, now: _now());
+  }
+
+  /// 请求生成（或重新生成）助记法。
+  Future<void> requestMnemonic(int wordId) async {
+    await _edit.enqueueInitialization(
+      wordId: wordId,
+      now: _now(),
+      taskType: JobTaskType.mnemonic,
+    );
+  }
+
+  /// 本次写入用的服务实例。
+  ///
+  /// 刻意不引用 `features/add` 里的 provider：详情页与「添加词条」弹窗
+  /// 是两条独立的入口，共享一个 provider 会让任一侧重构都要看另一侧。
+  WordEditService get _edit => WordEditService(_ref.read(databaseProvider));
+
+  int _now() => DateTime.now().millisecondsSinceEpoch;
 
   /// 失效该词条相关的全部缓存。
   ///
@@ -117,6 +201,7 @@ class WordDetailActions {
       ..invalidate(wordDetailProvider(wordId))
       ..invalidate(wordLearningSnapshotProvider(wordId))
       ..invalidate(recentReviewLogsProvider(wordId))
+      ..invalidate(wordProviderAttemptsProvider(wordId))
       ..invalidate(dashboardOverviewProvider);
   }
 }

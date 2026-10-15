@@ -39,6 +39,15 @@ String contentSourceLabel(ContentSource source) => switch (source) {
   ContentSource.dictionaryOnly => '词典',
 };
 
+/// 口音的短标签；与旧版头部里的「美 / 英」一字对应。
+///
+/// 只用一个字是因为它要跟在音标前面当前缀（「美 /ˈæpl/」），
+/// 写成「美式发音」会把整行撑到换行。
+String accentLabel(Accent accent) => switch (accent) {
+  Accent.us => '美',
+  Accent.uk => '英',
+};
+
 /// 复习评级的中文名。
 String ratingLabel(ReviewRating rating) => switch (rating) {
   ReviewRating.again => '重来',
@@ -46,6 +55,13 @@ String ratingLabel(ReviewRating rating) => switch (rating) {
   ReviewRating.good => '良好',
   ReviewRating.easy => '轻松',
 };
+
+/// 值缺失时的统一占位符。
+///
+/// 与 `formatDays` / `formatStability` / `formatDifficulty` 共用：
+/// 同一个「没有」在界面上必须长成同一个样子，否则用户会以为不同的
+/// 破折号各自代表不同的含义。
+const String missingValuePlaceholder = '—';
 
 /// 题型的中文名。
 String questionTypeLabel(QuestionType type) => switch (type) {
@@ -68,6 +84,13 @@ String formatTimestamp(int millis) {
   return '${date.year}-${_pad(date.month)}-${_pad(date.day)} '
       '${_pad(date.hour)}:${_pad(date.minute)}';
 }
+
+/// 可空时间戳；缺失时显示为 `—`。
+///
+/// 与 [formatTimestamp] 分开而不是让它接受可空参数：调用点若传可空值，
+/// 忘记判空就会在页面上渲染出「1970-01-01」这种看起来像真实数据的假时间。
+String formatOptionalTimestamp(int? millis) =>
+    millis == null ? missingValuePlaceholder : formatTimestamp(millis);
 
 /// 作答耗时；缺失或非正数显示为 `—`。
 String formatDuration(int? millis) {

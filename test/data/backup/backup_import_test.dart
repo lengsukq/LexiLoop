@@ -12,6 +12,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/database.dart';
@@ -149,6 +150,20 @@ void main() {
   }
 
   group('格式校验', () {
+    test('拒绝超过大小上限的文件', () async {
+      final oversized = 'x' * (maxBackupBytes + 1);
+      await expectLater(
+        importer.import(oversized),
+        throwsA(
+          isA<ValidationError>().having(
+            (e) => e.code,
+            'code',
+            AppErrorCode.backupTooLarge,
+          ),
+        ),
+      );
+    });
+
     test('拒绝非 JSON', () async {
       await expectLater(
         importer.import('not json'),
@@ -234,6 +249,32 @@ void main() {
       await importer.import(buildBackup());
 
       expect(await countOf('words'), 2, reason: '不应累积为 4');
+    });
+
+    test('旧排行榜分数不会被导入，新计分公式从空表起步', () async {
+      await importer.import(
+        buildBackup(
+          extra: <String, Object?>{
+            'game_high_scores': <Map<String, Object?>>[
+              <String, Object?>{
+                'game_mode': 'GAME_WORD_BUILDER',
+                'score': 999,
+                'max_combo': 9,
+                'accuracy': 1.0,
+                'elapsed_ms': 1000,
+                'played_at': 1,
+                'created_at': 1,
+              },
+            ],
+          },
+        ),
+      );
+
+      // 本版的计分公式已重构（统一 scoring.dart + 速度奖励 + 连击上限 +
+      // S/A/B/C 评级），与旧版的历史分不可比；把旧分带过来只会让用户
+      // 对着永远刷不破的记录困惑。`game_high_scores` 刻意不在
+      // BackupImporter.tableOrder 里，因此导入既不写入也不清空它。
+      expect(await countOf('game_high_scores'), 0);
     });
 
     test('忽略备份中目标表不存在的列', () async {

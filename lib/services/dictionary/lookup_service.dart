@@ -56,7 +56,7 @@ class DictionaryLookupService {
 
   /// 按设置构造全部数据源（含未启用的，由 selection 过滤）。
   List<DictionaryProvider> buildProviders(AppSettings settings) {
-    final llmConfig = llmConfigFromRaw(settings.raw[llmConfigSettingsKey]);
+    final llmConfig = llmConfigFromSettings(settings.raw);
     return <DictionaryProvider>[
       YoudaoProvider(_fetcher),
       IcibaProvider(_fetcher),

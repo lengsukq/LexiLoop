@@ -40,32 +40,36 @@ LlmConfig llmConfig({
   int retryCount = 1,
   bool thinkingEnabled = false,
   String reasoningEffort = '',
-}) => llmConfigFromRaw(<String, Object?>{
-  'providers': <Object?>[
-    <String, Object?>{
-      'id': 'p1',
-      'name': '主',
-      'apiType': 'openai',
-      'baseUrl': 'https://a.example/v1',
-      'apiKey': 'k1',
+}) => llmConfigFromSettings(<String, Object?>{
+  // `aiRetryCount` 存在设置顶层（见 `modules/settings/service.ts:77`），
+  // 不在 `llmConfig.ai` 里——放在那儿会被静默忽略。
+  aiRetryCountSettingsKey: retryCount,
+  llmConfigSettingsKey: <String, Object?>{
+    'providers': <Object?>[
+      <String, Object?>{
+        'id': 'p1',
+        'name': '主',
+        'apiType': 'openai',
+        'baseUrl': 'https://a.example/v1',
+        'apiKey': 'k1',
+      },
+      <String, Object?>{
+        'id': 'p2',
+        'name': '备',
+        'apiType': 'anthropic',
+        'baseUrl': 'https://b.example',
+        'apiKey': 'k2',
+      },
+    ],
+    'ai': <String, Object?>{
+      'enabled': true,
+      'providerId': 'p1',
+      'model': 'm1',
+      'retryModel': retryModel,
+      'retryProviderId': retryProviderId,
+      'thinkingEnabled': thinkingEnabled,
+      'reasoningEffort': reasoningEffort,
     },
-    <String, Object?>{
-      'id': 'p2',
-      'name': '备',
-      'apiType': 'anthropic',
-      'baseUrl': 'https://b.example',
-      'apiKey': 'k2',
-    },
-  ],
-  'ai': <String, Object?>{
-    'enabled': true,
-    'providerId': 'p1',
-    'model': 'm1',
-    'retryModel': retryModel,
-    'retryProviderId': retryProviderId,
-    'aiRetryCount': retryCount,
-    'thinkingEnabled': thinkingEnabled,
-    'reasoningEffort': reasoningEffort,
   },
 });
 
@@ -406,23 +410,25 @@ void main() {
     });
 
     test('取值被夹到合法区间', () {
-      final config = llmConfigFromRaw(<String, Object?>{
-        'providers': <Object?>[
-          <String, Object?>{
-            'id': 'p1',
-            'apiType': 'openai',
-            'baseUrl': 'https://a.example/v1/',
-            'apiKey': 'k',
+      final config = llmConfigFromSettings(<String, Object?>{
+        aiRetryCountSettingsKey: 99,
+        'llmConfig': <String, Object?>{
+          'providers': <Object?>[
+            <String, Object?>{
+              'id': 'p1',
+              'apiType': 'openai',
+              'baseUrl': 'https://a.example/v1/',
+              'apiKey': 'k',
+            },
+          ],
+          'ai': <String, Object?>{
+            'enabled': true,
+            'providerId': 'p1',
+            'model': 'm',
+            'temperature': 5,
+            'timeoutMs': 1,
+            'thinkingBudgetTokens': 1,
           },
-        ],
-        'ai': <String, Object?>{
-          'enabled': true,
-          'providerId': 'p1',
-          'model': 'm',
-          'temperature': 5,
-          'timeoutMs': 1,
-          'thinkingBudgetTokens': 1,
-          'aiRetryCount': 99,
         },
       });
       // 尾部斜杠被去掉，避免拼出 `//chat/completions`。

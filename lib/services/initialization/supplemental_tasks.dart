@@ -96,7 +96,7 @@ class LlmSupplementalTaskRunner implements SupplementalTaskRunner {
 
   Future<LlmClient> _client() async {
     final settings = await _settings.load();
-    final config = llmConfigFromRaw(settings.raw[llmConfigSettingsKey]);
+    final config = llmConfigFromSettings(settings.raw);
     if (!config.isUsable) {
       throw const ExternalServiceError(
         AppErrorCode.aiDisabled,

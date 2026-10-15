@@ -11,7 +11,14 @@ import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/services/dictionary/lookup_service.dart';
+import 'package:lexiloop/services/initialization/initialization_maintenance.dart';
+import 'package:lexiloop/services/initialization/initialization_queries.dart';
+import 'package:lexiloop/services/initialization/initialization_worker.dart';
+import 'package:lexiloop/services/initialization/job_runner.dart';
+import 'package:lexiloop/services/initialization/supplemental_tasks.dart';
 import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/settings_service.dart';
 import 'package:lexiloop/services/study_service.dart';
@@ -72,3 +79,57 @@ final FutureProvider<AppSettings> appSettingsProvider =
     FutureProvider<AppSettings>(
       (ref) => ref.watch(settingsServiceProvider).load(),
     );
+
+/// 初始化任务队列的查询入口。
+///
+/// 放在这里而不是 `features/initialize`：[initializationJobRunnerProvider]
+/// 也在本文件，而 data 层不允许反向依赖界面层——否则 worker 与查询会各拿一份实例。
+final Provider<InitializationQueries> initializationQueriesProvider =
+    Provider<InitializationQueries>(
+      (ref) => InitializationQueries(
+        ref.watch(databaseProvider),
+        ref.watch(settingsServiceProvider),
+      ),
+    );
+
+/// 共享的 HTTP 客户端（词典联网用）。
+///
+/// 单例而不是每次新建 `Dio`：`Dio` 内部有连接池，反复新建会丢掉复用，
+/// 初始化队列一次 tick 可能连续调几十次。
+final Provider<HttpFetcher> httpFetcherProvider = Provider<HttpFetcher>(
+  (ref) => DioHttpFetcher(),
+);
+
+/// 初始化任务 worker。
+///
+/// **目前只在应用启动时由 [initializationMaintenanceProvider] 驱动，
+/// 测试里直接构造。** 不要在界面层 `watch` 它跑任务，界面层只调
+/// [InitializationMaintenance.pumpOnce]（带重入保护）。
+final Provider<InitializationJobRunner> initializationJobRunnerProvider =
+    Provider<InitializationJobRunner>(
+      (ref) => InitializationWorker(
+        ref.watch(databaseProvider),
+        ref.watch(settingsServiceProvider),
+        ref.watch(initializationQueriesProvider),
+        DictionaryLookupService(ref.watch(httpFetcherProvider)),
+        LlmSupplementalTaskRunner(
+          ref.watch(databaseProvider),
+          ref.watch(settingsServiceProvider),
+          ref.watch(httpFetcherProvider),
+        ),
+      ),
+    );
+
+/// 初始化任务的后台维护（启动回收 + 定时 tick）。
+///
+/// 启动后 `dispose` 由 ProviderScope 接管，`main()` 里只需 `watch`（后点火，
+/// 见 `lib/main.dart`）。启动那一步除了回收任务，还会顺带跑一次错词本衰减与
+/// 导入批次过期——这两件事没有别的地方会做，不挂在这里就等于永远不做。
+final Provider<InitializationMaintenance> initializationMaintenanceProvider =
+    Provider<InitializationMaintenance>((ref) {
+      final maintenance = InitializationMaintenance(
+        ref.watch(initializationJobRunnerProvider),
+      );
+      ref.onDispose(maintenance.dispose);
+      return maintenance;
+    });

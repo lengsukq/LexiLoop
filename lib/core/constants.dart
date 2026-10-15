@@ -305,8 +305,23 @@ const int dailyClozeOffset = 5;
 /// 跳过（稍后再学）后的冷却时长。
 const int skipCooldownMs = 12 * hourMs;
 
+/// `study_session_items.skip_reason`：因词条被暂停而撤下的题目。
+///
+/// **必须与旧版逐字符一致**：跳过原因参与候选排除判断
+/// （`SESSION_EXPIRED` / `PROGRESS_RESET` 属系统收尾，不算用户意愿，
+/// 见 `study_dao.dart` 的 `_availabilitySql`），备份回放与跨端统计也按
+/// 该字符串分组，改字面量等于让旧数据与新数据对不上。
+const String wordSuspendedSkipReason = 'WORD_SUSPENDED';
+
 /// 学习会话可恢复的有效期。
 const int sessionResumeTtlMs = dayMs;
+
+/// 备份文件的大小上限（字节）。
+///
+/// 与旧版 `src/modules/backups/service.ts:60` 的 100 MB 一致。
+/// 真实备份约 27 MB；上限只用来挡住误选了一个超大文件时的 OOM，
+/// 不限制正常用户的词库规模。
+const int maxBackupBytes = 100 * 1024 * 1024;
 
 /// 到期排序中「逾期天数」的封顶值，防止陈年旧卡长期霸榜。
 const double dueOverdueCapDays = 10;
@@ -464,6 +479,10 @@ const int maxCsvRows = 20000;
 const int importPreviewTtlMs = 30 * minuteMs;
 
 /// 未提交的导入批次过期时长。
+///
+/// 导入批次停在 `PENDING` 说明中途崩了或进程被杀；
+/// 不回收的话撤销按钮会永远停在那里，所以后台按此阈值置为 `FAILED`
+/// （对应旧版 `expireStaleBatches`）。
 const int importBatchExpiryMs = dayMs;
 
 /// 撤销导入时回显的受阻词条上限。
@@ -575,8 +594,15 @@ const int workerStaleAfterMs = 10 * minuteMs;
 /// 单批处理的任务数上限。
 const int defaultMaxJobsPerTick = 3;
 
-/// 周期性维护的执行间隔。
+/// 周期性维护的执行间隔（队列已排空后的保活间隔）。
 const int maintenanceIntervalMs = 10 * minuteMs;
+
+/// 上一批有产出时的维护间隔。
+///
+/// 有活就尽快推完，10 分钟只适用于「没有待处理任务」的保活。
+/// 取 30s 而非旧版的 3s：本地一次 tick 要真联网查词典，
+/// 按 3s 节奏排期会持续占着数据通道，对耗电没有好处。
+const int maintenanceBusyIntervalMs = 30 * secondMs;
 
 /// 每日 AI 建议的生成时刻（本地时区，24 小时制）。
 const int dailySuggestionHour = 0;

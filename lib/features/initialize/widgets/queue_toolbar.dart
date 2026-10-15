@@ -5,7 +5,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
@@ -42,26 +44,16 @@ class _QueueToolbarState extends ConsumerState<QueueToolbar> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: _search,
-                decoration: const InputDecoration(
-                  hintText: '搜索词条',
-                  prefixIcon: Icon(Icons.search, size: 18),
-                ),
-                onSubmitted: _applySearch,
-              ),
-            ),
-            const SizedBox(width: toolbarGap),
-            TextButton.icon(
-              onPressed: _busy ? null : () => unawaited(retryFailed()),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('重试失败'),
-            ),
-          ],
+        TextField(
+          controller: _search,
+          decoration: const InputDecoration(
+            hintText: '搜索词条',
+            prefixIcon: Icon(Icons.search, size: 18),
+          ),
+          onSubmitted: _applySearch,
         ),
+        const SizedBox(height: toolbarGap),
+        _actions(),
         const SizedBox(height: toolbarGap),
         Wrap(
           spacing: chipGap,
@@ -85,11 +77,55 @@ class _QueueToolbarState extends ConsumerState<QueueToolbar> {
     );
   }
 
+  /// 「立即处理一批」与「重试失败」两个动作。
+  ///
+  /// 放成独立控件而不是塞进 `build()`：守卫对 `build()` 有 80 行上限，
+  /// 而这一页的动作会随功能继续增长。
+  Widget _actions() {
+    return Row(
+      children: <Widget>[
+        FilledButton.icon(
+          onPressed: _busy ? null : () => unawaited(processNow()),
+          icon: const Icon(Icons.play_arrow, size: 16),
+          label: const Text('立即处理一批'),
+        ),
+        const SizedBox(width: toolbarGap),
+        TextButton.icon(
+          onPressed: _busy ? null : () => unawaited(retryFailed()),
+          icon: const Icon(Icons.refresh, size: 16),
+          label: const Text('重试失败'),
+        ),
+      ],
+    );
+  }
+
   void _applySearch(String value) {
     final filter = ref.read(queueFilterProvider);
     ref
         .read(queueFilterProvider.notifier)
         .replace(filter.copyWith(search: value));
+  }
+
+  /// 立即处理一批排队中的任务。
+  ///
+  /// 后台每 [maintenanceIntervalMs] 才会保活一次、上一批有产出时每
+  /// [maintenanceBusyIntervalMs] 就推进一次；但用户刚导入完词条时
+  /// 等下一轮仍然不干脆，所以给一个手动入口。返回 0 时提示「没有可处理的任务」
+  /// ——不区分「队列为空」和「失败」，因为维护层已经吞掉了异常，
+  /// 真实原因在任务的失败原因字段里。
+  Future<void> processNow() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final processed = await ref.read(queueActionsProvider).processNow();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(processed == 0 ? '没有可处理的任务' : '已处理 $processed 个任务'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// 重试当前所有失败任务。

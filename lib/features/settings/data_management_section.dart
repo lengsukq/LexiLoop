@@ -9,7 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
-import 'package:lexiloop/features/import/import_providers.dart';
+import 'package:lexiloop/features/settings/data_invalidation.dart';
 import 'package:lexiloop/features/settings/local_data_reset.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
@@ -99,7 +99,7 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
           ),
         ),
       );
-      _invalidateData();
+      invalidateLocalData(ref);
     } on AppError catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
@@ -117,16 +117,8 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
     final messenger = ScaffoldMessenger.of(context);
     await clearAllData(ref.read(databaseProvider));
     ref.read(settingsServiceProvider).invalidate();
-    _invalidateData();
+    invalidateLocalData(ref);
     messenger.showSnackBar(const SnackBar(content: Text('本地数据已清空。')));
-  }
-
-  void _invalidateData() {
-    ref
-      ..invalidate(appSettingsProvider)
-      ..invalidate(importHistoryProvider)
-      ..invalidate(wordListProvider)
-      ..invalidate(wordCountProvider);
   }
 }
 

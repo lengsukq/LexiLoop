@@ -4,19 +4,9 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
-import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/services/initialization/initialization_maintenance.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
-import 'package:lexiloop/services/initialization/initialization_queries.dart';
-
-/// 初始化队列查询。
-final Provider<InitializationQueries> initializationQueriesProvider =
-    Provider<InitializationQueries>(
-      (ref) => InitializationQueries(
-        ref.watch(databaseProvider),
-        ref.watch(settingsServiceProvider),
-      ),
-    );
 
 /// 队列列表的筛选条件。
 class QueueFilter {
@@ -65,9 +55,40 @@ class QueueFilterNotifier extends Notifier<QueueFilter> {
 final NotifierProvider<QueueFilterNotifier, QueueFilter> queueFilterProvider =
     NotifierProvider<QueueFilterNotifier, QueueFilter>(QueueFilterNotifier.new);
 
+/// 最近一次后台批处理完成的时刻（毫秒）；`0` 表示还没跑过。
+///
+/// 队列页 `watch` 它就能在后台跑完时自动重查，不必让用户离开页面再回来
+/// 才看到进度（对应旧版 `BACKGROUND_TICK_EVENT`）。
+final NotifierProvider<BackgroundTickNotifier, int> backgroundTickProvider =
+    NotifierProvider<BackgroundTickNotifier, int>(BackgroundTickNotifier.new);
+
+/// 把后台维护的「一批跑完」事件翻译成一次可被 `watch` 的时间戳变化。
+///
+/// 订阅放在界面侧而不是让调度器认识 Riverpod：`lib/services` 不允许反向
+/// 依赖 `lib/features`，因此事件源只暴露一个回调，由这里接上。
+class BackgroundTickNotifier extends Notifier<int> {
+  @override
+  int build() {
+    final maintenance = ref.watch(initializationMaintenanceProvider);
+    final listener = _onBackgroundTick;
+    maintenance.addTickListener(listener);
+    // build 重建时同样会触发 onDispose，否则监听者会在调度器上越挂越多。
+    ref.onDispose(() => maintenance.removeTickListener(listener));
+    return 0;
+  }
+
+  /// 空跑的一批不更新时间戳：队列没有任何变化，刷新只会白白多查一次库。
+  void _onBackgroundTick(int processed) {
+    if (processed <= 0) return;
+    state = DateTime.now().millisecondsSinceEpoch;
+  }
+}
+
 /// 当前页的任务列表。
 final FutureProvider<InitializationJobPage> queuePageProvider =
     FutureProvider<InitializationJobPage>((ref) {
+      // watch 这份时间戳即等于订阅「后台跑完请重查」，代价只有一个 provider。
+      ref.watch(backgroundTickProvider);
       final filter = ref.watch(queueFilterProvider);
       return ref
           .watch(initializationQueriesProvider)
@@ -80,9 +101,10 @@ final FutureProvider<InitializationJobPage> queuePageProvider =
 
 /// 各状态的任务计数。
 final FutureProvider<InitializationProgress> queueProgressProvider =
-    FutureProvider<InitializationProgress>(
-      (ref) => ref.watch(initializationQueriesProvider).progressSummary(),
-    );
+    FutureProvider<InitializationProgress>((ref) {
+      ref.watch(backgroundTickProvider);
+      return ref.watch(initializationQueriesProvider).progressSummary();
+    });
 
 /// 队列操作：取消、重试、批量入队。
 ///
@@ -92,6 +114,18 @@ class QueueActions {
   const new(this._ref);
 
   final Ref _ref;
+
+  /// 立即处理一批任务，返回实际处理的数量。
+  ///
+  /// 用户不必等 10 分钟的定时器。走 [InitializationMaintenance.pumpOnce]
+  /// 而不是直接调 `tick`：它带重入保护，避免与定时器那一批并发写库。
+  Future<int> processNow() async {
+    final processed = await _ref
+        .read(initializationMaintenanceProvider)
+        .pumpOnce(now: _now());
+    _invalidate();
+    return processed;
+  }
 
   /// 取消一个任务。
   Future<void> cancel(int jobId) async {

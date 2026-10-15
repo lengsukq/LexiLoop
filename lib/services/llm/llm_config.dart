@@ -15,6 +15,13 @@ import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 /// LLM 配置在 `settings.raw` 中的键名。
 const String llmConfigSettingsKey = 'llmConfig';
 
+/// AI 重试遍数在 `settings.raw` 中的键名。
+///
+/// **注意它不在 `llmConfig` 里面**：旧版 `modules/settings/service.ts:77`
+/// 把它和 `backgroundConcurrency` 一样定义在设置对象顶层。
+/// 本版曾从 `llmConfig.ai` 下读它，结果永远拿到默认值——用户改了设置也不生效。
+const String aiRetryCountSettingsKey = 'aiRetryCount';
+
 /// LLM 接口协议。
 enum LlmApiType {
   /// OpenAI 兼容（`POST {baseUrl}/chat/completions`）。
@@ -165,10 +172,41 @@ class LlmConfig {
   }
 }
 
+/// 从整份 `settings.raw` 解析 LLM 配置。
+///
+/// **为什么不是直接用 [llmConfigFromRaw]**：`aiRetryCount` 存在设置顶层而不在
+/// `llmConfig` 子对象里，只把子对象传进来就会丢掉它。所有调用方手上拿的都是
+/// 整份 `raw`，走这一个入口才不会有人再读错层级。
+LlmConfig llmConfigFromSettings(Map<Object?, Object?> settingsRaw) {
+  final config = llmConfigFromRaw(settingsRaw[llmConfigSettingsKey]);
+  final override = settingsRaw[aiRetryCountSettingsKey];
+  if (override is! num) return config;
+  return LlmConfig(
+    providers: config.providers,
+    ai: LlmAiConfig(
+      enabled: config.ai.enabled,
+      providerId: config.ai.providerId,
+      model: config.ai.model,
+      retryProviderId: config.ai.retryProviderId,
+      retryModel: config.ai.retryModel,
+      thinkingEnabled: config.ai.thinkingEnabled,
+      reasoningEffort: config.ai.reasoningEffort,
+      temperature: config.ai.temperature,
+      maxOutputTokens: config.ai.maxOutputTokens,
+      timeoutMs: config.ai.timeoutMs,
+      thinkingBudgetTokens: config.ai.thinkingBudgetTokens,
+      retryCount: override.round().clamp(1, maxAiRetryCount),
+    ),
+  );
+}
+
 /// 从 `settings.raw['llmConfig']` 解析 LLM 配置。
 ///
 /// 任何一层结构不符都退化为 [LlmConfig.disabled]，而不是抛错——
 /// 设置页的脏数据不应该让初始化队列整体不可用。
+///
+/// **调用方应改用 [llmConfigFromSettings]**：本函数看不到顶层设置，
+/// 因此读不到 `aiRetryCount`。
 LlmConfig llmConfigFromRaw(Object? raw) {
   if (raw is! Map) return LlmConfig.disabled;
   final providers = _providers(raw['providers']);
@@ -223,15 +261,16 @@ LlmAiConfig _ai(Object? raw) {
     maxOutputTokens: limits.$2,
     timeoutMs: limits.$3,
     thinkingBudgetTokens: limits.$4,
-    retryCount: limits.$5,
   );
 }
 
 /// 数值字段的取值夹取。
 ///
-/// 单独成函数是因为这里集中了 5 组「区间 + 默认值」，
+/// 单独成函数是因为这里集中了 4 组「区间 + 默认值」，
 /// 混在结构解析里会让 `_ai` 越过 40 行上限。
-(double, int, int, int, int) _aiLimits(Map<dynamic, dynamic> raw) => (
+///
+/// **`aiRetryCount` 不在这里**：它在设置顶层，由 [llmConfigFromSettings] 覆盖。
+(double, int, int, int) _aiLimits(Map<dynamic, dynamic> raw) => (
   _clampDouble(
     raw['temperature'],
     defaultLlmTemperature,
@@ -256,7 +295,6 @@ LlmAiConfig _ai(Object? raw) {
     minThinkingBudgetTokens,
     maxThinkingBudgetTokens,
   ),
-  _clampInt(raw['aiRetryCount'], defaultAiRetryCount, 1, maxAiRetryCount),
 );
 
 /// 去掉基址的尾部斜杠，避免拼出 `//chat/completions`。

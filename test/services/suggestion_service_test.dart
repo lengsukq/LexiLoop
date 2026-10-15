@@ -40,6 +40,24 @@ class FakeGenerator implements SuggestionAiGenerator {
   }
 }
 
+/// 永远失败的 AI 生成器。
+class _ThrowingGenerator implements SuggestionAiGenerator {
+  @override
+  String get providerId => 'p1';
+
+  @override
+  String get model => 'm1';
+
+  @override
+  Future<Map<String, Object?>> generate({
+    required DailySuggestionMetrics metrics,
+    required List<RecommendedStudyItem> candidates,
+    required String sourceDateKey,
+  }) async {
+    throw StateError('provider unreachable');
+  }
+}
+
 void main() {
   late AppDatabase db;
   late SettingsService settings;
@@ -189,6 +207,42 @@ void main() {
   });
 
   group('AI 生成', () {
+    test('today 也会走 AI 通路（旧版这里被硬编码成规则式）', () async {
+      final wordId = await insertWord(term: 'weak');
+      await insertReview(index: 1, wordId: wordId, isCorrect: false);
+      final generator = FakeGenerator(<String, Object?>{
+        'headline': 'AI 标题',
+        'summary': 'AI 总结',
+        'strengths': <Object?>['亮点一'],
+        'risks': <Object?>['风险一'],
+        'actions': <Object?>['行动一'],
+        'recommended': <Object?>[
+          <String, Object?>{'wordId': wordId, 'reason': 'AI 指定优先'},
+        ],
+      });
+
+      final service = SuggestionService(db, settings, generator);
+      final suggestion = (await service.today(now: now))!;
+
+      // 旧版 `modules/suggestions/service.ts:22-36` 把 generator 写死成
+      // RULE_BASED，`generateAiSuggestion` 从未被调用。本版刻意保留 AI 通路：
+      // 用户配置了 LLM 就该真的用上，配置失败才回落。
+      expect(generator.calls, 1);
+      expect(suggestion.generator, SuggestionGenerator.ai);
+    });
+
+    test('生成器抛错时回落规则式并带警告，不影响当天建议可用', () async {
+      final wordId = await insertWord(term: 'weak');
+      await insertReview(index: 1, wordId: wordId, isCorrect: false);
+
+      final service = SuggestionService(db, settings, _ThrowingGenerator());
+      final suggestion = (await service.today(now: now))!;
+
+      expect(suggestion.generator, SuggestionGenerator.ruleBased);
+      expect(suggestion.generationWarning, isNotNull);
+      expect(suggestion.headline, isNot(isEmpty));
+    });
+
     test('质量分过低时整份丢弃并回退规则式', () async {
       final wordId = await insertWord(term: 'weak');
       await insertReview(index: 1, wordId: wordId, isCorrect: false);

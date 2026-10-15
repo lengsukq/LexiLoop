@@ -36,7 +36,7 @@ class AiLexicalProvider implements DictionaryProvider {
 
   @override
   bool isEnabled(AppSettings settings) =>
-      llmConfigFromRaw(settings.raw[llmConfigSettingsKey]).isUsable;
+      llmConfigFromSettings(settings.raw).isUsable;
 
   @override
   bool supports(ProviderRequest request) => true;

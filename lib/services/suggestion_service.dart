@@ -18,7 +18,6 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/date_key.dart';
-import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
@@ -539,8 +538,11 @@ class SuggestionService {
         candidates: candidates,
         sourceDateKey: sourceDateKey,
       );
-    } on AppError catch (error) {
-      return _aiFallback('${error.message}（已回退规则式建议）');
+    } on Object catch (error) {
+      // 故意捕获 `Object` 而不是只接 `AppError`：每日建议是首页的点缀，
+      // 任何网络层的意外异常（socket、编解码、超时）都不该把整张仪表盘带崩。
+      // 回落规则式并把原因写进 `generationWarning`，用户仍能拿到可用建议。
+      return _aiFallback('AI 建议生成失败（$error），已回退规则式建议');
     }
     final score = aiSuggestionQualityScore(raw, candidates);
     if (score < aiQualityScoreThreshold) {
@@ -561,7 +563,7 @@ class SuggestionService {
 
   Future<SuggestionAiGenerator?> _defaultGenerator() async {
     final settings = await _settings.load();
-    final config = llmConfigFromRaw(settings.raw[llmConfigSettingsKey]);
+    final config = llmConfigFromSettings(settings.raw);
     if (!config.isUsable) return null;
     return LlmSuggestionGenerator(DioHttpFetcher(), config);
   }

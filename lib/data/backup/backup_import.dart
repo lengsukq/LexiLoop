@@ -15,6 +15,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
@@ -143,6 +144,9 @@ class BackupImporter {
   /// 整个过程在**单个事务**内完成：要么全部替换成功，要么原数据不变。
   /// 导入前会清空这 12 张表——旧版的语义就是「全量替换」。
   Future<BackupImportResult> import(String raw) async {
+    if (raw.length > maxBackupBytes) {
+      throw const ValidationError(AppErrorCode.backupTooLarge);
+    }
     final tables = _parse(raw);
     final rowCounts = <String, int>{};
 

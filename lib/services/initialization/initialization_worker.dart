@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/data/dictionary/content_normalize.dart';
@@ -29,6 +30,7 @@ import 'package:lexiloop/services/dictionary/pipeline.dart';
 import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/services/initialization/initialization_queries.dart';
+import 'package:lexiloop/services/initialization/job_runner.dart';
 import 'package:lexiloop/services/initialization/supplemental_tasks.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/services/settings_service.dart';
@@ -40,7 +42,9 @@ const String initializationWorkerId = 'flutter-local-worker';
 const String staleLockMessage = '进程重启前的运行中任务已重新排队';
 
 /// 初始化任务 worker。
-class InitializationWorker {
+///
+/// 实现 [InitializationJobRunner]，供后台维护调度与队列页按钮调用。
+class InitializationWorker implements InitializationJobRunner {
   /// 以数据库、设置、查询入口、词典服务与补充任务执行器构造。
   const new(
     this._db,
@@ -56,7 +60,7 @@ class InitializationWorker {
   final DictionaryLookupService _dictionary;
   final SupplementalTaskRunner _supplemental;
 
-  /// 取一批可执行任务并逐个执行，返回实际处理的数量。
+  @override
   Future<int> tick({required int now}) async {
     final jobs = await _claim(now);
     var processed = 0;
@@ -80,6 +84,7 @@ class InitializationWorker {
   ///
   /// [staleOnly] 为真时只回收 `locked_at` 早于 `workerStaleAfterMs` 的任务
   /// （会话中途的异常兜底）；为假时全量回收（应用启动时的崩溃恢复）。
+  @override
   Future<int> resetStaleRunningJobs(int now, {bool staleOnly = false}) async {
     final sql = staleOnly
         ? 'UPDATE initialization_jobs SET status = ?, locked_at = NULL, '
@@ -109,6 +114,7 @@ class InitializationWorker {
   }
 
   /// 把冷却已过的失败任务重新入队。
+  @override
   Future<int> retryFailedJobs(int now) async {
     final changes = await _db.customUpdate(
       'UPDATE initialization_jobs SET status = ?, attempt_count = 0, '
@@ -127,6 +133,46 @@ class InitializationWorker {
     );
     await _syncQueuedWords(now);
     return changes;
+  }
+
+  /// 让长期没再答错的词条退出错词本。
+  ///
+  /// SQL 与旧版 `decayStaleWrongWords` 逐字等价：判据是
+  /// 「最后答错早于 `wrongWordDecayDays` 天前」且「此后没有答对过」，
+  /// 两者取交集——只用前者会把「先错很久、最近刚答对一次」的词条误伤。
+  @override
+  Future<int> decayStaleWrongWords(int now) {
+    final cutoff = now - wrongWordDecayDays * dayMs;
+    return _db.customUpdate(
+      'UPDATE wrong_word_states '
+      'SET active = 0, resolved_at = ?, updated_at = ? '
+      'WHERE active = 1 AND last_wrong_at IS NOT NULL AND last_wrong_at < ? '
+      'AND (last_correct_at IS NULL OR last_correct_at < ?)',
+      variables: <Variable<Object>>[
+        Variable<int>(now),
+        Variable<int>(now),
+        Variable<int>(cutoff),
+        Variable<int>(cutoff),
+      ],
+      updateKind: UpdateKind.update,
+    );
+  }
+
+  /// 把卡在 `PENDING` 超过 `importBatchExpiryMs` 的导入批次置为失败。
+  ///
+  /// 刻意只改状态、不删行：批次里的逐行明细要留给用户看失败原因。
+  @override
+  Future<int> expireStaleImportBatches(int now) {
+    return _db.customUpdate(
+      'UPDATE import_batches SET status = ?, completed_at = ? '
+      "WHERE status = 'PENDING' AND created_at < ?",
+      variables: <Variable<Object>>[
+        Variable<String>(ImportBatchStatus.failed.wire),
+        Variable<int>(now),
+        Variable<int>(now - importBatchExpiryMs),
+      ],
+      updateKind: UpdateKind.update,
+    );
   }
 
   Future<List<ClaimedJob>> _claim(int now) async {
@@ -460,7 +506,7 @@ class InitializationWorker {
     int now,
   ) async {
     if (requested.isNotEmpty) return;
-    final llmConfig = llmConfigFromRaw(settings.raw[llmConfigSettingsKey]);
+    final llmConfig = llmConfigFromSettings(settings.raw);
     if (!llmConfig.isUsable) return;
     if (word.contentType == LexicalContentType.sentence) {
       if (_hasTargetTranslation(merged, word.targetLanguage)) return;

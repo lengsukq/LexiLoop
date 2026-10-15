@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
@@ -20,6 +21,9 @@ import 'package:lexiloop/services/initialization/supplemental_tasks.dart';
 import 'package:lexiloop/services/settings_service.dart';
 
 import '../data/dictionary/fake_http_fetcher.dart';
+
+/// 判据用：超过该时长没再答错的错词应当退出错词本。
+const int staleWrongWordMs = wrongWordDecayDays * dayMs;
 
 /// 永远失败的补充任务执行器（本组用例只关心状态机）。
 class FailingSupplemental implements SupplementalTaskRunner {
@@ -417,6 +421,153 @@ void main() {
         updateKind: UpdateKind.update,
       );
       expect(await workerWith(failingFetcher()).retryFailedJobs(now), 0);
+    });
+  });
+
+  group('decayStaleWrongWords', () {
+    /// 插入一条错词状态。
+    Future<int> insertWrongWord({
+      required String term,
+      bool active = true,
+      int? lastWrongAt,
+      int? lastCorrectAt,
+    }) async {
+      final wordId = await insertWord(term: term);
+      await db
+          .into(db.wrongWordStates)
+          .insert(
+            WrongWordStatesCompanion.insert(
+              wordId: Value<int>(wordId),
+              active: Value<bool>(active),
+              wrongCount: const Value<int>(1),
+              lastWrongAt: Value<int?>(lastWrongAt),
+              lastCorrectAt: Value<int?>(lastCorrectAt),
+              updatedAt: now,
+            ),
+          );
+      return wordId;
+    }
+
+    Future<Map<String, Object?>> wrongWordRow(int wordId) async {
+      final row = await db
+          .customSelect(
+            'SELECT * FROM wrong_word_states WHERE word_id = ?',
+            variables: <Variable<Object>>[Variable<int>(wordId)],
+          )
+          .getSingle();
+      return row.data;
+    }
+
+    test('超过衰减天数且此后没答对过的错词退出错词本', () async {
+      final stale = await insertWrongWord(
+        term: 'stale',
+        lastWrongAt: now - staleWrongWordMs - 1,
+      );
+      final recent = await insertWrongWord(
+        term: 'recent',
+        lastWrongAt: now - 1,
+      );
+
+      final changed = await workerWith(failingFetcher())
+          .decayStaleWrongWords(now);
+
+      expect(changed, 1);
+      final staleRow = await wrongWordRow(stale);
+      expect(staleRow['active'], 0);
+      expect(staleRow['resolved_at'], now);
+      expect(staleRow['updated_at'], now);
+      expect((await wrongWordRow(recent))['active'], 1);
+    });
+
+    test('「先错很久、最近刚答对一次」的错词保留', () async {
+      final wordId = await insertWrongWord(
+        term: 'recovered',
+        lastWrongAt: now - staleWrongWordMs - 1,
+        lastCorrectAt: now - 1,
+      );
+
+      expect(await workerWith(failingFetcher()).decayStaleWrongWords(now), 0);
+      expect((await wrongWordRow(wordId))['active'], 1);
+    });
+
+    test('恰好卡在衰减边界上不衰减，且已退出的不重复处理', () async {
+      final boundary = await insertWrongWord(
+        term: 'boundary',
+        lastWrongAt: now - staleWrongWordMs,
+      );
+      final inactive = await insertWrongWord(
+        term: 'inactive',
+        active: false,
+        lastWrongAt: now - staleWrongWordMs - 1,
+      );
+
+      expect(await workerWith(failingFetcher()).decayStaleWrongWords(now), 0);
+      expect((await wrongWordRow(boundary))['active'], 1);
+      expect((await wrongWordRow(inactive))['resolved_at'], isNull);
+    });
+  });
+
+  group('expireStaleImportBatches', () {
+    /// 插入一个导入批次。
+    Future<int> insertBatch({
+      required int createdAt,
+      ImportBatchStatus status = ImportBatchStatus.pending,
+    }) async {
+      final id = await db
+          .into(db.importBatches)
+          .insert(
+            ImportBatchesCompanion.insert(
+              filename: 'words.csv',
+              importMode: ImportMode.fillMissing,
+              status: Value<ImportBatchStatus>(status),
+              totalRows: const Value<int>(3),
+              validRows: const Value<int>(3),
+              createdAt: createdAt,
+            ),
+          );
+      return id;
+    }
+
+    Future<String> batchStatus(int batchId) async {
+      final row = await db
+          .customSelect(
+            'SELECT status FROM import_batches WHERE id = ?',
+            variables: <Variable<Object>>[Variable<int>(batchId)],
+          )
+          .getSingle();
+      return row.read<String>('status');
+    }
+
+    test('卡在 PENDING 超过过期时长的批次置为 FAILED', () async {
+      final stuck = await insertBatch(createdAt: now - importBatchExpiryMs - 1);
+
+      final changed = await workerWith(failingFetcher())
+          .expireStaleImportBatches(now);
+
+      expect(changed, 1);
+      expect(await batchStatus(stuck), ImportBatchStatus.failed.wire);
+      final row = await db
+          .customSelect(
+            'SELECT completed_at FROM import_batches WHERE id = ?',
+            variables: <Variable<Object>>[Variable<int>(stuck)],
+          )
+          .getSingle();
+      expect(row.read<int>('completed_at'), now);
+    });
+
+    test('未到期的批次与已结束的批次都不动', () async {
+      final fresh = await insertBatch(createdAt: now - 1);
+      final committed = await insertBatch(
+        status: ImportBatchStatus.committed,
+        createdAt: now - importBatchExpiryMs - 1,
+      );
+
+      final changed = await workerWith(failingFetcher())
+          .expireStaleImportBatches(now);
+
+      expect(changed, 0);
+      expect(await batchStatus(fresh), ImportBatchStatus.pending.wire);
+      expect(await batchStatus(committed), ImportBatchStatus.committed.wire);
     });
   });
 

@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/db/daos/review_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
@@ -174,16 +175,112 @@ LIMIT 1''',
   }
 
   /// 切换「暂停学习」。
+  ///
+  /// 暂停会把该词条在**所有会话**里的待答题一并撤下
+  /// （`skip_reason = WORD_SUSPENDED`，见 [wordSuspendedSkipReason]）：
+  /// 留着它们等于让用户对着一个自己刚声明「不想学」的词继续做题，
+  /// 被抽空的会话还会永远显示「未完成」。对应旧版
+  /// `modules/words/mutations.ts` 的 `cancelPendingStudyItemsForSuspend`。
+  ///
+  /// 恢复学习**不**把撤下的题目放回队列：它们已经计入
+  /// `completed_count`，放回去会让统计虚高；用户重开一次会话即可重新抽到。
+  ///
+  /// 撤题、计数、会话收尾与 `is_suspended` 的写入在**同一个事务**里：
+  /// 半套的暂停（词已暂停而题还挂在队列上）比不暂停更糟。
   Future<void> setSuspended({
     required int wordId,
     required bool suspended,
     required int now,
   }) async {
-    await (_db.update(_db.words)..where((row) => row.id.equals(wordId))).write(
-      WordsCompanion(
-        isSuspended: Value<bool>(suspended),
-        updatedAt: Value<int>(now),
-      ),
+    await _db.transaction(() async {
+      await (_db.update(
+        _db.words,
+      )..where((row) => row.id.equals(wordId))).write(
+        WordsCompanion(
+          isSuspended: Value<bool>(suspended),
+          updatedAt: Value<int>(now),
+        ),
+      );
+      if (suspended) await _withdrawPendingItems(wordId, now);
+    });
+  }
+
+  /// 撤下某词条在待答题队列中的全部题目，并收尾被抽空的会话。
+  ///
+  /// 先按会话分组数出待答题：单条 `UPDATE` 只给出总数，而会话计数是
+  /// **按会话**累加的，不知道每组各有几题就无从更新。
+  /// 该词条没有任何待答题时直接返回——暂停是用户意图，不该因为
+  /// 「没东西可撤」而失败。
+  Future<void> _withdrawPendingItems(int wordId, int now) async {
+    final grouped = await _pendingItemCounts(wordId);
+    if (grouped.isEmpty) return;
+    await _markWithdrawn(wordId, now);
+    final review = ReviewDao(_db);
+    for (final row in grouped) {
+      final sessionId = row.read<int>('session_id');
+      await _countWithdrawn(sessionId, row.read<int>('c'));
+      if (await review.pendingItemCount(sessionId) == 0) {
+        await review.closeSession(sessionId, now);
+      }
+    }
+  }
+
+  /// 该词条在各个会话里的待答题数（按会话分组）。
+  Future<List<QueryRow>> _pendingItemCounts(int wordId) {
+    return _db
+        .customSelect(
+          'SELECT study_session_id AS session_id, count(*) AS c '
+          'FROM study_session_items '
+          'WHERE word_id = ? AND status = ? GROUP BY study_session_id',
+          variables: <Variable<Object>>[
+            Variable<int>(wordId),
+            Variable<String>(StudyItemStatus.pending.wire),
+          ],
+        )
+        .get();
+  }
+
+  /// 把该词条的全部待答题标记为「因暂停而跳过」。
+  ///
+  /// `answered_at` 必须写：候选排除只看「已跳过**且**有作答时间」的题目，
+  /// 留空等于让这个暂停在候选侧失效。
+  Future<void> _markWithdrawn(int wordId, int now) async {
+    await _db.customUpdate(
+      '''
+UPDATE study_session_items
+SET status = ?, answered_at = ?, skip_reason = ?
+WHERE word_id = ? AND status = ?''',
+      variables: <Variable<Object>>[
+        Variable<String>(StudyItemStatus.skipped.wire),
+        Variable<int>(now),
+        const Variable<String>(wordSuspendedSkipReason),
+        Variable<int>(wordId),
+        Variable<String>(StudyItemStatus.pending.wire),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{
+        _db.studySessionItems,
+      },
+      updateKind: UpdateKind.update,
+    );
+  }
+
+  /// 把撤下的题数记进所属会话的完成数与跳过数。
+  ///
+  /// 跳过也算「处理过」：会话的完成判定只看还有没有待答题，
+  /// `completed_count` 不跟着涨，进度条就会永远差一截。
+  Future<void> _countWithdrawn(int sessionId, int count) async {
+    await _db.customUpdate(
+      'UPDATE study_sessions '
+      'SET completed_count = completed_count + ?, '
+      'skipped_count = skipped_count + ? '
+      'WHERE id = ?',
+      variables: <Variable<Object>>[
+        Variable<int>(count),
+        Variable<int>(count),
+        Variable<int>(sessionId),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{_db.studySessions},
+      updateKind: UpdateKind.update,
     );
   }
 

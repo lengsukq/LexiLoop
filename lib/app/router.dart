@@ -14,7 +14,10 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/add_page.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
+import 'package:lexiloop/features/games/games_page.dart';
 import 'package:lexiloop/features/import/import_page.dart';
+import 'package:lexiloop/features/match/match_page.dart';
+import 'package:lexiloop/features/phonetics/phonetics_page.dart';
 import 'package:lexiloop/features/placeholder/placeholder_page.dart';
 import 'package:lexiloop/features/settings/settings_page.dart';
 import 'package:lexiloop/features/statistics/statistics_page.dart';
@@ -62,6 +65,9 @@ Widget _pageFor(AppDestination destination) {
   return switch (destination.path) {
     '/' => const DashboardPage(),
     '/add' => const AddPage(),
+    '/games' => const GamesPage(),
+    '/match' => const MatchPage(),
+    '/phonetics' => const PhoneticsPage(),
     '/words' => const WordsPage(),
     '/settings' => const SettingsPage(),
     '/statistics' => const StatisticsPage(),

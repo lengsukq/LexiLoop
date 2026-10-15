@@ -68,7 +68,21 @@ flutter build macos --debug
 | 设置 | `lib/domain/models/app_settings.dart`、`lib/services/settings_service.dart` | 按 tab 分组、未建模键原样保留 |
 | 朗读 | `lib/services/tts_service.dart` | 引擎抽象（可测）、语速按内容类型区分 |
 
-### 2.5 迁移中修正的旧版缺陷
+### 2.5 P2 界面与 P3/P4 功能
+
+| 模块 | 位置 | 要点 |
+|---|---|---|
+| 学习会话页 | `lib/features/study/**` | 8 种题型的作答控件、四档自评即提交、反馈与总结；按职责拆成 13 个组件 |
+| 词条详情页 | `lib/features/word_detail/**` | 12 张卡片（释义/例句/短语/变形/同反义/词族/易混/词根词缀/学习情况/复习历史/笔记/助记） |
+| 仪表盘 | `lib/features/dashboard/**` | 今日计划、统计、到期与错词提醒、平台能力 |
+| 统计页 | `lib/features/statistics/**` | 逐日趋势折线、掌握分布、题型正确率、最近作答 |
+| 手动添加词条 | `lib/features/add/**` | 离线可用；不建服务端预览表 |
+| CSV 导入 | `lib/data/import/**`、`lib/services/csv_import_service.dart`、`lib/features/import/**` | EasyDict 列名别名、三种导入模式、批次撤销 |
+| 设置页 | `lib/features/settings/**` | 6 个 tab，即时保存 |
+| 朗读 | `lib/services/tts_service.dart` | 引擎抽象可测；学习页与详情页的朗读按钮待接 |
+| 词条写入 | `lib/services/word_edit_service.dart` | 创建/更新/暂停/笔记/删除/入队初始化 |
+
+### 2.6 迁移中修正的旧版缺陷
 
 这些是重写时**有意偏离**旧版的地方，每条都有注释与测试钉住：
 
@@ -89,6 +103,14 @@ flutter build macos --debug
 7. **`FSRS` 实例的全局缓存无上限**。本版改为调用方持有实例。
 8. **干扰项池是模块级可变全局变量**。本版每次按需查询。
 9. **腾讯翻译 provider 需要把 SecretKey 内嵌进客户端**，本版放弃该 provider。
+10. **`target_language` 用 `zh-CN` 而不是 `zh`**。真实备份（1417 词条）里
+    `words.target_language` 与 `definitions_json[].language` 全是 `zh-CN`，
+    而语言映射表若写成裸 `zh`，手动添加的词条释义会永远匹配不上。
+11. **`word_contents` 各 JSON 列的解析在两个 DAO 里各写了一份**（约 300 行重复）。
+    本版抽到 `domain/dictionary/content_parse.dart`，并用 27MB 生产备份
+    逐列核对了真实键名（`phrases_json` 用 `phrase`、`forms_json` 用
+    `type`+`value`、`tags_json` 是纯字符串数组、
+    `summary/learning/sentence_analysis` 是对象而非数组）。
 
 ---
 
@@ -96,10 +118,8 @@ flutter build macos --debug
 
 | 工作流 | 范围 |
 |---|---|
-| 学习会话页面 | `lib/features/study/**` |
-| 词条详情页 + 真实数据仪表盘 | `lib/features/word_detail/**`、`lib/features/dashboard/**` |
-| EasyDict CSV 导入 + 设置页 | `lib/features/import/**`、`lib/features/settings/**` |
 | 词典 provider + 初始化队列 + LLM | `lib/data/dictionary/**`、`lib/services/dictionary|llm|initialization/**` |
+| 小游戏 + 配对 + 音标训练 | `lib/features/games|match|phonetics/**`、`lib/domain/games|phonetics/**` |
 
 ---
 
@@ -107,10 +127,8 @@ flutter build macos --debug
 
 | 阶段 | 内容 |
 |---|---|
-| P3 | 统计页（`fl_chart`）、学习连续天数与趋势 |
-| P4 | 每日 AI 建议接入界面、模型选择对话框 |
-| P5 | 4 个小游戏、配对游戏、音标训练（48 音标静态目录） |
-| P6 | 液态玻璃打磨、双端 TTS 实测校准、打包与签名 |
+| P4 | 初始化队列界面（`/initialize`）、每日 AI 建议接入界面、模型选择对话框 |
+| P6 | 学习页与详情页的朗读按钮接入 `TtsService`、液态玻璃打磨、双端 TTS 实测校准、打包与签名 |
 | — | Android 端实机验证（由用户负责；`flutter doctor --android-licenses` 尚未接受） |
 
 ---

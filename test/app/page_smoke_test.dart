@@ -1,17 +1,22 @@
-/// 每个页面的**路由级冒烟测试**。
+/// 每个页面的**路由级冒烟 + 自适应**测试。
 ///
-/// **它守的是什么**：页面在自己的 widget 测试里通常被塞进
-/// `MaterialApp(home: Scaffold(body: Page()))`，于是 `Scaffold` 提供了
-/// `Material` 祖先；而真实路由里页面挂在 `AdaptiveShell` 的内容区，只有
-/// `AmbientBackground`（`DecoratedBox` + `Stack`）。页面若自己不提供
-/// `Material`，`TextField` / `Checkbox` / `InkWell` 就会向上找很远——
-/// 添加页当初要找 110 层以上才碰到一个，而 `debugCheckHasMaterial` 会在
-/// `LookupBoundary` 处截断查找。
+/// **它守的是什么**：
 ///
-/// 这类缺陷的麻烦之处是 `debugCheckHasMaterial` 是 `assert`：release 构建
-/// 会剥掉它，所以 Web 的 release 端到端测试照样全绿，只有 debug 构建会
-/// 整屏红字。因此这组用例**只从真实路由进入每个页面**，断言「渲染出来了、
-/// 没有异常」，宽窄两种宽度各跑一遍。
+/// 1. `Material` 祖先。页面在自己的 widget 测试里通常被塞进
+///    `MaterialApp(home: Scaffold(body: Page()))`，于是 `Scaffold` 提供了
+///    `Material` 祖先；而真实路由里页面挂在 `AdaptiveShell` 的内容区。页面若
+///    自己不提供 `Material`，`TextField` / `Checkbox` / `InkWell` 就会向上找
+///    很远——添加页当初要找 110 层以上才碰到一个，而 `debugCheckHasMaterial`
+///    会在 `LookupBoundary` 处截断查找。
+///
+///    这类缺陷的麻烦之处是 `debugCheckHasMaterial` 是 `assert`：release 构建
+///    会剥掉它，所以 Web 的 release 端到端测试照样全绿，只有 debug 构建会
+///    整屏红字。因此这组用例**只从真实路由进入每个页面**。
+///
+/// 2. 自适应。每个页面在 4 种宽度下各渲染一遍：手机竖屏 360、平板 700、
+///    桌面 1000 与宽桌面 1440。布局溢出（`RenderFlex overflowed`）在测试里
+///    是构建期异常，会被 `takeException()` 抓住——这正是「各个页面的设计都
+///    要自适应」的可执行定义。
 ///
 /// **诚实说明**：报告里那次添加页红屏在本机复现不出来（同一份代码、debug
 /// 构建、真实应用根、宽窄两种宽度都不报错），所以这里不能声称「复现了那个
@@ -31,11 +36,32 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
+import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
 import '../services/audio/audio_fakes.dart';
+
+/// 逐个走一遍的地址：8 个主导航目的地 + 4 个顶层向导路由。
+final List<String> allRoutes = <String>[
+  for (final destination in appDestinations) destination.path,
+  csvImportPath,
+  articlePath,
+  gamesPath,
+  matchPath,
+];
+
+/// 自适应要覆盖的宽度。
+///
+/// 360 是主流手机竖屏下限；700 是平板竖屏；1000 刚过侧边栏断点（1024）；
+/// 1440 是宽桌面。断点两侧都要有，否则「过断点时布局重排」这类缺陷测不到。
+const Map<String, double> widths = <String, double>{
+  '手机 360': 360,
+  '平板 700': 700,
+  '桌面 1000': 1000,
+  '宽桌面 1440': 1440,
+};
 
 void main() {
   late AppDatabase db;
@@ -46,13 +72,14 @@ void main() {
   /// 从真实路由打开一个地址并渲染若干帧。
   ///
   /// 不用 `pumpAndSettle`：若干页面停在带无限动画的加载态，会一直等到超时。
-  /// 这里要抓的是构建期异常（缺 `Material` 就是构建期抛的），几帧足够。
+  /// 这里要抓的是构建期异常（缺 `Material`、布局溢出都是构建期抛的），
+  /// 几帧足够。
   Future<void> pumpRoute(
     WidgetTester tester,
-    String location, {
-    Size size = const Size(1200, 900),
-  }) async {
-    tester.view.physicalSize = size;
+    String location,
+    double width,
+  ) async {
+    tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -79,45 +106,48 @@ void main() {
     expect(
       tester.takeException(),
       isNull,
-      reason: '$location 渲染时抛异常（多半是缺 Material 祖先）',
+      reason:
+          '$location 在 $width 宽下抛异常。\n'
+          '若是 `RenderFlex overflowed`，说明该页在这一档宽度下不自适应；\n'
+          '若是 `No Material widget found`，说明它依赖了远处的祖先。',
     );
   }
 
-  // 8 个主导航目的地 + 3 个顶层向导路由，逐个走一遍。
-  for (final destination in appDestinations) {
-    testWidgets('${destination.path} 能渲染且无异常', (tester) async {
-      await pumpRoute(tester, destination.path);
-    });
-  }
-
-  for (final path in <String>[
-    csvImportPath,
-    articlePath,
-    gamesPath,
-    matchPath,
-  ]) {
-    testWidgets('$path 能渲染且无异常', (tester) async {
-      await pumpRoute(tester, path);
-    });
+  for (final path in allRoutes) {
+    for (final entry in widths.entries) {
+      testWidgets('$path 在 ${entry.key} 下能渲染且无异常', (tester) async {
+        await pumpRoute(tester, path, entry.value);
+      });
+    }
   }
 
   testWidgets('添加页的输入框在真实路由下有 Material 祖先', (tester) async {
     // 这条直接钉住那个红屏：添加页自己没有 Scaffold，
     // 全靠外壳内容区的 Material 兜底。
-    await pumpRoute(tester, '/add');
+    await pumpRoute(tester, '/add', 1200);
     expect(find.byType(TextField), findsWidgets);
   });
 
-  testWidgets('窄屏下每个页面也能渲染', (tester) async {
-    // 自适应要求：窄屏走底部 Tab 布局，页面不能因为宽度变化而崩。
-    for (final path in <String>[
-      '/',
-      '/words',
-      '/add',
-      '/statistics',
-      '/settings',
-    ]) {
-      await pumpRoute(tester, path, size: const Size(420, 900));
+  testWidgets('窄屏走底部 Tab（带「更多」），宽屏走侧边栏', (tester) async {
+    // 断点两侧的导航形态必须真的不同，否则「自适应」只是没崩而已。
+    // 底部 Tab 把超出 4 个的目的地收进「更多」，侧边栏则全部平铺——
+    // 用「更多」的有无来区分两种形态。
+    await pumpRoute(tester, '/', 420);
+    expect(find.text('更多'), findsOneWidget);
+
+    await pumpRoute(tester, '/', 1200);
+    expect(find.text('更多'), findsNothing);
+    // 侧边栏是宽屏唯一的 LiquidGlass 外壳，用它把断言限定在导航里：
+    // 「今日」这类标签在页面正文里也会出现。
+    for (final destination in appDestinations) {
+      expect(
+        find.descendant(
+          of: find.byType(LiquidGlass),
+          matching: find.text(destination.label),
+        ),
+        findsWidgets,
+        reason: '宽屏侧边栏应当平铺出全部目的地：${destination.label}',
+      );
     }
   });
 }

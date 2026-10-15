@@ -133,17 +133,21 @@ class _StepCard extends StatelessWidget {
                 child: Text(
                   '$step',
                   style: LexiType.caption.copyWith(
-                    color: colors.accent,
+                    color: colors.accentText,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               const SizedBox(width: LexiSpace.s8),
-              Text(
-                title,
-                style: LexiType.callout.copyWith(
-                  color: colors.label,
-                  fontWeight: FontWeight.w600,
+              // 标题必须能换行：360 宽下「第 2 步 · 预览并挑选要导入的词」
+              // 这类标题的自然宽度会顶破这一行（实测溢出 11px）。
+              Expanded(
+                child: Text(
+                  title,
+                  style: LexiType.callout.copyWith(
+                    color: colors.label,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

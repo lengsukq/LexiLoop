@@ -18,6 +18,7 @@ import 'package:lexiloop/features/words/widgets/word_paginator.dart';
 import 'package:lexiloop/features/words/widgets/words_header.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 
 /// 单词本页面。
@@ -91,9 +92,14 @@ class _WordList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s4,
+        LexiSpace.s20,
+        LexiSpace.s16,
+      ),
       itemCount: entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: LexiSpace.s8),
       itemBuilder: (context, index) {
         final entry = entries[index];
         return WordCard(

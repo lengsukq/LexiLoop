@@ -59,7 +59,7 @@ class StudyFeedbackPanel extends StatelessWidget {
                 size: 20,
                 color: accent,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               Text(
                 outcome.isCorrect ? '回答正确' : '回答错误',
                 style: LexiType.title.copyWith(
@@ -75,17 +75,17 @@ class StudyFeedbackPanel extends StatelessWidget {
             ],
           ),
           if (!outcome.isCorrect) ...<Widget>[
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _WrongAnswerDetail(item: item, outcome: outcome, answer: answer),
           ],
           if (usedHint) ...<Widget>[
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             Text(
               studyHintRevealedText,
               style: LexiType.footnote.copyWith(color: colors.warning),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           _StatRow(
             label: '掌握度',
             value:
@@ -94,7 +94,7 @@ class StudyFeedbackPanel extends StatelessWidget {
           ),
           _StatRow(label: '下次复习', value: _nextReviewText(outcome)),
           if (outcome.adaptiveFollowUp != null) ...<Widget>[
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _Notice(
               icon: Icons.repeat_rounded,
               text: '这个词稍后会再出现一次',
@@ -102,7 +102,7 @@ class StudyFeedbackPanel extends StatelessWidget {
             ),
           ],
           if (outcome.idempotent) ...<Widget>[
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _Notice(
               icon: Icons.info_rounded,
               text: '重复提交已忽略，排期未重复推进',
@@ -139,7 +139,7 @@ class _WrongAnswerDetail extends StatelessWidget {
           '期望答案：${outcome.expectedAnswer}',
           style: LexiType.callout.copyWith(color: colors.danger),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         StudyAnswerDiff(item: item, outcome: outcome, answer: answer),
       ],
     );
@@ -174,10 +174,15 @@ class StudySummaryView extends StatelessWidget {
     // 与「刚做完一轮」是同一件事：现在没得学了，只能再来一轮或回首页。
     final title = session.items.isEmpty ? '暂时没有更多可学习词条' : '这一轮完成了';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s24,
+        LexiSpace.s20,
+        LexiSpace.s32,
+      ),
       children: <Widget>[
         Icon(Icons.celebration_rounded, size: 40, color: colors.accent),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Center(
           child: Text(
             title,
@@ -188,7 +193,7 @@ class StudySummaryView extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         Surface(
           padding: const EdgeInsets.all(LexiSpace.s20),
           child: Column(
@@ -212,12 +217,12 @@ class StudySummaryView extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: _buttonHeight),
           child: FilledButton(onPressed: onRestart, child: const Text('再来一轮')),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: _buttonHeight),
           child: OutlinedButton(onPressed: onHome, child: const Text('返回首页')),
@@ -238,7 +243,7 @@ class _StatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -246,7 +251,7 @@ class _StatRow extends StatelessWidget {
             label,
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: LexiSpace.s12),
           Flexible(
             child: Text(
               value,
@@ -277,7 +282,7 @@ class _Notice extends StatelessWidget {
     return Row(
       children: <Widget>[
         Icon(icon, size: 15, color: color),
-        const SizedBox(width: 6),
+        const SizedBox(width: LexiSpace.s6),
         Expanded(
           child: Text(text, style: LexiType.footnote.copyWith(color: color)),
         ),

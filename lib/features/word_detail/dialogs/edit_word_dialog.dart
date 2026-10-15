@@ -22,6 +22,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 弹窗内容宽度。
@@ -175,12 +176,12 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
                   _error = null;
                 }),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: LexiSpace.s6),
               _TargetMeta(target: widget.target, termChanged: _termChanged),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               const _SaveAfterFetchHint(),
               if (_error != null) ...<Widget>[
-                const SizedBox(height: 10),
+                const SizedBox(height: LexiSpace.s10),
                 Text(
                   _error!,
                   style: LexiType.footnote.copyWith(
@@ -188,7 +189,7 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               _Footer(
                 busy: _busy,
                 applying: _applying,
@@ -210,14 +211,14 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
     if (preview == null || _busy) return const <Widget>[];
     if (!preview.hasContent) return <Widget>[_NoContentView(preview: preview)];
     return <Widget>[
-      const SizedBox(height: 12),
+      const SizedBox(height: LexiSpace.s12),
       WordContentPreview(content: preview.content),
-      const SizedBox(height: 12),
+      const SizedBox(height: LexiSpace.s12),
       ApplyModeSelector(
         mode: _mode,
         onChanged: (mode) => setState(() => _mode = mode),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: LexiSpace.s12),
       Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
@@ -225,7 +226,7 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
             onPressed: _applying ? null : () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           FilledButton(
             onPressed: _applying ? null : _apply,
             child: Text(_applying ? '应用中…' : '确认应用并保存词条'),
@@ -292,10 +293,10 @@ class _SaveAfterFetchHint extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: colors.accent.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(
         '修改词条后需点击「有道词典初始化」获取新内容并确认应用，'
@@ -331,7 +332,7 @@ class _Footer extends StatelessWidget {
           onPressed: busy || applying ? null : onClose,
           child: const Text('取消'),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         OutlinedButton(
           onPressed: !canFetch || busy || applying ? null : onFetch,
           child: Text(busy ? '获取中…' : '有道词典初始化'),
@@ -357,14 +358,14 @@ class _NoContentView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Text(
           '有道词典未返回该词条的有效内容，暂不能保存修改。',
           style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         for (final message in messages)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: LexiSpace.s4),
             child: Text(
               message,
               style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),

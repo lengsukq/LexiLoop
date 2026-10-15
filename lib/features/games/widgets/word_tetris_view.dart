@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_tetris.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇俄罗斯方块视图。
@@ -41,7 +42,7 @@ class WordTetrisView extends StatelessWidget {
           '看释义，点中正在下落的正确单词',
           style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
@@ -50,7 +51,7 @@ class WordTetrisView extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SizedBox(
           height: fieldHeight,
           child: Stack(
@@ -84,7 +85,7 @@ class WordTetrisView extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           '堆叠 ${state.danger}/$wordTetrisDangerCap · 点错会记一次失误 · 堆满结束本轮',
           style: LexiType.caption.copyWith(
@@ -107,7 +108,7 @@ class _Block extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 70,
+      width: _blockWidth,
       height: WordTetrisView.blockHeight,
       child: Material(
         color: shaking ? context.lexiColors.danger : const Color(0xFF5856D6),
@@ -117,7 +118,7 @@ class _Block extends StatelessWidget {
           borderRadius: BorderRadius.circular(LexiRadius.sm),
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
               child: Text(
                 word,
                 maxLines: 2,
@@ -146,18 +147,18 @@ class _StackGauge extends StatelessWidget {
     final colors = context.lexiColors;
     if (danger <= 0) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(LexiSpace.s4),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           for (var index = 0; index < danger; index += 1)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: LexiSpace.s2),
               child: Container(
                 height: 8,
                 decoration: BoxDecoration(
                   color: colors.purple.withValues(alpha: 0.75),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(LexiRadius.pill),
                 ),
               ),
             ),
@@ -166,3 +167,6 @@ class _StackGauge extends StatelessWidget {
     );
   }
 }
+
+/// 下落方块宽度。
+const double _blockWidth = 70;

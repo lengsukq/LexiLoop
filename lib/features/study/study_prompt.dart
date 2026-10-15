@@ -44,7 +44,7 @@ class StudyPrompt extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _PromptHeader(type: item.questionType),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           _body(context),
         ],
       ),
@@ -76,7 +76,10 @@ class _PromptHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s4,
+      ),
       decoration: BoxDecoration(
         color: colors.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -118,7 +121,7 @@ class _TermPrompt extends StatelessWidget {
                 ),
               ),
               if (phonetic != null) ...<Widget>[
-                const SizedBox(height: 6),
+                const SizedBox(height: LexiSpace.s6),
                 Text(
                   '/$phonetic/',
                   style: LexiType.callout.copyWith(
@@ -171,7 +174,7 @@ class _ListeningPrompt extends StatelessWidget {
     return Row(
       children: <Widget>[
         SpeakButton(word: word, accent: accent),
-        const SizedBox(width: 12),
+        const SizedBox(width: LexiSpace.s12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,7 +186,7 @@ class _ListeningPrompt extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: LexiSpace.s4),
               Text(
                 '听不清时可以再点一次朗读',
                 style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
@@ -215,13 +218,13 @@ class _ClozePrompt extends StatelessWidget {
       children: <Widget>[
         Text.rich(_clozeSpan(payload.blankedSentence, style, colors.accent)),
         if (payload.translation case final translation?) ...<Widget>[
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           Text(
             translation,
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '提示：${studyMeaningText(word)}',
           style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),

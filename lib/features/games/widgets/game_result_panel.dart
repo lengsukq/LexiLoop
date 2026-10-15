@@ -16,6 +16,7 @@ import 'package:lexiloop/domain/games/scoring.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 结算页的文案。
@@ -78,17 +79,17 @@ class GameResultPanel extends StatelessWidget {
     return ListView(
       children: <Widget>[
         _Hero(labels: labels, result: result),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _Stats(labels: labels, summary: summary),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _Accuracy(accuracy: summary.accuracy),
         if (mistakes.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 14),
+          const SizedBox(height: LexiSpace.s14),
           _MistakeList(mistakes: mistakes, onOpenWord: onOpenWord),
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _Leaderboard(leaderboard: result.leaderboard),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         Row(
           children: <Widget>[
             Expanded(
@@ -98,7 +99,7 @@ class GameResultPanel extends StatelessWidget {
                 label: const Text('再来一局'),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: LexiSpace.s10),
             Expanded(
               child: OutlinedButton(
                 onPressed: onExit,
@@ -125,14 +126,17 @@ class _Hero extends StatelessWidget {
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.xl),
       showSpecular: true,
-      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 18),
+      padding: const EdgeInsets.symmetric(
+        vertical: LexiSpace.s24,
+        horizontal: LexiSpace.s20,
+      ),
       child: Column(
         children: <Widget>[
           Text(
             labels.title,
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             '${result.score}',
             style: LexiType.hero.copyWith(
@@ -141,14 +145,14 @@ class _Hero extends StatelessWidget {
               letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: LexiSpace.s2),
           Text(
             '评级 ${result.rank.label} · 用时 '
             '${(result.summary.elapsedMs / 1000).toStringAsFixed(1)} 秒 · '
             '最长 ${result.summary.maxCombo} 连击',
             style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Text(
             '历史最高分 ${result.leaderboard.best}',
             style: LexiType.footnote.copyWith(color: colors.accent),
@@ -175,13 +179,13 @@ class _Stats extends StatelessWidget {
           value: summary.firstTryCorrect,
           color: colors.success,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         _StatCell(
           label: '纠正完成',
           value: summary.recovered,
           color: colors.warning,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         _StatCell(
           label: labels.missed,
           value: summary.missed,
@@ -208,7 +212,7 @@ class _StatCell extends StatelessWidget {
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(LexiRadius.md),
         ),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s10),
         child: Column(
           children: <Widget>[
             Text(
@@ -256,9 +260,9 @@ class _Accuracy extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(LexiRadius.pill),
           child: LinearProgressIndicator(
             value: accuracy / 100,
             minHeight: 6,
@@ -295,7 +299,7 @@ class _MistakeListState extends State<_MistakeList> {
     return LiquidGlass(
       level: GlassLevel.subtle,
       borderRadius: BorderRadius.circular(LexiRadius.md),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -306,7 +310,7 @@ class _MistakeListState extends State<_MistakeList> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           for (final mistake in widget.mistakes)
             _MistakeRow(
               mistake: mistake,
@@ -347,7 +351,10 @@ class _MistakeRow extends StatelessWidget {
         onTap: onToggle,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          padding: const EdgeInsets.symmetric(
+            vertical: LexiSpace.s6,
+            horizontal: LexiSpace.s2,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -416,7 +423,7 @@ class _Leaderboard extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         for (var index = 0; index < leaderboard.top.length; index += 1)
           _ScoreRow(index: index, entry: leaderboard.top[index]),
       ],
@@ -439,11 +446,11 @@ class _ScoreRow extends StatelessWidget {
         '${playedAt.hour.toString().padLeft(2, '0')}:'
         '${playedAt.minute.toString().padLeft(2, '0')}';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         children: <Widget>[
           SizedBox(
-            width: 26,
+            width: _indexColumnWidth,
             child: Text(
               '${index + 1}',
               style: LexiType.footnote.copyWith(
@@ -470,3 +477,6 @@ class _ScoreRow extends StatelessWidget {
     );
   }
 }
+
+/// 序号列宽——两位数以内右对齐。
+const double _indexColumnWidth = 26;

@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/word_builder.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 单词拼图视图。
@@ -46,7 +47,7 @@ class WordBuilderView extends StatelessWidget {
             color: context.lexiColors.quaternaryLabel,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
@@ -55,13 +56,13 @@ class WordBuilderView extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _BuiltRow(
           built: built,
           wrong: state.wrong,
           onTap: (id) => onAction(DeselectLetter(id)),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -75,7 +76,7 @@ class WordBuilderView extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: LexiSpace.s20),
         Row(
           children: <Widget>[
             OutlinedButton(
@@ -84,12 +85,12 @@ class WordBuilderView extends StatelessWidget {
                   : () => onAction(const ClearLetters()),
               child: const Text('清空'),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             OutlinedButton(
               onPressed: () => onAction(const RevealWord()),
               child: const Text('不认识'),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             Expanded(
               child: FilledButton(
                 onPressed: state.isComplete
@@ -127,7 +128,7 @@ class _BuiltRow extends StatelessWidget {
             ? colors.danger.withValues(alpha: 0.06)
             : colors.accent.withValues(alpha: 0.04),
       ),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(LexiSpace.s8),
       child: built.isEmpty
           ? Center(
               child: Text(
@@ -178,8 +179,8 @@ class _LetterTileBox extends StatelessWidget {
           onTap: used ? null : onTap,
           borderRadius: BorderRadius.circular(LexiRadius.sm),
           child: SizedBox(
-            width: 40,
-            height: 40,
+            width: LexiSpace.s40,
+            height: LexiSpace.s40,
             child: Center(
               child: Text(
                 label.toUpperCase(),
@@ -215,7 +216,7 @@ class _Revealed extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Text(
           question.word.term,
           style: LexiType.display.copyWith(
@@ -224,13 +225,13 @@ class _Revealed extends StatelessWidget {
             letterSpacing: 2,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '记住它的拼写，然后继续下一题。该词已记入错词，之后会优先复习。',
           textAlign: TextAlign.center,
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         FilledButton.icon(
           onPressed: () => onAction(const ConfirmRevealed()),
           icon: const Icon(Icons.check_circle_outline_rounded, size: 18),

@@ -59,7 +59,7 @@ class StudyRatingBar extends StatelessWidget {
           hint,
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Row(
           children: <Widget>[
             for (final rating in ReviewRating.values) ...<Widget>[
@@ -72,7 +72,8 @@ class StudyRatingBar extends StatelessWidget {
                   onTap: () => onSelect(rating),
                 ),
               ),
-              if (rating != ReviewRating.values.last) const SizedBox(width: 8),
+              if (rating != ReviewRating.values.last)
+                const SizedBox(width: LexiSpace.s8),
             ],
           ],
         ),
@@ -126,7 +127,7 @@ class _RatingButton extends StatelessWidget {
         child: Container(
           constraints: const BoxConstraints(minHeight: 48),
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LexiRadius.sm),
             border: Border.all(

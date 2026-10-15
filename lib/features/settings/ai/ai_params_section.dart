@@ -15,6 +15,7 @@ import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 推理强度的可选项；空串表示「交给模型自己决定」。
@@ -59,13 +60,13 @@ class AiParamsSection extends StatelessWidget {
             ),
           ),
           if (ai.enabled) ...<Widget>[
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _TargetPickers(config: config, onChanged: onChanged),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _TuningFields(config: config, onChanged: onChanged),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _ThinkingFields(config: config, onChanged: onChanged),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _RetryFields(config: config, onChanged: onChanged),
           ],
         ],
@@ -115,7 +116,7 @@ class _TargetPickers extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: LexiSpace.s10),
         Expanded(
           child: DropdownButtonFormField<String>(
             key: const Key('aiModelSelect'),
@@ -293,14 +294,14 @@ class _RetryFields extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const _RetryHeader(),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
               child: _RetryProviderPicker(config: config, onChanged: onChanged),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: LexiSpace.s10),
             Expanded(
               child: _RetryModelPicker(config: config, onChanged: onChanged),
             ),

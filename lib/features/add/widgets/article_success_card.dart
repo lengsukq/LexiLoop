@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 完成摘要。
@@ -44,8 +45,8 @@ class ArticleCommittingStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const SizedBox(
-            width: 22,
-            height: 22,
+            width: LexiSpace.s24,
+            height: LexiSpace.s24,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(height: articleCardGap),

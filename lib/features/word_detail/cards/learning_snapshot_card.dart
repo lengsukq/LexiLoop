@@ -8,6 +8,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -60,7 +61,7 @@ class _SnapshotBody extends StatelessWidget {
           level: snapshot.masteryLevel,
           score: snapshot.masteryScore,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         if (snapshot.hasCard) ...<Widget>[
           DetailField(
             label: 'FSRS 阶段',
@@ -78,7 +79,7 @@ class _SnapshotBody extends StatelessWidget {
         ] else
           const DetailEmptyHint(text: '还没有复习记录，学一次之后这里会显示 FSRS 卡片状态。'),
         DetailField(label: '累计正确率', value: accuracy ?? '暂无作答记录'),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         _WrongWordBlock(snapshot: snapshot),
       ],
     );
@@ -116,7 +117,7 @@ class _WrongWordBlock extends StatelessWidget {
             DetailChip(text: '连续答对 ${snapshot.consecutiveCorrect} 次'),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         DetailField(
           label: '最近答错',
           value: formatOptionalTimestamp(snapshot.lastWrongAt),

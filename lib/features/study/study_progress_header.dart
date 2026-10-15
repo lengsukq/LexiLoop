@@ -33,7 +33,12 @@ class StudyProgressHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s12,
+        LexiSpace.s20,
+        LexiSpace.s8,
+      ),
       child: Column(
         children: <Widget>[
           Row(
@@ -48,7 +53,7 @@ class StudyProgressHeader extends StatelessWidget {
               _HeaderAction(label: '结束', enabled: true, onTap: onExit),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           _ProgressTrack(
             value: session.plannedCount <= 0
                 ? 0
@@ -78,13 +83,13 @@ class _CountsRow extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: LexiSpace.s10),
         _CountChip(
           label: '正确',
           value: session.correctCount,
           color: colors.success,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: LexiSpace.s6),
         _CountChip(
           label: '错误',
           value: session.wrongCount,

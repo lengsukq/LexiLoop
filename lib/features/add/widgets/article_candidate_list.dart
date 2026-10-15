@@ -13,6 +13,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 候选列表。
@@ -226,7 +227,7 @@ class _WordRow extends ConsumerWidget {
       key: Key('articleCandidate$key'),
       onTap: candidate.isKnown ? null : () => notifier.toggleKey(key),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
         child: Row(
           children: <Widget>[
             Checkbox(
@@ -250,16 +251,16 @@ class _WordRow extends ConsumerWidget {
             ),
             if (candidate.cefrLevel != null)
               ArticleBadge(label: candidate.cefrLevel!, color: colors.accent),
-            const SizedBox(width: 6),
+            const SizedBox(width: LexiSpace.s6),
             Text(
               '×${candidate.occurrences}',
               style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: LexiSpace.s6),
             _StateBadge(candidate: candidate, selected: selected),
-            const SizedBox(width: 6),
+            const SizedBox(width: LexiSpace.s6),
             SizedBox(
-              width: 96,
+              width: _reasonColumnWidth,
               child: Text(
                 candidate.aiReason ?? (candidate.isKnown ? '已在词库' : '—'),
                 maxLines: 1,
@@ -341,7 +342,7 @@ class _CandidateCard extends ConsumerWidget {
     final card = candidate.aiCard;
     return Container(
       margin: const EdgeInsets.only(bottom: articleTightGap),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: selected ? colors.accent.withValues(alpha: 0.06) : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -417,7 +418,7 @@ class _AiCardBody extends StatelessWidget {
     ].join('；');
     return Container(
       margin: const EdgeInsets.only(top: articleTightGap),
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(LexiSpace.s8),
       decoration: BoxDecoration(
         color: colors.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -457,7 +458,7 @@ class _LabeledText extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s2),
       child: Text.rich(
         TextSpan(
           children: <InlineSpan>[
@@ -478,3 +479,6 @@ class _LabeledText extends StatelessWidget {
     );
   }
 }
+
+/// 「AI 理由 / 状态」列宽——固定宽度让每行的说明文字左端对齐。
+const double _reasonColumnWidth = 96;

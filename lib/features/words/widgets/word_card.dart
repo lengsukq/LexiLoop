@@ -16,6 +16,7 @@ import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -48,7 +49,10 @@ class WordCard extends StatelessWidget {
         level: GlassLevel.elevated,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         showSpecular: true,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s14,
+          vertical: LexiSpace.s12,
+        ),
         child: Row(
           children: <Widget>[
             Expanded(
@@ -56,14 +60,14 @@ class WordCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   _CardHeading(entry: entry),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: LexiSpace.s4),
                   _CardMeaning(meaning: entry.meaning),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: LexiSpace.s6),
                   _CardMeta(entry: entry, isDue: isDue),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: LexiSpace.s10),
             _CardAside(entry: entry),
           ],
         ),
@@ -95,12 +99,12 @@ class _CardHeading extends StatelessWidget {
         ),
         if (entry.wrongWordActive)
           const Padding(
-            padding: EdgeInsets.only(left: 6),
+            padding: EdgeInsets.only(left: LexiSpace.s6),
             child: _CardTag(label: '错词', colorRole: _TagRole.danger),
           ),
         if (entry.isSuspended)
           const Padding(
-            padding: EdgeInsets.only(left: 6),
+            padding: EdgeInsets.only(left: LexiSpace.s6),
             child: _CardTag(label: '已暂停', colorRole: _TagRole.muted),
           ),
       ],
@@ -179,7 +183,7 @@ class _CardAside extends StatelessWidget {
             _EditButton(entry: entry),
           ],
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: LexiSpace.s2),
         Text(
           '${entry.masteryScore}',
           style: LexiType.title.copyWith(
@@ -288,7 +292,10 @@ class _CardTag extends StatelessWidget {
       _TagRole.muted => colors.tertiaryLabel,
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),

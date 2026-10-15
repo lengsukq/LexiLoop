@@ -8,6 +8,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -54,7 +55,7 @@ class _RemindersBody extends StatelessWidget {
           count: overview.dueToday,
           actionLabel: '去复习',
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         _ReminderRow(
           id: 'wrong',
           label: '错词本',

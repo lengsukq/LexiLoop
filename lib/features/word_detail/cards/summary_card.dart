@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 摘要卡片：简释、整句翻译、CEFR 等级、词频，以及词条标签。
@@ -36,7 +37,7 @@ class SummaryCard extends StatelessWidget {
           if (summary.frequency != null)
             DetailField(label: '词频', value: summary.frequency!),
           if (tags.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             Wrap(
               spacing: 6,
               runSpacing: 6,

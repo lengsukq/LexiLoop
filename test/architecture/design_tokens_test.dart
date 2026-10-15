@@ -5,10 +5,12 @@
 /// 实现的徽标——它们不是一次写坏的，是每次「这里想大一点点」累积出来的。
 /// 没有守卫，下一次改动还会这样长回来。
 ///
-/// 这里守三件事：
+/// 这里守五件事：
 /// 1. 字号只能来自 [LexiType]；
-/// 2. 色板里声明的「文字 × 背景」组合必须满足对比度下限（**算出来**，不是估的）；
-/// 3. 音阶自身保持严格递增且不低于可读下限。
+/// 2. 圆角只能来自 [LexiRadius]；
+/// 3. 间距必须落在 [LexiSpace] 音阶上；
+/// 4. 色板里声明的「文字 × 背景」组合必须满足对比度下限（**算出来**，不是估的）；
+/// 5. 音阶自身保持严格递增且不低于可读下限。
 library;
 
 import 'dart:math' as math;
@@ -16,6 +18,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 import 'source_scan.dart';
@@ -98,6 +101,85 @@ void main() {
           isNotNull,
           reason: '${step.fontSize} 磅这一档没有行高，多行文本会挤在一起',
         );
+      }
+    });
+  });
+
+  group('圆角', () {
+    test('lib 里不得出现 circular 的数字字面量', () {
+      final violations = <String>[];
+      final pattern = RegExp(r'(?:BorderRadius|Radius)\.circular\(\s*[0-9]');
+      for (final file in collectDartFiles('lib')) {
+        for (var i = 0; i < file.lines.length; i += 1) {
+          if (pattern.hasMatch(file.lines[i])) {
+            violations.add(file.locate(i + 1));
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            '圆角必须取自 LexiRadius（`lib/ui/theme/lexi_colors.dart`）。\n'
+            '收敛前这里有 9 种临时圆角（3/4/6/8/10/12/13/14/16/999）：\n'
+            '同一个应用里同时出现 13 与 14 两种「差不多」的圆角，是纯噪声。\n'
+            '违规项：\n${violations.join('\n')}',
+      );
+    });
+
+    test('圆角档位严格递增且不低于 4', () {
+      const steps = LexiRadius.steps;
+      expect(steps.length, greaterThanOrEqualTo(6));
+      for (var i = 1; i < steps.length; i += 1) {
+        expect(
+          steps[i],
+          greaterThan(steps[i - 1]),
+          reason: '圆角档位必须严格递增：$steps',
+        );
+      }
+      expect(
+        steps.first,
+        greaterThanOrEqualTo(4),
+        reason: '最小档不得低于 4——再小就看不出来了',
+      );
+      expect(
+        LexiRadius.pill,
+        greaterThan(steps.last),
+        reason: 'pill 是形状哨兵，必须大于所有真实档位',
+      );
+    });
+  });
+
+  group('间距', () {
+    test('lib 里的间距必须落在 LexiSpace 音阶上', () {
+      final violations = <String>[];
+      for (final file in collectDartFiles('lib')) {
+        violations.addAll(_spacingViolations(file));
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            '间距必须取自 LexiSpace（`lib/ui/theme/lexi_space.dart`）。\n'
+            '收敛前这里有 25 种间距值（1 / 2.5 / 3 / 5 / 7 / 9 / 18 / 22 …），\n'
+            '差一两个像素在单屏上看不出来，但同一列卡片之间「有的差 12、\n'
+            '有的差 14」会让人说不出哪里别扭。\n'
+            '固定尺寸（列宽、点击热区）不是间距，就地命名成有语义的 const。\n'
+            '违规项：\n${violations.join('\n')}',
+      );
+    });
+
+    test('间距音阶是严格递增的 2pt 节奏', () {
+      const steps = LexiSpace.steps;
+      for (var i = 1; i < steps.length; i += 1) {
+        expect(
+          steps[i],
+          greaterThan(steps[i - 1]),
+          reason: '间距音阶必须严格递增：$steps',
+        );
+      }
+      for (final step in steps) {
+        expect(step % 2, 0, reason: '$step 不在 2pt 节奏上');
       }
     });
   });
@@ -213,3 +295,56 @@ Map<String, Color> _textTokens(LexiColors colors) => <String, Color>{
   'warningText': colors.warningText,
   'purpleText': colors.purpleText,
 };
+
+/// 找出 [file] 中间距不在 [LexiSpace] 音阶上的地方。
+///
+/// 扫描是启发式的，只看两个「间距一定住在这里」的位置：
+/// * `EdgeInsets.*(...)`——取到最近的 `)`，`dart format` 不会在参数里嵌调用；
+/// * `SizedBox(width: …)` / `SizedBox(height: …)`——只看这两个具名参数，
+///   因此 `child:` 里的数字（`Text('…', maxLines: 2)`）不会被误判。
+///
+/// 反过来说，写在别的参数里的间距（`BoxConstraints(minHeight:)` 之类）这里
+/// 管不到——那些是**尺寸**而不是间距，本就该用有语义的常量表达。
+List<String> _spacingViolations(SourceFile file) {
+  final text = file.lines.join('\n');
+  final violations = <String>[];
+
+  int lineOf(int offset) =>
+      '\n'.allMatches(text.substring(0, offset)).length + 1;
+
+  void check(num value, int offset, String where) {
+    if (value == 0) return;
+    if (LexiSpace.steps.contains(value.toDouble())) return;
+    violations.add('${file.path}:${lineOf(offset)}  $where 里的 $value 不在音阶上');
+  }
+
+  final numbers = RegExp(r'[0-9]+(?:\.[0-9]+)?');
+
+  for (final match in RegExp(
+    r'EdgeInsets[A-Za-z.]*\(([^()]*)\)',
+    dotAll: true,
+  ).allMatches(text)) {
+    final bodyStart = match.start + match.group(0)!.indexOf('(') + 1;
+    for (final number in numbers.allMatches(match.group(1)!)) {
+      check(
+        num.parse(number.group(0)!),
+        bodyStart + number.start,
+        'EdgeInsets',
+      );
+    }
+  }
+
+  for (final match in RegExp(
+    r'SizedBox\(([^()]*)',
+    dotAll: true,
+  ).allMatches(text)) {
+    final bodyStart = match.start + match.group(0)!.indexOf('(') + 1;
+    for (final number in RegExp(
+      r'(?:width|height):\s*([0-9]+(?:\.[0-9]+)?)',
+    ).allMatches(match.group(1)!)) {
+      check(num.parse(number.group(1)!), bodyStart + number.start, 'SizedBox');
+    }
+  }
+
+  return violations;
+}

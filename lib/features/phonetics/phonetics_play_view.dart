@@ -18,6 +18,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 音标训练进行中页面。
@@ -47,13 +48,13 @@ class PhoneticPlayView extends StatelessWidget {
     return Column(
       children: <Widget>[
         GameHud(title: '音标辨音训练', core: quiz.core, onExit: onExit),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Expanded(
           child: SingleChildScrollView(
             child: Column(
               children: <Widget>[
                 _Prompt(question: question, quiz: quiz),
-                const SizedBox(height: 16),
+                const SizedBox(height: LexiSpace.s16),
                 GameChoiceGrid(
                   choices: question.base.choices.options,
                   onChoose: (choice) => onAction(ChoosePhonetic(choice)),
@@ -67,7 +68,7 @@ class PhoneticPlayView extends StatelessWidget {
                   enabled: !quiz.revealed && !quiz.hasWrongSelection,
                 ),
                 if (quiz.hasWrongSelection) ...<Widget>[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: LexiSpace.s10),
                   Text(
                     '不对，再听一次后重新选择',
                     style: LexiType.body.copyWith(
@@ -76,15 +77,15 @@ class PhoneticPlayView extends StatelessWidget {
                   ),
                 ],
                 if (quiz.revealed) ...<Widget>[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: LexiSpace.s14),
                   _Analysis(entry: question.entry),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LexiSpace.s12),
                   FilledButton(
                     onPressed: () => onAction(const ContinuePhonetic()),
                     child: const Text('继续'),
                   ),
                 ] else ...<Widget>[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LexiSpace.s12),
                   TextButton(
                     onPressed: () => onAction(const SkipPhonetic()),
                     child: const Text('跳过这题'),
@@ -137,16 +138,19 @@ class _Prompt extends StatelessWidget {
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.xl),
       showSpecular: true,
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        vertical: LexiSpace.s20,
+        horizontal: LexiSpace.s16,
+      ),
       child: Column(
         children: <Widget>[
           Text(
             _hint(question.challenge),
             style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           _Body(question: question),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           _SpeakButton(term: question.base.word.term),
         ],
       ),
@@ -186,7 +190,7 @@ class _Body extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             question.base.word.definition,
             textAlign: TextAlign.center,
@@ -255,7 +259,7 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
         ),
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: LexiSpace.s6),
             child: Text(
               _error!,
               textAlign: TextAlign.center,
@@ -280,7 +284,7 @@ class _Analysis extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.subtle,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -294,14 +298,14 @@ class _Analysis extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               Text(
                 '${entry.nameZh} · ${entry.identity.groupLabel}',
                 style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           _Field(label: '发音要领', text: entry.description),
           _Field(label: '口型', text: entry.guide.mouthShape),
           _Field(label: '易踩坑', text: entry.relations.pitfalls),
@@ -331,7 +335,7 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: LexiSpace.s6),
       child: RichText(
         text: TextSpan(
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),

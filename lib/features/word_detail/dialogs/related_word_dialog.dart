@@ -20,6 +20,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -173,7 +174,7 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
             if (_message != null) _MessageBlock(text: _message!),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: LexiSpace.s8),
                 child: Text(
                   _error!,
                   style: LexiType.footnote.copyWith(
@@ -181,7 +182,7 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
                   ),
                 ),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             _Actions(
               preview: preview,
               adding: _adding,
@@ -209,10 +210,13 @@ class _Title extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s8,
+            vertical: LexiSpace.s4,
+          ),
           decoration: BoxDecoration(
             color: colors.purple.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(LexiRadius.sm),
           ),
           child: Text(
             relationLabel(relation),
@@ -222,7 +226,7 @@ class _Title extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           term,
           style: LexiType.title2.copyWith(
@@ -242,16 +246,16 @@ class _CheckingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           const SizedBox(
-            width: 16,
-            height: 16,
+            width: LexiSpace.s16,
+            height: LexiSpace.s16,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: LexiSpace.s10),
           Text(
             '正在检查词库状态…',
             style: LexiType.body.copyWith(
@@ -275,11 +279,11 @@ class _DifferenceBlock extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(top: LexiSpace.s8),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: colors.purple.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(text, style: LexiType.body.copyWith(color: colors.purple)),
     );
@@ -298,11 +302,11 @@ class _StatusBlock extends StatelessWidget {
     final existing = preview.existing;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(top: LexiSpace.s10),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
         color: colors.label.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
         children: <Widget>[
@@ -352,7 +356,7 @@ class _StatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -379,10 +383,13 @@ class _PlainBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: colors.tertiaryLabel.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: Text(
         text,
@@ -406,11 +413,11 @@ class _MessageBlock extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(top: LexiSpace.s8),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: colors.success.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(text, style: LexiType.body.copyWith(color: colors.success)),
     );
@@ -443,7 +450,7 @@ class _Actions extends StatelessWidget {
             onPressed: adding ? null : () => onOpenWord(existing.id),
             child: const Text('打开词条'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
         ],
         if (canAdd)
           FilledButton(

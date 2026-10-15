@@ -13,6 +13,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇水平分组。
@@ -27,7 +28,12 @@ class VocabularySection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.lexiColors;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         SettingsSectionCard(
           title: '词汇水平',
@@ -46,7 +52,7 @@ class VocabularySection extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '考试目标',
           subtitle: '可多选，用于统计与推荐；「不限定」不作为目标。',
@@ -101,7 +107,7 @@ class _LevelOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s6),
       child: Material(
         color: selected ? colors.accent.withValues(alpha: 0.1) : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -109,7 +115,10 @@ class _LevelOption extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(LexiRadius.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s10,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(
@@ -119,7 +128,7 @@ class _LevelOption extends StatelessWidget {
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: LexiSpace.s10),
                 Text(
                   vocabularyLevelLabel(level),
                   style: LexiType.body.copyWith(

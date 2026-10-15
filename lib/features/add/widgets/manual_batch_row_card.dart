@@ -12,6 +12,7 @@ import 'package:lexiloop/features/add/manual_batch_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一行在批量列表里的位置与内容。
@@ -119,7 +120,7 @@ class _RowHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +145,7 @@ class _RowHeader extends StatelessWidget {
                     const _Badge(label: '已确认', tone: _BadgeTone.success),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: LexiSpace.s2),
               Text(
                 _summary(row),
                 maxLines: 2,
@@ -301,7 +302,7 @@ class _SummaryBlock extends StatelessWidget {
           ],
         ),
         if (_text(summary['translation']).isNotEmpty) ...<Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Text(
             _text(summary['translation']),
             style: LexiType.title.copyWith(
@@ -311,7 +312,7 @@ class _SummaryBlock extends StatelessWidget {
           ),
         ],
         if (_text(summary['shortDefinition']).isNotEmpty) ...<Widget>[
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             _text(summary['shortDefinition']),
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -361,7 +362,7 @@ class _LinesBlock extends StatelessWidget {
         children: <Widget>[
           for (final line in lines)
             Padding(
-              padding: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.only(bottom: LexiSpace.s2),
               child: Text(
                 line,
                 style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -393,7 +394,7 @@ class _Block extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         child,
       ],
     ),
@@ -416,7 +417,10 @@ class _Badge extends StatelessWidget {
       _BadgeTone.success => colors.successDeep,
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),

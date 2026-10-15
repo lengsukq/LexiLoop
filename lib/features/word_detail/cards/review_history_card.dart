@@ -8,6 +8,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -54,11 +55,11 @@ class _LogRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         children: <Widget>[
           SizedBox(
-            width: 118,
+            width: _timestampColumnWidth,
             child: Text(
               formatTimestamp(entry.reviewedAt),
               style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
@@ -68,13 +69,13 @@ class _LogRow extends StatelessWidget {
             text: ratingLabel(entry.rating),
             color: entry.isCorrect ? colors.success : colors.danger,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: LexiSpace.s6),
           Icon(
             entry.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
             size: 14,
             color: entry.isCorrect ? colors.success : colors.danger,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               questionTypeLabel(entry.questionType),
@@ -91,3 +92,6 @@ class _LogRow extends StatelessWidget {
     );
   }
 }
+
+/// 复习时间列宽——时间戳等宽，固定宽度让右侧内容左端对齐。
+const double _timestampColumnWidth = 118;

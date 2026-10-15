@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词库列表页的空状态。
@@ -24,7 +25,7 @@ class WordEmptyView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(LexiSpace.s32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -33,7 +34,7 @@ class WordEmptyView extends StatelessWidget {
               size: 44,
               color: context.lexiColors.tertiaryLabel,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: LexiSpace.s14),
             Text(
               filtered ? '没有匹配的词条' : '还没有词条',
               style: LexiType.title.copyWith(
@@ -41,7 +42,7 @@ class WordEmptyView extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: LexiSpace.s6),
             Text(
               filtered ? '调整筛选条件或清空搜索词后再试。' : '可以导入旧版备份，也可以直接用 CSV 导入建立词库。',
               textAlign: TextAlign.center,
@@ -50,12 +51,12 @@ class WordEmptyView extends StatelessWidget {
               ),
             ),
             if (!filtered) ...<Widget>[
-              const SizedBox(height: 16),
+              const SizedBox(height: LexiSpace.s16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   const ImportBackupButton(),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: LexiSpace.s8),
                   FilledButton.icon(
                     onPressed: () => context.go(csvImportPath),
                     icon: const Icon(Icons.upload_rounded, size: 17),

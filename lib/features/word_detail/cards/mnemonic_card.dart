@@ -10,6 +10,7 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -56,7 +57,7 @@ class MnemonicCard extends ConsumerWidget {
             hasMnemonic: learning.mnemonic != null,
           ),
           if (!analysis.isEmpty) ...<Widget>[
-            const SizedBox(height: 6),
+            const SizedBox(height: LexiSpace.s6),
             _AnalysisSection(analysis: analysis),
           ],
         ],
@@ -157,7 +158,7 @@ class _ItemGroup extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: LexiSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -168,7 +169,7 @@ class _ItemGroup extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: LexiSpace.s2),
           for (final item in items) DetailBullet(item.text, note: _note(item)),
         ],
       ),
@@ -198,7 +199,7 @@ class _BulletGroup extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: LexiSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -209,7 +210,7 @@ class _BulletGroup extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: LexiSpace.s2),
           for (final item in items) DetailBullet(item),
         ],
       ),

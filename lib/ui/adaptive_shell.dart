@@ -12,6 +12,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 承载 8 个分支的自适应外壳。
@@ -103,17 +104,17 @@ class _Sidebar extends StatelessWidget {
     final location = GoRouterState.of(context).uri.path;
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       child: LiquidGlass(
         borderRadius: BorderRadius.circular(LexiRadius.xl),
         showSpecular: true,
         showEdge: true,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(LexiSpace.s16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _SidebarBrand(),
-            const SizedBox(height: 20),
+            const SizedBox(height: LexiSpace.s20),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -152,7 +153,7 @@ class _SidebarBrand extends StatelessWidget {
     return Row(
       children: <Widget>[
         Icon(Icons.loop_rounded, color: colors.accent, size: 22),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         Text(
           'LexiLoop',
           style: LexiType.title.copyWith(
@@ -183,21 +184,24 @@ class _SidebarItem extends StatelessWidget {
     final foreground = active ? colors.accent : colors.secondaryLabel;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s2),
       child: Material(
         color: active
             ? colors.accent.withValues(alpha: 0.1)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(LexiRadius.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s10,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(destination.icon, size: 18, color: foreground),
-                const SizedBox(width: 12),
+                const SizedBox(width: LexiSpace.s12),
                 Expanded(
                   child: Text(
                     destination.label,
@@ -239,11 +243,14 @@ class _SidebarFooter extends StatelessWidget {
         LiquidGlass(
           level: GlassLevel.subtle,
           borderRadius: BorderRadius.circular(LexiRadius.md),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s10,
+            vertical: LexiSpace.s8,
+          ),
           child: Row(
             children: <Widget>[
               Icon(Icons.storage_rounded, size: 13, color: colors.success),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Expanded(
                 child: Text(
                   '本地数据库',
@@ -254,7 +261,7 @@ class _SidebarFooter extends StatelessWidget {
                 ),
               ),
               Icon(Icons.auto_awesome, size: 12, color: colors.accent),
-              const SizedBox(width: 3),
+              const SizedBox(width: LexiSpace.s4),
               Text(
                 'FSRS',
                 style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
@@ -262,9 +269,9 @@ class _SidebarFooter extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
@@ -277,7 +284,7 @@ class _SidebarFooter extends StatelessWidget {
                   style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               Flexible(
                 child: Text(
                   '⌘1-8 快捷切换',
@@ -319,12 +326,20 @@ class _BottomBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.fromLTRB(
+          LexiSpace.s12,
+          0,
+          LexiSpace.s12,
+          LexiSpace.s8,
+        ),
         child: LiquidGlass(
           borderRadius: BorderRadius.circular(LexiRadius.xl),
           showSpecular: true,
           showEdge: true,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s6,
+            vertical: LexiSpace.s6,
+          ),
           // InkWell 需要 Material 祖先才能绘制涟漪；LiquidGlass 只提供
           // DecoratedBox，因此在此显式包一层透明 Material。
           child: Material(
@@ -399,12 +414,12 @@ class _BottomBarItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(LexiRadius.md),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(destination.icon, size: 20, color: foreground),
-            const SizedBox(height: 3),
+            const SizedBox(height: LexiSpace.s4),
             Text(
               destination.label,
               style: LexiType.caption.copyWith(
@@ -434,12 +449,12 @@ class _MoreButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(LexiRadius.md),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(Icons.more_horiz_rounded, size: 20, color: foreground),
-            const SizedBox(height: 3),
+            const SizedBox(height: LexiSpace.s4),
             Text(
               '更多',
               style: LexiType.caption.copyWith(
@@ -467,18 +482,21 @@ class _MoreSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(LexiSpace.s12),
         child: LiquidGlass(
           level: GlassLevel.elevated,
           borderRadius: BorderRadius.circular(LexiRadius.xxl),
           showSpecular: true,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(LexiSpace.s16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 12),
+                padding: const EdgeInsets.only(
+                  left: LexiSpace.s4,
+                  bottom: LexiSpace.s12,
+                ),
                 child: Text(
                   '更多',
                   style: LexiType.footnote.copyWith(
@@ -527,11 +545,11 @@ class _MoreSheetItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s14),
           child: Row(
             children: <Widget>[
               Icon(destination.icon, size: 17, color: colors.accent),
-              const SizedBox(width: 10),
+              const SizedBox(width: LexiSpace.s10),
               Text(
                 destination.label,
                 style: LexiType.callout.copyWith(

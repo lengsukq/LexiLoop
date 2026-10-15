@@ -16,6 +16,7 @@ import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/features/import/rollback_blocked_message.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 撤销失败的提示停留时长。
@@ -37,14 +38,14 @@ class ImportHistorySection extends ConsumerWidget {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
               Icon(Icons.history_rounded, size: 16, color: colors.accent),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Text(
                 '导入历史',
                 style: LexiType.callout.copyWith(
@@ -60,10 +61,10 @@ class ImportHistorySection extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           history.when(
             loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
+              padding: EdgeInsets.symmetric(vertical: LexiSpace.s20),
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (error, _) => Text(
@@ -162,8 +163,11 @@ class _BatchTileState extends ConsumerState<_BatchTile> {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(top: LexiSpace.s8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s10,
+        vertical: LexiSpace.s8,
+      ),
       decoration: BoxDecoration(
         color: colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -218,7 +222,7 @@ class _BatchSummaryRow extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: LexiSpace.s2),
               Text(
                 _batchMeta(batch),
                 style: LexiType.caption.copyWith(color: colors.secondaryLabel),
@@ -226,7 +230,7 @@ class _BatchSummaryRow extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         _BatchStatusBadge(status: batch.status),
         IconButton(
           tooltip: expanded ? '收起明细' : '展开明细',
@@ -277,7 +281,7 @@ class _BatchRows extends ConsumerWidget {
 
     return rows.when(
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 10),
+        padding: EdgeInsets.symmetric(vertical: LexiSpace.s10),
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => Text(
@@ -287,14 +291,14 @@ class _BatchRows extends ConsumerWidget {
       data: (items) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           for (final row in items)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: LexiSpace.s2),
               child: Row(
                 children: <Widget>[
                   SizedBox(
-                    width: 40,
+                    width: LexiSpace.s40,
                     child: Text(
                       '${row.rowNumber}',
                       style: LexiType.caption.copyWith(
@@ -312,7 +316,7 @@ class _BatchRows extends ConsumerWidget {
                   ),
                   ImportRowStatusBadge(status: row.status),
                   if (row.errorMessage != null) ...<Widget>[
-                    const SizedBox(width: 6),
+                    const SizedBox(width: LexiSpace.s6),
                     Flexible(
                       child: Text(
                         row.errorMessage!,
@@ -346,7 +350,10 @@ class _BatchStatusBadge extends StatelessWidget {
       ImportBatchStatus.rolledBack => ('已撤销', colors.tertiaryLabel),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),

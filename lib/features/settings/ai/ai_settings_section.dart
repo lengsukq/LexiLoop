@@ -28,6 +28,7 @@ import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「AI 模型」分组。
@@ -81,10 +82,15 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection> {
   Widget build(BuildContext context) {
     final config = _config;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         _providersCard(context, config),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         AiParamsSection(config: config, onChanged: _persist),
       ],
     );
@@ -107,7 +113,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection> {
               label: const Text('添加 Provider'),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           if (config.providers.isEmpty)
             Text(
               '暂无 Provider。添加一个并填好接口地址与 API Key 后才能启用 AI。',

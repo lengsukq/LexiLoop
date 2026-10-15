@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览区的最大高度。
@@ -109,7 +110,7 @@ class PreviewSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -121,7 +122,7 @@ class PreviewSection extends StatelessWidget {
               letterSpacing: 0.6,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           ...children,
         ],
       ),
@@ -140,11 +141,11 @@ class _TranslationSummary extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: LexiSpace.s12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
         color: colors.accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +154,7 @@ class _TranslationSummary extends StatelessWidget {
             '翻译摘要',
             style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             text,
             style: LexiType.callout.copyWith(
@@ -176,7 +177,7 @@ class _PhoneticRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s12),
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
@@ -204,18 +205,18 @@ class _DefinitionTile extends StatelessWidget {
     final partOfSpeech = _text(item['partOfSpeech']);
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: LexiSpace.s6),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: colors.label.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (partOfSpeech != null) ...<Widget>[
             DetailChip(text: partOfSpeech),
-            const SizedBox(height: 4),
+            const SizedBox(height: LexiSpace.s4),
           ],
           Text(
             _text(item['text']) ?? '',
@@ -239,14 +240,19 @@ class _ExampleTile extends StatelessWidget {
     final translation = _text(item['translation']);
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      margin: const EdgeInsets.only(bottom: LexiSpace.s6),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s10,
+        LexiSpace.s8,
+        LexiSpace.s10,
+        LexiSpace.s8,
+      ),
       decoration: BoxDecoration(
         border: Border(left: BorderSide(color: colors.accent, width: 3)),
         color: colors.label.withValues(alpha: 0.03),
         borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(12),
-          bottomRight: Radius.circular(12),
+          topRight: Radius.circular(LexiRadius.md),
+          bottomRight: Radius.circular(LexiRadius.md),
         ),
       ),
       child: Column(

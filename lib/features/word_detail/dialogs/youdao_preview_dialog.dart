@@ -20,6 +20,7 @@ import 'package:lexiloop/features/word_detail/dialogs/word_content_preview.dart'
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 弹窗内容宽度。
@@ -160,15 +161,15 @@ class _LoadingView extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s40),
       child: Column(
         children: <Widget>[
           const SizedBox(
-            width: 26,
-            height: 26,
+            width: _spinnerSize,
+            height: _spinnerSize,
             child: CircularProgressIndicator(strokeWidth: 2.4),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: LexiSpace.s14),
           Text(
             '正在从有道词典获取内容…',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -196,20 +197,20 @@ class _ErrorView extends StatelessWidget {
     final colors = context.lexiColors;
     return Column(
       children: <Widget>[
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         Icon(Icons.error_outline_rounded, size: 38, color: colors.danger),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           message,
           textAlign: TextAlign.center,
           style: LexiType.body.copyWith(color: colors.danger),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             TextButton(onPressed: onClose, child: const Text('关闭')),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             OutlinedButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ),
@@ -233,23 +234,23 @@ class _NoContentView extends StatelessWidget {
     ];
     return Column(
       children: <Widget>[
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         Icon(Icons.menu_book_rounded, size: 38, color: colors.tertiaryLabel),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '有道词典未返回该词条的有效内容。',
           style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         for (final message in messages)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: LexiSpace.s4),
             child: Text(
               message,
               textAlign: TextAlign.center,
               style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('关闭'),
@@ -286,13 +287,13 @@ class _ContentView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         WordContentPreview(content: preview.content),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         ApplyModeSelector(mode: mode, onChanged: onModeChanged),
         if (error != null) ...<Widget>[
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           Text(error!, style: LexiType.footnote.copyWith(color: colors.danger)),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: <Widget>[
@@ -300,7 +301,7 @@ class _ContentView extends StatelessWidget {
               onPressed: applying ? null : onClose,
               child: const Text('取消'),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             FilledButton(
               onPressed: applying ? null : onApply,
               child: Text(applying ? '应用中…' : '确认应用'),
@@ -311,3 +312,6 @@ class _ContentView extends StatelessWidget {
     );
   }
 }
+
+/// 加载指示器尺寸。
+const double _spinnerSize = 26;

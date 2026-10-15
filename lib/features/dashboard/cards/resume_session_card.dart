@@ -23,6 +23,7 @@ import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -76,7 +77,7 @@ class _ResumeSessionBody extends StatelessWidget {
       onTap: () => goToStudyMode(context, session.mode),
       borderRadius: BorderRadius.circular(LexiRadius.sm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
         child: Row(
           children: <Widget>[
             Expanded(
@@ -93,7 +94,7 @@ class _ResumeSessionBody extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(width: 2),
+            const SizedBox(width: LexiSpace.s2),
             Icon(
               Icons.arrow_forward_rounded,
               size: resumeSessionArrowSize,

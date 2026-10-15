@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「仅补全缺失字段」的说明。
@@ -34,10 +35,10 @@ class ApplyModeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
         color: colors.label.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,7 +50,7 @@ class ApplyModeSelector extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           _ModeOption(
             label: '仅补全缺失字段',
             hint: fillMissingHint,
@@ -87,9 +88,9 @@ class _ModeOption extends StatelessWidget {
     final colors = context.lexiColors;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(LexiRadius.sm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -100,7 +101,7 @@ class _ModeOption extends StatelessWidget {
               size: 18,
               color: selected ? colors.accent : colors.tertiaryLabel,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -21,6 +21,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 题型分组。
@@ -60,7 +61,12 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
     final config = QuestionTypeConfig(_draft);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         if (_blocked) ...<Widget>[
           SettingsNotice(
@@ -68,7 +74,7 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
             message: '至少要启用一种题型，否则学习时会抽不出题目。本次改动未保存。',
             color: colors.danger,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
         ],
         SettingsSectionCard(
           title: '题型开关与权重',
@@ -77,9 +83,9 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _PresetBar(onApply: _applyPreset, onReset: _resetBalanced),
-              const SizedBox(height: 12),
+              const SizedBox(height: LexiSpace.s12),
               _ShareBar(config: config),
-              const SizedBox(height: 12),
+              const SizedBox(height: LexiSpace.s12),
               for (final group in _typeGroups)
                 _TypeGroupCard(
                   group: group,
@@ -87,7 +93,7 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
                   onToggle: _toggle,
                   onWeightEnd: _setWeight,
                 ),
-              const SizedBox(height: 2),
+              const SizedBox(height: LexiSpace.s2),
               Text(
                 _availabilityHint,
                 style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
@@ -175,7 +181,7 @@ class _PresetBar extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         OutlinedButton.icon(
           key: const Key('questionTypeResetBalanced'),
           onPressed: onReset,
@@ -206,7 +212,7 @@ class _ShareBar extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(LexiRadius.sm),
       child: SizedBox(
-        height: 8,
+        height: LexiSpace.s8,
         child: Row(
           // 必须 stretch：`ColoredBox` 没有子节点，默认的 center 会把它量成 0 高。
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,7 +260,7 @@ class _TypeGroupCard extends StatelessWidget {
     final enabledCount = group.types.where(config.isEnabled).length;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -307,7 +313,7 @@ class _QuestionTypeRow extends StatelessWidget {
     final share = config.sharePercentOf(type).round();
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -318,10 +324,10 @@ class _QuestionTypeRow extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   color: questionTypeColor(colors, type),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(LexiRadius.pill),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Expanded(
                 child: Text(
                   questionTypeLabel(type),

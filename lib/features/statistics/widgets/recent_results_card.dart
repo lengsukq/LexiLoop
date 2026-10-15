@@ -70,4 +70,4 @@ const double cellSize = 12;
 const double cellGap = 4;
 
 /// 方块圆角。
-const double cellRadius = 3;
+const double cellRadius = LexiRadius.xxs;

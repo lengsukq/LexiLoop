@@ -9,6 +9,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -36,9 +37,10 @@ class DefinitionsCard extends ConsumerWidget {
         children: <Widget>[
           for (final entry in groups.entries) ...<Widget>[
             _LanguageGroup(language: entry.key, items: entry.value),
-            if (entry.key != groups.keys.last) const SizedBox(height: 12),
+            if (entry.key != groups.keys.last)
+              const SizedBox(height: LexiSpace.s12),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           _ManualDefinitionEditor(
             wordId: wordId,
             existing: _userAuthored(definitions),
@@ -94,7 +96,7 @@ class _LanguageGroup extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         for (final item in items) ...<Widget>[
           DetailBullet(item.text, note: _annotation(item)),
           if (item.usageNote != null)
@@ -162,7 +164,7 @@ class _ManualDefinitionEditorState
             hintText: '用自己的话写一条释义（留空则清除）',
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         Row(
           children: <Widget>[
             FilledButton.tonal(
@@ -170,7 +172,7 @@ class _ManualDefinitionEditorState
               child: Text(saved.isEmpty ? '保存释义' : '更新释义'),
             ),
             if (saved.isNotEmpty) ...<Widget>[
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               TextButton(
                 onPressed: _busy ? null : _clear,
                 child: const Text('清除我的释义'),

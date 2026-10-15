@@ -14,6 +14,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -130,7 +131,7 @@ class _AttemptRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -140,7 +141,7 @@ class _AttemptRow extends StatelessWidget {
                 text: attemptStatusLabel(attempt.status),
                 color: attemptStatusColor(attempt.status, colors),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Expanded(
                 child: Text(
                   attempt.providerId,
@@ -159,7 +160,7 @@ class _AttemptRow extends StatelessWidget {
           ),
           if (attempt.qualityScore != null || attempt.durationMs != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: LexiSpace.s2),
               child: Text(
                 _facts(attempt),
                 style: LexiType.caption.copyWith(color: colors.secondaryLabel),
@@ -167,7 +168,7 @@ class _AttemptRow extends StatelessWidget {
             ),
           if (attempt.errorMessage != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: LexiSpace.s2),
               child: Text(
                 attempt.errorCode == null
                     ? attempt.errorMessage!

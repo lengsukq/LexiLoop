@@ -16,6 +16,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// Merriam-Webster 词典 API Key 的存储键。
@@ -58,7 +59,12 @@ class _ProvidersSectionState extends ConsumerState<ProvidersSection> {
   Widget build(BuildContext context) {
     final providers = widget.settings.providers;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         SettingsSectionCard(
           title: '词典与翻译数据源',
@@ -100,7 +106,7 @@ class _ProvidersSectionState extends ConsumerState<ProvidersSection> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: 'Merriam-Webster API Key',
           subtitle: '只保存在本机数据库里，不会上传到任何服务器。',
@@ -113,7 +119,7 @@ class _ProvidersSectionState extends ConsumerState<ProvidersSection> {
                 onChanged: (value) =>
                     _saveRaw(merriamWebsterDictionaryKeyName, value),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: LexiSpace.s8),
               _SecretField(
                 fieldKey: const Key('merriamWebsterThesaurusKeyField'),
                 label: '同义词词典 API Key',

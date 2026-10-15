@@ -11,6 +11,7 @@ import 'package:lexiloop/features/words/widgets/word_filter_controls.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 打开筛选弹层。
@@ -32,12 +33,17 @@ class _WordFilterSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(LexiSpace.s12),
         child: LiquidGlass(
           level: GlassLevel.elevated,
           borderRadius: BorderRadius.circular(LexiRadius.xxl),
           showSpecular: true,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.fromLTRB(
+            LexiSpace.s16,
+            LexiSpace.s12,
+            LexiSpace.s16,
+            LexiSpace.s16,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,7 +51,7 @@ class _WordFilterSheet extends StatelessWidget {
               Row(
                 children: <Widget>[
                   Icon(Icons.tune_rounded, size: 16, color: colors.accent),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: LexiSpace.s6),
                   Text(
                     '筛选单词本',
                     style: LexiType.callout.copyWith(
@@ -55,11 +61,11 @@ class _WordFilterSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               const Flexible(
                 child: SingleChildScrollView(child: WordFilterControls()),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               const _SheetActions(),
             ],
           ),

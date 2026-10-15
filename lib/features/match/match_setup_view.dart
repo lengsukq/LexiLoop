@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 配对准备页。
@@ -41,15 +42,15 @@ class MatchSetupView extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         Text(
           '将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         for (final preset in matchPresets)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: LexiSpace.s8),
             child: _PresetCard(
               preset: preset,
               selected: state.preset.id == preset.id,
@@ -57,25 +58,25 @@ class MatchSetupView extends StatelessWidget {
             ),
           ),
         if (state.error != null) ...<Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Container(
             decoration: BoxDecoration(
               color: colors.danger.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(LexiRadius.md),
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(LexiSpace.s12),
             child: Text(
               state.error!,
               style: LexiType.footnote.copyWith(color: colors.dangerDeep),
             ),
           ),
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         FilledButton(
           onPressed: state.loading ? null : onStart,
           child: Text(state.loading ? '正在组题…' : '开始配对'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '至少需要 4 个带释义且释义不重复的可学习词条。',
           textAlign: TextAlign.center,
@@ -118,7 +119,10 @@ class _PresetCard extends StatelessWidget {
                 color: selected ? colors.accent : colors.borderSubtle,
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s14,
+              vertical: LexiSpace.s12,
+            ),
             child: Row(
               children: <Widget>[
                 Expanded(

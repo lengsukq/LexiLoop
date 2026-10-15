@@ -14,6 +14,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 配对牌面。
@@ -46,14 +47,14 @@ class MatchBoardView extends StatelessWidget {
           onExit: onExit,
           mistakeLabel: '错配',
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           '已配对 ${board.matchedCount}/${board.pairs.length} · 点击英文与对应释义',
           style: LexiType.footnote.copyWith(
             color: context.lexiColors.secondaryLabel,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,7 +66,7 @@ class MatchBoardView extends StatelessWidget {
                   onAction: onAction,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: LexiSpace.s10),
               Expanded(
                 child: _Column(
                   side: MatchSide.definition,
@@ -95,7 +96,7 @@ class _Column extends StatelessWidget {
         : board.deck.definitions;
     return ListView.separated(
       itemCount: order.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: LexiSpace.s8),
       itemBuilder: (context, index) {
         final pairIndex = order[index];
         if (pairIndex >= board.pairs.length) return const SizedBox.shrink();
@@ -161,7 +162,10 @@ class _Card extends StatelessWidget {
                 borderRadius: BorderRadius.circular(LexiRadius.md),
                 border: Border.all(color: border),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: LexiSpace.s10,
+                vertical: LexiSpace.s8,
+              ),
               alignment: Alignment.centerLeft,
               child: Text(
                 side == MatchSide.word ? pair.word.term : pair.word.definition,

@@ -22,6 +22,7 @@ import 'package:lexiloop/features/settings/question_type_section.dart';
 import 'package:lexiloop/features/settings/study_plan_section.dart';
 import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 
@@ -73,7 +74,7 @@ class _SettingsTabs extends StatelessWidget {
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s16),
               child: TabBarView(
                 children: <Widget>[
                   StudyPlanSection(settings: settings),
@@ -100,7 +101,12 @@ class _SettingsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s16,
+        LexiSpace.s20,
+        LexiSpace.s10,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -112,7 +118,7 @@ class _SettingsHeader extends StatelessWidget {
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             '所有改动即时生效，无需保存。',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),

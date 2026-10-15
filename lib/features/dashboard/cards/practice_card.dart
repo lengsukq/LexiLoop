@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -37,7 +38,7 @@ class PracticeCard extends StatelessWidget {
             '独立模式，不占用今日复习队列',
             style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           Wrap(
             spacing: entryGap,
             runSpacing: entryGap,
@@ -167,7 +168,7 @@ class _PracticeEntryTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Icon(entry.icon, size: 18, color: colors.accent),
-                const SizedBox(height: 8),
+                const SizedBox(height: LexiSpace.s8),
                 Text(
                   entry.label,
                   maxLines: 1,
@@ -177,7 +178,7 @@ class _PracticeEntryTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: LexiSpace.s2),
                 Text(
                   entry.subtitle,
                   maxLines: 1,

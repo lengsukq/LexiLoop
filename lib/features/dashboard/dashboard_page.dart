@@ -27,6 +27,7 @@ import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 空库引导的标题 Key，供测试定位。
@@ -75,7 +76,12 @@ class _DashboardCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+    padding: const EdgeInsets.fromLTRB(
+      LexiSpace.s20,
+      LexiSpace.s20,
+      LexiSpace.s20,
+      LexiSpace.s32,
+    ),
     children: const <Widget>[
       _PageHeader(),
       // 「继续上次学习」挂在今日队列上方（对应旧版 `page.tsx:142-148` 的
@@ -83,17 +89,17 @@ class _DashboardCards extends StatelessWidget {
       // 排在今日计划之前才不会被 30 题的配额盖住。没有可恢复会话时
       // 它自己渲染成空，不占位置。
       ResumeSessionCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       TodayPlanCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       SuggestionCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       StatisticsCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       RemindersCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       PracticeCard(),
-      SizedBox(height: 10),
+      SizedBox(height: LexiSpace.s10),
       PlatformCapabilityCard(),
     ],
   );
@@ -117,12 +123,12 @@ class _PageHeader extends StatelessWidget {
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         Text(
           'LexiLoop 词环 · 纯本地',
           style: LexiType.callout.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
       ],
     );
   }
@@ -140,12 +146,17 @@ class _EmptyLibraryState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s20,
+        LexiSpace.s20,
+        LexiSpace.s32,
+      ),
       children: <Widget>[
         const _PageHeader(),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         const Center(child: _EmptyIcon()),
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         Text(
           '从 EasyDict 收藏开始',
           key: emptyStateTitleKey,
@@ -155,13 +166,13 @@ class _EmptyLibraryState extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           '导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，不会导入整本词典。',
           textAlign: TextAlign.center,
           style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: LexiSpace.s24),
         FilledButton.icon(
           key: emptyStateImportButtonKey,
           onPressed: () => context.go(csvImportPath),

@@ -17,6 +17,7 @@ import 'package:lexiloop/features/games/widgets/word_stack_view.dart';
 import 'package:lexiloop/features/games/widgets/word_tetris_view.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 小游戏进行中页面。
@@ -44,14 +45,14 @@ class GamesPlayView extends StatelessWidget {
     return Column(
       children: <Widget>[
         GameHud(title: gameModeTitle(mode), core: playing.core, onExit: onExit),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Expanded(
           child: LiquidGlass(
             level: GlassLevel.elevated,
             borderRadius: BorderRadius.circular(LexiRadius.xl),
             showSpecular: true,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(LexiSpace.s16),
               child: Column(
                 children: <Widget>[
                   if (playing.current != null &&
@@ -108,13 +109,16 @@ class _PriorityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s10),
       child: Container(
         decoration: BoxDecoration(
           color: colors.danger.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(LexiRadius.sm),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s10,
+          vertical: LexiSpace.s4,
+        ),
         child: Text(
           '重点复习词',
           style: LexiType.caption.copyWith(

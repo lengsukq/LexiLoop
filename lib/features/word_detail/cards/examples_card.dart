@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -59,7 +60,7 @@ class _ExampleRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -69,7 +70,7 @@ class _ExampleRow extends ConsumerWidget {
           ),
           if (item.translation != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: LexiSpace.s2),
               child: Text(
                 item.translation!,
                 style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -77,7 +78,7 @@ class _ExampleRow extends ConsumerWidget {
             ),
           if (item.difficulty != null || item.senseId != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.only(top: LexiSpace.s2),
               child: Text(
                 <String>[
                   if (item.difficulty != null) '难度 ${item.difficulty}',

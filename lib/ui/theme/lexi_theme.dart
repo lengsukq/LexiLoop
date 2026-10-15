@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 构建 LexiLoop 的浅色与深色主题。
@@ -100,7 +101,10 @@ abstract final class LexiTheme {
       fillColor: isDark
           ? const Color.fromRGBO(255, 255, 255, 0.05)
           : const Color.fromRGBO(255, 255, 255, 0.7),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s16,
+        vertical: LexiSpace.s12,
+      ),
       border: OutlineInputBorder(
         borderRadius: radius,
         borderSide: BorderSide(color: colors.borderDefault),
@@ -125,7 +129,10 @@ abstract final class LexiTheme {
       style: FilledButton.styleFrom(
         backgroundColor: colors.accent,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s20,
+          vertical: LexiSpace.s14,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(LexiRadius.md),
         ),

@@ -17,6 +17,7 @@ import 'package:lexiloop/features/add/widgets/manual_batch_row_card.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词典批量预览面板。
@@ -194,7 +195,7 @@ class _CounterRow extends StatelessWidget {
             style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         Text(
           '${state.text.length}/$manualBatchMaxTotalChars',
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
@@ -247,7 +248,7 @@ class _OptionsRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: LexiSpace.s10),
           Expanded(
             child: _LabeledField(
               label: '目标语言',
@@ -316,7 +317,7 @@ class _PreviewRow extends StatelessWidget {
           ].join(),
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
@@ -324,8 +325,8 @@ class _PreviewRow extends StatelessWidget {
             onPressed: empty || state.busy ? null : onPreview,
             icon: state.previewing
                 ? const SizedBox(
-                    width: 14,
-                    height: 14,
+                    width: LexiSpace.s14,
+                    height: LexiSpace.s14,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.auto_awesome_rounded, size: 16),
@@ -351,11 +352,11 @@ class _BatchProgress extends StatelessWidget {
         key: const Key('manualBatchProgress'),
         children: <Widget>[
           const SizedBox(
-            width: 14,
-            height: 14,
+            width: LexiSpace.s14,
+            height: LexiSpace.s14,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               '正在逐行查询词典，请稍候…（${state.previewDone}/${state.rows.length}）',
@@ -418,12 +419,12 @@ class _ConfirmAllCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             '确认不会再次查询词典；也可以先逐行展开详情再确认。',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           FilledButton.icon(
             key: const Key('manualBatchConfirmAll'),
             onPressed: state.pendingCount == 0 || state.busy
@@ -459,7 +460,7 @@ class _AllConfirmedCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Icon(Icons.check_circle_outline, color: colors.success, size: 18),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               Text(
                 '已全部加入词库',
                 style: LexiType.callout.copyWith(
@@ -469,12 +470,12 @@ class _AllConfirmedCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             '共确认 ${state.successCount} 个词条，词典预览内容已经正式保存。',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           FilledButton(
             key: const Key('manualBatchReset'),
             onPressed: onReset,
@@ -497,7 +498,7 @@ class _ErrorBanner extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       key: const Key('manualBatchError'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
         color: colors.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -505,7 +506,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
@@ -535,7 +536,7 @@ class _LabeledField extends StatelessWidget {
           color: context.lexiColors.secondaryLabel,
         ),
       ),
-      const SizedBox(height: 2),
+      const SizedBox(height: LexiSpace.s2),
       child,
     ],
   );

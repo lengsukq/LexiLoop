@@ -14,6 +14,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 学习计划分组。
 class StudyPlanSection extends ConsumerWidget {
@@ -28,12 +29,17 @@ class StudyPlanSection extends ConsumerWidget {
     final plan = settings.studyPlan;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         _DailyQuotaCard(plan: plan),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         _RetentionCard(plan: plan),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         _AiRetryCard(plan: plan),
       ],
     );

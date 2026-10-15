@@ -12,6 +12,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 考试目标的中文名。
@@ -157,7 +158,10 @@ class _ExamTargetChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.xxl),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s12,
+            vertical: LexiSpace.s6,
+          ),
           child: Text(
             label,
             style: LexiType.footnote.copyWith(
@@ -354,7 +358,7 @@ class _AnalyzeButtons extends ConsumerWidget {
             onPressed: canAnalyze ? notifier.analyzeSingle : null,
             child: Text('单次请求（${state.charCount} 字）'),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           FilledButton.icon(
             key: const Key('articleAnalyzeSegmented'),
             onPressed: canAnalyze ? notifier.analyzeSegmented : null,

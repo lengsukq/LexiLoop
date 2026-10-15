@@ -12,6 +12,7 @@ import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 队列列表。
@@ -129,12 +130,15 @@ class _WordTileState extends ConsumerState<_WordTile> {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.md),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s14,
+        vertical: LexiSpace.s12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _WordHeader(word: word),
-          const SizedBox(height: 4),
+          const SizedBox(height: LexiSpace.s4),
           Text(
             _summaryText(word),
             style: LexiType.footnote.copyWith(
@@ -142,7 +146,7 @@ class _WordTileState extends ConsumerState<_WordTile> {
             ),
           ),
           if (word.errorSummary != null) ...<Widget>[
-            const SizedBox(height: 4),
+            const SizedBox(height: LexiSpace.s4),
             Text(
               word.errorSummary!,
               maxLines: 2,
@@ -152,7 +156,7 @@ class _WordTileState extends ConsumerState<_WordTile> {
               ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           _WordActions(
             word: word,
             toggleLabel: _expanded ? '收起任务' : '展开 ${word.tasks.length} 个任务',
@@ -212,7 +216,7 @@ class _WordHeader extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: LexiSpace.s4),
                 const Icon(Icons.open_in_new, size: 12),
               ],
             ),
@@ -324,21 +328,21 @@ class _TaskDetailRow extends ConsumerWidget {
               _StatusBadge(status: task.status),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: LexiSpace.s2),
           Text(
             '重试 ${task.attemptCount}/${task.maxAttempts}'
             ' · 更新时间 ${formatTaskStamp(task.updatedAt)}',
             style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           if (task.lastError != null) ...<Widget>[
-            const SizedBox(height: 2),
+            const SizedBox(height: LexiSpace.s2),
             Text(
               task.lastError!,
               style: LexiType.caption.copyWith(color: colors.danger),
             ),
           ],
           if (_actionable(task.status) != null) ...<Widget>[
-            const SizedBox(height: 2),
+            const SizedBox(height: LexiSpace.s2),
             _TaskActionButton(
               status: task.status,
               jobId: task.id,
@@ -366,7 +370,7 @@ class _TaskActionButton extends StatelessWidget {
       onPressed: () => _run(context, actions),
       style: TextButton.styleFrom(
         minimumSize: const Size(0, tapTarget),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s8),
         visualDensity: VisualDensity.compact,
       ),
       child: Text(label),
@@ -398,7 +402,10 @@ class _StatusBadge extends StatelessWidget {
     final colors = context.lexiColors;
     final tint = statusColor(status, colors);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s4,
+      ),
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),

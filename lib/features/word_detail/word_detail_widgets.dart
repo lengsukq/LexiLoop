@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -33,7 +34,7 @@ class DetailField extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -71,12 +72,12 @@ class DetailBullet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: LexiSpace.s6),
             child: Container(
               width: 5,
               height: 5,
@@ -86,7 +87,7 @@ class DetailBullet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: LexiSpace.s10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +125,10 @@ class DetailChip extends StatelessWidget {
     final colors = context.lexiColors;
     final tone = color ?? colors.secondaryLabel;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s4,
+      ),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -156,11 +160,11 @@ class DetailLoadingCard extends StatelessWidget {
       child: Row(
         children: <Widget>[
           const SizedBox(
-            width: 14,
-            height: 14,
+            width: LexiSpace.s14,
+            height: LexiSpace.s14,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: LexiSpace.s10),
           Text(
             '加载中…',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -200,7 +204,7 @@ class DetailErrorCard extends StatelessWidget {
         children: <Widget>[
           Text(message, style: LexiType.body.copyWith(color: colors.danger)),
           if (onRetry != null) ...<Widget>[
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             FilledButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ],

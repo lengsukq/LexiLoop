@@ -21,6 +21,7 @@ import 'package:lexiloop/features/word_detail/cards/word_detail_header_card.dart
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
@@ -67,7 +68,12 @@ class _WordDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s16,
+        LexiSpace.s20,
+        LexiSpace.s32,
+      ),
       children: _spaced(<Widget>[
         WordDetailHeaderCard(detail: detail),
         ..._contentSections(),
@@ -135,7 +141,7 @@ class _WordDetailBody extends StatelessWidget {
   List<Widget> _spaced(List<Widget> sections) {
     final result = <Widget>[];
     for (final section in sections) {
-      if (result.isNotEmpty) result.add(const SizedBox(height: 10));
+      if (result.isNotEmpty) result.add(const SizedBox(height: LexiSpace.s10));
       result.add(section);
     }
     return result;
@@ -167,7 +173,7 @@ class _MissingView extends StatelessWidget {
     final colors = context.lexiColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(LexiSpace.s32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -176,7 +182,7 @@ class _MissingView extends StatelessWidget {
               size: 44,
               color: colors.tertiaryLabel,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: LexiSpace.s14),
             Text(
               '词条不存在或已被删除',
               style: LexiType.title.copyWith(
@@ -184,13 +190,13 @@ class _MissingView extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: LexiSpace.s6),
             Text(
               '它可能刚被删除，或来自一个尚未导入的 ID。',
               textAlign: TextAlign.center,
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: LexiSpace.s16),
             FilledButton(
               onPressed: () => Navigator.of(context).maybePop(),
               child: const Text('返回'),

@@ -11,6 +11,7 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 可开局的小游戏（配对与音标不在本页）。
@@ -86,15 +87,15 @@ class GamesSetupView extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         Text(
           '独立于每日复习队列。错词、近期忘记和模糊的词会优先出现。',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         for (final mode in miniGameModes)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: LexiSpace.s8),
             child: _ModeCard(
               mode: mode,
               selected: state.selectedMode == mode,
@@ -103,15 +104,15 @@ class GamesSetupView extends StatelessWidget {
             ),
           ),
         if (state.error != null) ...<Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           _ErrorBanner(message: state.error!),
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         FilledButton(
           onPressed: loading ? null : () => onStart(state.selectedMode),
           child: Text(loading ? '正在组题…' : '开始'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '题量不足时无法开局：每个模式都需要至少 4 个带有效释义的可学习词条。',
           textAlign: TextAlign.center,
@@ -156,7 +157,10 @@ class _ModeCard extends StatelessWidget {
                 color: selected ? colors.accent : colors.borderSubtle,
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s14,
+              vertical: LexiSpace.s12,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(
@@ -166,12 +170,12 @@ class _ModeCard extends StatelessWidget {
                   size: 20,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: LexiSpace.s10),
                 Expanded(child: _ModeCardText(mode: mode)),
                 if (loading)
                   const SizedBox(
-                    width: 16,
-                    height: 16,
+                    width: LexiSpace.s16,
+                    height: LexiSpace.s16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
               ],
@@ -205,7 +209,7 @@ class _ModeCardText extends StatelessWidget {
           gameModeSubtitle(mode),
           style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: LexiSpace.s2),
         Text(
           gameModeRule(mode),
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
@@ -228,11 +232,11 @@ class _ErrorBanner extends StatelessWidget {
         color: colors.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       child: Row(
         children: <Widget>[
           Icon(Icons.error_outline_rounded, size: 18, color: colors.danger),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,

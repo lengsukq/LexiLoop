@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 选择器的固定宽度：模型多到需要滚动，但不该吃掉整屏。
@@ -71,7 +72,7 @@ class _ModelPickerDialogState extends State<ModelPickerDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _toolbar(visible),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             Expanded(child: _list(visible)),
           ],
         ),
@@ -101,7 +102,7 @@ class _ModelPickerDialogState extends State<ModelPickerDialog> {
           onChanged: (value) => setState(() => _filter = value),
         ),
       ),
-      const SizedBox(width: 8),
+      const SizedBox(width: LexiSpace.s8),
       TextButton(
         key: const Key('modelPickerSelectAll'),
         onPressed: () => setState(() => _selected.addAll(visible)),

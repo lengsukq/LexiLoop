@@ -17,6 +17,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -84,13 +85,13 @@ class _PlanBody extends StatelessWidget {
           goalReached: reached,
           completedToday: overview?.completedToday ?? 0,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         if (overview != null) ...<Widget>[
           _GoalProgress(overview: overview),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
         ],
         _PlanQueues(plan: plan),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         _StartStudyButton(goalReached: reached),
       ],
     );
@@ -129,7 +130,7 @@ class _PlannedHeadline extends StatelessWidget {
             letterSpacing: -0.8,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: LexiSpace.s6),
         Text(
           '题待完成',
           style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -172,7 +173,7 @@ class _GoalProgress extends StatelessWidget {
             const Spacer(),
             if (reached) ...<Widget>[
               const _GoalReachedBadge(),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
             ],
             Text(
               _progressLabel(overview),
@@ -181,7 +182,7 @@ class _GoalProgress extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         ClipRRect(
           borderRadius: BorderRadius.circular(LexiRadius.sm),
           child: LinearProgressIndicator(
@@ -205,7 +206,10 @@ class _GoalReachedBadge extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       key: goalReachedBadgeKey,
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: colors.success.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
@@ -174,7 +175,7 @@ class ArticleErrorBanner extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
@@ -225,14 +226,17 @@ class ArticleNotice extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
               style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ),
-          if (action != null) ...<Widget>[const SizedBox(width: 8), action!],
+          if (action != null) ...<Widget>[
+            const SizedBox(width: LexiSpace.s8),
+            action!,
+          ],
         ],
       ),
     );
@@ -252,7 +256,10 @@ class ArticleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    padding: const EdgeInsets.symmetric(
+      horizontal: LexiSpace.s8,
+      vertical: LexiSpace.s2,
+    ),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(LexiRadius.sm),

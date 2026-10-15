@@ -11,6 +11,7 @@ import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
     show toolbarGap;
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 词库列表的分页条。
 class WordPaginator extends ConsumerWidget {
@@ -28,7 +29,12 @@ class WordPaginator extends ConsumerWidget {
     final pages = _pageCount(total, query.limit);
     final page = query.page;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        0,
+        LexiSpace.s20,
+        LexiSpace.s12,
+      ),
       child: Row(
         children: <Widget>[
           TextButton(

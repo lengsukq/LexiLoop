@@ -11,6 +11,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 掌握概览进度带。
@@ -42,11 +43,19 @@ class _OverviewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        0,
+        LexiSpace.s20,
+        LexiSpace.s8,
+      ),
       child: LiquidGlass(
         level: GlassLevel.elevated,
         borderRadius: BorderRadius.circular(LexiRadius.lg),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s16,
+          vertical: LexiSpace.s14,
+        ),
         child: Row(
           children: <Widget>[
             Container(
@@ -63,7 +72,7 @@ class _OverviewBody extends StatelessWidget {
                 color: colors.accent,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: LexiSpace.s14),
             Expanded(child: _OverviewText(overview: overview)),
             TextButton(
               onPressed: () => context.go(statisticsPath),
@@ -110,13 +119,13 @@ class _OverviewText extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: LexiSpace.s4),
         Text(
           '已掌握 ${overview.mastered} / ${overview.total} 个词条 · '
           '还有 ${overview.remaining} 个待继续学习',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         ClipRRect(
           borderRadius: BorderRadius.circular(LexiRadius.sm),
           child: LinearProgressIndicator(

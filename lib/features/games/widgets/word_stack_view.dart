@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_stack.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 单词堆堆乐视图。
@@ -44,7 +45,7 @@ class WordStackView extends StatelessWidget {
           '看释义，点选滚动词块堆高塔',
           style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
@@ -53,21 +54,21 @@ class WordStackView extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _Row(
           words: options.take(half).toList(),
           state: state,
           onAction: onAction,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         _Row(
           words: options.skip(half).toList(),
           state: state,
           onAction: onAction,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         SizedBox(
-          height: 108,
+          height: _stackAreaHeight,
           child: visible.isEmpty
               ? Center(
                   child: Text(
@@ -82,7 +83,7 @@ class WordStackView extends StatelessWidget {
                   children: <Widget>[
                     for (var index = 0; index < visible.length; index += 1)
                       Padding(
-                        padding: const EdgeInsets.only(top: 3),
+                        padding: const EdgeInsets.only(top: LexiSpace.s4),
                         child: _TowerBlock(
                           term: visible[index],
                           index: tower.length - visible.length + index,
@@ -128,8 +129,8 @@ class _Row extends StatelessWidget {
                 borderRadius: BorderRadius.circular(LexiRadius.md),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 11,
+                    horizontal: LexiSpace.s20,
+                    vertical: LexiSpace.s12,
                   ),
                   child: Text(
                     word,
@@ -183,3 +184,6 @@ class _TowerBlock extends StatelessWidget {
     );
   }
 }
+
+/// 堆塔区高度——固定高度让塔身增长时下方的操作区不位移。
+const double _stackAreaHeight = 108;

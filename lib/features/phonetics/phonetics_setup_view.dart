@@ -15,6 +15,7 @@ import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 音标训练准备页。
@@ -49,13 +50,13 @@ class PhoneticsSetupView extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         Text(
           '听音、音标与单词三向匹配。每轮 $phoneticItemCount 题 / '
           '$phoneticDurationSeconds 秒，解析里给出 48 音标目录的发音要领。',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         Text(
           '口音',
           style: LexiType.callout.copyWith(
@@ -63,13 +64,13 @@ class PhoneticsSetupView extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Row(
           children: <Widget>[
             for (final accent in Accent.values)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: LexiSpace.s8),
                   child: _AccentCard(
                     accent: accent,
                     selected: state.accent == accent,
@@ -79,28 +80,28 @@ class PhoneticsSetupView extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         _CatalogSummary(),
         if (state.error != null) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           Container(
             decoration: BoxDecoration(
               color: colors.danger.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(LexiRadius.md),
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(LexiSpace.s12),
             child: Text(
               state.error!,
               style: LexiType.footnote.copyWith(color: colors.dangerDeep),
             ),
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         FilledButton(
           onPressed: state.loading ? null : onStart,
           child: Text(state.loading ? '正在组题…' : '开始'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '至少需要 $phoneticMinimumItemCount 个带对应口音音标的可学习单词。',
           textAlign: TextAlign.center,
@@ -139,7 +140,7 @@ class _AccentCard extends StatelessWidget {
               color: selected ? colors.accent : colors.borderSubtle,
             ),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: LexiSpace.s14),
           alignment: Alignment.center,
           child: Text(
             label,
@@ -161,7 +162,7 @@ class _CatalogSummary extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.subtle,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -174,7 +175,7 @@ class _CatalogSummary extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -186,8 +187,8 @@ class _CatalogSummary extends StatelessWidget {
                     borderRadius: BorderRadius.circular(LexiRadius.sm),
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
+                    horizontal: LexiSpace.s8,
+                    vertical: LexiSpace.s4,
                   ),
                   child: Text(
                     entry.display,

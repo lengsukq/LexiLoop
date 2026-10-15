@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 笔记输入框的定位键。
@@ -73,7 +74,7 @@ class _NoteCardState extends ConsumerState<NoteCard> {
             maxLines: 6,
             decoration: const InputDecoration(hintText: '写下这个词的联想、用法或易错点…'),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           FilledButton.icon(
             onPressed: _busy ? null : _save,
             icon: const Icon(Icons.save_rounded, size: 17),

@@ -15,6 +15,7 @@ import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 二次确认时要求输入的词。
@@ -48,7 +49,12 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         SettingsSectionCard(
           title: '备份与导入',
@@ -64,13 +70,13 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
                 icon: const Icon(Icons.save_alt_rounded, size: 16),
                 label: Text(_exporting ? '导出中…' : '导出 JSON 备份'),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: LexiSpace.s8),
               OutlinedButton.icon(
                 onPressed: _importing ? null : _importBackup,
                 icon: const Icon(Icons.upload_file_rounded, size: 16),
                 label: Text(_importing ? '导入中…' : '导入旧版 JSON 备份'),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: LexiSpace.s8),
               OutlinedButton.icon(
                 key: const Key('openCsvImport'),
                 onPressed: () => context.go('/import'),
@@ -80,7 +86,7 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '危险区',
           subtitle: '以下操作不可撤销，建议先导出备份。',
@@ -92,7 +98,7 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
                 '应用回到首次启动的状态。',
                 style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               FilledButton.icon(
                 key: const Key('clearAllData'),
                 style: FilledButton.styleFrom(backgroundColor: colors.danger),
@@ -264,7 +270,7 @@ class _TypedConfirmDialogState extends State<_TypedConfirmDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(widget.body),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           TextField(
             key: widget.fieldKey,
             controller: _controller,

@@ -9,6 +9,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
@@ -67,21 +68,21 @@ class _StatisticsBody extends StatelessWidget {
                 letterSpacing: -0.8,
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: LexiSpace.s6),
             Text(
               '个词条',
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         for (final level in MasteryLevel.values)
           _MasteryBar(
             level: level,
             count: overview.byMastery[level] ?? 0,
             total: overview.totalWords,
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         DashboardStatRow(
           label: '今日已答',
           value: '${overview.reviewedToday}',
@@ -122,14 +123,17 @@ class _MasteryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         children: <Widget>[
-          SizedBox(width: 76, child: MasteryBadge(level: level)),
-          const SizedBox(width: 8),
+          SizedBox(
+            width: _masteryLabelWidth,
+            child: MasteryBadge(level: level),
+          ),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(LexiRadius.pill),
               child: Container(
                 height: 8,
                 color: colors.fill,
@@ -143,9 +147,9 @@ class _MasteryBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           SizedBox(
-            width: 34,
+            width: _countColumnWidth,
             child: Text(
               '$count',
               textAlign: TextAlign.end,
@@ -160,3 +164,9 @@ class _MasteryBar extends StatelessWidget {
     );
   }
 }
+
+/// 掌握等级标签列宽——固定宽度让五行条形左端对齐。
+const double _masteryLabelWidth = 76;
+
+/// 计数列宽——右对齐的数值需要固定宽度才不会随位数抖动。
+const double _countColumnWidth = 34;

@@ -9,6 +9,7 @@ import 'package:lexiloop/features/initialize/configurator/configurator_providers
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 数据源列表（可用性 + 优先级排序）与调用策略。
@@ -187,7 +188,7 @@ class ProviderRow extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: LexiSpace.s2),
                 Text(
                   _reason,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -241,7 +242,7 @@ class _PriorityBadge extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: badgePaddingH),
     decoration: BoxDecoration(
       color: context.lexiColors.accent.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(LexiRadius.xs),
     ),
     child: Text(
       '$index',
@@ -300,7 +301,7 @@ class _LockedNotice extends StatelessWidget {
           style: Theme.of(context).textTheme.labelLarge
               ?.copyWith(color: colors.label),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: LexiSpace.s2),
         Text(
           '本次任务只会请求有道词典，不会调用其他词典、翻译服务或 AI。',
           style: Theme.of(context).textTheme.labelSmall

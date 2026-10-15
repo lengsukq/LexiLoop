@@ -12,6 +12,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/widgets/word_filter_controls.dart';
 import 'package:lexiloop/features/words/widgets/word_filter_sheet.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 词库页的搜索框与筛选入口。
 class WordFilterBar extends StatelessWidget {
@@ -21,7 +22,12 @@ class WordFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s4,
+        LexiSpace.s20,
+        LexiSpace.s8,
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= sidebarBreakpoint;
@@ -32,12 +38,12 @@ class WordFilterBar extends StatelessWidget {
                 children: <Widget>[
                   const Expanded(child: _SearchField()),
                   if (!wide) ...<Widget>[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: LexiSpace.s8),
                     const _FilterButton(),
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: LexiSpace.s8),
               if (wide) const WordFilterControls(),
             ],
           );

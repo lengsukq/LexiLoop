@@ -278,6 +278,11 @@ class LexiColors extends ThemeExtension<LexiColors> {
 
 /// LexiLoop 的圆角档位，对应旧版 CSS 的 `--radius-*`。
 abstract final class LexiRadius {
+  /// 微型圆角（4px）——热力图小方块、行内 diff 标签。
+  ///
+  /// 只给边长 12～16 的微型元素用；再大就该走 [xs] 以上。
+  static const double xxs = 4;
+
   /// 极小圆角（6px）——内嵌的小标签、输入框内的色块。
   static const double xs = 6;
 
@@ -301,6 +306,9 @@ abstract final class LexiRadius {
   /// 用一个大到「一定超过元素半高」的值表达胶囊形状；Flutter 会把圆角
   /// 夹到半高，因此不需要按元素尺寸计算。
   static const double pill = 999;
+
+  /// 全部档位（不含 [pill]——那是形状哨兵，不是可插值的档位）。
+  static const List<double> steps = <double>[xxs, xs, sm, md, lg, xl, xxl];
 }
 
 /// 读取当前主题色板的便捷扩展。

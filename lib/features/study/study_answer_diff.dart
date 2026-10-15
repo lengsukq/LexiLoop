@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_diff.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 会做答案差异对比的题型。
@@ -81,7 +82,7 @@ class _TermDiffView extends StatelessWidget {
           segments: diff.actual,
           color: colors.danger,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         _DiffLine(
           lineKey: const Key('study.diff.expected'),
           label: '正确答案：',
@@ -160,7 +161,7 @@ class _SentenceDiffView extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         Wrap(
           key: const Key('study.diff.words'),
           spacing: 4,
@@ -169,7 +170,7 @@ class _SentenceDiffView extends StatelessWidget {
             for (final word in diff.words) _WordChip(word: word),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         Text(
           '编辑距离 ${diff.editDistance} · 参考：${diff.expectedText}',
           key: const Key('study.diff.meta'),
@@ -207,10 +208,13 @@ class _WordChip extends StatelessWidget {
       ),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s4,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(LexiRadius.xxs),
       ),
       child: Text(
         word.word,

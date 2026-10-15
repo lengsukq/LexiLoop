@@ -9,6 +9,7 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 字母拼图。
@@ -50,7 +51,7 @@ class _LetterBankState extends State<LetterBank> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _SpellingDisplay(text: _spelled),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -64,7 +65,7 @@ class _LetterBankState extends State<LetterBank> {
                 ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         Row(
           children: <Widget>[
             _SmallAction(
@@ -73,7 +74,7 @@ class _LetterBankState extends State<LetterBank> {
               enabled: !locked && _picked.isNotEmpty,
               onTap: _backspace,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: LexiSpace.s10),
             _SmallAction(
               icon: Icons.clear_rounded,
               label: '清空',
@@ -119,7 +120,10 @@ class _SpellingDisplay extends StatelessWidget {
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 56),
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s12,
+        vertical: LexiSpace.s10,
+      ),
       decoration: BoxDecoration(
         color: colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),

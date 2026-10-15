@@ -12,6 +12,7 @@ import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览表格。
@@ -38,7 +39,7 @@ class ImportPreviewTable extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -47,19 +48,19 @@ class ImportPreviewTable extends StatelessWidget {
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           if (preview.skippedCount > 0) ...<Widget>[
-            const SizedBox(height: 4),
+            const SizedBox(height: LexiSpace.s4),
             Text(
               '已跳过 ${preview.skippedCount} 个空行',
               style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           const _TableHeader(),
           const Divider(height: 12),
           for (final row in rows) _PreviewRow(row: row),
           if (hidden > 0)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: LexiSpace.s8),
               child: Text(
                 '另有 $hidden 行未展示（可导入，只是不在此处渲染）',
                 style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
@@ -91,10 +92,16 @@ class _TableHeader extends StatelessWidget {
     );
     return Row(
       children: <Widget>[
-        SizedBox(width: 44, child: Text('行号', style: style)),
+        SizedBox(
+          width: _rowNumberColumnWidth,
+          child: Text('行号', style: style),
+        ),
         Expanded(flex: 3, child: Text('词条', style: style)),
         Expanded(flex: 2, child: Text('类型', style: style)),
-        SizedBox(width: 68, child: Text('状态', style: style)),
+        SizedBox(
+          width: _statusColumnWidth,
+          child: Text('状态', style: style),
+        ),
         Expanded(flex: 3, child: Text('问题', style: style)),
       ],
     );
@@ -112,10 +119,13 @@ class _PreviewRow extends StatelessWidget {
     final label = LexiType.footnote.copyWith(color: colors.label);
     final muted = LexiType.footnote.copyWith(color: colors.secondaryLabel);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         children: <Widget>[
-          SizedBox(width: 44, child: Text('${row.rowNumber}', style: muted)),
+          SizedBox(
+            width: _rowNumberColumnWidth,
+            child: Text('${row.rowNumber}', style: muted),
+          ),
           Expanded(
             flex: 3,
             child: Text(
@@ -129,7 +139,10 @@ class _PreviewRow extends StatelessWidget {
             flex: 2,
             child: Text(_contentTypeLabel(row.contentType), style: muted),
           ),
-          SizedBox(width: 68, child: ImportRowStatusBadge(status: row.status)),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: ImportRowStatusBadge(status: row.status),
+          ),
           Expanded(
             flex: 3,
             child: Text(
@@ -166,7 +179,10 @@ class ImportRowStatusBadge extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -189,3 +205,9 @@ String _contentTypeLabel(LexicalContentType type) => switch (type) {
   LexicalContentType.phrase => '短语',
   LexicalContentType.sentence => '句子',
 };
+
+/// 「行号」列宽——行号最多五位数，固定宽度让表头与数据行对齐。
+const double _rowNumberColumnWidth = 44;
+
+/// 「状态」列宽——要放得下最长的状态徽章。
+const double _statusColumnWidth = 68;

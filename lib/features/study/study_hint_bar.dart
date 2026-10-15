@@ -17,6 +17,7 @@ import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 提示模式露出的首尾字母个数，同时也是最短词条长度。
@@ -125,7 +126,7 @@ class StudyHintBar extends ConsumerWidget {
           ),
         ),
         if (hint.onHint != null) ...<Widget>[
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           Row(
             children: <Widget>[
               if (_needsReplay(item)) ...<Widget>[
@@ -141,7 +142,7 @@ class StudyHintBar extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: LexiSpace.s8),
               ],
               _HintAction(
                 icon: Icons.lightbulb_outline_rounded,
@@ -159,7 +160,7 @@ class StudyHintBar extends ConsumerWidget {
           ),
         ],
         if (hint.used && hint.onHint != null) ...<Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Text(
             studyHintPendingText,
             style: LexiType.caption.copyWith(

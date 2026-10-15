@@ -7,6 +7,7 @@ import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/word_detail/dialogs/related_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -88,14 +89,17 @@ class _RelatedRow extends StatelessWidget {
         term: item.word,
         relation: relation,
       ),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(LexiRadius.sm),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+        padding: const EdgeInsets.symmetric(
+          vertical: LexiSpace.s6,
+          horizontal: LexiSpace.s2,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(child: _RelatedBody(item: item)),
-            const SizedBox(width: 6),
+            const SizedBox(width: LexiSpace.s6),
             Icon(
               Icons.add_circle_outline_rounded,
               size: 16,
@@ -132,11 +136,11 @@ class _RelatedBody extends StatelessWidget {
               ),
             ),
             if (item.partOfSpeech != null) ...<Widget>[
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               DetailChip(text: item.partOfSpeech!),
             ],
             if (item.relation != null) ...<Widget>[
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               DetailChip(text: item.relation!),
             ],
           ],

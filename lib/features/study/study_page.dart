@@ -41,6 +41,7 @@ import 'package:lexiloop/features/study/study_states.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/fsrs_scheduler.dart';
 import 'package:lexiloop/ui/glass.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 四档自评快捷键 `1`–`4` 对应的数字键。
 ///
@@ -232,13 +233,18 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
 
   Widget _content(StudyItemView item) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s20,
+        LexiSpace.s12,
+        LexiSpace.s20,
+        LexiSpace.s32,
+      ),
       children: <Widget>[
         StudyPrompt(item: item, accent: widget.accent),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         ..._hintSection(item),
         _answerSection(item),
-        const SizedBox(height: 20),
+        const SizedBox(height: LexiSpace.s20),
         _ratingSection(item),
         ..._feedbackSection(item),
       ],
@@ -250,7 +256,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     if (!studyHintAvailable(item)) return const <Widget>[];
     return <Widget>[
       StudyHintBar(item: item, accent: widget.accent, hint: _hintState(item)),
-      const SizedBox(height: 12),
+      const SizedBox(height: LexiSpace.s12),
     ];
   }
 
@@ -276,14 +282,14 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     final outcome = _outcome;
     if (outcome == null) return const <Widget>[];
     return <Widget>[
-      const SizedBox(height: 16),
+      const SizedBox(height: LexiSpace.s16),
       StudyFeedbackPanel(
         outcome: outcome,
         item: item,
         answer: _answer ?? '',
         usedHint: _usedHint,
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: LexiSpace.s16),
       ConstrainedBox(
         constraints: const BoxConstraints(minHeight: studyButtonHeight),
         child: FilledButton(onPressed: _next, child: const Text('下一题')),

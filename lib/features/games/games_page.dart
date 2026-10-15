@@ -15,6 +15,7 @@ import 'package:lexiloop/features/games/games_result_view.dart';
 import 'package:lexiloop/features/games/games_setup_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 小游戏页面。
@@ -94,7 +95,7 @@ class _SavingView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           const CircularProgressIndicator(),
-          const SizedBox(height: 14),
+          const SizedBox(height: LexiSpace.s14),
           Text(
             '正在结算…',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),

@@ -260,7 +260,7 @@ const double unitGap = 3;
 const double barHeight = 8;
 
 /// 占比条圆角。
-const double barRadius = 4;
+const double barRadius = LexiRadius.pill;
 
 /// 空提示的垂直内边距。
 const double emptyHintPadding = 8;

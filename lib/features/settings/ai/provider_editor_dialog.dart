@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 展示新增 / 编辑对话框。
@@ -86,14 +87,14 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
               hint: '唯一标识，如 my-openai',
               controller: _id,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _field(
               fieldKey: const Key('aiProviderEditorName'),
               label: '名称',
               hint: '显示名，可留空',
               controller: _name,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             DropdownButtonFormField<LlmApiType>(
               key: const Key('aiProviderEditorApiType'),
               initialValue: _apiType,
@@ -110,17 +111,17 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
                 if (value != null) setState(() => _apiType = value);
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _field(
               fieldKey: const Key('aiProviderEditorBaseUrl'),
               label: '接口地址',
               hint: baseUrlHint(_apiType),
               controller: _baseUrl,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: LexiSpace.s10),
             _secretField(),
             if (error != null) ...<Widget>[
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               Text(
                 error,
                 key: const Key('aiProviderEditorError'),

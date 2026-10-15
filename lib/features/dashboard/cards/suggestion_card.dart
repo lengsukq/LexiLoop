@@ -23,6 +23,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -107,13 +108,13 @@ class _SuggestionBody extends StatelessWidget {
       children: <Widget>[
         _SuggestionHeader(suggestion: suggestion),
         if (suggestion.summary.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 6),
+          const SizedBox(height: LexiSpace.s6),
           Text(
             suggestion.summary,
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         _MetricRow(metrics: suggestion.metrics),
         _BulletGroup(
           title: '亮点',
@@ -132,7 +133,7 @@ class _SuggestionBody extends StatelessWidget {
         ),
         if (items.isNotEmpty) _RecommendedSection(items: items),
         if (suggestion.generationWarning != null) ...<Widget>[
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           Text(
             suggestion.generationWarning!,
             style: LexiType.caption.copyWith(color: colors.warning),
@@ -165,9 +166,9 @@ class _SuggestionHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: LexiSpace.s6),
         _QualityBadge(score: suggestion.qualityScore),
-        const SizedBox(width: 6),
+        const SizedBox(width: LexiSpace.s6),
         _SourceBadge(ai: suggestion.generator == SuggestionGenerator.ai),
       ],
     );
@@ -187,7 +188,10 @@ class _QualityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = qualityTone(context.lexiColors, score);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -213,7 +217,10 @@ class _SourceBadge extends StatelessWidget {
     final colors = context.lexiColors;
     final tint = ai ? colors.purple : colors.tertiaryLabel;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
+      ),
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -287,8 +294,8 @@ class _MetricTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      margin: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s8),
       decoration: BoxDecoration(
         color: colors.fill.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
@@ -304,7 +311,7 @@ class _MetricTile extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 1),
+          const SizedBox(height: LexiSpace.s2),
           Text(
             label,
             style: LexiType.caption.copyWith(color: colors.quaternaryLabel),
@@ -331,7 +338,7 @@ class _BulletGroup extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(top: LexiSpace.s10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -339,7 +346,7 @@ class _BulletGroup extends StatelessWidget {
             title,
             style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: LexiSpace.s6),
           for (final item in items) _Bullet(text: item, color: color),
         ],
       ),
@@ -356,19 +363,19 @@ class _Bullet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 3),
+    padding: const EdgeInsets.only(bottom: LexiSpace.s4),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.only(top: 5),
+          padding: const EdgeInsets.only(top: LexiSpace.s6),
           child: Container(
             width: dotSize,
             height: dotSize,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: LexiSpace.s8),
         Expanded(
           child: Text(
             text,
@@ -398,7 +405,7 @@ class _RecommendedSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         Row(
           children: <Widget>[
             Text(
@@ -415,9 +422,9 @@ class _RecommendedSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: LexiSpace.s8),
         for (final item in items) _RecommendedEntry(item: item),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         const _FocusReviewButton(),
       ],
     );
@@ -439,7 +446,7 @@ class _RecommendedEntry extends StatelessWidget {
     final colors = context.lexiColors;
     final definition = item.definition;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -454,11 +461,11 @@ class _RecommendedEntry extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 1.5,
+                  horizontal: LexiSpace.s6,
+                  vertical: LexiSpace.s2,
                 ),
                 decoration: BoxDecoration(
                   color: colors.fill,

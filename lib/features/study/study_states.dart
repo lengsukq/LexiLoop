@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 加载态。
@@ -42,18 +43,18 @@ class StudyErrorView extends StatelessWidget {
     final colors = context.lexiColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(LexiSpace.s32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(Icons.error_outline_rounded, size: 40, color: colors.danger),
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             Text(
               message,
               textAlign: TextAlign.center,
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: LexiSpace.s14),
             ConstrainedBox(
               constraints: const BoxConstraints(
                 minHeight: studyButtonHeight,

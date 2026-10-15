@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 标题文案。
@@ -69,7 +70,7 @@ class ResetProgressOption extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: LexiSpace.s2),
                 Text(
                   resetProgressDescription,
                   style: TextStyle(

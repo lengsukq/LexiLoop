@@ -7,6 +7,7 @@ import 'package:lexiloop/features/initialize/configurator/configurator_controls.
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 预览面板。
 ///
@@ -82,7 +83,7 @@ class _PreviewBody extends StatelessWidget {
             style: Theme.of(context).textTheme.labelMedium
                 ?.copyWith(color: colors.label),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: LexiSpace.s2),
           for (final skip in preview.skips)
             Text(
               '${skip.term}：${skip.reason}',

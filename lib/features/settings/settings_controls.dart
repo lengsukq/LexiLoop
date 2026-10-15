@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一个设置分组卡片。
@@ -35,7 +36,7 @@ class SettingsSectionCard extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -47,13 +48,13 @@ class SettingsSectionCard extends StatelessWidget {
             ),
           ),
           if (subtitle != null) ...<Widget>[
-            const SizedBox(height: 4),
+            const SizedBox(height: LexiSpace.s4),
             Text(
               subtitle,
               style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           child,
         ],
       ),
@@ -123,7 +124,7 @@ class _SettingsSliderRowState extends State<SettingsSliderRow> {
     final colors = context.lexiColors;
     final description = widget.description;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -198,7 +199,7 @@ class SettingsSwitchRow extends StatelessWidget {
     final colors = context.lexiColors;
     final description = this.description;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s2),
       child: Row(
         children: <Widget>[
           Expanded(
@@ -237,7 +238,7 @@ class SettingsNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -245,7 +246,7 @@ class SettingsNotice extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Icon(Icons.info_outline_rounded, size: 15, color: color),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,

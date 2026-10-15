@@ -12,6 +12,7 @@ import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/ai/provider_editor_dialog.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一次探测的进行中状态与结果。
@@ -96,7 +97,7 @@ class AiProviderCard extends StatelessWidget {
     final provider = data.provider;
     return Padding(
       key: Key('aiProviderCard-${provider.id}'),
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s10),
       child: _body(context, provider),
     );
   }
@@ -107,22 +108,22 @@ class AiProviderCard extends StatelessWidget {
       color: colors.fill,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(LexiSpace.s12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _header(context, provider),
             if (!provider.isUsable)
               Padding(
-                padding: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.only(top: LexiSpace.s6),
                 child: Text(
                   '接口地址或 API Key 为空，该 Provider 目前不可用。',
                   style: LexiType.footnote.copyWith(color: colors.danger),
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _defaultModel(context, provider),
-            const SizedBox(height: 8),
+            const SizedBox(height: LexiSpace.s8),
             _models(context, provider),
             _probeLine(
               context,
@@ -261,7 +262,7 @@ class AiProviderCard extends StatelessWidget {
     if (result == null) return const SizedBox.shrink();
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: LexiSpace.s8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -270,7 +271,7 @@ class AiProviderCard extends StatelessWidget {
             size: 15,
             color: result.success ? colors.success : colors.danger,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: LexiSpace.s6),
           Expanded(
             child: Text(
               result.message,
@@ -317,8 +318,8 @@ class AiProviderCard extends StatelessWidget {
   }
 
   Widget _spinner() => const SizedBox(
-    width: 14,
-    height: 14,
+    width: LexiSpace.s14,
+    height: LexiSpace.s14,
     child: CircularProgressIndicator(strokeWidth: 2),
   );
 }

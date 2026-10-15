@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 游戏类页面的统一外壳：环境光背景 + 安全区 + 居中的内容宽度。
@@ -33,7 +34,12 @@ class GameScaffold extends StatelessWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  LexiSpace.s16,
+                  LexiSpace.s12,
+                  LexiSpace.s16,
+                  LexiSpace.s16,
+                ),
                 child: child,
               ),
             ),
@@ -95,7 +101,7 @@ class GameHud extends StatelessWidget {
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: LexiSpace.s8),
             IconButton(
               onPressed: onExit,
               icon: const Icon(Icons.close_rounded, size: 20),
@@ -104,14 +110,14 @@ class GameHud extends StatelessWidget {
           ],
         ),
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(LexiRadius.pill),
           child: LinearProgressIndicator(
             value: ratio.clamp(0, 1),
             minHeight: 5,
             backgroundColor: colors.fill,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Row(
           children: <Widget>[
             _Stat(label: '得分', value: '${core.tally.score}'),
@@ -169,18 +175,18 @@ class GameErrorView extends StatelessWidget {
     final colors = context.lexiColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(LexiSpace.s32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(Icons.error_outline_rounded, size: 38, color: colors.danger),
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             Text(
               message,
               textAlign: TextAlign.center,
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: LexiSpace.s14),
             FilledButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ),

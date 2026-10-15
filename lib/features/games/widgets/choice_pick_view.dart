@@ -24,6 +24,7 @@ import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/features/games/game_speech.dart';
 import 'package:lexiloop/features/games/widgets/game_choice_grid.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 听音辨词 / 词义冲刺视图。
@@ -78,7 +79,7 @@ class _ChoicePickViewState extends ConsumerState<ChoicePickView> {
           _ListeningPrompt(onSpeak: () => _speak(question.word.term))
         else
           _MeaningPrompt(term: question.word.term),
-        const SizedBox(height: 18),
+        const SizedBox(height: LexiSpace.s20),
         GameChoiceGrid(
           choices: question.choices.options,
           enabled: !widget.state.isLocked,
@@ -142,7 +143,7 @@ class _ListeningPrompt extends StatelessWidget {
           '听发音，选择正确的英文词条',
           style: LexiType.body.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         Material(
           color: colors.accent.withValues(alpha: 0.12),
           shape: const CircleBorder(),
@@ -150,8 +151,8 @@ class _ListeningPrompt extends StatelessWidget {
             onTap: onSpeak,
             customBorder: const CircleBorder(),
             child: SizedBox(
-              width: 92,
-              height: 92,
+              width: _speakButtonSize,
+              height: _speakButtonSize,
               child: Icon(
                 Icons.volume_up_rounded,
                 size: 44,
@@ -160,7 +161,7 @@ class _ListeningPrompt extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           '点击可重复播放',
           style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
@@ -184,7 +185,7 @@ class _MeaningPrompt extends StatelessWidget {
           '选择最准确的中文释义',
           style: LexiType.body.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LexiSpace.s16),
         Text(
           term,
           textAlign: TextAlign.center,
@@ -198,3 +199,6 @@ class _MeaningPrompt extends StatelessWidget {
     );
   }
 }
+
+/// 发音按钮的点击热区边长（方形）。
+const double _speakButtonSize = 92;

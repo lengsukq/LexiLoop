@@ -15,6 +15,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
@@ -86,7 +87,10 @@ class _ModeOption extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(LexiRadius.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s10,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(
@@ -96,7 +100,7 @@ class _ModeOption extends StatelessWidget {
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: LexiSpace.s10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 分析中界面。
@@ -54,11 +55,11 @@ class _ProgressBody extends ConsumerWidget {
         Row(
           children: <Widget>[
             const SizedBox(
-              width: 18,
-              height: 18,
+              width: LexiSpace.s20,
+              height: LexiSpace.s20,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: LexiSpace.s10),
             Expanded(
               child: Text(
                 segmented && progress != null
@@ -161,7 +162,7 @@ class _BatchRow extends ConsumerWidget {
     return Container(
       key: Key('articleBatchRow${batch.batchIndex}'),
       margin: const EdgeInsets.only(bottom: articleTightGap),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
         color: isError ? colors.danger.withValues(alpha: 0.06) : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -176,7 +177,7 @@ class _BatchRow extends ConsumerWidget {
               aiError: aiError,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           _BatchStatusAction(
             batchIndex: batch.batchIndex,
             loading: loading,
@@ -267,8 +268,8 @@ class _BatchStatusAction extends StatelessWidget {
     final colors = context.lexiColors;
     if (loading) {
       return const SizedBox(
-        width: 16,
-        height: 16,
+        width: LexiSpace.s16,
+        height: LexiSpace.s16,
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }

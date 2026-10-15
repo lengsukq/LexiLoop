@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 播放分组。
 class PlaybackSection extends ConsumerWidget {
@@ -24,10 +25,15 @@ class PlaybackSection extends ConsumerWidget {
     final playback = settings.playback;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s4,
+        LexiSpace.s12,
+        LexiSpace.s4,
+        LexiSpace.s24,
+      ),
       children: <Widget>[
         _PronunciationGroup(playback: playback),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '朗读语速',
           subtitle: '按词条长度分开设置：句子读太快会听不清，单词读太慢会浪费时间。',
@@ -62,7 +68,7 @@ class PlaybackSection extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '选择题',
           subtitle: '揭示答案前的延迟，留出回忆时间。',
@@ -125,7 +131,7 @@ class _PronunciationGroup extends ConsumerWidget {
           ),
         ),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: LexiSpace.s12),
       SettingsSectionCard(
         title: '真人录音',
         subtitle: '词典站点提供的是真人朗读的 mp3，音质明显好于系统合成音，代价是每次播放都要联网取一次。',

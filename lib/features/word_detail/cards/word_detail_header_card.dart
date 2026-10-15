@@ -15,6 +15,7 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -35,22 +36,27 @@ class WordDetailHeaderCard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _HeaderActionBar(detail: detail),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         LiquidGlass(
           level: GlassLevel.elevated,
           borderRadius: BorderRadius.circular(LexiRadius.lg),
           showSpecular: true,
-          padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+          padding: const EdgeInsets.fromLTRB(
+            LexiSpace.s20,
+            LexiSpace.s16,
+            LexiSpace.s14,
+            LexiSpace.s14,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _TermBlock(detail: detail),
               _TranslationHint(detail: detail),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               _PronunciationBar(detail: detail),
-              const SizedBox(height: 10),
+              const SizedBox(height: LexiSpace.s10),
               _SourceMeta(detail: detail),
-              const SizedBox(height: 6),
+              const SizedBox(height: LexiSpace.s6),
               _HeaderActions(detail: detail),
             ],
           ),
@@ -265,7 +271,7 @@ class _TermBlock extends StatelessWidget {
             letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Wrap(
           spacing: 6,
           runSpacing: 6,
@@ -313,14 +319,14 @@ class _TranslationHint extends ConsumerWidget {
     }
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: LexiSpace.s8),
       child: Row(
         children: <Widget>[
           Text(
             '暂无中文释义',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           TextButton.icon(
             onPressed: () => unawaited(_request(context, ref)),
             icon: const Icon(Icons.translate_rounded, size: 15),
@@ -397,7 +403,10 @@ class _AccentToggle extends ConsumerWidget {
               .read(selectedAccentProvider.notifier)
               .select(detail.id, accent),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s8,
+            ),
             decoration: BoxDecoration(
               color: selected
                   ? colors.accent.withValues(alpha: 0.16)
@@ -405,7 +414,7 @@ class _AccentToggle extends ConsumerWidget {
               border: Border.all(
                 color: selected ? colors.accent : colors.separator,
               ),
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(LexiRadius.pill),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -418,7 +427,7 @@ class _AccentToggle extends ConsumerWidget {
                   ),
                 ),
                 if (phonetic.isNotEmpty) ...<Widget>[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: LexiSpace.s6),
                   Text(
                     '/$phonetic/',
                     style: LexiType.footnote.copyWith(
@@ -491,7 +500,7 @@ class _SourceMeta extends StatelessWidget {
   }
 
   Widget _metaLine(LexiColors colors, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 2),
+    padding: const EdgeInsets.only(bottom: LexiSpace.s2),
     child: Text(
       text,
       style: LexiType.caption.copyWith(color: colors.tertiaryLabel),

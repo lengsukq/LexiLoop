@@ -18,6 +18,7 @@ import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
@@ -34,26 +35,31 @@ class ImportPage extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          padding: const EdgeInsets.fromLTRB(
+            LexiSpace.s20,
+            LexiSpace.s16,
+            LexiSpace.s20,
+            LexiSpace.s32,
+          ),
           children: <Widget>[
             const _ImportHeader(),
-            const SizedBox(height: 16),
+            const SizedBox(height: LexiSpace.s16),
             const _StepCard(step: 1, title: '选择语言方向', child: _LanguageStep()),
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             const _StepCard(
               step: 2,
               title: '选择 EasyDict CSV 文件',
               child: _FileStep(),
             ),
             if (state.errorMessage != null) ...<Widget>[
-              const SizedBox(height: 12),
+              const SizedBox(height: LexiSpace.s12),
               _ErrorBanner(message: state.errorMessage!),
             ],
             if (state.result != null) ...<Widget>[
-              const SizedBox(height: 12),
+              const SizedBox(height: LexiSpace.s12),
               _ResultCard(result: state.result!),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             _StepCard(
               step: 3,
               title: '预览与导入模式',
@@ -61,7 +67,7 @@ class ImportPage extends ConsumerWidget {
                   ? const _PreviewPlaceholder()
                   : _PreviewStep(preview: state.preview!),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: LexiSpace.s12),
             const ImportHistorySection(),
           ],
         ),
@@ -87,7 +93,7 @@ class _ImportHeader extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         Text(
           '支持 EasyDict 导出的 CSV：单词 / 释义 / 音标 / 例句 / 同义词等列会自动识别。',
           style: LexiType.body.copyWith(color: colors.secondaryLabel),
@@ -110,7 +116,7 @@ class _StepCard extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -132,7 +138,7 @@ class _StepCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: LexiSpace.s8),
               Text(
                 title,
                 style: LexiType.callout.copyWith(
@@ -142,7 +148,7 @@ class _StepCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           child,
         ],
       ),
@@ -168,7 +174,7 @@ class _LanguageStep extends ConsumerWidget {
             onChanged: notifier.setSourceLanguage,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: LexiSpace.s12),
         Expanded(
           child: _LanguageDropdown(
             key: const Key('importTargetLanguage'),
@@ -204,7 +210,7 @@ class _LanguageDropdown extends StatelessWidget {
           label,
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         DropdownButton<String>(
           value: value,
           isExpanded: true,
@@ -252,14 +258,14 @@ class _FileStep extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: LexiSpace.s12),
         FilledButton.icon(
           key: const Key('importPickFile'),
           onPressed: state.busy ? null : notifier.pickFile,
           icon: state.busy
               ? const SizedBox(
-                  width: 14,
-                  height: 14,
+                  width: LexiSpace.s14,
+                  height: LexiSpace.s14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.folder_open_rounded, size: 16),
@@ -316,9 +322,9 @@ class _PreviewStep extends ConsumerWidget {
           selected: state.onlyProblems,
           onSelected: (selected) => notifier.setOnlyProblems(value: selected),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         ImportPreviewTable(preview: preview, onlyProblems: state.onlyProblems),
-        const SizedBox(height: 14),
+        const SizedBox(height: LexiSpace.s14),
         Text(
           '导入模式',
           style: LexiType.footnote.copyWith(
@@ -326,19 +332,19 @@ class _PreviewStep extends ConsumerWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: LexiSpace.s6),
         for (final mode in ImportMode.values)
           _ModeOption(
             mode: mode,
             selected: state.mode == mode,
             onTap: () => notifier.setMode(mode),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         ResetProgressOption(
           value: state.resetLearningProgress,
           onChanged: (next) => notifier.setResetLearningProgress(value: next),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: LexiSpace.s12),
         _SubmitButton(
           busy: state.busy,
           enabled: preview.importableRows > 0,
@@ -388,7 +394,7 @@ class _ModeOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s6),
       child: Material(
         color: selected ? colors.accent.withValues(alpha: 0.1) : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -396,7 +402,10 @@ class _ModeOption extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(LexiRadius.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s10,
+            ),
             child: Row(
               children: <Widget>[
                 Icon(
@@ -406,7 +415,7 @@ class _ModeOption extends StatelessWidget {
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: LexiSpace.s10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +427,7 @@ class _ModeOption extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: LexiSpace.s2),
                       Text(
                         _modeDescription(mode),
                         style: LexiType.footnote.copyWith(
@@ -458,14 +467,14 @@ class _SubmitButton extends StatelessWidget {
           onPressed: busy || !enabled ? null : onSubmit,
           icon: busy
               ? const SizedBox(
-                  width: 14,
-                  height: 14,
+                  width: LexiSpace.s14,
+                  height: LexiSpace.s14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.check_rounded, size: 16),
           label: Text(busy ? '导入中…' : '开始导入'),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: LexiSpace.s12),
         if (!enabled)
           Expanded(
             child: Text(
@@ -489,7 +498,7 @@ class _ResultCard extends StatelessWidget {
     return LiquidGlass(
       level: GlassLevel.elevated,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
         key: const Key('importResultCard'),
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,7 +506,7 @@ class _ResultCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Icon(Icons.task_alt_rounded, size: 17, color: colors.success),
-              const SizedBox(width: 6),
+              const SizedBox(width: LexiSpace.s6),
               Text(
                 '导入完成',
                 style: LexiType.callout.copyWith(
@@ -507,14 +516,14 @@ class _ResultCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: LexiSpace.s8),
           Text(
             '新增 ${result.created} · 已存在 ${result.existing} · '
             '重复 ${result.duplicate} · 无效 ${result.invalid} · '
             '失败 ${result.failed}；已入队初始化 ${result.queuedInitializations} 个',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: LexiSpace.s12),
           const _ResultActions(),
         ],
       ),
@@ -578,7 +587,7 @@ class _ErrorBanner extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       key: const Key('importErrorBanner'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
         color: colors.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(LexiRadius.md),
@@ -586,7 +595,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,

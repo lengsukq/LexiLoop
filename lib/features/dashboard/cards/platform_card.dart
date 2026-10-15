@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -45,7 +46,7 @@ class PlatformCapabilityCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: LexiSpace.s10),
           _StatusRow(
             label: 'TTS 落盘缓存',
             value: PlatformCaps.supportsTtsFileSynthesis ? '支持' : '不支持',
@@ -85,7 +86,7 @@ class _StatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -96,7 +97,7 @@ class _StatusRow extends StatelessWidget {
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: LexiSpace.s8),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
@@ -105,7 +106,7 @@ class _StatusRow extends StatelessWidget {
                 size: 13,
                 color: ok ? colors.success : colors.warning,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: LexiSpace.s6),
               Text(
                 value,
                 style: LexiType.body.copyWith(

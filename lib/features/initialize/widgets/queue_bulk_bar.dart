@@ -11,6 +11,7 @@ import 'package:lexiloop/features/initialize/configurator/initialization_configu
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「已选 N 个词条」浮条。
@@ -33,7 +34,7 @@ class QueueBulkBar extends ConsumerWidget {
         borderRadius: BorderRadius.circular(LexiRadius.xl),
         padding: const EdgeInsets.symmetric(
           horizontal: barPadding,
-          vertical: 10,
+          vertical: LexiSpace.s10,
         ),
         child: Row(
           children: <Widget>[
@@ -104,7 +105,10 @@ class _SelectionCount extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Container(
-      constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+      constraints: const BoxConstraints.tightFor(
+        width: _countBubbleSize,
+        height: _countBubbleSize,
+      ),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: colors.accent,
@@ -129,3 +133,6 @@ const double barPadding = 12;
 
 /// 计数气泡与文案之间的间距。
 const double countGap = 6;
+
+/// 选中数量气泡的边长（正方形）。
+const double _countBubbleSize = 26;

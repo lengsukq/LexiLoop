@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/whack_a_mole.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇地鼠视图。
@@ -35,7 +36,7 @@ class WhackAMoleView extends StatelessWidget {
             color: context.lexiColors.quaternaryLabel,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: LexiSpace.s8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
@@ -44,7 +45,7 @@ class WhackAMoleView extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: LexiSpace.s20),
         GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
@@ -62,7 +63,7 @@ class WhackAMoleView extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           '地鼠缩回前锤中正确单词 · 锤错会记一次失误',
           style: LexiType.caption.copyWith(
@@ -113,7 +114,7 @@ class _Hole extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
         SizedBox(
-          height: 54,
+          height: _moleSlotHeight,
           child: visible
               ? AnimatedScale(
                   scale: 1,
@@ -128,7 +129,9 @@ class _Hole extends StatelessWidget {
                       borderRadius: BorderRadius.circular(LexiRadius.md),
                       child: Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: LexiSpace.s6,
+                          ),
                           child: Text(
                             word!,
                             maxLines: 1,
@@ -146,15 +149,18 @@ class _Hole extends StatelessWidget {
                 )
               : const SizedBox.shrink(),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: LexiSpace.s4),
         Container(
           height: 10,
           decoration: BoxDecoration(
             color: colors.borderStrong,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(LexiRadius.pill),
           ),
         ),
       ],
     );
   }
 }
+
+/// 地鼠槽位高度——固定高度让地鼠出现时布局不跳动。
+const double _moleSlotHeight = 54;

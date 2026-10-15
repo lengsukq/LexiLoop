@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 标题文案。
 const String resetProgressTitle = '重置已有词条的学习进度';
@@ -25,12 +26,6 @@ const double _resetOptionGap = 4;
 
 /// 内边距。
 const double _resetOptionPadding = 12;
-
-/// 标题字号。
-const double _resetTitleFontSize = 13.5;
-
-/// 说明字号。
-const double _resetDescriptionFontSize = 12;
 
 /// 危险色描边的勾选项。
 class ResetProgressOption extends StatelessWidget {
@@ -70,7 +65,7 @@ class ResetProgressOption extends StatelessWidget {
                   resetProgressTitle,
                   style: TextStyle(
                     color: colors.danger,
-                    fontSize: _resetTitleFontSize,
+                    fontSize: LexiType.body.fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -79,7 +74,7 @@ class ResetProgressOption extends StatelessWidget {
                   resetProgressDescription,
                   style: TextStyle(
                     color: colors.secondaryLabel,
-                    fontSize: _resetDescriptionFontSize,
+                    fontSize: LexiType.footnote.fontSize,
                   ),
                 ),
               ],

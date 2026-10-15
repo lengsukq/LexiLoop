@@ -9,6 +9,7 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 字母拼图。
 class LetterBank extends StatefulWidget {
@@ -126,9 +127,8 @@ class _SpellingDisplay extends StatelessWidget {
       ),
       child: Text(
         text.isEmpty ? '点击下方字母拼写' : text,
-        style: TextStyle(
+        style: LexiType.page.copyWith(
           color: text.isEmpty ? colors.tertiaryLabel : colors.label,
-          fontSize: 24,
           fontWeight: FontWeight.w700,
           letterSpacing: 2,
         ),
@@ -160,9 +160,8 @@ class _LetterTileButton extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(
             tile.value,
-            style: TextStyle(
+            style: LexiType.title.copyWith(
               color: enabled ? colors.label : colors.tertiaryLabel,
-              fontSize: 19,
               fontWeight: FontWeight.w600,
             ),
           ),

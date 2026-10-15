@@ -12,6 +12,7 @@ import 'package:lexiloop/features/add/manual_batch_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一行在批量列表里的位置与内容。
 class ManualBatchEntry {
@@ -113,7 +114,7 @@ class _RowHeader extends StatelessWidget {
             '${entry.index + 1}',
             style: TextStyle(
               color: colors.accent,
-              fontSize: indexBadgeFontSize,
+              fontSize: LexiType.caption.fontSize,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -130,9 +131,8 @@ class _RowHeader extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     row.term,
-                    style: TextStyle(
+                    style: LexiType.callout.copyWith(
                       color: colors.label,
-                      fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -149,11 +149,10 @@ class _RowHeader extends StatelessWidget {
                 _summary(row),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: row.error.isEmpty
                       ? colors.secondaryLabel
                       : colors.danger,
-                  fontSize: 13,
                 ),
               ),
             ],
@@ -210,9 +209,8 @@ class _RowActions extends StatelessWidget {
         if (row.isConfirmed) ...<Widget>[
           Text(
             '词条 ID：${row.confirmedWordId}',
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.success,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -294,11 +292,11 @@ class _SummaryBlock extends StatelessWidget {
               const _Badge(label: '词库中已存在', tone: _BadgeTone.warning),
             Text(
               '${preview.sourceLanguageName} → ${preview.targetLanguageName}',
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
             Text(
               '预览有效至 ${articleExpiryText(preview.expiresAt)}',
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ],
         ),
@@ -306,9 +304,8 @@ class _SummaryBlock extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             _text(summary['translation']),
-            style: TextStyle(
+            style: LexiType.title.copyWith(
               color: colors.label,
-              fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -317,7 +314,7 @@ class _SummaryBlock extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             _text(summary['shortDefinition']),
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ],
@@ -367,7 +364,7 @@ class _LinesBlock extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 2),
               child: Text(
                 line,
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+                style: LexiType.body.copyWith(color: colors.secondaryLabel),
               ),
             ),
         ],
@@ -391,9 +388,8 @@ class _Block extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: TextStyle(
+          style: LexiType.caption.copyWith(
             color: context.lexiColors.tertiaryLabel,
-            fontSize: 11.5,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -427,9 +423,8 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: color,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -506,9 +501,6 @@ const double rowCardPadding = 12;
 
 /// 序号徽标尺寸。
 const double indexBadgeSize = 22;
-
-/// 序号徽标字号。
-const double indexBadgeFontSize = 11.5;
 
 /// 行标题与操作区之间的间距。
 const double rowActionGap = 8;

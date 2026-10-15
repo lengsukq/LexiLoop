@@ -12,6 +12,7 @@ import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览表格。
 class ImportPreviewTable extends StatelessWidget {
@@ -43,13 +44,13 @@ class ImportPreviewTable extends StatelessWidget {
         children: <Widget>[
           Text(
             summary.toString(),
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           if (preview.skippedCount > 0) ...<Widget>[
             const SizedBox(height: 4),
             Text(
               '已跳过 ${preview.skippedCount} 个空行',
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ],
           const SizedBox(height: 10),
@@ -61,7 +62,7 @@ class ImportPreviewTable extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 '另有 $hidden 行未展示（可导入，只是不在此处渲染）',
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+                style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
               ),
             ),
         ],
@@ -84,9 +85,8 @@ class _TableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final style = TextStyle(
+    final style = LexiType.caption.copyWith(
       color: colors.tertiaryLabel,
-      fontSize: 11.5,
       fontWeight: FontWeight.w600,
     );
     return Row(
@@ -109,8 +109,8 @@ class _PreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final label = TextStyle(color: colors.label, fontSize: 12.5);
-    final muted = TextStyle(color: colors.secondaryLabel, fontSize: 12);
+    final label = LexiType.footnote.copyWith(color: colors.label);
+    final muted = LexiType.footnote.copyWith(color: colors.secondaryLabel);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -136,7 +136,7 @@ class _PreviewRow extends StatelessWidget {
               row.errorMessage ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.danger, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.danger),
             ),
           ),
         ],
@@ -174,9 +174,8 @@ class ImportRowStatusBadge extends StatelessWidget {
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: color,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),

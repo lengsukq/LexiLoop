@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一个选项的三态。
 enum ChoiceState {
@@ -131,9 +132,8 @@ class _ChoiceTile extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style:
                       labelStyle ??
-                      TextStyle(
+                      LexiType.title.copyWith(
                         color: colors.label,
-                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -142,9 +142,8 @@ class _ChoiceTile extends StatelessWidget {
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: LexiType.caption.copyWith(
                       color: colors.quaternaryLabel,
-                      fontSize: 11.5,
                     ),
                   ),
               ],

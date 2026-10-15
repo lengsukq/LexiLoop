@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「标签 + 值」的一行。
@@ -40,17 +41,13 @@ class DetailField extends StatelessWidget {
             width: labelWidth,
             child: Text(
               label,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: colors.label,
-                fontSize: 13.5,
-                height: 1.4,
-              ),
+              style: LexiType.body.copyWith(color: colors.label),
             ),
           ),
         ],
@@ -94,21 +91,12 @@ class DetailBullet extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  text,
-                  style: TextStyle(
-                    color: colors.label,
-                    fontSize: 13.5,
-                    height: 1.45,
-                  ),
-                ),
+                Text(text, style: LexiType.body.copyWith(color: colors.label)),
                 if (note != null)
                   Text(
                     note!,
-                    style: TextStyle(
+                    style: LexiType.footnote.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 12.5,
-                      height: 1.4,
                     ),
                   ),
               ],
@@ -143,9 +131,8 @@ class DetailChip extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: tone,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -176,7 +163,7 @@ class DetailLoadingCard extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '加载中…',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),
@@ -211,7 +198,7 @@ class DetailErrorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(message, style: TextStyle(color: colors.danger, fontSize: 13)),
+          Text(message, style: LexiType.body.copyWith(color: colors.danger)),
           if (onRetry != null) ...<Widget>[
             const SizedBox(height: 8),
             FilledButton(onPressed: onRetry, child: const Text('重试')),
@@ -235,7 +222,7 @@ class DetailEmptyHint extends StatelessWidget {
     final colors = context.lexiColors;
     return Text(
       text,
-      style: TextStyle(color: colors.tertiaryLabel, fontSize: 13),
+      style: LexiType.body.copyWith(color: colors.tertiaryLabel),
     );
   }
 }

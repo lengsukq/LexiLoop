@@ -14,6 +14,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 数字输入的合法区间。
 typedef NumberBounds = ({num min, num max});
@@ -78,9 +79,8 @@ class _BoundedNumberFieldState extends State<BoundedNumberField> {
       decoration: InputDecoration(
         labelText: widget.label,
         isDense: true,
-        hintStyle: TextStyle(
+        hintStyle: LexiType.body.copyWith(
           color: context.lexiColors.tertiaryLabel,
-          fontSize: 13,
         ),
       ),
       onChanged: _handleChanged,

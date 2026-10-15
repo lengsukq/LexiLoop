@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/word_builder.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 单词拼图视图。
 class WordBuilderView extends StatelessWidget {
@@ -41,19 +42,16 @@ class WordBuilderView extends StatelessWidget {
       children: <Widget>[
         Text(
           '根据释义拼出英文',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.quaternaryLabel,
-            fontSize: 12.5,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: context.lexiColors.label,
-            fontSize: 20,
-            height: 1.4,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -134,7 +132,7 @@ class _BuiltRow extends StatelessWidget {
           ? Center(
               child: Text(
                 '点按字母拼写',
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
               ),
             )
           : Wrap(
@@ -185,9 +183,8 @@ class _LetterTileBox extends StatelessWidget {
             child: Center(
               child: Text(
                 label.toUpperCase(),
-                style: TextStyle(
+                style: LexiType.title.copyWith(
                   color: filled ? Colors.white : colors.label,
-                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -213,18 +210,16 @@ class _Revealed extends StatelessWidget {
       children: <Widget>[
         Text(
           '正确答案 · 计时已暂停',
-          style: TextStyle(
+          style: LexiType.body.copyWith(
             color: colors.warningDeep,
-            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 12),
         Text(
           question.word.term,
-          style: TextStyle(
+          style: LexiType.display.copyWith(
             color: colors.label,
-            fontSize: 30,
             fontWeight: FontWeight.w800,
             letterSpacing: 2,
           ),
@@ -233,7 +228,7 @@ class _Revealed extends StatelessWidget {
         Text(
           '记住它的拼写，然后继续下一题。该词已记入错词，之后会优先复习。',
           textAlign: TextAlign.center,
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(

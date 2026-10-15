@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览区的最大高度。
 ///
@@ -114,9 +115,8 @@ class PreviewSection extends StatelessWidget {
         children: <Widget>[
           Text(
             label,
-            style: TextStyle(
+            style: LexiType.caption.copyWith(
               color: colors.tertiaryLabel,
-              fontSize: 11.5,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.6,
             ),
@@ -151,16 +151,14 @@ class _TranslationSummary extends StatelessWidget {
         children: <Widget>[
           Text(
             '翻译摘要',
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           const SizedBox(height: 4),
           Text(
             text,
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 14,
               fontWeight: FontWeight.w500,
-              height: 1.5,
             ),
           ),
         ],
@@ -221,7 +219,7 @@ class _DefinitionTile extends StatelessWidget {
           ],
           Text(
             _text(item['text']) ?? '',
-            style: TextStyle(color: colors.label, fontSize: 13.5, height: 1.5),
+            style: LexiType.body.copyWith(color: colors.label),
           ),
         ],
       ),
@@ -256,21 +254,15 @@ class _ExampleTile extends StatelessWidget {
         children: <Widget>[
           Text(
             _text(item['sentence']) ?? '',
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: colors.label,
-              fontSize: 13.5,
               fontStyle: FontStyle.italic,
-              height: 1.5,
             ),
           ),
           if (translation != null)
             Text(
               translation,
-              style: TextStyle(
-                color: colors.secondaryLabel,
-                fontSize: 12.5,
-                height: 1.4,
-              ),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
         ],
       ),

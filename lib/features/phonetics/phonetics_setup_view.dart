@@ -15,6 +15,7 @@ import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 音标训练准备页。
 class PhoneticsSetupView extends StatelessWidget {
@@ -42,9 +43,8 @@ class PhoneticsSetupView extends StatelessWidget {
       children: <Widget>[
         Text(
           '音标辨音训练',
-          style: TextStyle(
+          style: LexiType.page.copyWith(
             color: colors.label,
-            fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.4,
           ),
@@ -53,14 +53,13 @@ class PhoneticsSetupView extends StatelessWidget {
         Text(
           '听音、音标与单词三向匹配。每轮 $phoneticItemCount 题 / '
           '$phoneticDurationSeconds 秒，解析里给出 48 音标目录的发音要领。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 16),
         Text(
           '口音',
-          style: TextStyle(
+          style: LexiType.callout.copyWith(
             color: colors.label,
-            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -92,7 +91,7 @@ class PhoneticsSetupView extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Text(
               state.error!,
-              style: TextStyle(color: colors.dangerDeep, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
             ),
           ),
         ],
@@ -105,7 +104,7 @@ class PhoneticsSetupView extends StatelessWidget {
         Text(
           '至少需要 $phoneticMinimumItemCount 个带对应口音音标的可学习单词。',
           textAlign: TextAlign.center,
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -144,9 +143,8 @@ class _AccentCard extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(
             label,
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: selected ? colors.accent : colors.label,
-              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -171,9 +169,8 @@ class _CatalogSummary extends StatelessWidget {
             '目录：$phonemeCatalogSize 个音标 · '
             '${contrastGroups.length} 组易混对比 · '
             '${accentDiffs.length} 条美英差异',
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: colors.label,
-              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -194,9 +191,8 @@ class _CatalogSummary extends StatelessWidget {
                   ),
                   child: Text(
                     entry.display,
-                    style: TextStyle(
+                    style: LexiType.footnote.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 12,
                       fontFamily: 'monospace',
                     ),
                   ),

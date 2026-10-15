@@ -12,6 +12,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 考试目标的中文名。
 const Map<VocabularyLevel, String> articleExamTargetLabels =
@@ -51,9 +52,8 @@ class ArticleInputStep extends ConsumerWidget {
             children: <Widget>[
               Text(
                 _inputHint,
-                style: TextStyle(
+                style: LexiType.footnote.copyWith(
                   color: context.lexiColors.secondaryLabel,
-                  fontSize: 12.5,
                 ),
               ),
               const SizedBox(height: articleCardGap),
@@ -68,9 +68,8 @@ class ArticleInputStep extends ConsumerWidget {
                 const SizedBox(height: articleTightGap),
                 Text(
                   '当前为单段，将一次性请求；如需分段请用空行分隔段落。',
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: context.lexiColors.tertiaryLabel,
-                    fontSize: 12,
                   ),
                 ),
               ],
@@ -101,7 +100,7 @@ class _ExamTargetPicker extends ConsumerWidget {
       children: <Widget>[
         Text(
           '考试目标 · 可多选，不选为自适应（支持跨档如四级 + 托福）',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: articleTightGap),
         Wrap(
@@ -127,7 +126,7 @@ class _ExamTargetPicker extends ConsumerWidget {
           state.draft.examTargets.isEmpty
               ? (state.draft.examTargetsLoaded ? '当前：自适应（按已掌握词库）' : '正在读取设置…')
               : '已选 ${state.draft.examTargets.length} 档，多档时就高不就低',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -161,9 +160,8 @@ class _ExamTargetChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text(
             label,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: active ? Colors.white : colors.secondaryLabel,
-              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -218,10 +216,10 @@ class _ArticleTextFieldState extends ConsumerState<_ArticleTextField> {
           maxLines: 10,
           minLines: 8,
           maxLength: maxArticleChars,
-          style: TextStyle(color: colors.label, fontSize: 14, height: 1.5),
+          style: LexiType.callout.copyWith(color: colors.label),
           decoration: InputDecoration(
             hintText: articleSampleArticle,
-            hintStyle: TextStyle(color: colors.tertiaryLabel, fontSize: 13),
+            hintStyle: LexiType.body.copyWith(color: colors.tertiaryLabel),
             counterText: '',
             filled: true,
             fillColor: colors.fill,
@@ -236,11 +234,10 @@ class _ArticleTextFieldState extends ConsumerState<_ArticleTextField> {
             Expanded(
               child: Text(
                 '${state.charCount} / $maxArticleChars 字符 · 至少 $minArticleChars 字符',
-                style: TextStyle(
+                style: LexiType.caption.copyWith(
                   color: tooLong
                       ? colors.danger
                       : (tooShort ? colors.warning : colors.tertiaryLabel),
-                  fontSize: 11.5,
                 ),
               ),
             ),
@@ -287,16 +284,15 @@ class _SegmentPlanCard extends ConsumerWidget {
         children: <Widget>[
           Text(
             '智能分段预览',
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: colors.label,
-              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
           Text(
             '按换行智能识别为 ${plan.segments.length} 段 · 共 ${plan.totalChars} 字符 · '
             '将分 ${plan.batches.length} 次请求$perBatchHint',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: articleTightGap),
           Wrap(
@@ -317,7 +313,7 @@ class _SegmentPlanCard extends ConsumerWidget {
                 child: Text(
                   '每批段数：${state.draft.segmentsPerBatch} 段 / 批（1 段最稳、'
                   '$maxArticleSegmentsPerBatch 段最快）',
-                  style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
                 ),
               ),
               Slider(

@@ -27,6 +27,7 @@ import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 空库引导的标题 Key，供测试定位。
 const Key emptyStateTitleKey = Key('dashboard-empty-title');
@@ -110,9 +111,8 @@ class _PageHeader extends StatelessWidget {
       children: <Widget>[
         Text(
           '今日',
-          style: TextStyle(
+          style: LexiType.display.copyWith(
             color: colors.label,
-            fontSize: 30,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
           ),
@@ -120,7 +120,7 @@ class _PageHeader extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'LexiLoop 词环 · 纯本地',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 14),
+          style: LexiType.callout.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 20),
       ],
@@ -150,9 +150,8 @@ class _EmptyLibraryState extends StatelessWidget {
           '从 EasyDict 收藏开始',
           key: emptyStateTitleKey,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: colors.label,
-            fontSize: 20,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -160,11 +159,7 @@ class _EmptyLibraryState extends StatelessWidget {
         Text(
           '导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，不会导入整本词典。',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: colors.secondaryLabel,
-            fontSize: 13.5,
-            height: 1.45,
-          ),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 24),
         FilledButton.icon(

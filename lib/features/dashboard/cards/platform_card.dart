@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 平台能力卡片：把 `PlatformCaps` 的判定结果直接摆出来。
@@ -39,9 +40,8 @@ class PlatformCapabilityCard extends StatelessWidget {
         children: <Widget>[
           Text(
             '运行平台：$platformName',
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -93,7 +93,7 @@ class _StatusRow extends StatelessWidget {
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ),
           const SizedBox(width: 8),
@@ -108,9 +108,8 @@ class _StatusRow extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 value,
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: colors.label,
-                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),

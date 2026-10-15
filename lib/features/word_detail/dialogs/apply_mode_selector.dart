@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「仅补全缺失字段」的说明。
 const String fillMissingHint = '保留现有内容，只用有道结果填充空缺部分。';
@@ -43,9 +44,8 @@ class ApplyModeSelector extends StatelessWidget {
         children: <Widget>[
           Text(
             '应用方式',
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: colors.label,
-              fontSize: 13.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -107,18 +107,15 @@ class _ModeOption extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     label,
-                    style: TextStyle(
+                    style: LexiType.body.copyWith(
                       color: colors.label,
-                      fontSize: 13.5,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   Text(
                     hint,
-                    style: TextStyle(
+                    style: LexiType.footnote.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 12,
-                      height: 1.4,
                     ),
                   ),
                 ],

@@ -8,6 +8,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 复习历史卡片：最近 `reviewHistoryLimit` 条作答记录。
@@ -60,7 +61,7 @@ class _LogRow extends StatelessWidget {
             width: 118,
             child: Text(
               formatTimestamp(entry.reviewedAt),
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ),
           DetailChip(
@@ -78,12 +79,12 @@ class _LogRow extends StatelessWidget {
             child: Text(
               questionTypeLabel(entry.questionType),
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.label, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.label),
             ),
           ),
           Text(
             formatDuration(entry.durationMs),
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+            style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
           ),
         ],
       ),

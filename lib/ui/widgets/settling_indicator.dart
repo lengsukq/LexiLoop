@@ -7,15 +7,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 结算中的提示文案。
 const String settlingMessage = '正在结算…';
 
 /// 转圈与说明文字的间距。
 const double _settlingGap = 14;
-
-/// 说明文字的字号。
-const double _settlingFontSize = 13.5;
 
 /// 结算中的居中提示。
 class SettlingIndicator extends StatelessWidget {
@@ -34,7 +32,7 @@ class SettlingIndicator extends StatelessWidget {
             settlingMessage,
             style: TextStyle(
               color: context.lexiColors.secondaryLabel,
-              fontSize: _settlingFontSize,
+              fontSize: LexiType.body.fontSize,
             ),
           ),
         ],

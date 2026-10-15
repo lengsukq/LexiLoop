@@ -13,6 +13,7 @@ import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 筛选与排序控件组。
 class WordFilterControls extends ConsumerWidget {
@@ -184,7 +185,9 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: TextStyle(color: context.lexiColors.tertiaryLabel, fontSize: 12.5),
+      style: LexiType.footnote.copyWith(
+        color: context.lexiColors.tertiaryLabel,
+      ),
     );
   }
 }
@@ -218,9 +221,8 @@ class _FilterChip extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: selected ? colors.accent : colors.secondaryLabel,
-              fontSize: 12.5,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),

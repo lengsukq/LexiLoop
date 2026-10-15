@@ -22,6 +22,7 @@ import 'package:lexiloop/features/settings/question_type_section.dart';
 import 'package:lexiloop/features/settings/study_plan_section.dart';
 import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 
 /// 设置页。
@@ -105,9 +106,8 @@ class _SettingsHeader extends StatelessWidget {
         children: <Widget>[
           Text(
             '设置',
-            style: TextStyle(
+            style: LexiType.page.copyWith(
               color: colors.label,
-              fontSize: 28,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.4,
             ),
@@ -115,7 +115,7 @@ class _SettingsHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '所有改动即时生效，无需保存。',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),

@@ -20,6 +20,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
 /// 弹窗内容宽度。
@@ -161,9 +162,8 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
             if (preview?.translation != null)
               Text(
                 preview!.translation!,
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: context.lexiColors.secondaryLabel,
-                  fontSize: 13,
                 ),
               ),
             if (preview?.difference != null)
@@ -176,9 +176,8 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   _error!,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: context.lexiColors.danger,
-                    fontSize: 12.5,
                   ),
                 ),
               ),
@@ -217,9 +216,8 @@ class _Title extends StatelessWidget {
           ),
           child: Text(
             relationLabel(relation),
-            style: TextStyle(
+            style: LexiType.caption.copyWith(
               color: colors.purple,
-              fontSize: 11.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -227,9 +225,8 @@ class _Title extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           term,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: colors.label,
-            fontSize: 22,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -257,9 +254,8 @@ class _CheckingRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '正在检查词库状态…',
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: context.lexiColors.secondaryLabel,
-              fontSize: 13,
             ),
           ),
         ],
@@ -285,10 +281,7 @@ class _DifferenceBlock extends StatelessWidget {
         color: colors.purple.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Text(
-        text,
-        style: TextStyle(color: colors.purple, fontSize: 13, height: 1.5),
-      ),
+      child: Text(text, style: LexiType.body.copyWith(color: colors.purple)),
     );
   }
 }
@@ -324,7 +317,7 @@ class _StatusBlock extends StatelessWidget {
             value: Text(
               '${languageLabel(preview.sourceLanguage)} → '
               '${languageLabel(preview.targetLanguage)}',
-              style: TextStyle(color: colors.label, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.label),
             ),
           ),
           if (preview.partOfSpeech != null)
@@ -332,7 +325,7 @@ class _StatusBlock extends StatelessWidget {
               label: '词性',
               value: Text(
                 preview.partOfSpeech!,
-                style: TextStyle(color: colors.label, fontSize: 13),
+                style: LexiType.body.copyWith(color: colors.label),
               ),
             ),
           if (existing != null)
@@ -365,9 +358,8 @@ class _StatusRow extends StatelessWidget {
         children: <Widget>[
           Text(
             label,
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: context.lexiColors.secondaryLabel,
-              fontSize: 13,
             ),
           ),
           value,
@@ -394,9 +386,8 @@ class _PlainBadge extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: colors.tertiaryLabel,
-          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -421,7 +412,7 @@ class _MessageBlock extends StatelessWidget {
         color: colors.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Text(text, style: TextStyle(color: colors.success, fontSize: 13)),
+      child: Text(text, style: LexiType.body.copyWith(color: colors.success)),
     );
   }
 }

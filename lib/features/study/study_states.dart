@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 加载态。
 class StudyLoadingView extends StatelessWidget {
@@ -50,7 +51,7 @@ class StudyErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: 14),
             ConstrainedBox(

@@ -9,6 +9,7 @@ import 'package:lexiloop/features/initialize/configurator/configurator_providers
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 数据源列表（可用性 + 优先级排序）与调用策略。
 ///
@@ -246,7 +247,7 @@ class _PriorityBadge extends StatelessWidget {
       '$index',
       style: TextStyle(
         color: context.lexiColors.accent,
-        fontSize: badgeFontSize,
+        fontSize: LexiType.caption.fontSize,
         fontWeight: FontWeight.w700,
       ),
     ),
@@ -447,9 +448,6 @@ const double rowSpacing = 4;
 
 /// 序号徽标的水平内边距。
 const double badgePaddingH = 7;
-
-/// 序号徽标的字号。
-const double badgeFontSize = 11;
 
 /// 上移 / 下移图标的尺寸。
 const double moveIconSize = 20;

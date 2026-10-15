@@ -16,6 +16,7 @@ import 'package:lexiloop/domain/games/scoring.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 结算页的文案。
 class GameResultLabels {
@@ -129,14 +130,13 @@ class _Hero extends StatelessWidget {
         children: <Widget>[
           Text(
             labels.title,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13.5),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: 4),
           Text(
             '${result.score}',
-            style: TextStyle(
+            style: LexiType.hero.copyWith(
               color: colors.label,
-              fontSize: 44,
               fontWeight: FontWeight.w800,
               letterSpacing: -1,
             ),
@@ -146,12 +146,12 @@ class _Hero extends StatelessWidget {
             '评级 ${result.rank.label} · 用时 '
             '${(result.summary.elapsedMs / 1000).toStringAsFixed(1)} 秒 · '
             '最长 ${result.summary.maxCombo} 连击',
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
           ),
           const SizedBox(height: 6),
           Text(
             '历史最高分 ${result.leaderboard.best}',
-            style: TextStyle(color: colors.accent, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.accent),
           ),
         ],
       ),
@@ -213,15 +213,14 @@ class _StatCell extends StatelessWidget {
           children: <Widget>[
             Text(
               '$value',
-              style: TextStyle(
+              style: LexiType.title2.copyWith(
                 color: color,
-                fontSize: 22,
                 fontWeight: FontWeight.w700,
               ),
             ),
             Text(
               label,
-              style: TextStyle(color: colors.quaternaryLabel, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.quaternaryLabel),
             ),
           ],
         ),
@@ -245,14 +244,13 @@ class _Accuracy extends StatelessWidget {
             Expanded(
               child: Text(
                 '一次正确率',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+                style: LexiType.body.copyWith(color: colors.secondaryLabel),
               ),
             ),
             Text(
               '$accuracy%',
-              style: TextStyle(
+              style: LexiType.callout.copyWith(
                 color: colors.label,
-                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -303,9 +301,8 @@ class _MistakeListState extends State<_MistakeList> {
         children: <Widget>[
           Text(
             '本轮失误 ${widget.mistakes.length} 个 · 已记入错词，后续会优先出现',
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.warningDeep,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -361,9 +358,8 @@ class _MistakeRow extends StatelessWidget {
                       mistake.term,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: LexiType.body.copyWith(
                         color: colors.label,
-                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -381,7 +377,7 @@ class _MistakeRow extends StatelessWidget {
                 mistake.definition,
                 maxLines: expanded ? null : 2,
                 overflow: expanded ? null : TextOverflow.ellipsis,
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
               if (expanded && onOpenWord != null)
                 Align(
@@ -415,9 +411,8 @@ class _Leaderboard extends StatelessWidget {
           leaderboard.isNewBest
               ? '新纪录！本轮第 1 名'
               : '本轮第 ${leaderboard.rank} 名 · 历史最佳 ${leaderboard.best}',
-          style: TextStyle(
+          style: LexiType.body.copyWith(
             color: leaderboard.isNewBest ? colors.warningDeep : colors.accent,
-            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -451,9 +446,8 @@ class _ScoreRow extends StatelessWidget {
             width: 26,
             child: Text(
               '${index + 1}',
-              style: TextStyle(
+              style: LexiType.footnote.copyWith(
                 color: colors.tertiaryLabel,
-                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -461,16 +455,15 @@ class _ScoreRow extends StatelessWidget {
           Expanded(
             child: Text(
               '${entry.score}',
-              style: TextStyle(
+              style: LexiType.callout.copyWith(
                 color: colors.label,
-                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           Text(
             '连击 ${entry.detail.maxCombo} · $stamp',
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
         ],
       ),

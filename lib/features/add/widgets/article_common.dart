@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
 const String articleSampleArticle =
@@ -85,9 +86,8 @@ class ArticleSectionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: LexiType.callout.copyWith(
                     color: colors.label,
-                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -125,15 +125,14 @@ class ArticleMetric extends StatelessWidget {
       children: <Widget>[
         Text(
           '$value',
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: color ?? colors.label,
-            fontSize: 20,
             fontWeight: FontWeight.w700,
           ),
         ),
         Text(
           label,
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -179,7 +178,7 @@ class ArticleErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.danger, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.danger),
             ),
           ),
         ],
@@ -230,7 +229,7 @@ class ArticleNotice extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ),
           if (action != null) ...<Widget>[const SizedBox(width: 8), action!],
@@ -260,9 +259,8 @@ class ArticleBadge extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: TextStyle(
+      style: LexiType.caption.copyWith(
         color: color,
-        fontSize: 11.5,
         fontWeight: FontWeight.w600,
       ),
     ),

@@ -7,6 +7,7 @@ import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词库页头部。
 class WordsHeader extends StatelessWidget {
@@ -30,9 +31,8 @@ class WordsHeader extends StatelessWidget {
               children: <Widget>[
                 Text(
                   '单词本',
-                  style: TextStyle(
+                  style: LexiType.page.copyWith(
                     color: colors.label,
-                    fontSize: 28,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.4,
                   ),
@@ -40,7 +40,7 @@ class WordsHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   total == null ? '加载中…' : '共 $total 个词条',
-                  style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+                  style: LexiType.body.copyWith(color: colors.secondaryLabel),
                 ),
               ],
             ),

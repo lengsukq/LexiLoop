@@ -8,6 +8,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 错词与到期提醒卡片：到期数、错词数，各带一个跳转按钮。
@@ -89,14 +90,13 @@ class _ReminderRow extends StatelessWidget {
             children: <Widget>[
               Text(
                 label,
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+                style: LexiType.body.copyWith(color: colors.secondaryLabel),
               ),
               Text(
                 '$count',
                 key: Key('dashboard-$id-count'),
-                style: TextStyle(
+                style: LexiType.title2.copyWith(
                   color: count == 0 ? colors.tertiaryLabel : colors.label,
-                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),

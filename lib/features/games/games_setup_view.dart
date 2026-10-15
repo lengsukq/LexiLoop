@@ -11,6 +11,7 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 可开局的小游戏（配对与音标不在本页）。
 ///
@@ -79,9 +80,8 @@ class GamesSetupView extends StatelessWidget {
       children: <Widget>[
         Text(
           '趣味训练',
-          style: TextStyle(
+          style: LexiType.page.copyWith(
             color: colors.label,
-            fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.4,
           ),
@@ -89,7 +89,7 @@ class GamesSetupView extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '独立于每日复习队列。错词、近期忘记和模糊的词会优先出现。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 16),
         for (final mode in miniGameModes)
@@ -115,7 +115,7 @@ class GamesSetupView extends StatelessWidget {
         Text(
           '题量不足时无法开局：每个模式都需要至少 4 个带有效释义的可学习词条。',
           textAlign: TextAlign.center,
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -196,20 +196,19 @@ class _ModeCardText extends StatelessWidget {
       children: <Widget>[
         Text(
           gameModeTitle(mode),
-          style: TextStyle(
+          style: LexiType.callout.copyWith(
             color: colors.label,
-            fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
         ),
         Text(
           gameModeSubtitle(mode),
-          style: TextStyle(color: colors.quaternaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: 2),
         Text(
           gameModeRule(mode),
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -237,7 +236,7 @@ class _ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.dangerDeep, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
             ),
           ),
         ],

@@ -12,6 +12,7 @@ import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 队列列表。
 class QueueList extends ConsumerWidget {
@@ -136,9 +137,8 @@ class _WordTileState extends ConsumerState<_WordTile> {
           const SizedBox(height: 4),
           Text(
             _summaryText(word),
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: context.lexiColors.tertiaryLabel,
-              fontSize: 12,
             ),
           ),
           if (word.errorSummary != null) ...<Widget>[
@@ -147,7 +147,9 @@ class _WordTileState extends ConsumerState<_WordTile> {
               word.errorSummary!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.lexiColors.danger, fontSize: 12),
+              style: LexiType.footnote.copyWith(
+                color: context.lexiColors.danger,
+              ),
             ),
           ],
           const SizedBox(height: 8),
@@ -204,9 +206,8 @@ class _WordHeader extends ConsumerWidget {
                     word.term,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: LexiType.callout.copyWith(
                       color: colors.accent,
-                      fontSize: 15.5,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -314,9 +315,8 @@ class _TaskDetailRow extends ConsumerWidget {
                   '${taskTypeLabel(task.taskType)} · 任务 #${task.id}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: colors.label,
-                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -328,13 +328,13 @@ class _TaskDetailRow extends ConsumerWidget {
           Text(
             '重试 ${task.attemptCount}/${task.maxAttempts}'
             ' · 更新时间 ${formatTaskStamp(task.updatedAt)}',
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           if (task.lastError != null) ...<Widget>[
             const SizedBox(height: 2),
             Text(
               task.lastError!,
-              style: TextStyle(color: colors.danger, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.danger),
             ),
           ],
           if (_actionable(task.status) != null) ...<Widget>[
@@ -406,7 +406,7 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         queueStatusLabel(status),
-        style: TextStyle(color: tint, fontSize: 11.5),
+        style: LexiType.caption.copyWith(color: tint),
       ),
     );
   }

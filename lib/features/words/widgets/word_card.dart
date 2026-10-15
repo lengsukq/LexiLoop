@@ -16,6 +16,7 @@ import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
 /// 词条卡片。
@@ -86,9 +87,8 @@ class _CardHeading extends StatelessWidget {
             entry.term,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: LexiType.title.copyWith(
               color: context.lexiColors.label,
-              fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -120,7 +120,7 @@ class _CardMeaning extends StatelessWidget {
       meaning ?? '暂无释义',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(color: context.lexiColors.secondaryLabel, fontSize: 13),
+      style: LexiType.body.copyWith(color: context.lexiColors.secondaryLabel),
     );
   }
 }
@@ -146,13 +146,13 @@ class _CardMeta extends StatelessWidget {
         MasteryBadge(level: entry.masteryLevel),
         Text(
           '${entry.sourceLanguage} → ${entry.targetLanguage}',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
         if (isDue) const _CardTag(label: '到期', colorRole: _TagRole.accent),
         if (dueAt != null)
           Text(
             formatDueDate(dueAt),
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
       ],
     );
@@ -182,15 +182,14 @@ class _CardAside extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           '${entry.masteryScore}',
-          style: TextStyle(
+          style: LexiType.title.copyWith(
             color: colors.accent,
-            fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
         ),
         Text(
           '熟练度',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 10),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -296,9 +295,8 @@ class _CardTag extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: color,
-          fontSize: 10.5,
           fontWeight: FontWeight.w600,
         ),
       ),

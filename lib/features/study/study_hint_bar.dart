@@ -17,9 +17,7 @@ import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
-
-/// 提示模式的等宽字号（逻辑像素）。
-const double _hintPatternFontSize = 18;
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 提示模式露出的首尾字母个数，同时也是最短词条长度。
 ///
@@ -122,7 +120,7 @@ class StudyHintBar extends ConsumerWidget {
           style: TextStyle(
             color: context.lexiColors.accent,
             fontFamily: 'monospace',
-            fontSize: _hintPatternFontSize,
+            fontSize: LexiType.title.fontSize,
             letterSpacing: 2,
           ),
         ),
@@ -164,9 +162,8 @@ class StudyHintBar extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             studyHintPendingText,
-            style: TextStyle(
+            style: LexiType.caption.copyWith(
               color: context.lexiColors.tertiaryLabel,
-              fontSize: 11.5,
             ),
           ),
         ],
@@ -197,7 +194,7 @@ class _HintAction extends StatelessWidget {
       child: TextButton.icon(
         onPressed: onTap,
         icon: Icon(icon, size: 16, color: foreground),
-        label: Text(label, style: TextStyle(color: foreground, fontSize: 13)),
+        label: Text(label, style: LexiType.body.copyWith(color: foreground)),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_diff.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 会做答案差异对比的题型。
 ///
@@ -109,16 +110,15 @@ class _DiffLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final base = TextStyle(color: colors.label, fontSize: 13);
+    final base = LexiType.body.copyWith(color: colors.label);
     return Text.rich(
       key: lineKey,
       TextSpan(
         children: <InlineSpan>[
           TextSpan(
             text: label,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.tertiaryLabel,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -155,9 +155,8 @@ class _SentenceDiffView extends StatelessWidget {
       children: <Widget>[
         Text(
           '逐词对比（红=多写，绿=漏词）',
-          style: TextStyle(
+          style: LexiType.caption.copyWith(
             color: colors.tertiaryLabel,
-            fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -174,7 +173,7 @@ class _SentenceDiffView extends StatelessWidget {
         Text(
           '编辑距离 ${diff.editDistance} · 参考：${diff.expectedText}',
           key: const Key('study.diff.meta'),
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -215,9 +214,8 @@ class _WordChip extends StatelessWidget {
       ),
       child: Text(
         word.word,
-        style: TextStyle(
+        style: LexiType.footnote.copyWith(
           color: foreground,
-          fontSize: 12.5,
           decoration: decoration,
           decorationColor: colors.success.withValues(alpha: 0.5),
         ),

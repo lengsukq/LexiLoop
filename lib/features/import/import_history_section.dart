@@ -16,6 +16,7 @@ import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/features/import/rollback_blocked_message.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 撤销失败的提示停留时长。
 ///
@@ -46,9 +47,8 @@ class ImportHistorySection extends ConsumerWidget {
               const SizedBox(width: 6),
               Text(
                 '导入历史',
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -68,15 +68,12 @@ class ImportHistorySection extends ConsumerWidget {
             ),
             error: (error, _) => Text(
               error is AppError ? error.message : '读取导入历史失败：$error',
-              style: TextStyle(color: colors.danger, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.danger),
             ),
             data: (batches) => batches.isEmpty
                 ? Text(
                     '还没有导入记录。',
-                    style: TextStyle(
-                      color: colors.secondaryLabel,
-                      fontSize: 13,
-                    ),
+                    style: LexiType.body.copyWith(color: colors.secondaryLabel),
                   )
                 : Column(
                     children: <Widget>[
@@ -216,16 +213,15 @@ class _BatchSummaryRow extends StatelessWidget {
                 batch.filename,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: colors.label,
-                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 _batchMeta(batch),
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.secondaryLabel),
               ),
             ],
           ),
@@ -286,7 +282,7 @@ class _BatchRows extends ConsumerWidget {
       ),
       error: (error, _) => Text(
         error is AppError ? error.message : '读取行明细失败：$error',
-        style: TextStyle(color: colors.danger, fontSize: 12.5),
+        style: LexiType.footnote.copyWith(color: colors.danger),
       ),
       data: (items) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,9 +297,8 @@ class _BatchRows extends ConsumerWidget {
                     width: 40,
                     child: Text(
                       '${row.rowNumber}',
-                      style: TextStyle(
+                      style: LexiType.caption.copyWith(
                         color: colors.tertiaryLabel,
-                        fontSize: 11.5,
                       ),
                     ),
                   ),
@@ -312,7 +307,7 @@ class _BatchRows extends ConsumerWidget {
                       row.term.isEmpty ? '（空）' : row.term,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colors.label, fontSize: 12.5),
+                      style: LexiType.footnote.copyWith(color: colors.label),
                     ),
                   ),
                   ImportRowStatusBadge(status: row.status),
@@ -323,7 +318,7 @@ class _BatchRows extends ConsumerWidget {
                         row.errorMessage!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: colors.danger, fontSize: 11.5),
+                        style: LexiType.caption.copyWith(color: colors.danger),
                       ),
                     ),
                   ],
@@ -358,9 +353,8 @@ class _BatchStatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: color,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),

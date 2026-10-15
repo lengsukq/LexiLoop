@@ -15,6 +15,7 @@ import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 二次确认时要求输入的词。
 const String deleteConfirmKeyword = 'DELETE';
@@ -89,7 +90,7 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
               Text(
                 '清空全部数据会删除所有词条、学习记录、导入历史与设置，'
                 '应用回到首次启动的状态。',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
               const SizedBox(height: 10),
               FilledButton.icon(

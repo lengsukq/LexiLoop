@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_tetris.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇俄罗斯方块视图。
 class WordTetrisView extends StatelessWidget {
@@ -38,16 +39,14 @@ class WordTetrisView extends StatelessWidget {
       children: <Widget>[
         Text(
           '看释义，点中正在下落的正确单词',
-          style: TextStyle(color: colors.quaternaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: 8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: colors.label,
-            fontSize: 20,
-            height: 1.4,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -88,9 +87,8 @@ class WordTetrisView extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '堆叠 ${state.danger}/$wordTetrisDangerCap · 点错会记一次失误 · 堆满结束本轮',
-          style: TextStyle(
+          style: LexiType.caption.copyWith(
             color: full ? colors.danger : colors.tertiaryLabel,
-            fontSize: 11.5,
             fontWeight: full ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -125,9 +123,8 @@ class _Block extends StatelessWidget {
                 maxLines: 2,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: LexiType.caption.copyWith(
                   color: Colors.white,
-                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),

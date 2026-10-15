@@ -21,6 +21,7 @@ import 'package:lexiloop/features/word_detail/cards/word_detail_header_card.dart
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
@@ -178,9 +179,8 @@ class _MissingView extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               '词条不存在或已被删除',
-              style: TextStyle(
+              style: LexiType.title.copyWith(
                 color: colors.label,
-                fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -188,7 +188,7 @@ class _MissingView extends StatelessWidget {
             Text(
               '它可能刚被删除，或来自一个尚未导入的 ID。',
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: 16),
             FilledButton(

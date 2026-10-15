@@ -12,6 +12,7 @@ import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
 import 'package:lexiloop/features/add/widgets/article_strategy_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览步骤。
 class ArticlePreviewStep extends ConsumerWidget {
@@ -86,7 +87,9 @@ class _ExpiryLine extends ConsumerWidget {
         : '';
     return Text(
       '预览在 ${articleExpiryText(preview.expiresAt)} 前有效$segmented',
-      style: TextStyle(color: context.lexiColors.secondaryLabel, fontSize: 12),
+      style: LexiType.footnote.copyWith(
+        color: context.lexiColors.secondaryLabel,
+      ),
     );
   }
 }

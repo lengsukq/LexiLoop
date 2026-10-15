@@ -10,6 +10,7 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 助记与句子分析卡片：助记法、发音提示、常见错误与句子分析。
@@ -162,9 +163,8 @@ class _ItemGroup extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.secondaryLabel,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -204,9 +204,8 @@ class _BulletGroup extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.secondaryLabel,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),

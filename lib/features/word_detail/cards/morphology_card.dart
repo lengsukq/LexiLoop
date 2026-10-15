@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 词根词缀卡片：词根、前缀、后缀分区展示。
@@ -89,9 +90,8 @@ class _MorphologyGroup extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: colors.secondaryLabel,
-              fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),

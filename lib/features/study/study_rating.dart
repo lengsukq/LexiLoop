@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 拿不到间隔预览时的占位符。
 ///
@@ -55,7 +56,7 @@ class StudyRatingBar extends StatelessWidget {
       children: <Widget>[
         Text(
           hint,
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 8),
         Row(
@@ -132,9 +133,8 @@ class _RatingButton extends StatelessWidget {
             children: <Widget>[
               Text(
                 studyRatingLabel(rating),
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: foreground,
-                  fontSize: 14,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
@@ -144,9 +144,8 @@ class _RatingButton extends StatelessWidget {
               Text(
                 interval,
                 key: Key('study.rating.interval.${rating.wire}'),
-                style: TextStyle(
+                style: LexiType.caption.copyWith(
                   color: foreground.withValues(alpha: 0.75),
-                  fontSize: 10.5,
                 ),
               ),
             ],

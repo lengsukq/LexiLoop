@@ -24,6 +24,7 @@ import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/features/games/game_speech.dart';
 import 'package:lexiloop/features/games/widgets/game_choice_grid.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 听音辨词 / 词义冲刺视图。
 class ChoicePickView extends ConsumerStatefulWidget {
@@ -139,7 +140,7 @@ class _ListeningPrompt extends StatelessWidget {
       children: <Widget>[
         Text(
           '听发音，选择正确的英文词条',
-          style: TextStyle(color: colors.quaternaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: 14),
         Material(
@@ -162,7 +163,7 @@ class _ListeningPrompt extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '点击可重复播放',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -181,15 +182,14 @@ class _MeaningPrompt extends StatelessWidget {
       children: <Widget>[
         Text(
           '选择最准确的中文释义',
-          style: TextStyle(color: colors.quaternaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: 16),
         Text(
           term,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.hero.copyWith(
             color: colors.label,
-            fontSize: 34,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.5,
           ),

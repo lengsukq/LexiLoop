@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词库列表页的空状态。
 class WordEmptyView extends StatelessWidget {
@@ -35,9 +36,8 @@ class WordEmptyView extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               filtered ? '没有匹配的词条' : '还没有词条',
-              style: TextStyle(
+              style: LexiType.title.copyWith(
                 color: context.lexiColors.label,
-                fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -45,9 +45,8 @@ class WordEmptyView extends StatelessWidget {
             Text(
               filtered ? '调整筛选条件或清空搜索词后再试。' : '可以导入旧版备份，也可以直接用 CSV 导入建立词库。',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: LexiType.body.copyWith(
                 color: context.lexiColors.secondaryLabel,
-                fontSize: 13,
               ),
             ),
             if (!filtered) ...<Widget>[

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/whack_a_mole.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇地鼠视图。
 class WhackAMoleView extends StatelessWidget {
@@ -30,19 +31,16 @@ class WhackAMoleView extends StatelessWidget {
       children: <Widget>[
         Text(
           '看释义，锤出正确的单词地鼠',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.quaternaryLabel,
-            fontSize: 12.5,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: context.lexiColors.label,
-            fontSize: 20,
-            height: 1.4,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -67,9 +65,8 @@ class WhackAMoleView extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           '地鼠缩回前锤中正确单词 · 锤错会记一次失误',
-          style: TextStyle(
+          style: LexiType.caption.copyWith(
             color: context.lexiColors.tertiaryLabel,
-            fontSize: 11.5,
           ),
         ),
       ],
@@ -137,9 +134,8 @@ class _Hole extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: LexiType.body.copyWith(
                               color: Colors.white,
-                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

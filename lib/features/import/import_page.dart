@@ -18,6 +18,7 @@ import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
 /// CSV 导入页。
@@ -80,9 +81,8 @@ class _ImportHeader extends StatelessWidget {
       children: <Widget>[
         Text(
           '导入词库',
-          style: TextStyle(
+          style: LexiType.page.copyWith(
             color: colors.label,
-            fontSize: 28,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.4,
           ),
@@ -90,7 +90,7 @@ class _ImportHeader extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '支持 EasyDict 导出的 CSV：单词 / 释义 / 音标 / 例句 / 同义词等列会自动识别。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -126,9 +126,8 @@ class _StepCard extends StatelessWidget {
                 ),
                 child: Text(
                   '$step',
-                  style: TextStyle(
+                  style: LexiType.caption.copyWith(
                     color: colors.accent,
-                    fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -136,9 +135,8 @@ class _StepCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -204,7 +202,7 @@ class _LanguageDropdown extends StatelessWidget {
       children: <Widget>[
         Text(
           label,
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 4),
         DropdownButton<String>(
@@ -217,7 +215,7 @@ class _LanguageDropdown extends StatelessWidget {
                 value: language.code,
                 child: Text(
                   '${language.label}（${language.code}）',
-                  style: TextStyle(color: colors.label, fontSize: 13.5),
+                  style: LexiType.body.copyWith(color: colors.label),
                 ),
               ),
           ],
@@ -249,9 +247,8 @@ class _FileStep extends ConsumerWidget {
                 : '${preview.filename}（${preview.totalRows} 行）',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: preview == null ? colors.secondaryLabel : colors.label,
-              fontSize: 13,
             ),
           ),
         ),
@@ -281,7 +278,7 @@ class _PreviewPlaceholder extends StatelessWidget {
     final colors = context.lexiColors;
     return Text(
       '选择文件后，这里会显示逐行预览与问题行。',
-      style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+      style: LexiType.body.copyWith(color: colors.secondaryLabel),
     );
   }
 }
@@ -324,9 +321,8 @@ class _PreviewStep extends ConsumerWidget {
         const SizedBox(height: 14),
         Text(
           '导入模式',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.secondaryLabel,
-            fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -417,18 +413,16 @@ class _ModeOption extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         _modeLabel(mode),
-                        style: TextStyle(
+                        style: LexiType.body.copyWith(
                           color: selected ? colors.accent : colors.label,
-                          fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _modeDescription(mode),
-                        style: TextStyle(
+                        style: LexiType.footnote.copyWith(
                           color: colors.secondaryLabel,
-                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -476,7 +470,7 @@ class _SubmitButton extends StatelessWidget {
           Expanded(
             child: Text(
               '没有可导入的行。',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ),
       ],
@@ -506,9 +500,8 @@ class _ResultCard extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '导入完成',
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -519,7 +512,7 @@ class _ResultCard extends StatelessWidget {
             '新增 ${result.created} · 已存在 ${result.existing} · '
             '重复 ${result.duplicate} · 无效 ${result.invalid} · '
             '失败 ${result.failed}；已入队初始化 ${result.queuedInitializations} 个',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: 12),
           const _ResultActions(),
@@ -597,7 +590,7 @@ class _ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.danger, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.danger),
             ),
           ),
         ],

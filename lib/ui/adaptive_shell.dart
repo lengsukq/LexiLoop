@@ -12,6 +12,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 承载 8 个分支的自适应外壳。
 class AdaptiveShell extends StatelessWidget {
@@ -154,9 +155,8 @@ class _SidebarBrand extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           'LexiLoop',
-          style: TextStyle(
+          style: LexiType.title.copyWith(
             color: colors.label,
-            fontSize: 17,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
           ),
@@ -201,9 +201,8 @@ class _SidebarItem extends StatelessWidget {
                 Expanded(
                   child: Text(
                     destination.label,
-                    style: TextStyle(
+                    style: LexiType.callout.copyWith(
                       color: active ? colors.accent : colors.label,
-                      fontSize: 14.5,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
@@ -211,9 +210,8 @@ class _SidebarItem extends StatelessWidget {
                 if (active)
                   Text(
                     '⌘${destination.shortcut}',
-                    style: TextStyle(
+                    style: LexiType.caption.copyWith(
                       color: colors.quaternaryLabel,
-                      fontSize: 10,
                     ),
                   ),
               ],
@@ -249,9 +247,8 @@ class _SidebarFooter extends StatelessWidget {
               Expanded(
                 child: Text(
                   '本地数据库',
-                  style: TextStyle(
+                  style: LexiType.caption.copyWith(
                     color: colors.secondaryLabel,
-                    fontSize: 11.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -260,7 +257,7 @@ class _SidebarFooter extends StatelessWidget {
               const SizedBox(width: 3),
               Text(
                 'FSRS',
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 10.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ],
           ),
@@ -277,7 +274,7 @@ class _SidebarFooter extends StatelessWidget {
                 child: Text(
                   'LexiLoop v1.0',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
                 ),
               ),
               const SizedBox(width: 8),
@@ -286,7 +283,7 @@ class _SidebarFooter extends StatelessWidget {
                   '⌘1-8 快捷切换',
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.end,
-                  style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
                 ),
               ),
             ],
@@ -410,9 +407,8 @@ class _BottomBarItem extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               destination.label,
-              style: TextStyle(
+              style: LexiType.caption.copyWith(
                 color: foreground,
-                fontSize: 10.5,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -446,9 +442,8 @@ class _MoreButton extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               '更多',
-              style: TextStyle(
+              style: LexiType.caption.copyWith(
                 color: foreground,
-                fontSize: 10.5,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -486,9 +481,8 @@ class _MoreSheet extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 4, bottom: 12),
                 child: Text(
                   '更多',
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: colors.secondaryLabel,
-                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -540,9 +534,8 @@ class _MoreSheetItem extends StatelessWidget {
               const SizedBox(width: 10),
               Text(
                 destination.label,
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),

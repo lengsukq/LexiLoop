@@ -9,6 +9,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -60,9 +61,8 @@ class _StatisticsBody extends StatelessWidget {
             Text(
               '${overview.totalWords}',
               key: totalWordsKey,
-              style: TextStyle(
+              style: LexiType.hero.copyWith(
                 color: colors.label,
-                fontSize: 34,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.8,
               ),
@@ -70,7 +70,7 @@ class _StatisticsBody extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               '个词条',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ],
         ),
@@ -149,9 +149,8 @@ class _MasteryBar extends StatelessWidget {
             child: Text(
               '$count',
               textAlign: TextAlign.end,
-              style: TextStyle(
+              style: LexiType.body.copyWith(
                 color: colors.label,
-                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),

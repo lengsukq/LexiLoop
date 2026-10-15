@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 完成摘要。
 ///
@@ -50,7 +51,7 @@ class ArticleCommittingStep extends StatelessWidget {
           const SizedBox(height: articleCardGap),
           Text(
             '创建初始化任务并应用导入策略，请勿重复提交。',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),
@@ -79,12 +80,12 @@ class ArticleSuccessCard extends ConsumerWidget {
           const SizedBox(height: articleCardGap),
           Text(
             _successSummary(result),
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: articleCardGap),
           Text(
             _successHint,
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           const SizedBox(height: articleCardGap),
           Align(

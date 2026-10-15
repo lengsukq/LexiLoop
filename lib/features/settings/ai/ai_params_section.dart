@@ -15,6 +15,7 @@ import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 推理强度的可选项；空串表示「交给模型自己决定」。
 const List<String> reasoningEffortOptions = <String>[
@@ -322,11 +323,11 @@ class _RetryHeader extends StatelessWidget {
       children: <Widget>[
         Text(
           '失败降级',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         Text(
           '只对超时、限流、网络错误这类瞬时失败生效；鉴权失败重试没有意义。',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );

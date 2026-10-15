@@ -14,6 +14,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 配对牌面。
 class MatchBoardView extends StatelessWidget {
@@ -48,9 +49,8 @@ class MatchBoardView extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '已配对 ${board.matchedCount}/${board.pairs.length} · 点击英文与对应释义',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.secondaryLabel,
-            fontSize: 12.5,
           ),
         ),
         const SizedBox(height: 10),
@@ -169,7 +169,11 @@ class _Card extends StatelessWidget {
                   color: side == MatchSide.word
                       ? colors.label
                       : colors.secondaryLabel,
-                  fontSize: side == MatchSide.word ? 15 : 13,
+                  fontSize:
+                      (side == MatchSide.word
+                              ? LexiType.callout
+                              : LexiType.body)
+                          .fontSize,
                   fontWeight: side == MatchSide.word
                       ? FontWeight.w600
                       : FontWeight.w400,

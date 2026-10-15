@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 趣味训练入口。
@@ -34,7 +35,7 @@ class PracticeCard extends StatelessWidget {
         children: <Widget>[
           Text(
             '独立模式，不占用今日复习队列',
-            style: TextStyle(color: colors.quaternaryLabel, fontSize: 12),
+            style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -171,9 +172,8 @@ class _PracticeEntryTile extends StatelessWidget {
                   entry.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: colors.label,
-                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -182,7 +182,7 @@ class _PracticeEntryTile extends StatelessWidget {
                   entry.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
                 ),
               ],
             ),

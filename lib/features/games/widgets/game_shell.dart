@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 游戏类页面的统一外壳：环境光背景 + 安全区 + 居中的内容宽度。
 class GameScaffold extends StatelessWidget {
@@ -80,18 +81,16 @@ class GameHud extends StatelessWidget {
             Expanded(
               child: Text(
                 '$title · 第 ${core.progress.index + 1}/${core.plan.itemCount} 题',
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: colors.secondaryLabel,
-                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             Text(
               '${(core.remainingMs / 1000).ceil()}s',
-              style: TextStyle(
+              style: LexiType.callout.copyWith(
                 color: ratio < 0.25 ? colors.danger : colors.label,
-                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               ),
@@ -139,15 +138,14 @@ class _Stat extends StatelessWidget {
         children: <Widget>[
           Text(
             value,
-            style: TextStyle(
+            style: LexiType.title.copyWith(
               color: colors.label,
-              fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
           ),
           Text(
             label,
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
         ],
       ),
@@ -180,7 +178,7 @@ class GameErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13.5),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: 14),
             FilledButton(onPressed: onRetry, child: const Text('重试')),

@@ -15,6 +15,7 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
 /// 词条头部：操作栏 + 文本、状态徽章、口音切换与学习开关。
@@ -258,9 +259,8 @@ class _TermBlock extends StatelessWidget {
       children: <Widget>[
         Text(
           detail.term,
-          style: TextStyle(
+          style: LexiType.display.copyWith(
             color: colors.label,
-            fontSize: 30,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.5,
           ),
@@ -318,7 +318,7 @@ class _TranslationHint extends ConsumerWidget {
         children: <Widget>[
           Text(
             '暂无中文释义',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(width: 8),
           TextButton.icon(
@@ -412,9 +412,8 @@ class _AccentToggle extends ConsumerWidget {
               children: <Widget>[
                 Text(
                   label,
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: selected ? colors.accent : colors.secondaryLabel,
-                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -422,9 +421,8 @@ class _AccentToggle extends ConsumerWidget {
                   const SizedBox(width: 6),
                   Text(
                     '/$phonetic/',
-                    style: TextStyle(
+                    style: LexiType.footnote.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 12.5,
                       fontFamily: 'monospace',
                     ),
                   ),
@@ -496,7 +494,7 @@ class _SourceMeta extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 2),
     child: Text(
       text,
-      style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+      style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
     ),
   );
 }
@@ -520,7 +518,7 @@ class _HeaderActions extends ConsumerWidget {
         const Spacer(),
         Text(
           detail.isSuspended ? '已暂停' : '学习中',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         Switch(
           value: detail.isSuspended,

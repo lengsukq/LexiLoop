@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 配对准备页。
 class MatchSetupView extends StatelessWidget {
@@ -34,9 +35,8 @@ class MatchSetupView extends StatelessWidget {
       children: <Widget>[
         Text(
           '限时词汇配对',
-          style: TextStyle(
+          style: LexiType.page.copyWith(
             color: colors.label,
-            fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.4,
           ),
@@ -44,7 +44,7 @@ class MatchSetupView extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 16),
         for (final preset in matchPresets)
@@ -66,7 +66,7 @@ class MatchSetupView extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Text(
               state.error!,
-              style: TextStyle(color: colors.dangerDeep, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
             ),
           ),
         ],
@@ -79,7 +79,7 @@ class MatchSetupView extends StatelessWidget {
         Text(
           '至少需要 4 个带释义且释义不重复的可学习词条。',
           textAlign: TextAlign.center,
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -127,18 +127,16 @@ class _PresetCard extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         preset.name,
-                        style: TextStyle(
+                        style: LexiType.callout.copyWith(
                           color: colors.label,
-                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         '${preset.pairs} 组 · ${preset.seconds} 秒 · '
                         '${preset.description}',
-                        style: TextStyle(
+                        style: LexiType.footnote.copyWith(
                           color: colors.quaternaryLabel,
-                          fontSize: 12,
                         ),
                       ),
                     ],

@@ -17,6 +17,7 @@ import 'package:lexiloop/features/add/widgets/manual_batch_row_card.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词典批量预览面板。
 class ManualBatchPanel extends ConsumerStatefulWidget {
@@ -159,7 +160,7 @@ class _QuickFillRow extends StatelessWidget {
       children: <Widget>[
         Text(
           '快捷填入：',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         for (final sample in _batchSamples)
           ActionChip(
@@ -190,13 +191,13 @@ class _CounterRow extends StatelessWidget {
               '已输入 $lineCount 行，最多 $manualBatchMaxRows 行。',
               '类型、原语言、目标语言会应用到每一行。',
             ].join(),
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           '${state.text.length}/$manualBatchMaxTotalChars',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -313,7 +314,7 @@ class _PreviewRow extends StatelessWidget {
             '生成预览会先查有道词典，识别不出短语或句子时自动用 AI 兜底，',
             '不会创建正式词条。确认后才会写入词库。',
           ].join(),
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
         const SizedBox(height: 8),
         Align(
@@ -358,7 +359,7 @@ class _BatchProgress extends StatelessWidget {
           Expanded(
             child: Text(
               '正在逐行查询词典，请稍候…（${state.previewDone}/${state.rows.length}）',
-              style: TextStyle(color: colors.accent, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.accent),
             ),
           ),
         ],
@@ -370,7 +371,7 @@ class _BatchProgress extends StatelessWidget {
         '${state.successCount} 行成功 · 共 ${state.rows.length} 行，',
         '确认后才会写入正式词库。',
       ].join(),
-      style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+      style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
     );
   }
 }
@@ -412,16 +413,15 @@ class _ConfirmAllCard extends StatelessWidget {
         children: <Widget>[
           Text(
             '确认后才会写入正式词库',
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '确认不会再次查询词典；也可以先逐行展开详情再确认。',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: 10),
           FilledButton.icon(
@@ -462,9 +462,8 @@ class _AllConfirmedCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '已全部加入词库',
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -473,7 +472,7 @@ class _AllConfirmedCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '共确认 ${state.successCount} 个词条，词典预览内容已经正式保存。',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: 10),
           FilledButton(
@@ -510,7 +509,7 @@ class _ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: colors.danger, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.danger),
             ),
           ),
         ],
@@ -532,9 +531,8 @@ class _LabeledField extends StatelessWidget {
     children: <Widget>[
       Text(
         label,
-        style: TextStyle(
+        style: LexiType.footnote.copyWith(
           color: context.lexiColors.secondaryLabel,
-          fontSize: 12,
         ),
       ),
       const SizedBox(height: 2),

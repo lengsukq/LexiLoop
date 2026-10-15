@@ -13,6 +13,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇水平分组。
 class VocabularySection extends ConsumerWidget {
@@ -63,7 +64,9 @@ class VocabularySection extends ConsumerWidget {
               if (settings.examTargets.isEmpty)
                 Text(
                   '当前未选择任何考试目标。',
-                  style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+                  style: LexiType.footnote.copyWith(
+                    color: colors.secondaryLabel,
+                  ),
                 ),
             ],
           ),
@@ -119,9 +122,8 @@ class _LevelOption extends StatelessWidget {
                 const SizedBox(width: 10),
                 Text(
                   vocabularyLevelLabel(level),
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: selected ? colors.accent : colors.label,
-                    fontSize: 13.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

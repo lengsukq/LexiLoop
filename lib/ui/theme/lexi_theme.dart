@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 构建 LexiLoop 的浅色与深色主题。
 abstract final class LexiTheme {
@@ -128,7 +129,7 @@ abstract final class LexiTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(LexiRadius.md),
         ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        textStyle: LexiType.callout.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -137,7 +138,7 @@ abstract final class LexiTheme {
     return TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: colors.accent,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        textStyle: LexiType.callout.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -172,7 +173,7 @@ abstract final class LexiTheme {
       backgroundColor: isDark
           ? const Color(0xFF2C2C2E)
           : const Color(0xFF1C1C1E),
-      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      contentTextStyle: LexiType.callout.copyWith(color: Colors.white),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
@@ -193,7 +194,7 @@ abstract final class LexiTheme {
         color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFF1C1C1E),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
-      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+      textStyle: LexiType.footnote.copyWith(color: Colors.white),
     );
   }
 

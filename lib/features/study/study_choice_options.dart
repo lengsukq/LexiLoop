@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 选项在提交前后的四种外观。
 enum _OptionState {
@@ -140,9 +141,8 @@ class _ChoiceTile extends StatelessWidget {
             children: <Widget>[
               Text(
                 label,
-                style: TextStyle(
+                style: LexiType.title.copyWith(
                   color: foreground,
-                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -150,9 +150,8 @@ class _ChoiceTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   text,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: colors.secondaryLabel,
-                    fontSize: 12.5,
                   ),
                 ),
               ],
@@ -173,7 +172,7 @@ class _MissingChoices extends StatelessWidget {
     final colors = context.lexiColors;
     return Text(
       '该词条暂无可用选项，可先跳过本题',
-      style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+      style: LexiType.body.copyWith(color: colors.secondaryLabel),
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 掌握概览进度带。
 class MasteryOverviewStrip extends ConsumerWidget {
@@ -94,18 +95,16 @@ class _OverviewText extends StatelessWidget {
             Expanded(
               child: Text(
                 '当前词条掌握程度',
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             Text(
               '$percent%',
-              style: TextStyle(
+              style: LexiType.title2.copyWith(
                 color: colors.accent,
-                fontSize: 20,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -115,7 +114,7 @@ class _OverviewText extends StatelessWidget {
         Text(
           '已掌握 ${overview.mastered} / ${overview.total} 个词条 · '
           '还有 ${overview.remaining} 个待继续学习',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: 8),
         ClipRRect(

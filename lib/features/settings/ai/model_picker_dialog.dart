@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 选择器的固定宽度：模型多到需要滚动，但不该吃掉整屏。
 const double modelPickerWidth = 460;
@@ -120,9 +121,8 @@ class _ModelPickerDialogState extends State<ModelPickerDialog> {
         child: Text(
           '没有匹配的模型。',
           key: const Key('modelPickerEmpty'),
-          style: TextStyle(
+          style: LexiType.body.copyWith(
             color: context.lexiColors.quaternaryLabel,
-            fontSize: 13,
           ),
         ),
       );

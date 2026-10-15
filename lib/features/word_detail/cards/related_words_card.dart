@@ -7,6 +7,7 @@ import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/word_detail/dialogs/related_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 关系类型对应的卡片标题与图标。
@@ -124,9 +125,8 @@ class _RelatedBody extends StatelessWidget {
             Flexible(
               child: Text(
                 item.word,
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -144,21 +144,13 @@ class _RelatedBody extends StatelessWidget {
         if (item.translation != null)
           Text(
             item.translation!,
-            style: TextStyle(
-              color: colors.secondaryLabel,
-              fontSize: 13,
-              height: 1.4,
-            ),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         // 易混词的区别说明是这一类的核心信息，有则必须显示。
         if (item.difference != null)
           Text(
             '区别：${item.difference}',
-            style: TextStyle(
-              color: colors.warning,
-              fontSize: 12.5,
-              height: 1.4,
-            ),
+            style: LexiType.footnote.copyWith(color: colors.warning),
           ),
       ],
     );

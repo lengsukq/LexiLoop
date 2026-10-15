@@ -16,6 +16,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// Merriam-Webster 词典 API Key 的存储键。
 const String merriamWebsterDictionaryKeyName = 'merriamWebsterDictionaryKey';
@@ -172,7 +173,7 @@ class _SecretField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: '留空表示不使用',
-        hintStyle: TextStyle(color: colors.tertiaryLabel, fontSize: 13),
+        hintStyle: LexiType.body.copyWith(color: colors.tertiaryLabel),
       ),
     );
   }

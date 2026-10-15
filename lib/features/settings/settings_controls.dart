@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一个设置分组卡片。
 class SettingsSectionCard extends StatelessWidget {
@@ -40,9 +41,8 @@ class SettingsSectionCard extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -50,7 +50,7 @@ class SettingsSectionCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ],
           const SizedBox(height: 10),
@@ -132,14 +132,13 @@ class _SettingsSliderRowState extends State<SettingsSliderRow> {
               Expanded(
                 child: Text(
                   widget.label,
-                  style: TextStyle(color: colors.label, fontSize: 13.5),
+                  style: LexiType.body.copyWith(color: colors.label),
                 ),
               ),
               Text(
                 widget.valueText ?? _value.toStringAsFixed(2),
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: colors.accent,
-                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -148,7 +147,7 @@ class _SettingsSliderRowState extends State<SettingsSliderRow> {
           if (description != null)
             Text(
               description,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
             ),
           Slider(
             value: _value.clamp(widget.min, widget.max),
@@ -206,16 +205,12 @@ class SettingsSwitchRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  label,
-                  style: TextStyle(color: colors.label, fontSize: 13.5),
-                ),
+                Text(label, style: LexiType.body.copyWith(color: colors.label)),
                 if (description != null)
                   Text(
                     description,
-                    style: TextStyle(
+                    style: LexiType.caption.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 11.5,
                     ),
                   ),
               ],
@@ -254,7 +249,7 @@ class SettingsNotice extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: color, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: color),
             ),
           ),
         ],

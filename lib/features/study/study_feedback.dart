@@ -12,6 +12,7 @@ import 'package:lexiloop/features/study/study_answer_diff.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 主按钮高度下限（逻辑像素）。
 const double _buttonHeight = 50;
@@ -63,16 +64,15 @@ class StudyFeedbackPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 outcome.isCorrect ? '回答正确' : '回答错误',
-                style: TextStyle(
+                style: LexiType.title.copyWith(
                   color: accent,
-                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const Spacer(),
               Text(
                 '自评：${studyRatingLabel(outcome.rating)}',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
             ],
           ),
@@ -84,7 +84,7 @@ class StudyFeedbackPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               studyHintRevealedText,
-              style: TextStyle(color: colors.warning, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.warning),
             ),
           ],
           const SizedBox(height: 12),
@@ -139,7 +139,7 @@ class _WrongAnswerDetail extends StatelessWidget {
       children: <Widget>[
         Text(
           '期望答案：${outcome.expectedAnswer}',
-          style: TextStyle(color: colors.danger, fontSize: 14),
+          style: LexiType.callout.copyWith(color: colors.danger),
         ),
         const SizedBox(height: 8),
         StudyAnswerDiff(item: item, outcome: outcome, answer: answer),
@@ -184,9 +184,8 @@ class StudySummaryView extends StatelessWidget {
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: LexiType.title2.copyWith(
               color: colors.label,
-              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -250,7 +249,7 @@ class _StatRow extends StatelessWidget {
         children: <Widget>[
           Text(
             label,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(width: 12),
           Flexible(
@@ -258,9 +257,8 @@ class _StatRow extends StatelessWidget {
               value,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.end,
-              style: TextStyle(
+              style: LexiType.callout.copyWith(
                 color: colors.label,
-                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -286,7 +284,7 @@ class _Notice extends StatelessWidget {
         Icon(icon, size: 15, color: color),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(text, style: TextStyle(color: color, fontSize: 12.5)),
+          child: Text(text, style: LexiType.footnote.copyWith(color: color)),
         ),
       ],
     );

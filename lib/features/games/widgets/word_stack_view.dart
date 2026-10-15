@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_stack.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 单词堆堆乐视图。
 class WordStackView extends StatelessWidget {
@@ -41,16 +42,14 @@ class WordStackView extends StatelessWidget {
       children: <Widget>[
         Text(
           '看释义，点选滚动词块堆高塔',
-          style: TextStyle(color: colors.quaternaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: 8),
         Text(
           question.word.definition,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: LexiType.title2.copyWith(
             color: colors.label,
-            fontSize: 20,
-            height: 1.4,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -73,7 +72,9 @@ class WordStackView extends StatelessWidget {
               ? Center(
                   child: Text(
                     '点对词块，塔会越堆越高',
-                    style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+                    style: LexiType.footnote.copyWith(
+                      color: colors.tertiaryLabel,
+                    ),
                   ),
                 )
               : Column(
@@ -92,7 +93,7 @@ class WordStackView extends StatelessWidget {
         ),
         Text(
           '已堆 ${tower.length} 层 · 点错会记一次失误',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -132,9 +133,8 @@ class _Row extends StatelessWidget {
                   ),
                   child: Text(
                     word,
-                    style: TextStyle(
+                    style: LexiType.callout.copyWith(
                       color: colors.label,
-                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -175,9 +175,8 @@ class _TowerBlock extends StatelessWidget {
         term,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: LexiType.footnote.copyWith(
           color: Colors.white,
-          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

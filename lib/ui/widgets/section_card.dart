@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 卡片内边距。
 const double sectionCardPadding = 18;
@@ -26,9 +27,6 @@ const double _sectionCardIconSize = 16;
 
 /// 图标与标题之间的间距。
 const double _sectionCardIconGap = 8;
-
-/// 标题字号。
-const double _sectionCardTitleFontSize = 15;
 
 /// 玻璃底板上的一张分区卡片。
 class SectionCard extends StatelessWidget {
@@ -65,7 +63,7 @@ class SectionCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   color: colors.label,
-                  fontSize: _sectionCardTitleFontSize,
+                  fontSize: LexiType.callout.fontSize,
                   fontWeight: FontWeight.w600,
                 ),
               ),

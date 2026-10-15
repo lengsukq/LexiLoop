@@ -23,6 +23,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「昨日质量」徽章文字的 Key，供测试定位（文字同时携带分数与语气色）。
@@ -60,7 +61,7 @@ class _SuggestionCardState extends ConsumerState<SuggestionCard> {
         loading: () => const DashboardLoading(),
         error: (error, _) => Text(
           '加载失败：$error',
-          style: TextStyle(color: context.lexiColors.danger, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: context.lexiColors.danger),
         ),
       ),
     );
@@ -109,7 +110,7 @@ class _SuggestionBody extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             suggestion.summary,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
         const SizedBox(height: 10),
@@ -134,7 +135,7 @@ class _SuggestionBody extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             suggestion.generationWarning!,
-            style: TextStyle(color: colors.warning, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.warning),
           ),
         ],
         _RegenerateButton(busy: busy, onRegenerate: onRegenerate),
@@ -158,9 +159,8 @@ class _SuggestionHeader extends StatelessWidget {
         Expanded(
           child: Text(
             suggestion.headline,
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -196,7 +196,7 @@ class _QualityBadge extends StatelessWidget {
       child: Text(
         score == null ? '昨日质量 无记录' : '昨日质量 $score',
         key: suggestionQualityTextKey,
-        style: TextStyle(color: tone, fontSize: 11),
+        style: LexiType.caption.copyWith(color: tone),
       ),
     );
   }
@@ -221,7 +221,7 @@ class _SourceBadge extends StatelessWidget {
       ),
       child: Text(
         ai ? 'AI 生成' : '规则生成',
-        style: TextStyle(color: tint, fontSize: 11),
+        style: LexiType.caption.copyWith(color: tint),
       ),
     );
   }
@@ -299,16 +299,15 @@ class _MetricTile extends StatelessWidget {
           Text(
             value,
             key: Key('suggestion-metric-$metric'),
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 1),
           Text(
             label,
-            style: TextStyle(color: colors.quaternaryLabel, fontSize: 11),
+            style: LexiType.caption.copyWith(color: colors.quaternaryLabel),
           ),
         ],
       ),
@@ -338,7 +337,7 @@ class _BulletGroup extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           const SizedBox(height: 5),
           for (final item in items) _Bullet(text: item, color: color),
@@ -373,10 +372,8 @@ class _Bullet extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
+            style: LexiType.footnote.copyWith(
               color: context.lexiColors.secondaryLabel,
-              fontSize: 12.5,
-              height: 1.35,
             ),
           ),
         ),
@@ -406,16 +403,15 @@ class _RecommendedSection extends StatelessWidget {
           children: <Widget>[
             Text(
               '今日重点复习',
-              style: TextStyle(
+              style: LexiType.body.copyWith(
                 color: colors.label,
-                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const Spacer(),
             Text(
               '${items.length} 题',
-              style: TextStyle(color: colors.danger, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.danger),
             ),
           ],
         ),
@@ -452,9 +448,8 @@ class _RecommendedEntry extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.term,
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: colors.label,
-                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -471,9 +466,8 @@ class _RecommendedEntry extends StatelessWidget {
                 ),
                 child: Text(
                   questionTypeLabel(item.questionType),
-                  style: TextStyle(
+                  style: LexiType.caption.copyWith(
                     color: colors.secondaryLabel,
-                    fontSize: 10.5,
                   ),
                 ),
               ),
@@ -484,12 +478,12 @@ class _RecommendedEntry extends StatelessWidget {
               definition,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           if (item.reason.isNotEmpty)
             Text(
               item.reason,
-              style: TextStyle(color: colors.quaternaryLabel, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.quaternaryLabel),
             ),
         ],
       ),
@@ -548,7 +542,7 @@ class _EmptyHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     '今天还没有建议。积累一些复习记录后会更有针对性。',
-    style: TextStyle(color: context.lexiColors.tertiaryLabel, fontSize: 12.5),
+    style: LexiType.footnote.copyWith(color: context.lexiColors.tertiaryLabel),
   );
 }
 

@@ -28,6 +28,7 @@ import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「AI 模型」分组。
 class AiSettingsSection extends ConsumerStatefulWidget {
@@ -111,7 +112,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection> {
             Text(
               '暂无 Provider。添加一个并填好接口地址与 API Key 后才能启用 AI。',
               key: const Key('aiProviderEmptyHint'),
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           for (final provider in config.providers)
             AiProviderCard(

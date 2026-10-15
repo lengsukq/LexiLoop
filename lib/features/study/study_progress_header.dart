@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 顶部进度与计数。
 class StudyProgressHeader extends StatelessWidget {
@@ -71,9 +72,8 @@ class _CountsRow extends StatelessWidget {
       children: <Widget>[
         Text(
           '${session.completedCount} / ${session.plannedCount}',
-          style: TextStyle(
+          style: LexiType.callout.copyWith(
             color: colors.label,
-            fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -112,9 +112,8 @@ class _CountChip extends StatelessWidget {
       ),
       child: Text(
         '$label $value',
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: color,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -163,9 +162,8 @@ class _HeaderAction extends StatelessWidget {
         onPressed: enabled ? onTap : null,
         child: Text(
           label,
-          style: TextStyle(
+          style: LexiType.body.copyWith(
             color: enabled ? colors.accent : colors.tertiaryLabel,
-            fontSize: 13.5,
             fontWeight: FontWeight.w600,
           ),
         ),

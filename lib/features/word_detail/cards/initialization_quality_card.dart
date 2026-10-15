@@ -14,6 +14,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 初始化质量卡片（默认折叠）。
@@ -144,16 +145,15 @@ class _AttemptRow extends StatelessWidget {
                 child: Text(
                   attempt.providerId,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: colors.label,
-                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               Text(
                 formatTimestamp(attempt.createdAt),
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ],
           ),
@@ -162,7 +162,7 @@ class _AttemptRow extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 _facts(attempt),
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.secondaryLabel),
               ),
             ),
           if (attempt.errorMessage != null)
@@ -172,7 +172,7 @@ class _AttemptRow extends StatelessWidget {
                 attempt.errorCode == null
                     ? attempt.errorMessage!
                     : '${attempt.errorCode}：${attempt.errorMessage}',
-                style: TextStyle(color: colors.danger, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.danger),
               ),
             ),
         ],

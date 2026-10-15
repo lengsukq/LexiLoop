@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 卡片内的加载占位。
 class DashboardLoading extends StatelessWidget {
@@ -26,7 +27,7 @@ class DashboardLoading extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           '加载中…',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -50,7 +51,7 @@ class DashboardError extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(message, style: TextStyle(color: colors.danger, fontSize: 13)),
+        Text(message, style: LexiType.body.copyWith(color: colors.danger)),
         const SizedBox(height: 8),
         FilledButton(onPressed: onRetry, child: const Text('重试')),
       ],
@@ -91,22 +92,21 @@ class DashboardStatRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
           ),
           Text(
             value,
             key: valueKey,
-            style: TextStyle(
+            style: LexiType.callout.copyWith(
               color: colors.label,
-              fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
           ),
           if (note != null)
             Text(
               note!,
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12.5),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
         ],
       ),

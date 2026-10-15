@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 展示新增 / 编辑对话框。
 ///
@@ -123,7 +124,7 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
               Text(
                 error,
                 key: const Key('aiProviderEditorError'),
-                style: TextStyle(color: colors.danger, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.danger),
               ),
             ],
           ],
@@ -157,9 +158,8 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
     decoration: InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle: TextStyle(
+      hintStyle: LexiType.body.copyWith(
         color: context.lexiColors.tertiaryLabel,
-        fontSize: 13,
       ),
     ),
   );

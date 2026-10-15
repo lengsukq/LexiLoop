@@ -11,6 +11,7 @@ import 'package:lexiloop/features/words/widgets/word_filter_controls.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 打开筛选弹层。
 Future<void> showWordFilterSheet(BuildContext context) =>
@@ -47,9 +48,8 @@ class _WordFilterSheet extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     '筛选单词本',
-                    style: TextStyle(
+                    style: LexiType.callout.copyWith(
                       color: colors.label,
-                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

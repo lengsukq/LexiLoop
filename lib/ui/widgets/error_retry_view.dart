@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 外边距。
 const double _errorViewPadding = 32;
@@ -20,9 +21,6 @@ const double _errorIconGap = 12;
 
 /// 文案与按钮的间距。
 const double _errorButtonGap = 14;
-
-/// 文案字号。
-const double _errorFontSize = 13;
 
 /// 重试按钮的文案。
 const String retryLabel = '重试';
@@ -58,7 +56,7 @@ class ErrorRetryView extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: colors.secondaryLabel,
-                fontSize: _errorFontSize,
+                fontSize: LexiType.body.fontSize,
               ),
             ),
             const SizedBox(height: _errorButtonGap),

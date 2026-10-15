@@ -17,6 +17,7 @@ import 'package:lexiloop/features/games/widgets/word_stack_view.dart';
 import 'package:lexiloop/features/games/widgets/word_tetris_view.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 小游戏进行中页面。
 class GamesPlayView extends StatelessWidget {
@@ -116,9 +117,8 @@ class _PriorityBadge extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: Text(
           '重点复习词',
-          style: TextStyle(
+          style: LexiType.caption.copyWith(
             color: colors.dangerDeep,
-            fontSize: 11.5,
             fontWeight: FontWeight.w600,
           ),
         ),

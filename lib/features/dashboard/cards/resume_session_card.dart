@@ -23,6 +23,7 @@ import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 整张卡片的 Key，供测试与无障碍定位。
@@ -82,14 +83,13 @@ class _ResumeSessionBody extends StatelessWidget {
               child: Text(
                 subtitle,
                 key: resumeSessionSubtitleKey,
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 13.5),
+                style: LexiType.body.copyWith(color: colors.secondaryLabel),
               ),
             ),
             Text(
               '继续',
-              style: TextStyle(
+              style: LexiType.body.copyWith(
                 color: colors.accent,
-                fontSize: 13.5,
                 fontWeight: FontWeight.w600,
               ),
             ),

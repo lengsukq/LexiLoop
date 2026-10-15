@@ -15,6 +15,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
 /// 导入策略卡。
@@ -102,17 +103,15 @@ class _ModeOption extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         articleModeLabel(mode),
-                        style: TextStyle(
+                        style: LexiType.body.copyWith(
                           color: selected ? colors.accent : colors.label,
-                          fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
                         articleModeDescription(mode),
-                        style: TextStyle(
+                        style: LexiType.footnote.copyWith(
                           color: colors.secondaryLabel,
-                          fontSize: 12,
                         ),
                       ),
                     ],

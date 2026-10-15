@@ -17,6 +17,7 @@ import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 朗读按钮的边长（逻辑像素），同时满足触控热区下限。
 const double _speakButtonSize = 44;
@@ -82,9 +83,8 @@ class _PromptHeader extends StatelessWidget {
       ),
       child: Text(
         studyQuestionTypeLabel(type),
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: colors.accent,
-          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -111,9 +111,8 @@ class _TermPrompt extends StatelessWidget {
             children: <Widget>[
               Text(
                 word.term,
-                style: TextStyle(
+                style: LexiType.display.copyWith(
                   color: colors.label,
-                  fontSize: 30,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.4,
                 ),
@@ -122,7 +121,9 @@ class _TermPrompt extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '/$phonetic/',
-                  style: TextStyle(color: colors.secondaryLabel, fontSize: 15),
+                  style: LexiType.callout.copyWith(
+                    color: colors.secondaryLabel,
+                  ),
                 ),
               ],
             ],
@@ -146,11 +147,9 @@ class _MeaningPrompt extends StatelessWidget {
     final meaning = studyMeaningText(word);
     return Text(
       meaning.isEmpty ? '（该词条暂无释义）' : meaning,
-      style: TextStyle(
+      style: LexiType.page.copyWith(
         color: colors.label,
-        fontSize: 24,
         fontWeight: FontWeight.w600,
-        height: 1.4,
       ),
     );
   }
@@ -179,16 +178,15 @@ class _ListeningPrompt extends StatelessWidget {
             children: <Widget>[
               Text(
                 '听音作答',
-                style: TextStyle(
+                style: LexiType.title2.copyWith(
                   color: colors.label,
-                  fontSize: 22,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '听不清时可以再点一次朗读',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
             ],
           ),
@@ -211,7 +209,7 @@ class _ClozePrompt extends StatelessWidget {
     if (payload == null) return _MeaningPrompt(word: word);
 
     final colors = context.lexiColors;
-    final style = TextStyle(color: colors.label, fontSize: 19, height: 1.6);
+    final style = LexiType.title.copyWith(color: colors.label);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -220,13 +218,13 @@ class _ClozePrompt extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             translation,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
         const SizedBox(height: 10),
         Text(
           '提示：${studyMeaningText(word)}',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );

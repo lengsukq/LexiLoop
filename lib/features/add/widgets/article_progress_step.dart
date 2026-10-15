@@ -10,6 +10,7 @@ import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 分析中界面。
 class ArticleProgressStep extends ConsumerWidget {
@@ -63,7 +64,7 @@ class _ProgressBody extends ConsumerWidget {
                 segmented && progress != null
                     ? '${progress.done}/${progress.total} 批完成'
                     : '本地分词去重后，AI 会按你的水平筛选值得学的词 / 短语 / 句子',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
             ),
           ],
@@ -72,7 +73,7 @@ class _ProgressBody extends ConsumerWidget {
           const SizedBox(height: articleTightGap),
           Text(
             '${progress!.failed} 批失败，可在下方单独重试',
-            style: TextStyle(color: colors.danger, fontSize: 12),
+            style: LexiType.footnote.copyWith(color: colors.danger),
           ),
         ],
       ],
@@ -216,9 +217,8 @@ class _BatchRowText extends StatelessWidget {
         Text(
           '第 ${batch.batchIndex + 1} 批 · ${segments.length} 段 · '
           '${batch.charCount} 字符${aiError != null ? ' · AI 回退' : ''}',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: colors.label,
-            fontSize: 12.5,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -226,19 +226,19 @@ class _BatchRowText extends StatelessWidget {
           segments.map((segment) => segment.previewText).join(' ｜ '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
         if (isError)
           Text(
             failed.error ?? '分析失败',
-            style: TextStyle(color: colors.danger, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.danger),
           ),
         if (aiError != null)
           Text(
             aiError!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: colors.warning, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.warning),
           ),
       ],
     );
@@ -291,7 +291,7 @@ class _BatchStatusAction extends StatelessWidget {
     }
     return Text(
       '等待中',
-      style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+      style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
     );
   }
 }

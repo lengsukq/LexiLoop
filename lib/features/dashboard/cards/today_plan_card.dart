@@ -17,6 +17,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「开始学习」按钮的 Key，供测试定位。
@@ -122,9 +123,8 @@ class _PlannedHeadline extends StatelessWidget {
         Text(
           '${plan.plannedTotal}',
           key: plannedTotalKey,
-          style: TextStyle(
+          style: LexiType.hero.copyWith(
             color: colors.label,
-            fontSize: 34,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.8,
           ),
@@ -132,14 +132,14 @@ class _PlannedHeadline extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '题待完成',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         const Spacer(),
         Text(
           goalReached
               ? '已处理 $completedToday 题，继续保持'
               : '预估 ${plan.estimatedMinutes} 分钟',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -167,7 +167,7 @@ class _GoalProgress extends StatelessWidget {
           children: <Widget>[
             Text(
               '今日完成度',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
             const Spacer(),
             if (reached) ...<Widget>[
@@ -177,7 +177,7 @@ class _GoalProgress extends StatelessWidget {
             Text(
               _progressLabel(overview),
               key: goalProgressKey,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
           ],
         ),
@@ -212,9 +212,8 @@ class _GoalReachedBadge extends StatelessWidget {
       ),
       child: Text(
         '今日目标已达成',
-        style: TextStyle(
+        style: LexiType.caption.copyWith(
           color: colors.success,
-          fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
       ),

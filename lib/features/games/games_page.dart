@@ -15,6 +15,7 @@ import 'package:lexiloop/features/games/games_result_view.dart';
 import 'package:lexiloop/features/games/games_setup_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 小游戏页面。
 class GamesPage extends ConsumerStatefulWidget {
@@ -96,7 +97,7 @@ class _SavingView extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             '正在结算…',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13.5),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),

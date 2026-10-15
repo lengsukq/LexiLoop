@@ -12,6 +12,7 @@ import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/ai/provider_editor_dialog.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一次探测的进行中状态与结果。
 class AiProbeState {
@@ -116,7 +117,7 @@ class AiProviderCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
                   '接口地址或 API Key 为空，该 Provider 目前不可用。',
-                  style: TextStyle(color: colors.danger, fontSize: 12),
+                  style: LexiType.footnote.copyWith(color: colors.danger),
                 ),
               ),
             const SizedBox(height: 8),
@@ -178,22 +179,21 @@ class AiProviderCard extends StatelessWidget {
       children: <Widget>[
         Text(
           provider.name.isEmpty ? provider.id : provider.name,
-          style: TextStyle(
+          style: LexiType.callout.copyWith(
             color: colors.label,
-            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
         Text(
           '${provider.id} · ${apiTypeLabel(provider.apiType)}',
-          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
         if (provider.baseUrl.isNotEmpty)
           Text(
             provider.baseUrl,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+            style: LexiType.caption.copyWith(color: colors.secondaryLabel),
           ),
       ],
     );
@@ -212,7 +212,7 @@ class AiProviderCard extends StatelessWidget {
         labelText: '默认模型',
         isDense: true,
         hintText: models.isEmpty ? '请先获取或添加模型' : null,
-        hintStyle: TextStyle(color: colors.tertiaryLabel, fontSize: 13),
+        hintStyle: LexiType.body.copyWith(color: colors.tertiaryLabel),
       ),
       items: <DropdownMenuItem<String>>[
         // 必须有这一项：`models` 非空而 `defaultModel` 为空（备份里的旧配置
@@ -233,7 +233,7 @@ class AiProviderCard extends StatelessWidget {
     if (provider.models.isEmpty) {
       return Text(
         '还没有保存模型。',
-        style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+        style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
       );
     }
     return Wrap(
@@ -243,7 +243,7 @@ class AiProviderCard extends StatelessWidget {
         for (final model in provider.models)
           InputChip(
             key: Key('aiProviderModel-${provider.id}-$model'),
-            label: Text(model, style: const TextStyle(fontSize: 12)),
+            label: Text(model, style: LexiType.footnote),
             deleteIcon: const Icon(Icons.close_rounded, size: 14),
             onDeleted: () => actions.onRemoveModel(model),
             visualDensity: VisualDensity.compact,
@@ -275,9 +275,8 @@ class AiProviderCard extends StatelessWidget {
             child: Text(
               result.message,
               key: key,
-              style: TextStyle(
+              style: LexiType.footnote.copyWith(
                 color: result.success ? colors.successDeep : colors.danger,
-                fontSize: 12,
               ),
             ),
           ),

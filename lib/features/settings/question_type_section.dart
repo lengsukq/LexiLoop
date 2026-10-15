@@ -21,6 +21,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 题型分组。
 class QuestionTypeSection extends ConsumerStatefulWidget {
@@ -89,7 +90,7 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
               const SizedBox(height: 2),
               Text(
                 _availabilityHint,
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ],
           ),
@@ -261,16 +262,15 @@ class _TypeGroupCard extends StatelessWidget {
             children: <Widget>[
               Text(
                 group.label,
-                style: TextStyle(
+                style: LexiType.footnote.copyWith(
                   color: colors.secondaryLabel,
-                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const Spacer(),
               Text(
                 '$enabledCount/${group.types.length} 已启用',
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ],
           ),
@@ -325,15 +325,14 @@ class _QuestionTypeRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   questionTypeLabel(type),
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: enabled ? colors.label : colors.tertiaryLabel,
-                    fontSize: 13.5,
                   ),
                 ),
               ),
               Text(
                 enabled ? '$share%' : '未启用',
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
               Switch(
                 key: Key('questionTypeSwitch-${type.wire}'),
@@ -344,7 +343,7 @@ class _QuestionTypeRow extends StatelessWidget {
           ),
           Text(
             questionTypeHint(type),
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+            style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
           ),
           SettingsSliderRow(
             key: Key('questionTypeWeight-${type.wire}'),

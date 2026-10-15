@@ -9,6 +9,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 释义卡片：按语言分组，标注词性与来源，并允许用户写一条自己的释义。
@@ -88,9 +89,8 @@ class _LanguageGroup extends StatelessWidget {
       children: <Widget>[
         Text(
           language.isEmpty ? '未标注语言' : languageLabel(language),
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: colors.secondaryLabel,
-            fontSize: 12.5,
             fontWeight: FontWeight.w600,
           ),
         ),

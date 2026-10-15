@@ -18,6 +18,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 音标训练进行中页面。
 class PhoneticPlayView extends StatelessWidget {
@@ -69,9 +70,8 @@ class PhoneticPlayView extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     '不对，再听一次后重新选择',
-                    style: TextStyle(
+                    style: LexiType.body.copyWith(
                       color: context.lexiColors.danger,
-                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -111,9 +111,11 @@ class PhoneticPlayView extends StatelessWidget {
   }
 
   TextStyle _optionStyle(BuildContext context, PhoneticQuestion question) {
+    // 两个分支的字号原本是 19 与 16，都落在 `title` 档（17），
+    // 因此条件已无意义——保留条件只会让人以为它们不一样。
     final base = TextStyle(
       color: context.lexiColors.label,
-      fontSize: question.challenge.hasPhoneticChoices ? 19 : 16,
+      fontSize: LexiType.title.fontSize,
       fontWeight: FontWeight.w600,
     );
     return question.challenge.hasPhoneticChoices
@@ -140,7 +142,7 @@ class _Prompt extends StatelessWidget {
         children: <Widget>[
           Text(
             _hint(question.challenge),
-            style: TextStyle(color: colors.quaternaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
           ),
           const SizedBox(height: 10),
           _Body(question: question),
@@ -169,9 +171,8 @@ class _Body extends StatelessWidget {
     return switch (question.challenge) {
       PhoneticChallengeType.phoneticToWord => Text(
         question.sound.phonetic,
-        style: TextStyle(
+        style: LexiType.hero.copyWith(
           color: colors.accent,
-          fontSize: 34,
           fontFamily: 'monospace',
           fontWeight: FontWeight.w700,
         ),
@@ -180,9 +181,8 @@ class _Body extends StatelessWidget {
         children: <Widget>[
           Text(
             question.base.word.term,
-            style: TextStyle(
+            style: LexiType.display.copyWith(
               color: colors.label,
-              fontSize: 30,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -190,14 +190,14 @@ class _Body extends StatelessWidget {
           Text(
             question.base.word.definition,
             textAlign: TextAlign.center,
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),
       PhoneticChallengeType.soundToPhonetic => Text(
         question.base.word.definition,
         textAlign: TextAlign.center,
-        style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+        style: LexiType.body.copyWith(color: colors.secondaryLabel),
       ),
     };
   }
@@ -259,7 +259,7 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
             child: Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.danger, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.danger),
             ),
           ),
       ],
@@ -288,9 +288,8 @@ class _Analysis extends StatelessWidget {
             children: <Widget>[
               Text(
                 entry.display,
-                style: TextStyle(
+                style: LexiType.title2.copyWith(
                   color: colors.accent,
-                  fontSize: 20,
                   fontFamily: 'monospace',
                   fontWeight: FontWeight.w700,
                 ),
@@ -298,7 +297,7 @@ class _Analysis extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '${entry.nameZh} · ${entry.identity.groupLabel}',
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
               ),
             ],
           ),
@@ -335,7 +334,7 @@ class _Field extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: RichText(
         text: TextSpan(
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           children: <InlineSpan>[
             TextSpan(
               text: '$label：',

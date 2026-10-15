@@ -11,6 +11,7 @@ import 'package:lexiloop/features/initialize/configurator/initialization_configu
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「已选 N 个词条」浮条。
 ///
@@ -40,9 +41,8 @@ class QueueBulkBar extends ConsumerWidget {
             const SizedBox(width: countGap),
             Text(
               '已选 ${selected.length} 个词条',
-              style: TextStyle(
+              style: LexiType.body.copyWith(
                 color: context.lexiColors.label,
-                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -112,9 +112,8 @@ class _SelectionCount extends StatelessWidget {
       ),
       child: Text(
         '$count',
-        style: TextStyle(
+        style: LexiType.footnote.copyWith(
           color: colors.surface,
-          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

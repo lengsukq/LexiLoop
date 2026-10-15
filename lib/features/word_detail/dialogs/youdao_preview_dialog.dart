@@ -20,6 +20,7 @@ import 'package:lexiloop/features/word_detail/dialogs/word_content_preview.dart'
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 弹窗内容宽度。
 const double youdaoDialogWidth = 560;
@@ -170,7 +171,7 @@ class _LoadingView extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             '正在从有道词典获取内容…',
-            style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),
@@ -201,7 +202,7 @@ class _ErrorView extends StatelessWidget {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: TextStyle(color: colors.danger, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.danger),
         ),
         const SizedBox(height: 16),
         Row(
@@ -237,7 +238,7 @@ class _NoContentView extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           '有道词典未返回该词条的有效内容。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         for (final message in messages)
           Padding(
@@ -245,7 +246,7 @@ class _NoContentView extends StatelessWidget {
             child: Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ),
         const SizedBox(height: 16),
@@ -289,7 +290,7 @@ class _ContentView extends StatelessWidget {
         ApplyModeSelector(mode: mode, onChanged: onModeChanged),
         if (error != null) ...<Widget>[
           const SizedBox(height: 10),
-          Text(error!, style: TextStyle(color: colors.danger, fontSize: 12.5)),
+          Text(error!, style: LexiType.footnote.copyWith(color: colors.danger)),
         ],
         const SizedBox(height: 12),
         Row(

@@ -22,6 +22,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 弹窗内容宽度。
 const double editWordDialogWidth = 560;
@@ -182,9 +183,8 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
                 const SizedBox(height: 10),
                 Text(
                   _error!,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: context.lexiColors.danger,
-                    fontSize: 12.5,
                   ),
                 ),
               ],
@@ -278,7 +278,7 @@ class _TargetMeta extends StatelessWidget {
       '${languageLabel(target.sourceLanguage)} → '
       '${languageLabel(target.targetLanguage)} · '
       '${contentTypeLabel(target.contentType)}$suffix',
-      style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+      style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
     );
   }
 }
@@ -300,11 +300,7 @@ class _SaveAfterFetchHint extends StatelessWidget {
       child: Text(
         '修改词条后需点击「有道词典初始化」获取新内容并确认应用，'
         '成功后才保存词条文本；未初始化前词条不会发生变化。',
-        style: TextStyle(
-          color: colors.secondaryLabel,
-          fontSize: 12,
-          height: 1.5,
-        ),
+        style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
       ),
     );
   }
@@ -364,14 +360,14 @@ class _NoContentView extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           '有道词典未返回该词条的有效内容，暂不能保存修改。',
-          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
         ),
         for (final message in messages)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               message,
-              style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
             ),
           ),
       ],

@@ -13,6 +13,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 候选列表。
 class ArticleCandidateList extends ConsumerWidget {
@@ -68,17 +69,15 @@ class ArticleCandidateList extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: articleCardGap),
               child: Text(
                 '当前筛选无候选。',
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: context.lexiColors.secondaryLabel,
-                  fontSize: 13,
                 ),
               ),
             ),
           Text(
             '已根据词库与类型去重；AI 推荐含短语与句子固定搭配，已自动勾选，可手动增删。',
-            style: TextStyle(
+            style: LexiType.caption.copyWith(
               color: context.lexiColors.tertiaryLabel,
-              fontSize: 11.5,
             ),
           ),
         ],
@@ -154,9 +153,8 @@ class _FilterBar extends ConsumerWidget {
               ),
               Text(
                 '仅看 AI 推荐',
-                style: TextStyle(
+                style: LexiType.footnote.copyWith(
                   color: context.lexiColors.secondaryLabel,
-                  fontSize: 12,
                 ),
               ),
             ],
@@ -187,9 +185,8 @@ class _WordTable extends ConsumerWidget {
       children: <Widget>[
         Text(
           '单词 · ${candidates.where((c) => c.isCandidate).length} 待学',
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.secondaryLabel,
-            fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -241,11 +238,10 @@ class _WordRow extends ConsumerWidget {
             Expanded(
               child: Text(
                 candidate.term,
-                style: TextStyle(
+                style: LexiType.body.copyWith(
                   color: candidate.isKnown
                       ? colors.tertiaryLabel
                       : colors.label,
-                  fontSize: 13.5,
                   decoration: candidate.isKnown
                       ? TextDecoration.lineThrough
                       : null,
@@ -257,7 +253,7 @@ class _WordRow extends ConsumerWidget {
             const SizedBox(width: 6),
             Text(
               '×${candidate.occurrences}',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(width: 6),
             _StateBadge(candidate: candidate, selected: selected),
@@ -268,7 +264,7 @@ class _WordRow extends ConsumerWidget {
                 candidate.aiReason ?? (candidate.isKnown ? '已在词库' : '—'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ),
           ],
@@ -313,9 +309,8 @@ class _CardList extends ConsumerWidget {
         const SizedBox(height: articleCardGap),
         Text(
           title,
-          style: TextStyle(
+          style: LexiType.footnote.copyWith(
             color: context.lexiColors.secondaryLabel,
-            fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -377,9 +372,8 @@ class _CandidateCard extends ConsumerWidget {
                   children: <Widget>[
                     Text(
                       candidate.term,
-                      style: TextStyle(
+                      style: LexiType.body.copyWith(
                         color: colors.label,
-                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -395,9 +389,8 @@ class _CandidateCard extends ConsumerWidget {
                 if (candidate.aiReason != null)
                   Text(
                     candidate.aiReason!,
-                    style: TextStyle(
+                    style: LexiType.caption.copyWith(
                       color: colors.secondaryLabel,
-                      fontSize: 11.5,
                     ),
                   ),
                 if (card != null) _AiCardBody(card: card),
@@ -470,15 +463,14 @@ class _LabeledText extends StatelessWidget {
           children: <InlineSpan>[
             TextSpan(
               text: label,
-              style: TextStyle(
+              style: LexiType.caption.copyWith(
                 color: colors.accent,
-                fontSize: 11.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
             TextSpan(
               text: text,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 11.5),
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
             ),
           ],
         ),

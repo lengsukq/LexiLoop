@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 例句卡片：句子 + 翻译 + 逐条操作（朗读 / 翻译 / 删除）。
@@ -64,18 +65,14 @@ class _ExampleRow extends ConsumerWidget {
         children: <Widget>[
           Text(
             item.sentence,
-            style: TextStyle(color: colors.label, fontSize: 14, height: 1.45),
+            style: LexiType.callout.copyWith(color: colors.label),
           ),
           if (item.translation != null)
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 item.translation!,
-                style: TextStyle(
-                  color: colors.secondaryLabel,
-                  fontSize: 13,
-                  height: 1.4,
-                ),
+                style: LexiType.body.copyWith(color: colors.secondaryLabel),
               ),
             ),
           if (item.difficulty != null || item.senseId != null)
@@ -86,7 +83,7 @@ class _ExampleRow extends ConsumerWidget {
                   if (item.difficulty != null) '难度 ${item.difficulty}',
                   if (item.senseId != null) '义项 ${item.senseId}',
                 ].join(' · '),
-                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
               ),
             ),
           Row(

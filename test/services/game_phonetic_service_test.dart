@@ -236,6 +236,7 @@ void main() {
       questions: session.questions,
     );
     quiz = phoneticQuizNext(quiz, const StartPhoneticQuiz());
+    quiz = phoneticQuizNext(quiz, const TickPhoneticQuiz(3000));
     // 第 1 题答对，第 2 题答错后跳过，其余靠时间耗尽。
     final first = quiz.current!;
     quiz = phoneticQuizNext(quiz, ChoosePhonetic(first.answer));
@@ -256,7 +257,8 @@ void main() {
     );
     expect(result.mode, GameMode.phonetics);
     expect(result.summary.firstTryCorrect, 1);
-    expect(result.summary.missed, session.questions.length - 2);
+    // 第 2 题答错后跳过 → 记为未完成；其余题目没走到 → 同样是未完成。
+    expect(result.summary.missed, session.questions.length - 1);
 
     final logs = await db
         .customSelect('SELECT count(*) AS c FROM review_logs')

@@ -405,6 +405,48 @@ const List<String> llmThinkingRejectionKeywords = <String>[
 /// 少于 8 个汉字通常是模型把英文解释直接塞进了助记字段。
 const int aiMnemonicMinChineseChars = 8;
 
+/// AI 建议质量分的分项权重（对应 `aiSuggestionQualityScore`）。
+const int aiSuggestionHeadlineWeight = 30;
+
+/// AI 建议质量分：总结权重。
+const int aiSuggestionSummaryWeight = 20;
+
+/// AI 建议质量分：行动建议充分时的权重。
+const int aiSuggestionActionsWeight = 20;
+
+/// AI 建议质量分：只有一条行动建议时的权重。
+const int aiSuggestionSingleActionWeight = 10;
+
+/// AI 建议质量分：有风险提示时的权重。
+const int aiSuggestionRisksWeight = 10;
+
+/// AI 建议质量分：推荐条目落在候选池内时的权重。
+const int aiSuggestionRecommendedWeight = 20;
+
+/// AI 建议质量分：行动建议「充分」所需条数。
+const int aiSuggestionMinActions = 2;
+
+/// AI 建议提示词里声明的亮点条数上限。
+const int suggestionAiMaxStrengths = 3;
+
+/// AI 建议提示词里声明的风险条数上限。
+const int suggestionAiMaxRisks = 4;
+
+/// AI 建议提示词里声明的行动建议条数下限。
+const int suggestionAiMinActions = 2;
+
+/// AI 建议提示词里声明的行动建议条数上限。
+const int suggestionAiMaxActions = 3;
+
+/// 推荐理由最多拼接的分句数。
+const int suggestionReasonPartLimit = 2;
+
+/// 双精度零值。
+///
+/// 架构守卫只豁免整数 `0`，浮点字面量 `0.0` 会被判为裸数字，
+/// 因此需要 `double` 上下文的零值必须具名。
+const double zeroDouble = 0;
+
 /// 百分数换算基数。
 ///
 /// `lib/services` 禁止裸数字字面量，而正确率 / 完成率到处要 `* 100`。

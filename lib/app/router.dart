@@ -42,6 +42,14 @@ GoRouter _createRouter() {
         path: importPath,
         builder: (context, state) => const ImportPage(),
       ),
+      // 小游戏与配对不在主导航里（它们是「独立模式，不占用今日复习队列」），
+      // 从首页的「趣味训练」进入，因此是顶层路由、不套外壳。
+      GoRoute(
+        path: '/games',
+        builder: (context, state) =>
+            GamesPage(initialMode: state.uri.queryParameters['mode']),
+      ),
+      GoRoute(path: '/match', builder: (context, state) => const MatchPage()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AdaptiveShell(navigationShell: navigationShell),

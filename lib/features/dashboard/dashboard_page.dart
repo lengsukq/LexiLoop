@@ -11,6 +11,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/features/dashboard/cards/platform_card.dart';
+import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/dashboard/cards/reminders_card.dart';
 import 'package:lexiloop/features/dashboard/cards/statistics_card.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
@@ -51,6 +52,8 @@ class DashboardPage extends StatelessWidget {
             const StatisticsCard(),
             const SizedBox(height: 10),
             const RemindersCard(),
+            const SizedBox(height: 10),
+            const PracticeCard(),
             const SizedBox(height: 10),
             const PlatformCapabilityCard(),
           ],

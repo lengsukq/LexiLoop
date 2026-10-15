@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/features/games/games_play_view.dart';
 import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/games_result_view.dart';
@@ -16,12 +17,41 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 小游戏页面。
-class GamesPage extends ConsumerWidget {
+class GamesPage extends ConsumerStatefulWidget {
   /// 创建小游戏页面。
-  const new({super.key});
+  ///
+  /// [initialMode] 来自路由 query（形如 `/games?mode=WORD_BUILDER`），
+  /// 让首页的「趣味训练」磁贴能直接落到具体游戏，而不是先进选择列表。
+  /// 值非法时忽略，退回选择列表。
+  const new({this.initialMode, super.key});
+
+  /// 初始游戏模式（`GameMode.wire`）。
+  final String? initialMode;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GamesPage> createState() => _GamesPageState();
+}
+
+class _GamesPageState extends ConsumerState<GamesPage> {
+  @override
+  void initState() {
+    super.initState();
+    final requested = widget.initialMode;
+    if (requested == null) return;
+    final mode = GameMode.values
+        .where((item) => item.wire == requested)
+        .firstOrNull;
+    if (mode == null) return;
+    // 首帧之后再改 provider：initState 处于构建阶段，此时改状态会触发
+    // 「构建期间修改 provider」的断言。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(gamesControllerProvider.notifier).selectMode(mode);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(gamesControllerProvider);
     final controller = ref.read(gamesControllerProvider.notifier);
 

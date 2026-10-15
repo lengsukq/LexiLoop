@@ -60,11 +60,7 @@ class GamePlan {
 }
 
 /// 按模式生成计划；可覆盖题量与时限（配对与音标由用户配置）。
-GamePlan gamePlanFor(
-  GameMode mode, {
-  int? itemCount,
-  int? durationSeconds,
-}) {
+GamePlan gamePlanFor(GameMode mode, {int? itemCount, int? durationSeconds}) {
   final rules = rulesFor(mode).session;
   final seconds = durationSeconds ?? rules.durationSeconds;
   return GamePlan(
@@ -77,11 +73,7 @@ GamePlan gamePlanFor(
 /// 一局的进度与计时。
 class GameProgress {
   /// 以各字段构造。
-  const new({
-    this.phase = GamePhase.ready,
-    this.index = 0,
-    this.elapsedMs = 0,
-  });
+  const new({this.phase = GamePhase.ready, this.index = 0, this.elapsedMs = 0});
 
   /// 当前阶段。
   final GamePhase phase;
@@ -243,7 +235,8 @@ class GameCoreState {
   bool get isLastItem => progress.index >= plan.itemCount - 1;
 
   /// 开始计时。
-  GameCoreState start() => _withProgress(progress.copyWith(phase: GamePhase.playing));
+  GameCoreState start() =>
+      _withProgress(progress.copyWith(phase: GamePhase.playing));
 
   /// 推进时间；时间耗尽即结束本局。
   GameCoreState tick({required int deltaMs}) {
@@ -296,6 +289,19 @@ class GameCoreState {
         combo: 0,
         mistakeCount: tally.mistakeCount + 1,
       ),
+      records: records.copyWith(
+        mistakeItemIds: <int>{...records.mistakeItemIds, itemId},
+      ),
+    );
+  }
+
+  /// 只标记某题曾失误，不推高失误计数、不扣分、不清零连击。
+  ///
+  /// 对应旧版 `use-game-scoring.ts` 的 `flagMistakeItems`：配对游戏一次错配
+  /// 涉及两张牌，只应记一次失误，但两张牌都要标成「曾失误」——
+  /// 否则其中一张之后配对成功会被误判为「一次配对」。
+  GameCoreState flagMistake({required int itemId}) {
+    return _copyWith(
       records: records.copyWith(
         mistakeItemIds: <int>{...records.mistakeItemIds, itemId},
       ),
@@ -362,9 +368,14 @@ class GameCoreState {
 
   /// 生成逐题作答记录（顺序与 [questions] 一致）。
   ///
-  /// 未作答的题目按「未解决 + 有失误 + 0 耗时」提交，与旧版
-  /// `games/page.tsx` 的兜底完全一致——否则超时结束的题目会漏出结算。
-  List<GameAnswerRecord> answerRecords(List<GameQuestion> questions) {
+  /// 未作答的题目按「未解决 + 有失误 + [fallbackDurationMs] 耗时」提交，
+  /// 与旧版 `games/page.tsx` 的兜底一致——否则超时结束的题目会漏出结算。
+  /// 配对游戏没有逐题计时，用平均耗时兜底（旧版同样是
+  /// `round(elapsedMs / pairCount)`）。
+  List<GameAnswerRecord> answerRecords(
+    List<GameQuestion> questions, {
+    int fallbackDurationMs = 0,
+  }) {
     return <GameAnswerRecord>[
       for (final question in questions)
         GameAnswerRecord(
@@ -374,7 +385,8 @@ class GameCoreState {
           hadMistake:
               records.hasMistake(question.itemId) ||
               !records.isSolved(question.itemId),
-          durationMs: records.durationsMs[question.itemId] ?? 0,
+          durationMs:
+              records.durationsMs[question.itemId] ?? fallbackDurationMs,
         ),
     ];
   }

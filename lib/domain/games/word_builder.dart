@@ -62,7 +62,8 @@ class WordBuilderState {
   /// 是否已用完所有字母块（旧版据此启用提交按钮）。
   bool get isComplete {
     final question = current;
-    return question != null && selectedIds.length == question.word.letters.length;
+    return question != null &&
+        selectedIds.length == question.word.letters.length;
   }
 
   /// 复制并覆盖部分字段。
@@ -174,7 +175,10 @@ WordBuilderState wordBuilderNext(
     TickWordBuilder(:final deltaMs) => _tick(state, deltaMs),
     SelectLetter(:final letterId) => _select(state, letterId),
     DeselectLetter(:final letterId) => _deselect(state, letterId),
-    ClearLetters() => state.copyWith(selectedIds: const <String>[], wrong: false),
+    ClearLetters() => state.copyWith(
+      selectedIds: const <String>[],
+      wrong: false,
+    ),
     SubmitWord() => _submit(state),
     RevealWord() => _reveal(state),
     ConfirmRevealed() => _confirmRevealed(state),

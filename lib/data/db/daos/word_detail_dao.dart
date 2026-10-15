@@ -795,7 +795,11 @@ class WordDetailDao {
     tags: _parseTextList(_decodeJson(row.readNullable<String>('tags_json'))),
     providerMetadataJson: row.readNullable<String>('provider_metadata_json'),
     contentSource:
-        wireLookup(ContentSource.values, row.read<String>('content_source')) ??
+        wireLookup(
+          ContentSource.values,
+          // 没有 word_contents 行时该列为 NULL，必须按可空读取。
+          row.readNullable<String>('content_source') ?? '',
+        ) ??
         ContentSource.mixed,
     initializedAt: row.readNullable<int>('initialized_at'),
   );

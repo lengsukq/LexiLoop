@@ -5,6 +5,7 @@
 library;
 
 import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 
@@ -71,7 +72,7 @@ String formatTimestamp(int millis) {
 /// 作答耗时；缺失或非正数显示为 `—`。
 String formatDuration(int? millis) {
   if (millis == null || millis <= 0) return '—';
-  return '${(millis / 1000).toStringAsFixed(1)} 秒';
+  return '${(millis / secondMs).toStringAsFixed(1)} 秒';
 }
 
 /// 天数字段；缺失显示为 `—`。

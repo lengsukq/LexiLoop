@@ -148,6 +148,14 @@ void main() {
     expect(find.text('返回'), findsOneWidget);
   });
 
+  testWidgets('会话启动失败时显示错误态与重试', (tester) async {
+    // AI 推荐模式在没有当日建议时直接抛 ConflictError，是最容易构造的失败路径。
+    await pumpStudy(tester, mode: StudyMode.aiRecommended);
+
+    expect(find.text('今日 AI 必做题已全部完成，明天再来吧。'), findsOneWidget);
+    expect(find.text('重试'), findsOneWidget);
+  });
+
   testWidgets('看词选义渲染出全部选项', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     for (final entry in <(String, String)>[
@@ -193,7 +201,7 @@ void main() {
     expect(find.text('香蕉'), findsOneWidget, reason: '干扰项也要带释义');
   });
 
-  testWidgets('选中选项后点确认会提交并显示判定', (tester) async {
+  testWidgets('选中选项后点自评即提交并显示判定', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     await insertWord(term: 'banana', meaning: '香蕉');
     await insertSession(
@@ -206,10 +214,36 @@ void main() {
 
     await tester.tap(find.text('苹果'));
     await tester.pump();
-    await tester.tap(find.text('确认'));
+    // 自评按钮就是提交入口：旧版交互是「先作答，再选记得程度」。
+    await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
 
     expect(find.text('回答正确'), findsOneWidget);
+    expect(sessionOf(container).completedCount, 1);
+  });
+
+  testWidgets('提交后自评按钮禁用，重复点击不会重复推进', (tester) async {
+    final wordId = await insertWord(term: 'apple', meaning: '苹果');
+    await insertWord(term: 'banana', meaning: '香蕉');
+    await insertSession(
+      wordId: wordId,
+      questionType: QuestionType.enToZhChoice,
+    );
+
+    final container = await pumpStudy(tester);
+    await tester.tap(find.text('苹果'));
+    await tester.pump();
+    await tester.tap(find.text('记得'));
+    await tester.pumpAndSettle();
+
+    // 再点一次「记得」不应产生第二次作答。
+    await tester.tap(find.text('记得'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(sessionOf(container).completedCount, 1);
+
+    // 其余档位同样不可点。
+    await tester.tap(find.text('简单'), warnIfMissed: false);
+    await tester.pumpAndSettle();
     expect(sessionOf(container).completedCount, 1);
   });
 
@@ -224,7 +258,7 @@ void main() {
     await pumpStudy(tester);
     await tester.tap(find.text('香蕉'));
     await tester.pump();
-    await tester.tap(find.text('确认'));
+    await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
 
     expect(find.text('回答错误'), findsOneWidget);
@@ -241,13 +275,13 @@ void main() {
     await pumpStudy(tester);
     await tester.enterText(find.byType(TextField), 'apple');
     await tester.pump();
-    await tester.tap(find.text('确认'));
+    await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
 
     expect(find.text('回答正确'), findsOneWidget);
   });
 
-  testWidgets('提交后出现四档自评按钮', (tester) async {
+  testWidgets('四档自评始终可见，作答后才可点', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     await insertSession(
       wordId: wordId,
@@ -255,16 +289,17 @@ void main() {
     );
 
     await pumpStudy(tester);
-    expect(find.text('忘了'), findsNothing, reason: '客观题先作答、再自评');
+    for (final label in <String>['忘了', '模糊', '记得', '简单']) {
+      expect(find.text(label), findsOneWidget, reason: '四档始终可见，用户才知道有哪些选择');
+    }
+    expect(find.text('先作答，再选择记得程度'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'apple');
     await tester.pump();
-    await tester.tap(find.text('确认'));
-    await tester.pumpAndSettle();
+    expect(find.text('你记得怎么样？'), findsOneWidget);
 
-    for (final label in <String>['忘了', '模糊', '记得', '简单']) {
-      expect(find.text(label), findsOneWidget);
-    }
+    await tester.tap(find.text('记得'));
+    await tester.pumpAndSettle();
     expect(find.text('已记录的等级'), findsOneWidget);
   });
 
@@ -274,7 +309,7 @@ void main() {
 
     await pumpStudy(tester);
     expect(find.text('apple'), findsOneWidget);
-    expect(find.text('确认'), findsNothing, reason: '主观题没有客观判定，不需要确认');
+    expect(find.text('你记得怎么样？'), findsOneWidget, reason: '主观题无需先作答');
 
     await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
@@ -349,7 +384,7 @@ void main() {
     await pumpStudy(tester);
     await tester.enterText(find.byType(TextField), 'apple');
     await tester.pump();
-    await tester.tap(find.text('确认'));
+    await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('下一题'));

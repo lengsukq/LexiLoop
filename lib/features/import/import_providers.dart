@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show FutureProviderFamily;
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
@@ -27,8 +28,8 @@ class ImportLanguage {
 
 /// 导入时可选的语言。
 ///
-/// 与 `core/constants.dart` 的 [lowercaseLanguages] 及 TTS 语言表覆盖的
-/// 集合一致，避免出现「能导入但读不出声」的组合。
+/// 与 `core/constants.dart` 的小写语言族、以及 TTS 语言表覆盖的集合一致，
+/// 避免出现「能导入但读不出声」的组合。
 const List<ImportLanguage> importLanguages = <ImportLanguage>[
   ImportLanguage('en', '英语'),
   ImportLanguage('zh', '中文'),
@@ -203,11 +204,7 @@ class ImportWizardNotifier extends Notifier<ImportWizardState> {
       final result = await ref
           .read(csvImportServiceProvider)
           .commit(batchId: preview.batchId, mode: state.mode, now: _now());
-      state = state.copyWith(
-        busy: false,
-        result: result,
-        clearPreview: true,
-      );
+      state = state.copyWith(busy: false, result: result, clearPreview: true);
       ref.invalidate(importHistoryProvider);
     } on AppError catch (error) {
       state = state.copyWith(busy: false, errorMessage: error.message);
@@ -236,9 +233,8 @@ final FutureProvider<List<ImportBatchSummary>> importHistoryProvider =
 
 /// 某个批次的行明细（按批次 ID 缓存）。
 final FutureProviderFamily<List<ImportRowSummary>, int>
-importBatchRowsProvider =
-    FutureProvider.family<List<ImportRowSummary>, int>(
-      (ref, batchId) => ref
-          .watch(csvImportServiceProvider)
-          .batchRows(batchId, limit: importRowPageSize, offset: 0),
-    );
+importBatchRowsProvider = FutureProvider.family<List<ImportRowSummary>, int>(
+  (ref, batchId) => ref
+      .watch(csvImportServiceProvider)
+      .batchRows(batchId, limit: importRowPageSize, offset: 0),
+);

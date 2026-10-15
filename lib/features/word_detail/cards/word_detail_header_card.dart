@@ -97,6 +97,11 @@ class _TermBlock extends StatelessWidget {
               DetailChip(text: '已暂停', color: colors.danger),
           ],
         ),
+        const SizedBox(height: 8),
+        Text(
+          '创建于 ${formatTimestamp(detail.createdAt)}',
+          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+        ),
       ],
     );
   }

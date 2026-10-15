@@ -15,11 +15,10 @@ void main() {
       parseEasyDictCsv(content, sourceLanguage: 'en', targetLanguage: 'zh');
 
   group('正常解析', () {
-    test('中英文字段全部落位', () {
+    test('释义 / 音标 / 例句 / 短语落位', () {
       const content =
-          '单词,释义,音标,例句,短语,同义词,反义词,词根,词缀,词族,易混词,标签\n'
-          'apple,苹果,/ˈæpl/,"An apple a day.",in apple pie order,'
-          'fruit; pome,orange,app-,re-,apple tree,apply,水果;食物\n';
+          '单词,释义,音标,例句,短语\n'
+          'apple,苹果,/ˈæpl/,"An apple a day.",in apple pie order\n';
 
       final result = parse(content);
 
@@ -33,16 +32,24 @@ void main() {
       expect(row.phonetic, '/ˈæpl/');
       expect(row.examples, <String>['An apple a day.']);
       expect(row.phrases, <String>['in apple pie order']);
+      expect(row.contentType, LexicalContentType.word);
+      expect(row.isValid, isTrue);
+      expect(row.errorMessage, isNull);
+    });
+
+    test('词表类字段按分隔符拆分', () {
+      const content =
+          '单词,同义词,反义词,词根,词缀,词族,易混词,标签\n'
+          'cat,fruit; pome,orange,app-,re-,cat tree,apply,动物;宠物\n';
+
+      final row = parse(content).rows.single;
       expect(row.synonyms, <String>['fruit', 'pome']);
       expect(row.antonyms, <String>['orange']);
       expect(row.roots, <String>['app-']);
       expect(row.affixes, <String>['re-']);
-      expect(row.wordFamilies, <String>['apple tree']);
+      expect(row.wordFamilies, <String>['cat tree']);
       expect(row.confusedWords, <String>['apply']);
-      expect(row.tags, <String>['水果', '食物']);
-      expect(row.contentType, LexicalContentType.word);
-      expect(row.isValid, isTrue);
-      expect(row.errorMessage, isNull);
+      expect(row.tags, <String>['动物', '宠物']);
     });
 
     test('英文表头大小写与空格宽松匹配', () {

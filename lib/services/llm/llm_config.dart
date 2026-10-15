@@ -12,6 +12,9 @@ library;
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 
+/// LLM 配置在 `settings.raw` 中的键名。
+const String llmConfigSettingsKey = 'llmConfig';
+
 /// LLM 接口协议。
 enum LlmApiType {
   /// OpenAI 兼容（`POST {baseUrl}/chat/completions`）。

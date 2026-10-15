@@ -30,9 +30,7 @@ class WhackAMoleLayout {
 
   /// 全部地鼠缩回的时刻（毫秒，自本题开始计时）。
   int get retreatAtMs =>
-      whackAMolePopDelayMs +
-      whackAMoleStaggerMs * moleCount +
-      whackAMoleStayMs;
+      whackAMolePopDelayMs + whackAMoleStaggerMs * moleCount + whackAMoleStayMs;
 }
 
 /// 按随机源给 [choiceCount] 只地鼠分配互不相同的洞。
@@ -40,10 +38,9 @@ WhackAMoleLayout buildWhackAMoleLayout({
   required int choiceCount,
   required double Function() random,
 }) {
-  final holes = shuffleWith(
-    <int>[for (var index = 0; index < whackAMoleHoleCount; index += 1) index],
-    random,
-  );
+  final holes = shuffleWith(<int>[
+    for (var index = 0; index < whackAMoleHoleCount; index += 1) index,
+  ], random);
   return WhackAMoleLayout(
     holes: holes.take(choiceCount).toList(growable: false),
     moleCount: choiceCount,
@@ -91,8 +88,9 @@ class WhackAMoleState {
       : questions[core.progress.index];
 
   /// 当前题的洞位分配。
-  WhackAMoleLayout? get layout =>
-      core.progress.index >= layouts.length ? null : layouts[core.progress.index];
+  WhackAMoleLayout? get layout => core.progress.index >= layouts.length
+      ? null
+      : layouts[core.progress.index];
 
   /// 第 [index] 只地鼠是否已冒头。
   bool isMoleUp(int index) =>
@@ -187,10 +185,7 @@ WhackAMoleState startWhackAMole({
 }
 
 /// 状态机入口：把一个动作应用到状态上，返回新状态。
-WhackAMoleState whackAMoleNext(
-  WhackAMoleState state,
-  WhackAMoleAction action,
-) {
+WhackAMoleState whackAMoleNext(WhackAMoleState state, WhackAMoleAction action) {
   return switch (action) {
     StartWhackAMole() => state.copyWith(core: state.core.start()),
     TickWhackAMole(:final deltaMs) => _tick(state, deltaMs),

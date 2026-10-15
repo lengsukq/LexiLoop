@@ -28,6 +28,10 @@ class ImportPreviewTable extends StatelessWidget {
     final colors = context.lexiColors;
     final rows = _visibleRows();
     final hidden = preview.totalRows - rows.length;
+    final summary = StringBuffer()
+      ..write('预览（共 ${preview.totalRows} 行，')
+      ..write('新增 ${preview.newRows} / 已存在 ${preview.existingRows} / ')
+      ..write('重复 ${preview.duplicateRows} / 无效 ${preview.invalidRows}）');
 
     return LiquidGlass(
       level: GlassLevel.elevated,
@@ -37,9 +41,7 @@ class ImportPreviewTable extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '预览（共 ${preview.totalRows} 行，'
-            '新增 ${preview.newRows} / 已存在 ${preview.existingRows} / '
-            '重复 ${preview.duplicateRows} / 无效 ${preview.invalidRows}）',
+            summary.toString(),
             style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
           ),
           if (preview.skippedCount > 0) ...<Widget>[
@@ -112,10 +114,7 @@ class _PreviewRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: <Widget>[
-          SizedBox(
-            width: 44,
-            child: Text('${row.rowNumber}', style: muted),
-          ),
+          SizedBox(width: 44, child: Text('${row.rowNumber}', style: muted)),
           Expanded(
             flex: 3,
             child: Text(
@@ -129,10 +128,7 @@ class _PreviewRow extends StatelessWidget {
             flex: 2,
             child: Text(_contentTypeLabel(row.contentType), style: muted),
           ),
-          SizedBox(
-            width: 68,
-            child: ImportRowStatusBadge(status: row.status),
-          ),
+          SizedBox(width: 68, child: ImportRowStatusBadge(status: row.status)),
           Expanded(
             flex: 3,
             child: Text(

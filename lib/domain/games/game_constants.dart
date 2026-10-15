@@ -166,6 +166,12 @@ const int phoneticMinimumItemCount = 4; // guard:allow-magic
 /// 音标训练的选项数量（旧版 `OPTION_COUNT`）。
 const int phoneticChoiceCount = 4; // guard:allow-magic
 
+/// 音标训练一次取用的候选池上限（旧版 `CANDIDATE_POOL_SIZE`）。
+///
+/// 取值 48 与音标目录规模一致：候选池要足够大，才能凑出
+/// 「同类音标」的干扰项。
+const int phoneticCandidatePoolSize = 48; // guard:allow-magic
+
 /// 音标训练的会话来源标识。
 ///
 /// **与旧版的差异**：旧版复用 `GAME_PHONETICS`，会被

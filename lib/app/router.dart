@@ -6,9 +6,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/add/add_page.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/features/placeholder/placeholder_page.dart';
 import 'package:lexiloop/features/statistics/statistics_page.dart';
+import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/ui/adaptive_shell.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
@@ -43,6 +46,8 @@ GoRouter _createRouter() {
 Widget _pageFor(AppDestination destination) {
   return switch (destination.path) {
     '/' => const DashboardPage(),
+    '/add' => const AddPage(),
+    '/study' => const StudyPage(mode: StudyMode.daily),
     '/words' => const WordsPage(),
     '/statistics' => const StatisticsPage(),
     _ => PlaceholderPage(destination: destination),

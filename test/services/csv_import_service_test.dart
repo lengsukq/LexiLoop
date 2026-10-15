@@ -14,7 +14,6 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/import/content_payload.dart';
-import 'package:lexiloop/data/import/csv_parser.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/csv_import_service.dart';
@@ -106,7 +105,7 @@ void main() {
   Future<WordContentRow> contentOf(int wordId) async {
     final query = db.select(db.wordContents)
       ..where((table) => table.wordId.equals(wordId));
-    return query.getSingle();
+    return await query.getSingle();
   }
 
   group('预览', () {

@@ -32,7 +32,7 @@ enum GameRank {
   /// 其余情况。
   c('C');
 
-  const new(this.label);
+  new(this.label);
 
   /// 展示用字母。
   final String label;

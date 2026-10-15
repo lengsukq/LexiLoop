@@ -129,10 +129,7 @@ class LlmCompletion {
 
 /// OpenAI 兼容端点的结构化输出档位。
 class _OpenAiFormat {
-  const _OpenAiFormat({
-    required this.responseFormat,
-    required this.appendSchema,
-  });
+  const new({required this.responseFormat, required this.appendSchema});
 
   final Object? responseFormat;
   final bool appendSchema;
@@ -329,6 +326,7 @@ class LlmClient {
     final body = _decodeBody(response.body);
     _assertModelBody(body, response.body, LlmApiType.anthropic);
     final completion = _parseAnthropic(body, target);
+    if (_isTruncated(completion.finishReason)) throw _truncationError();
     if (completion.text.isEmpty) throw _emptyResponse();
     return completion;
   }
@@ -358,9 +356,7 @@ class LlmClient {
       final refusal = _openAiRefusal(body);
       if (refusal != null) throw _refusalError(refusal);
       final completion = _parseOpenAi(body, target);
-      if (completion.finishReason == _lengthFinishReason) {
-        throw _truncationError();
-      }
+      if (_isTruncated(completion.finishReason)) throw _truncationError();
       if (completion.text.isEmpty) {
         lastError = _emptyResponse();
         continue;
@@ -515,8 +511,11 @@ class LlmClient {
   }
 }
 
-/// 输出被截断的结束原因。
-const String _lengthFinishReason = 'length';
+/// 输出被截断的结束原因（OpenAI 与 Anthropic 用词不同）。
+const Set<String> _truncationFinishReasons = <String>{'length', 'max_tokens'};
+
+bool _isTruncated(String? finishReason) =>
+    finishReason != null && _truncationFinishReasons.contains(finishReason);
 
 Map<String, String> _headers(LlmTarget target) =>
     target.apiType == LlmApiType.anthropic
@@ -563,8 +562,7 @@ ExternalServiceError _truncationError() => const ExternalServiceError(
 
 ExternalServiceError _refusalError(String refusal) => ExternalServiceError(
   AppErrorCode.aiRequestFailed,
-  details:
-      '模型拒绝回答：${refusal.length > llmErrorSnippetChars ? refusal.substring(0, llmErrorSnippetChars) : refusal}',
+  details: '模型拒绝回答：${_snippet(refusal)}',
 );
 
 Object? _decodeBody(String raw) {
@@ -596,13 +594,13 @@ void _assertModelBody(Object? body, String raw, LlmApiType apiType) {
   final hasChoices = body['choices'] is List;
   final hasContent = body['content'] is List;
   if (apiType == LlmApiType.openai && !hasChoices) {
-    throw ExternalServiceError(
+    throw const ExternalServiceError(
       AppErrorCode.aiRequestFailed,
       details: 'AI 网关返回了非模型响应（缺少 choices）',
     );
   }
   if (apiType == LlmApiType.anthropic && !hasContent) {
-    throw ExternalServiceError(
+    throw const ExternalServiceError(
       AppErrorCode.aiRequestFailed,
       details: 'AI 网关返回了非模型响应（缺少 content）',
     );

@@ -465,7 +465,7 @@ const int _translationLookahead = 7;
 
 /// 解析英英释义（`id="tEETrans"` 区块）。
 List<Map<String, Object?>> parseYoudaoEnDefinitions(String html) {
-  final section = RegExp('id="tEETrans"[\\s\\S]*?</ul>\\s*</div>')
+  final section = RegExp(r'id="tEETrans"[\s\S]*?</ul>\s*</div>')
       .firstMatch(html)
       ?.group(0);
   if (section == null) return const <Map<String, Object?>>[];
@@ -547,7 +547,7 @@ const int _maxRelatedWordLength = 40;
 
 bool _isPlainWord(String word, {required int maxLength}) {
   if (word.length < 2 || word.length > maxLength) return false;
-  return RegExp("^[a-zA-Z][a-zA-Z\\s'-]*\\$").hasMatch(word);
+  return RegExp(r"^[a-zA-Z][a-zA-Z\s'-]*$").hasMatch(word);
 }
 
 /// 解析同根词（`id="relWordTab"` 区块）。
@@ -575,7 +575,7 @@ List<Map<String, Object?>> parseYoudaoWordFamilyFromHtml(String html) {
     final word = anchor == null
         ? ''
         : decodeHtmlEntities(anchor.group(1)!.trim());
-    if (!RegExp("^[a-zA-Z][a-zA-Z'-]*\\$").hasMatch(word)) continue;
+    if (!RegExp(r"^[a-zA-Z][a-zA-Z'-]*$").hasMatch(word)) continue;
     if (!seen.add('${word.toLowerCase()}|${currentPos ?? ''}')) continue;
     final tail = inner.substring(anchor!.end);
     final translation = decodeHtmlEntities(stripHtmlTags(tail))
@@ -614,7 +614,7 @@ List<Map<String, Object?>> parseYoudaoPhrasesFromHtml(String html) {
   if (section == null) return const <Map<String, Object?>>[];
   final result = <Map<String, Object?>>[];
   final pattern = RegExp(
-    '<p class="wordGroup">[\\s\\S]*?<a[^>]*>([^<]+)</a>([\\s\\S]*?)</p>',
+    r'<p class="wordGroup">[\s\S]*?<a[^>]*>([^<]+)</a>([\s\S]*?)</p>',
   );
   for (final match in pattern.allMatches(section)) {
     final phrase = decodeHtmlEntities(match.group(1)!.trim());
@@ -622,7 +622,7 @@ List<Map<String, Object?>> parseYoudaoPhrasesFromHtml(String html) {
         .replaceAll(RegExp(r'^[；;，,、\s]+'), '')
         .trim();
     if (phrase.length < 2 || phrase.length > 80) continue;
-    if (!RegExp(r'^[a-zA-Z]').hasMatch(phrase)) continue;
+    if (!RegExp('^[a-zA-Z]').hasMatch(phrase)) continue;
     result.add(<String, Object?>{
       'phrase': phrase,
       'translation': translation.isEmpty ? null : translation,

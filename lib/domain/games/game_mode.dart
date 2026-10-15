@@ -36,7 +36,7 @@ enum GameMode {
   /// 音标辨音训练。
   phonetics('PHONETICS');
 
-  const new(this.wire);
+  new(this.wire);
 
   /// 数据库与备份 JSON 中的稳定标识。
   final String wire;
@@ -72,7 +72,7 @@ enum GamePriority {
   /// 普通候选。
   normal('NORMAL');
 
-  const new(this.wire);
+  new(this.wire);
 
   /// 稳定标识（旧版同名）。
   final String wire;

@@ -98,7 +98,7 @@ void _appendBidec(
           .replaceAll(RegExp('</seg>', caseSensitive: false), '')
           .trim();
       if (pos == null &&
-          RegExp('^_no_\$', caseSensitive: false).hasMatch(rawPos)) {
+          RegExp(r'^_no_$', caseSensitive: false).hasMatch(rawPos)) {
         continue;
       }
       _pushDefinition(

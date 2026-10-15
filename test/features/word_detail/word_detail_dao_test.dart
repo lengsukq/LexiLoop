@@ -12,6 +12,7 @@ library;
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/date_key.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
@@ -116,7 +117,7 @@ void main() {
       .insert(
         WordReviewStatsCompanion.insert(
           wordId: Value<int>(wordId),
-          totalReviews: Value<int>(10),
+          totalReviews: const Value<int>(10),
           correctReviews: Value<int>(correct),
           updatedAt: Value<int>(now),
         ),
@@ -151,12 +152,14 @@ void main() {
     });
 
     test('词条存在但没有内容行时仍返回详情，内容为空', () async {
-      final id = await insertWord(term: 'apple');
+      final id = await insertWord(term: 'apple', isSuspended: true);
 
       final detail = await dao.find(id);
 
       expect(detail, isNotNull);
       expect(detail!.term, 'apple');
+      expect(detail.normalizedTerm, 'apple');
+      expect(detail.isSuspended, isTrue);
       expect(detail.definitions, isEmpty);
       expect(detail.examples, isEmpty);
       expect(detail.hasNoContent, isTrue);
@@ -197,10 +200,18 @@ void main() {
       final id = await insertWord(term: 'apple');
       await insertContents(
         id,
-        synonymsJson:
-            '["fruit", {"word":"pome","translation":"梨果",'
-            '"partOfSpeech":"n.","relation":"近义","source":"ai",'
-            '"difference":"pome 指仁果"}]',
+        synonymsJson: '''
+[
+  "fruit",
+  {
+    "word": "pome",
+    "translation": "梨果",
+    "partOfSpeech": "n.",
+    "relation": "近义",
+    "source": "ai",
+    "difference": "pome 指仁果"
+  }
+]''',
       );
 
       final detail = await dao.find(id);
@@ -262,12 +273,17 @@ void main() {
         learningJson:
             '{"pronunciationTip":"连读","mnemonic":"起飞即离开",'
             '"commonMistakes":["误用为 take of"]}',
-        sentenceAnalysisJson:
-            '{"grammarPattern":"S+V+O","grammarExplanation":"主谓宾",'
-            '"grammarNotes":["要点一"],'
-            '"keyExpressions":["take off",{"expression":"look after",'
-            '"translation":"照顾"}],'
-            '"variations":[{"type":"被动","sentence":"It was taken off."}]}',
+        sentenceAnalysisJson: '''
+{
+  "grammarPattern": "S+V+O",
+  "grammarExplanation": "主谓宾",
+  "grammarNotes": ["要点一"],
+  "keyExpressions": [
+    "take off",
+    {"expression": "look after", "translation": "照顾"}
+  ],
+  "variations": [{"type": "被动", "sentence": "It was taken off."}]
+}''',
       );
 
       final detail = await dao.find(id);
@@ -399,7 +415,7 @@ void main() {
           .insert(
             WrongWordStatesCompanion.insert(
               wordId: Value<int>(due),
-              active: Value<bool>(true),
+              active: const Value<bool>(true),
               updatedAt: now,
             ),
           );
@@ -408,7 +424,7 @@ void main() {
           .insert(
             WrongWordStatesCompanion.insert(
               wordId: Value<int>(suspended),
-              active: Value<bool>(false),
+              active: const Value<bool>(false),
               updatedAt: now,
             ),
           );

@@ -12,6 +12,9 @@ import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
+/// 主按钮高度下限（逻辑像素）。
+const double _buttonHeight = 50;
+
 /// 提交后的判定反馈。
 class StudyFeedbackPanel extends StatelessWidget {
   /// 以判定结果构造。
@@ -163,12 +166,12 @@ class StudySummaryView extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 50),
+          constraints: const BoxConstraints(minHeight: _buttonHeight),
           child: FilledButton(onPressed: onRestart, child: const Text('再来一轮')),
         ),
         const SizedBox(height: 10),
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 50),
+          constraints: const BoxConstraints(minHeight: _buttonHeight),
           child: OutlinedButton(onPressed: onHome, child: const Text('返回首页')),
         ),
       ],

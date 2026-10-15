@@ -14,6 +14,9 @@ import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
+/// 朗读按钮的边长（逻辑像素），同时满足触控热区下限。
+const double _speakButtonSize = 44;
+
 /// 题干卡片。
 class StudyPrompt extends StatelessWidget {
   /// 以题目与设置中的默认口音构造。
@@ -259,8 +262,8 @@ class SpeakButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: _speakButtonSize,
+      height: _speakButtonSize,
       child: IconButton(
         onPressed: null,
         tooltip: '朗读功能待接入',

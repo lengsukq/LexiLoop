@@ -102,7 +102,7 @@ class YoudaoProvider implements DictionaryProvider {
   /// 以 HTTP 客户端、随机源与等待函数构造。
   ///
   /// [random] 与 [sleep] 可注入，使「重试一次 + 抖动」在单测中确定且不真的等待。
-  YoudaoProvider(
+  new(
     this._fetcher, {
     math.Random? random,
     Future<void> Function(Duration duration)? sleep,
@@ -178,13 +178,7 @@ class YoudaoProvider implements DictionaryProvider {
         if (attempt.status == ProviderAttemptStatus.failed) attempt,
     ];
     if (failures.isEmpty) return null;
-    final detail = attempts
-        .map(
-          (attempt) =>
-              '${attempt.endpoint}: ${attempt.errorCode ?? attempt.status.wire}'
-              '${attempt.errorMessage == null ? '' : ' (${attempt.errorMessage})'}',
-        )
-        .join('; ');
+    final detail = attempts.map(_describeAttempt).join('; ');
     final transient = failures.any((attempt) => attempt.isTransient);
     throw ExternalServiceError(
       transient
@@ -370,4 +364,11 @@ bool _hasPronunciation(Map<String, Object?> fields, String field) {
     if (!wantsAudio && _nonEmpty(item['phonetic'])) return true;
   }
   return false;
+}
+
+/// 把一次端点尝试描述成 `端点: 错误码 (说明)`。
+String _describeAttempt(_EndpointAttempt attempt) {
+  final code = attempt.errorCode ?? attempt.status.wire;
+  final message = attempt.errorMessage;
+  return '${attempt.endpoint}: $code${message == null ? '' : ' ($message)'}';
 }

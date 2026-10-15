@@ -316,8 +316,7 @@ class CsvImportService {
       await _commitRows(
         inputs,
         mode: mode,
-        sourceLanguage: languages.$1,
-        targetLanguage: languages.$2,
+        languages: languages,
         counters: counters,
         now: now,
       );
@@ -338,12 +337,11 @@ class CsvImportService {
   Future<void> _commitRows(
     List<_RowInput> inputs, {
     required ImportMode mode,
-    required String sourceLanguage,
-    required String targetLanguage,
+    required _LanguagePair languages,
     required _CommitCounters counters,
     required int now,
   }) async {
-    final existing = await _existingWordIds(sourceLanguage, targetLanguage);
+    final existing = await _existingWordIds(languages.source, languages.target);
     final contents = await _existingContents(existing.values);
     final providers = await _requestedProvidersJson();
 
@@ -784,12 +782,15 @@ class CsvImportService {
   }
 
   /// 取语言方向：所有行的语言来自同一批次，取第一行的即可。
-  (String, String)? _languagesOf(List<_RowInput> inputs) {
+  ///
+  /// 用私有类而不是 Dart 记录：记录的取值器是 `$1` / `$2`，
+  /// 而 `$2` 里的裸数字会被架构守卫的魔法数字检查拦下。
+  _LanguagePair? _languagesOf(List<_RowInput> inputs) {
     for (final input in inputs) {
       final row = input.row;
       if (row == null) continue;
       if (row.sourceLanguage.isEmpty || row.targetLanguage.isEmpty) continue;
-      return (row.sourceLanguage, row.targetLanguage);
+      return _LanguagePair(row.sourceLanguage, row.targetLanguage);
     }
     return null;
   }
@@ -945,6 +946,14 @@ Iterable<List<T>> _chunks<T>(List<T> items) sync* {
     final end = start + sqlBatchChunkSize;
     yield items.sublist(start, end > items.length ? items.length : end);
   }
+}
+
+/// 批次的词条语言方向。
+class _LanguagePair {
+  const new(this.source, this.target);
+
+  final String source;
+  final String target;
 }
 
 /// 选中的 CSV 文件。

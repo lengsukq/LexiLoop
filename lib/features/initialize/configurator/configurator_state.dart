@@ -143,14 +143,25 @@ class ConfiguratorNotifier extends Notifier<ConfiguratorState> {
   /// 打开时的作用范围；为空表示「全部词条」。
   final ConfiguratorScope? initialScope;
 
+  /// 必须在 `build()` 里 watch 而不是 read：数据源选项来自
+  /// `appSettingsProvider`，而设置是异步读的。首帧 build 时选项还没到，
+  /// 只 read 会拿到空列表，于是草稿里的「数据源」永远是空的——
+  /// 用户看到的是一个没有来源可选、点了创建只会报「请至少选择一个
+  /// 可用数据来源」的配置器。watch 让选项到达时整个草稿重建一次。
+  ///
+  /// 代价是设置变化时草稿会回到初始值。配置器是对话框，生命周期只有
+  /// 几十秒，用户不会在对话框打开期间去改设置，所以这个代价可以接受。
   @override
   ConfiguratorState build() {
+    final options =
+        ref.watch(configuratorProviderOptionsProvider).asData?.value ??
+        const <ConfiguratorProviderOption>[];
     final draft = initialConfiguratorDraft(
       initialScope ?? ConfiguratorScope.all,
     );
     return ConfiguratorState(
       draft: draft.copyWith(
-        providers: _eligibleProviders(_options(), draft.fields),
+        providers: _eligibleProviders(options, draft.fields),
       ),
     );
   }
@@ -254,7 +265,9 @@ class ConfiguratorNotifier extends Notifier<ConfiguratorState> {
     }
   }
 
-  /// 当前数据源选项。
+  /// 取已加载的数据源选项；未加载完时返回空列表。
+  ///
+  /// 绝大多数调用点在 `build()` 之后（用户交互），那时选项早已就绪。
   List<ConfiguratorProviderOption> _options() =>
       ref.read(configuratorProviderOptionsProvider).asData?.value ??
       const <ConfiguratorProviderOption>[];

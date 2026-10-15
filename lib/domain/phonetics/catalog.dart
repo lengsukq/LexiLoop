@@ -12,9 +12,14 @@
 /// [PhonemeRelations] 四个语义分组后，每个构造函数都不超过 5 个参数
 /// （架构守卫的硬约束），阅读时也不必在一屏里对照 14 个字段名。
 ///
-/// **与旧版的差异**：旧版 `CATEGORY_META` 里的 `color` 是 Tailwind 类名
-/// （`bg-[#5856d6]`），Flutter 侧改用 `LexiColors` 的语义色，
-/// 因此只保留分类的中英标签，不再搬运颜色字符串。
+/// **与旧版的差异（两处，均为修正）**：
+/// 1. 旧版 `CATEGORY_META` 里的 `color` 是 Tailwind 类名
+///    （`bg-[#5856d6]`），Flutter 侧改用 `LexiColors` 的语义色，
+///    因此只保留分类的中英标签，不再搬运颜色字符串；
+/// 2. 旧版 `/ŋ/` 的 `confusable` 含 `ŋk`——它不是音标符号而是拼写组合
+///    （该条目 `spellings` 里已有 `nk → think /θɪŋk/`），会让「易混对比」
+///    指向不存在的条目，本版移除。悬空引用由 [validatePhonemeCatalog]
+///    与 `test/domain/phonetics/catalog_test.dart` 持续看守。
 library;
 
 import 'package:lexiloop/domain/games/game_constants.dart';
@@ -1703,7 +1708,9 @@ const List<PhonemeEntry> phonemeCatalog = <PhonemeEntry>[
     ),
     relations: PhonemeRelations(
       pitfalls: '中国学习者常把 /ŋ/ 发成 /n/，或多加 /ɡ/，这是口音标志。',
-      confusable: <String>['n', 'ŋk'],
+      // 旧版此处还写了 `ŋk`。它不是音标符号而是拼写组合（该条目 spellings 里
+      // 已有 `nk → think /θɪŋk/`），留着会让「易混对比」指向不存在的条目。
+      confusable: <String>['n'],
     ),
   ),
   PhonemeEntry(

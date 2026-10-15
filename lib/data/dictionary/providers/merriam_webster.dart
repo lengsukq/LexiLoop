@@ -51,7 +51,8 @@ class MerriamWebsterProvider implements DictionaryProvider {
   @override
   bool isEnabled(AppSettings settings) =>
       settings.providers.merriamWebsterEnabled &&
-      (dictionaryKey.isNotEmpty || thesaurusKey.isNotEmpty);
+      (_rawKey(settings, merriamWebsterDictionaryKeyName).isNotEmpty ||
+          _rawKey(settings, merriamWebsterThesaurusKeyName).isNotEmpty);
 
   @override
   bool supports(ProviderRequest request) =>
@@ -89,10 +90,7 @@ class MerriamWebsterProvider implements DictionaryProvider {
     );
   }
 
-  String _raw(String key) {
-    final value = _settings.raw[key];
-    return value is String ? value.trim() : '';
-  }
+  String _raw(String key) => _rawKey(_settings, key);
 
   Future<_MwResponse> _request(
     String reference,
@@ -124,6 +122,12 @@ class MerriamWebsterProvider implements DictionaryProvider {
       );
     }
   }
+}
+
+/// 读取 `settings.raw` 里的字符串键。
+String _rawKey(AppSettings settings, String key) {
+  final value = settings.raw[key];
+  return value is String ? value.trim() : '';
 }
 
 /// 单次 Merriam-Webster 调用的结果（二选一非空）。
@@ -287,11 +291,18 @@ void _appendVis(Object? raw, List<Map<String, Object?>> target) {
   }
 }
 
-/// 去掉 `{...}` 形式的标记（如 `{a_link|word}`）并折叠空白。
+/// 处理 Merriam-Webster 的 `{...}` 标记并折叠空白。
+///
+/// **有意偏离旧版**：旧版把整个 `{a_link|salutation}` 删掉，于是
+/// `shortdef` 里就留下一条空文本释义，只能靠下游过滤。MW 的约定是
+/// `{标签|显示文本}`，因此这里保留 `|` 之后的部分，标记本身才丢弃。
 String _cleanMarkup(Object? value) {
   final text = value is String ? value : '';
   return text
-      .replaceAll(RegExp(r'\{[^}|]+(?:\|[^}]*)?\}'), '')
+      .replaceAllMapped(RegExp(r'\{([^}]*)\}'), (match) {
+        final parts = match.group(1)!.split('|');
+        return parts.length > 1 ? parts[1] : '';
+      })
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }

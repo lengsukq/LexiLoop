@@ -146,7 +146,10 @@ const int matchingMinimumPairCount = 4; // guard:allow-magic
 const int matchingMaximumPairCount = 8; // guard:allow-magic
 
 /// 配对的默认时限（秒）。
-const int matchingDefaultDurationSeconds = 90; // guard:allow-magic
+///
+/// 与旧版默认预设「标准挑战」（6 组 / 60 秒）一致；`matchPresets` 里的
+/// 三档预设会覆盖它。
+const int matchingDefaultDurationSeconds = 60; // guard:allow-magic
 
 /// 配对的最短时限（秒，旧版 `MINIMUM_DURATION_SECONDS`）。
 const int matchingMinimumDurationSeconds = 30; // guard:allow-magic

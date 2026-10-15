@@ -15,13 +15,36 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
+import 'package:lexiloop/services/tts_service.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+
+/// 记录朗读文本的假引擎。
+class RecordingSpeechEngine implements SpeechEngine {
+  /// 已朗读的文本。
+  final List<String> spoken = <String>[];
+
+  @override
+  Future<void> configure({
+    required double rate,
+    required String language,
+  }) async {}
+
+  @override
+  Future<void> speak(String text) async => spoken.add(text);
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<bool> isLanguageAvailable(String language) async => true;
+}
 
 void main() {
   late AppDatabase db;
@@ -113,13 +136,18 @@ void main() {
   Future<ProviderContainer> pumpStudy(
     WidgetTester tester, {
     StudyMode mode = StudyMode.daily,
+    SpeechEngine? speechEngine,
   }) async {
     tester.view.physicalSize = const Size(520, 1500);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final container = ProviderContainer(
-      overrides: [databaseProvider.overrideWithValue(db)],
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        if (speechEngine != null)
+          ttsServiceProvider.overrideWithValue(TtsService(speechEngine)),
+      ],
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
@@ -355,23 +383,23 @@ void main() {
     expect(find.text('我昨天吃了一个苹果。'), findsOneWidget);
   });
 
-  testWidgets('朗读按钮已禁用并带说明', (tester) async {
+  testWidgets('朗读按钮可点，且把文本交给朗读服务', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     await insertSession(
       wordId: wordId,
       questionType: QuestionType.enToZhChoice,
     );
 
-    await pumpStudy(tester);
+    // 用假引擎替换真插件：平台通道在测试进程里不可用。
+    final engine = RecordingSpeechEngine();
+    final container = await pumpStudy(tester, speechEngine: engine);
 
-    // TTS 尚未接入：断言按钮存在且**禁用**，而不是断言点了有声音。
-    expect(find.byTooltip('朗读功能待接入'), findsOneWidget);
-    final button = tester.widget<IconButton>(
-      find.byWidgetPredicate(
-        (widget) => widget is IconButton && widget.tooltip == '朗读功能待接入',
-      ),
-    );
-    expect(button.onPressed, isNull);
+    expect(find.byTooltip('朗读'), findsOneWidget);
+    await tester.tap(find.byTooltip('朗读'));
+    await tester.pumpAndSettle();
+
+    expect(engine.spoken, <String>['apple']);
+    expect(container.read(studySessionProvider).hasValue, isTrue);
   });
 
   testWidgets('完成态显示正确率与统计数字', (tester) async {

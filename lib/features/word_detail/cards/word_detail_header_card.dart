@@ -1,9 +1,14 @@
 /// 词条详情页头部卡片。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
@@ -112,18 +117,38 @@ class _HeaderActions extends ConsumerWidget {
 
   final WordDetail detail;
 
+  /// 朗读词条。
+  ///
+  /// 失败时提示原因：Android 缺语音包时系统 TTS 会静默无声，
+  /// 不提示的话用户只会觉得「按钮坏了」。
+  Future<void> _speak(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final playback =
+        ref.read(appSettingsProvider).value?.playback ??
+        PlaybackSettings.defaults;
+    try {
+      await ref
+          .read(ttsServiceProvider)
+          .speakTerm(
+            term: detail.term,
+            sourceLanguage: detail.sourceLanguage,
+            contentType: detail.contentType,
+            playback: playback,
+          );
+    } on AppError catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.lexiColors;
     return Row(
       children: <Widget>[
-        // 朗读尚未接入：按钮禁用并说明原因，而不是留一个点了没反应的图标。
-        const Tooltip(
-          message: '朗读功能待接入',
-          child: IconButton(
-            onPressed: null,
-            icon: Icon(Icons.volume_up_rounded),
-          ),
+        IconButton(
+          tooltip: '朗读',
+          onPressed: () => unawaited(_speak(context, ref)),
+          icon: const Icon(Icons.volume_up_rounded),
         ),
         const Spacer(),
         Text(

@@ -208,7 +208,11 @@ PhoneticQuestion _buildQuestion({
   );
 }
 
-/// 音标类选项的候选池：易混与同类的排在前面。
+/// 音标类选项的候选池：**只取同类或易混的音标**。
+///
+/// 「同类优先」必须在进入 `createChoicePool` **之前**完成截断：
+/// 那个函数会先把整个候选池打乱再截取，若把同类与不同类混在一个池里，
+/// 「优先」就退化成随机。同类不足时才用其余候选补齐。
 List<String> _phoneticPool({
   required PhoneticSource source,
   required List<PhoneticSource> sources,
@@ -219,18 +223,13 @@ List<String> _phoneticPool({
   final seen = <String>{_identity(source.phonetic)};
   for (final other in sources) {
     if (!seen.add(_identity(other.phonetic))) continue;
-    final otherEntry = matchPhoneme(other.phonetic);
-    final similar =
-        entry != null &&
-        otherEntry != null &&
-        (entry.similarPhonemes.contains(otherEntry.symbol) ||
-            entry.category == otherEntry.category);
-    (similar ? related : others).add(other.phonetic);
+    (isSimilarEntry(entry, matchPhoneme(other.phonetic)) ? related : others)
+        .add(other.phonetic);
   }
-  return <String>[...related, ...others];
+  return _boundedPool(related: related, others: others);
 }
 
-/// 单词类选项的候选池：同类的排在前面。
+/// 单词类选项的候选池：同样只取同类音标的词。
 List<String> _wordPool({
   required PhoneticSource source,
   required List<PhoneticSource> sources,
@@ -241,13 +240,27 @@ List<String> _wordPool({
   final seen = <String>{source.word.term.trim().toLowerCase()};
   for (final other in sources) {
     if (!seen.add(other.word.term.trim().toLowerCase())) continue;
-    final otherEntry = matchPhoneme(other.phonetic);
-    final similar =
-        entry != null &&
-        otherEntry != null &&
-        (entry.similarPhonemes.contains(otherEntry.symbol) ||
-            entry.category == otherEntry.category);
-    (similar ? related : others).add(other.word.term);
+    (isSimilarEntry(entry, matchPhoneme(other.phonetic)) ? related : others)
+        .add(other.word.term);
   }
-  return <String>[...related, ...others];
+  return _boundedPool(related: related, others: others);
+}
+
+/// 两个音标条目是否「同类或易混」。
+///
+/// 易混关系来自目录的 `confusable`（教学资产里手写的对比组），
+/// 同类关系来自 `category`（前元音、爆破音…）。两者都算「该一起练的音」。
+bool isSimilarEntry(PhonemeEntry? correct, PhonemeEntry? other) {
+  if (correct == null || other == null) return false;
+  if (correct.similarPhonemes.contains(other.symbol)) return true;
+  return correct.category == other.category;
+}
+
+/// 同类候选够用时只返回同类；不够时再补其余候选。
+List<String> _boundedPool({
+  required List<String> related,
+  required List<String> others,
+}) {
+  const need = phoneticChoiceCount - 1;
+  return related.length >= need ? related : <String>[...related, ...others];
 }

@@ -6,9 +6,15 @@
 /// 「作答逻辑」写在了同一个函数里。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
@@ -50,7 +56,7 @@ class StudyPrompt extends StatelessWidget {
     QuestionType.enToZh ||
     QuestionType.enToZhChoice => _TermPrompt(word: item.word, accent: accent),
     QuestionType.listeningChoice ||
-    QuestionType.listeningSpelling => const _ListeningPrompt(),
+    QuestionType.listeningSpelling => _ListeningPrompt(word: item.word),
     QuestionType.clozeSentence => _ClozePrompt(
       cloze: item.cloze,
       word: item.word,
@@ -124,7 +130,7 @@ class _TermPrompt extends StatelessWidget {
             ],
           ),
         ),
-        const SpeakButton(),
+        SpeakButton(word: word),
       ],
     );
   }
@@ -154,14 +160,17 @@ class _MeaningPrompt extends StatelessWidget {
 
 /// 只给听音的题干。
 class _ListeningPrompt extends StatelessWidget {
-  const new();
+  const new({required this.word});
+
+  /// 待朗读的词条。
+  final StudyWordView word;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Row(
       children: <Widget>[
-        const SpeakButton(),
+        SpeakButton(word: word),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -177,7 +186,7 @@ class _ListeningPrompt extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '朗读功能接入前，请根据音标或记忆作答',
+                '听不清时可以再点一次朗读',
                 style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
               ),
             ],
@@ -254,22 +263,52 @@ TextSpan _clozeSpan(String blanked, TextStyle style, Color blankColor) {
 /// TTS 尚未接入，这里刻意放一个**禁用**按钮并挂上说明性 Tooltip：让功能
 /// 缺失在界面上可见，而不是留一个点了没反应的活按钮（旧版把占位按钮写成
 /// 可点击的，用户会以为是自己设备没声音）。
-class SpeakButton extends StatelessWidget {
-  /// 创建朗读按钮。
-  const new({super.key});
+class SpeakButton extends ConsumerWidget {
+  /// 以要朗读的词条构造。
+  const new({required this.word, super.key});
+
+  /// 待朗读的词条；语速按内容类型区分。
+  final StudyWordView word;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.lexiColors;
+    final playback =
+        ref.watch(appSettingsProvider).value?.playback ??
+        PlaybackSettings.defaults;
     return SizedBox(
       width: _speakButtonSize,
       height: _speakButtonSize,
       child: IconButton(
-        onPressed: null,
-        tooltip: '朗读功能待接入',
+        onPressed: () => unawaited(_speak(context, ref, playback)),
+        tooltip: '朗读',
         iconSize: 20,
-        icon: Icon(Icons.volume_up_rounded, color: colors.tertiaryLabel),
+        icon: Icon(Icons.volume_up_rounded, color: colors.accent),
       ),
     );
+  }
+
+  /// 朗读并提示失败原因。
+  ///
+  /// Android 缺语音包时系统 TTS 会静默无声，必须显式告诉用户
+  /// 去哪里装，而不是让按钮看起来「点了没反应」。
+  Future<void> _speak(
+    BuildContext context,
+    WidgetRef ref,
+    PlaybackSettings playback,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(ttsServiceProvider)
+          .speakTerm(
+            term: word.term,
+            sourceLanguage: word.sourceLanguage,
+            contentType: word.contentType,
+            playback: playback,
+          );
+    } on AppError catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 }

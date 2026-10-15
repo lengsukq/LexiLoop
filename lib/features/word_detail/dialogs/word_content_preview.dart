@@ -14,6 +14,7 @@ import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 预览区的最大高度。
@@ -144,7 +145,7 @@ class _TranslationSummary extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: LexiSpace.s12),
       padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.08),
+        color: colors.accent.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
@@ -208,7 +209,7 @@ class _DefinitionTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: LexiSpace.s6),
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: colors.label.withValues(alpha: 0.03),
+        color: colors.label.withValues(alpha: LexiTint.group),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
@@ -249,7 +250,7 @@ class _ExampleTile extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         border: Border(left: BorderSide(color: colors.accent, width: 3)),
-        color: colors.label.withValues(alpha: 0.03),
+        color: colors.label.withValues(alpha: LexiTint.group),
         borderRadius: const BorderRadius.only(
           topRight: Radius.circular(LexiRadius.md),
           bottomRight: Radius.circular(LexiRadius.md),

@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -239,7 +240,7 @@ class SettingsNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Row(

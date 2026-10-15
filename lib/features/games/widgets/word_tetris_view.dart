@@ -10,6 +10,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_tetris.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇俄罗斯方块视图。
@@ -59,7 +60,7 @@ class WordTetrisView extends StatelessWidget {
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.purple.withValues(alpha: 0.06),
+                    color: colors.purple.withValues(alpha: LexiTint.subtle),
                     borderRadius: BorderRadius.circular(LexiRadius.lg),
                     border: Border.all(color: colors.borderSubtle),
                   ),
@@ -157,7 +158,7 @@ class _StackGauge extends StatelessWidget {
               child: Container(
                 height: 8,
                 decoration: BoxDecoration(
-                  color: colors.purple.withValues(alpha: 0.75),
+                  color: colors.purple.withValues(alpha: LexiTint.strong),
                   borderRadius: BorderRadius.circular(LexiRadius.pill),
                 ),
               ),

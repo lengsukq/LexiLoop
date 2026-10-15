@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「标签 + 值」的一行。
@@ -112,36 +113,16 @@ class DetailBullet extends StatelessWidget {
 /// 小标签（语种、内容类型、已暂停等）。
 class DetailChip extends StatelessWidget {
   /// 以文本构造。
-  const new({required this.text, this.color, super.key});
+  const new({required this.text, this.tone = LexiBadgeTone.neutral, super.key});
 
   /// 标签文本。
   final String text;
 
-  /// 强调色；为空时用次级文本色。
-  final Color? color;
+  /// 语义色调。
+  final LexiBadgeTone tone;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final tone = color ?? colors.secondaryLabel;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s4,
-      ),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        text,
-        style: LexiType.caption.copyWith(
-          color: tone,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(label: text, tone: tone);
 }
 
 /// 异步卡片的加载占位。

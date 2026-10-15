@@ -11,6 +11,7 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 可开局的小游戏（配对与音标不在本页）。
@@ -140,7 +141,10 @@ class _ModeCard extends StatelessWidget {
     final colors = context.lexiColors;
     return Material(
       color: selected
-          ? Color.alphaBlend(colors.accent.withValues(alpha: 0.1), colors.card)
+          ? Color.alphaBlend(
+              colors.accent.withValues(alpha: LexiTint.tint),
+              colors.card,
+            )
           : colors.card,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       child: InkWell(
@@ -224,7 +228,7 @@ class _ErrorBanner extends StatelessWidget {
     final colors = context.lexiColors;
     return Container(
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.1),
+        color: colors.danger.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       padding: const EdgeInsets.all(LexiSpace.s12),

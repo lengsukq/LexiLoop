@@ -13,6 +13,7 @@ import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
 import 'package:lexiloop/features/add/widgets/article_strategy_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 预览步骤。
 class ArticlePreviewStep extends ConsumerWidget {
@@ -136,7 +137,6 @@ class _SummaryBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     final phrases = preview.phraseCount > 0
         ? ' · 短语 ${preview.phraseCount}'
         : '';
@@ -152,13 +152,16 @@ class _SummaryBadges extends StatelessWidget {
             label:
                 'AI 已筛选 · 推荐 ${preview.recommendedTerms.length} 词'
                 '$phrases$sentences',
-            color: colors.purple,
+            tone: LexiBadgeTone.purple,
           )
         else
-          ArticleBadge(label: '未启用 AI · 展示单词与本地切句', color: colors.warning),
+          const ArticleBadge(
+            label: '未启用 AI · 展示单词与本地切句',
+            tone: LexiBadgeTone.warning,
+          ),
         ArticleBadge(
           label: '${preview.articleStats.charCount} 字符',
-          color: colors.secondaryLabel,
+          tone: LexiBadgeTone.neutral,
         ),
       ],
     );

@@ -18,6 +18,7 @@ import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 朗读按钮的边长（逻辑像素），同时满足触控热区下限。
@@ -73,26 +74,10 @@ class _PromptHeader extends StatelessWidget {
   final QuestionType type;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s4,
-      ),
-      decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        studyQuestionTypeLabel(type),
-        style: LexiType.caption.copyWith(
-          color: colors.accent,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(
+    label: studyQuestionTypeLabel(type),
+    tone: LexiBadgeTone.accent,
+  );
 }
 
 /// 给英文词条的题干：词条 + 音标 + 朗读。

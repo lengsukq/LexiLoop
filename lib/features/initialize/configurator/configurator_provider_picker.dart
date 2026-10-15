@@ -10,7 +10,8 @@ import 'package:lexiloop/features/initialize/configurator/configurator_state.dar
 import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 数据源列表（可用性 + 优先级排序）与调用策略。
 ///
@@ -238,21 +239,8 @@ class _PriorityBadge extends StatelessWidget {
   final int index;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: badgePaddingH),
-    decoration: BoxDecoration(
-      color: context.lexiColors.accent.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(LexiRadius.xs),
-    ),
-    child: Text(
-      '$index',
-      style: TextStyle(
-        color: context.lexiColors.accent,
-        fontSize: LexiType.caption.fontSize,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      LexiBadge(label: '$index', tone: LexiBadgeTone.accent);
 }
 
 /// 上移 / 下移按钮。
@@ -399,7 +387,9 @@ class StrategyCard extends StatelessWidget {
         width: strategyCardWidth,
         padding: const EdgeInsets.all(inlineGap),
         decoration: BoxDecoration(
-          color: selected ? colors.accent.withValues(alpha: 0.08) : colors.fill,
+          color: selected
+              ? colors.accent.withValues(alpha: LexiTint.tint)
+              : colors.fill,
           borderRadius: BorderRadius.circular(LexiRadius.sm),
         ),
         child: Row(

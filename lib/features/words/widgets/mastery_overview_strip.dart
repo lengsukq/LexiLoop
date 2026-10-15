@@ -11,6 +11,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -62,7 +63,7 @@ class _OverviewBody extends StatelessWidget {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: colors.accent.withValues(alpha: 0.1),
+                color: colors.accent.withValues(alpha: LexiTint.tint),
                 borderRadius: BorderRadius.circular(LexiRadius.md),
               ),
               child: Icon(

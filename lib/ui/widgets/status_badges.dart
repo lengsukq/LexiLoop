@@ -2,13 +2,13 @@
 ///
 /// 旧版把状态标签的 map 在 3 处各写一遍（`initialize/page.tsx`、
 /// `words/page.tsx`、`status-badges.tsx`）。这里集中一处。
+///
+/// 长相一律交给 `LexiBadge`：这里只负责「状态 → 文案 + 色调」的映射。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 掌握等级徽章。
 class MasteryBadge extends StatelessWidget {
@@ -23,18 +23,17 @@ class MasteryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final (String label, Color color) = switch (level) {
-      MasteryLevel.newWord => ('新词', colors.tertiaryLabel),
-      MasteryLevel.learning => ('学习中', colors.warning),
-      MasteryLevel.familiar => ('熟悉', colors.accent),
-      MasteryLevel.proficient => ('熟练', colors.success),
-      MasteryLevel.mastered => ('已掌握', colors.purple),
+    final (String label, LexiBadgeTone tone) = switch (level) {
+      MasteryLevel.newWord => ('新词', LexiBadgeTone.neutral),
+      MasteryLevel.learning => ('学习中', LexiBadgeTone.warning),
+      MasteryLevel.familiar => ('熟悉', LexiBadgeTone.accent),
+      MasteryLevel.proficient => ('熟练', LexiBadgeTone.success),
+      MasteryLevel.mastered => ('已掌握', LexiBadgeTone.purple),
     };
 
-    return _Badge(
+    return LexiBadge(
       label: score == null ? label : '$label · $score',
-      color: color,
+      tone: tone,
     );
   }
 }
@@ -49,45 +48,17 @@ class InitializationBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final (String label, Color color) = switch (status) {
-      InitializationStatus.ready => ('已就绪', colors.success),
-      InitializationStatus.partial => ('部分就绪', colors.warning),
-      InitializationStatus.pending => ('待初始化', colors.tertiaryLabel),
-      InitializationStatus.queued => ('排队中', colors.accent),
-      InitializationStatus.running => ('初始化中', colors.accent),
-      InitializationStatus.failed => ('失败', colors.danger),
-      InitializationStatus.disabled => ('已禁用', colors.quaternaryLabel),
+    // 「待初始化」与「已禁用」同属中性色：它们靠文案区分，不靠颜色。
+    final (String label, LexiBadgeTone tone) = switch (status) {
+      InitializationStatus.ready => ('已就绪', LexiBadgeTone.success),
+      InitializationStatus.partial => ('部分就绪', LexiBadgeTone.warning),
+      InitializationStatus.pending => ('待初始化', LexiBadgeTone.neutral),
+      InitializationStatus.queued => ('排队中', LexiBadgeTone.accent),
+      InitializationStatus.running => ('初始化中', LexiBadgeTone.accent),
+      InitializationStatus.failed => ('失败', LexiBadgeTone.danger),
+      InitializationStatus.disabled => ('已禁用', LexiBadgeTone.neutral),
     };
 
-    return _Badge(label: label, color: color);
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const new({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        label,
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+    return LexiBadge(label: label, tone: tone);
   }
 }

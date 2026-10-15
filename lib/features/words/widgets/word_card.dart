@@ -17,6 +17,7 @@ import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -98,12 +99,12 @@ class _CardHeading extends StatelessWidget {
         if (entry.wrongWordActive)
           const Padding(
             padding: EdgeInsets.only(left: LexiSpace.s6),
-            child: _CardTag(label: '错词', colorRole: _TagRole.danger),
+            child: _CardTag(label: '错词', tone: LexiBadgeTone.danger),
           ),
         if (entry.isSuspended)
           const Padding(
             padding: EdgeInsets.only(left: LexiSpace.s6),
-            child: _CardTag(label: '已暂停', colorRole: _TagRole.muted),
+            child: _CardTag(label: '已暂停', tone: LexiBadgeTone.neutral),
           ),
       ],
     );
@@ -150,7 +151,7 @@ class _CardMeta extends StatelessWidget {
           '${entry.sourceLanguage} → ${entry.targetLanguage}',
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
-        if (isDue) const _CardTag(label: '到期', colorRole: _TagRole.accent),
+        if (isDue) const _CardTag(label: '到期', tone: LexiBadgeTone.accent),
         if (dueAt != null)
           Text(
             formatDueDate(dueAt),
@@ -270,41 +271,13 @@ class _EditButton extends StatelessWidget {
   }
 }
 
-/// 徽标色位。
-enum _TagRole { danger, accent, muted }
-
 /// 卡片上的小徽标（错词 / 已暂停 / 到期）。
 class _CardTag extends StatelessWidget {
-  const new({required this.label, required this.colorRole});
+  const new({required this.label, required this.tone});
 
   final String label;
-
-  final _TagRole colorRole;
+  final LexiBadgeTone tone;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final color = switch (colorRole) {
-      _TagRole.danger => colors.danger,
-      _TagRole.accent => colors.accent,
-      _TagRole.muted => colors.tertiaryLabel,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        label,
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(label: label, tone: tone);
 }

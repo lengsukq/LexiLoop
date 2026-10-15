@@ -8,6 +8,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 各状态任务计数。
@@ -174,6 +175,19 @@ Color statusColor(InitializationStatus status, LexiColors colors) =>
       InitializationStatus.partial => colors.purple,
       _ => colors.secondaryLabel,
     };
+
+/// 状态对应的徽章色调。
+///
+/// 与 [statusColor] 分开：进度条要的是饱和填充色，徽章要的是「色调 + 专供
+/// 文字的深色变体」这一对，两者不能共用同一个 `Color`。
+LexiBadgeTone statusTone(InitializationStatus status) => switch (status) {
+  InitializationStatus.failed => LexiBadgeTone.danger,
+  InitializationStatus.running => LexiBadgeTone.accent,
+  InitializationStatus.queued => LexiBadgeTone.warning,
+  InitializationStatus.ready => LexiBadgeTone.success,
+  InitializationStatus.partial => LexiBadgeTone.purple,
+  _ => LexiBadgeTone.neutral,
+};
 
 /// 卡片内边距。
 const double cardPadding = 16;

@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
@@ -168,7 +170,7 @@ class ArticleErrorBanner extends StatelessWidget {
       key: const Key('articleErrorBanner'),
       padding: const EdgeInsets.all(articleCardPadding),
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.1),
+        color: colors.danger.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Row(
@@ -217,9 +219,9 @@ class ArticleNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(articleCardPadding),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: LexiTint.border)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,31 +246,15 @@ class ArticleNotice extends StatelessWidget {
 
 /// 状态徽章。
 class ArticleBadge extends StatelessWidget {
-  /// 以文案与配色构造。
-  const new({required this.label, required this.color, super.key});
+  /// 以文案与色调构造。
+  const new({required this.label, required this.tone, super.key});
 
   /// 文案。
   final String label;
 
-  /// 配色。
-  final Color color;
+  /// 语义色调。
+  final LexiBadgeTone tone;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: LexiSpace.s8,
-      vertical: LexiSpace.s2,
-    ),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(LexiRadius.sm),
-    ),
-    child: Text(
-      label,
-      style: LexiType.caption.copyWith(
-        color: color,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => LexiBadge(label: label, tone: tone);
 }

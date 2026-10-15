@@ -16,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 
 /// 玻璃层级的强度档位，对应旧版 CSS 的 4 个类。
 enum GlassLevel {
@@ -214,7 +215,7 @@ class LiquidGlass extends StatelessWidget {
               end: const Alignment(0, -0.1),
               colors: <Color>[
                 Colors.white.withValues(alpha: isDark ? 0.06 : 0.45),
-                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: LexiTint.none),
               ],
             ),
           ),
@@ -235,9 +236,9 @@ class LiquidGlass extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: <Color>[
-                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: LexiTint.none),
                 Colors.white.withValues(alpha: isDark ? 0.25 : 0.65),
-                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: LexiTint.none),
               ],
             ),
           ),
@@ -310,7 +311,10 @@ class _Spot extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
-              colors: <Color>[color, color.withValues(alpha: 0)],
+              colors: <Color>[
+                color,
+                color.withValues(alpha: LexiTint.none),
+              ],
             ),
           ),
         ),

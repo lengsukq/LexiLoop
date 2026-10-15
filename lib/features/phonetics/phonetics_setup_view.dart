@@ -15,6 +15,7 @@ import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -86,7 +87,7 @@ class PhoneticsSetupView extends StatelessWidget {
           const SizedBox(height: LexiSpace.s12),
           Container(
             decoration: BoxDecoration(
-              color: colors.danger.withValues(alpha: 0.1),
+              color: colors.danger.withValues(alpha: LexiTint.tint),
               borderRadius: BorderRadius.circular(LexiRadius.md),
             ),
             padding: const EdgeInsets.all(LexiSpace.s12),
@@ -128,7 +129,9 @@ class _AccentCard extends StatelessWidget {
     final colors = context.lexiColors;
     final label = accent == Accent.us ? '美式音标' : '英式音标';
     return Material(
-      color: selected ? colors.accent.withValues(alpha: 0.12) : colors.fill,
+      color: selected
+          ? colors.accent.withValues(alpha: LexiTint.tint)
+          : colors.fill,
       borderRadius: BorderRadius.circular(LexiRadius.md),
       child: InkWell(
         onTap: onTap,

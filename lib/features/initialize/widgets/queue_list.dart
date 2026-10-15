@@ -13,6 +13,7 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 队列列表。
@@ -397,25 +398,11 @@ class _StatusBadge extends StatelessWidget {
   final InitializationStatus status;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final tint = statusColor(status, colors);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s4,
-      ),
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-        border: Border.all(color: tint.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        queueStatusLabel(status),
-        style: LexiType.caption.copyWith(color: tint),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(
+    label: queueStatusLabel(status),
+    tone: statusTone(status),
+    emphasis: LexiBadgeEmphasis.outline,
+  );
 }
 
 /// 空态。

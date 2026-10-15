@@ -14,6 +14,7 @@ import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇水平分组。
@@ -109,7 +110,9 @@ class _LevelOption extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s6),
       child: Material(
-        color: selected ? colors.accent.withValues(alpha: 0.1) : colors.fill,
+        color: selected
+            ? colors.accent.withValues(alpha: LexiTint.tint)
+            : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           onTap: onTap,

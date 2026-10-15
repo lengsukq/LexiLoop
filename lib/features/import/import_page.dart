@@ -18,6 +18,7 @@ import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
@@ -126,7 +127,7 @@ class _StepCard extends StatelessWidget {
                 height: 20,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: colors.accent.withValues(alpha: 0.14),
+                  color: colors.accent.withValues(alpha: LexiTint.tint),
                   shape: BoxShape.circle,
                 ),
                 child: Text(
@@ -395,7 +396,9 @@ class _ModeOption extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s6),
       child: Material(
-        color: selected ? colors.accent.withValues(alpha: 0.1) : colors.fill,
+        color: selected
+            ? colors.accent.withValues(alpha: LexiTint.tint)
+            : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           onTap: onTap,
@@ -587,7 +590,7 @@ class _ErrorBanner extends StatelessWidget {
       key: const Key('importErrorBanner'),
       padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.1),
+        color: colors.danger.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Row(

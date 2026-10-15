@@ -13,6 +13,7 @@ import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 筛选与排序控件组。
@@ -209,7 +210,9 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Material(
-      color: selected ? colors.accent.withValues(alpha: 0.14) : colors.fill,
+      color: selected
+          ? colors.accent.withValues(alpha: LexiTint.tint)
+          : colors.fill,
       borderRadius: BorderRadius.circular(LexiRadius.sm),
       child: InkWell(
         onTap: onTap,

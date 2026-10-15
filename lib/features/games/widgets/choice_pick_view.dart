@@ -25,6 +25,7 @@ import 'package:lexiloop/features/games/game_speech.dart';
 import 'package:lexiloop/features/games/widgets/game_choice_grid.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 听音辨词 / 词义冲刺视图。
@@ -145,7 +146,7 @@ class _ListeningPrompt extends StatelessWidget {
         ),
         const SizedBox(height: LexiSpace.s14),
         Material(
-          color: colors.accent.withValues(alpha: 0.12),
+          color: colors.accent.withValues(alpha: LexiTint.tint),
           shape: const CircleBorder(),
           child: InkWell(
             onTap: onSpeak,

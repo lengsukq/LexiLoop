@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 一个选项的三态。
@@ -107,11 +108,11 @@ class _ChoiceTile extends StatelessWidget {
     // 选中态直接与卡片底合成，否则半透明色会漏出页面底，看起来像变脏。
     final background = switch (state) {
       ChoiceState.wrong => Color.alphaBlend(
-        colors.danger.withValues(alpha: 0.1),
+        colors.danger.withValues(alpha: LexiTint.tint),
         colors.card,
       ),
       ChoiceState.correct => Color.alphaBlend(
-        colors.success.withValues(alpha: 0.12),
+        colors.success.withValues(alpha: LexiTint.tint),
         colors.card,
       ),
       ChoiceState.idle => colors.card,

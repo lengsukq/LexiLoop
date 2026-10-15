@@ -21,7 +21,9 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
 /// 弹窗内容宽度。
@@ -209,23 +211,7 @@ class _Title extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s8,
-            vertical: LexiSpace.s4,
-          ),
-          decoration: BoxDecoration(
-            color: colors.purple.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(LexiRadius.sm),
-          ),
-          child: Text(
-            relationLabel(relation),
-            style: LexiType.caption.copyWith(
-              color: colors.purple,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+        LexiBadge(label: relationLabel(relation), tone: LexiBadgeTone.purple),
         const SizedBox(height: LexiSpace.s8),
         Text(
           term,
@@ -282,7 +268,7 @@ class _DifferenceBlock extends StatelessWidget {
       margin: const EdgeInsets.only(top: LexiSpace.s8),
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: colors.purple.withValues(alpha: 0.08),
+        color: colors.purple.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(text, style: LexiType.body.copyWith(color: colors.purple)),
@@ -305,7 +291,7 @@ class _StatusBlock extends StatelessWidget {
       margin: const EdgeInsets.only(top: LexiSpace.s10),
       padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
-        color: colors.label.withValues(alpha: 0.03),
+        color: colors.label.withValues(alpha: LexiTint.group),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(
@@ -380,26 +366,7 @@ class _PlainBadge extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: colors.tertiaryLabel.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        text,
-        style: LexiType.caption.copyWith(
-          color: colors.tertiaryLabel,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(label: text);
 }
 
 /// 成功提示块。
@@ -416,7 +383,7 @@ class _MessageBlock extends StatelessWidget {
       margin: const EdgeInsets.only(top: LexiSpace.s8),
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: colors.success.withValues(alpha: 0.08),
+        color: colors.success.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(text, style: LexiType.body.copyWith(color: colors.success)),

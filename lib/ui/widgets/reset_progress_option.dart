@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 标题文案。
@@ -45,9 +46,11 @@ class ResetProgressOption extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(_resetOptionPadding),
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.06),
+        color: colors.danger.withValues(alpha: LexiTint.subtle),
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        border: Border.all(color: colors.danger.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: colors.danger.withValues(alpha: LexiTint.border),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

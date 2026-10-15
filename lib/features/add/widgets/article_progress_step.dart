@@ -11,6 +11,7 @@ import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 分析中界面。
@@ -164,7 +165,9 @@ class _BatchRow extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: articleTightGap),
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: isError ? colors.danger.withValues(alpha: 0.06) : colors.fill,
+        color: isError
+            ? colors.danger.withValues(alpha: LexiTint.subtle)
+            : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Row(

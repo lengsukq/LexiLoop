@@ -16,6 +16,7 @@ import 'package:lexiloop/domain/games/scoring.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -207,7 +208,7 @@ class _StatCell extends StatelessWidget {
     return Expanded(
       child: Container(
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: color.withValues(alpha: LexiTint.tint),
           borderRadius: BorderRadius.circular(LexiRadius.md),
         ),
         padding: const EdgeInsets.symmetric(vertical: LexiSpace.s10),

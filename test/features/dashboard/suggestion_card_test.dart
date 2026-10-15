@@ -16,8 +16,8 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/suggestion_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 void main() {
   /// `/study` 落点上的模式，供断言 CTA 去向。
@@ -104,9 +104,22 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 取「昨日质量」徽章文字的颜色——它承载语气分档。
-  Color toneOf(WidgetTester tester) =>
-      tester.widget<Text>(find.byKey(suggestionQualityTextKey)).style!.color!;
+  /// 取「昨日质量」徽章的**色调**——它承载语气分档。
+  ///
+  /// 断言语义色调而不是具体颜色：具体颜色由 `test/ui/badge_test.dart` 从
+  /// 渲染树里取出来逐对验对比度，这里只关心「这一档该是什么语气」。
+  LexiBadgeTone toneOf(WidgetTester tester) =>
+      tester.widget<LexiBadge>(find.byKey(suggestionQualityTextKey)).tone;
+
+  /// 取徽章上的文案。
+  String qualityLabelOf(WidgetTester tester) => tester
+      .widget<Text>(
+        find.descendant(
+          of: find.byKey(suggestionQualityTextKey),
+          matching: find.byType(Text),
+        ),
+      )
+      .data!;
 
   /// 取某个指标格的数值文本。
   String metricOf(WidgetTester tester, String metric) =>
@@ -115,31 +128,25 @@ void main() {
   group('昨日质量徽章', () {
     testWidgets('高分显示绿色并带出分数', (tester) async {
       await showCard(tester, suggestionOf(quality: highQualityScore));
-      expect(
-        tester.widget<Text>(find.byKey(suggestionQualityTextKey)).data,
-        '昨日质量 $highQualityScore',
-      );
-      expect(toneOf(tester), LexiColors.light.success);
+      expect(qualityLabelOf(tester), '昨日质量 $highQualityScore');
+      expect(toneOf(tester), LexiBadgeTone.success);
     });
 
     testWidgets('中分显示琥珀色', (tester) async {
       await showCard(tester, suggestionOf(quality: 70));
-      expect(toneOf(tester), LexiColors.light.warning);
+      expect(toneOf(tester), LexiBadgeTone.warning);
     });
 
     testWidgets('低分显示红色', (tester) async {
       await showCard(tester, suggestionOf(quality: 40));
-      expect(toneOf(tester), LexiColors.light.danger);
+      expect(toneOf(tester), LexiBadgeTone.danger);
     });
 
     testWidgets('没有分数时用中性灰而不是红色', (tester) async {
       await showCard(tester, suggestionOf(quality: null));
-      expect(
-        tester.widget<Text>(find.byKey(suggestionQualityTextKey)).data,
-        '昨日质量 无记录',
-      );
-      expect(toneOf(tester), LexiColors.light.quaternaryLabel);
-      expect(toneOf(tester), isNot(LexiColors.light.danger));
+      expect(qualityLabelOf(tester), '昨日质量 无记录');
+      expect(toneOf(tester), LexiBadgeTone.neutral);
+      expect(toneOf(tester), isNot(LexiBadgeTone.danger));
     });
   });
 

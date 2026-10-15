@@ -9,6 +9,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/whack_a_mole.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 词汇地鼠视图。
@@ -121,8 +122,8 @@ class _Hole extends StatelessWidget {
                   duration: const Duration(milliseconds: 160),
                   child: Material(
                     color: wrong
-                        ? colors.danger.withValues(alpha: 0.85)
-                        : colors.warning.withValues(alpha: 0.9),
+                        ? colors.danger.withValues(alpha: LexiTint.strong)
+                        : colors.warning.withValues(alpha: LexiTint.strong),
                     borderRadius: BorderRadius.circular(LexiRadius.md),
                     child: InkWell(
                       onTap: () => onTap(WhackMole(word!)),

@@ -13,6 +13,7 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 承载 8 个分支的自适应外壳。
@@ -187,7 +188,7 @@ class _SidebarItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: LexiSpace.s2),
       child: Material(
         color: active
-            ? colors.accent.withValues(alpha: 0.1)
+            ? colors.accent.withValues(alpha: LexiTint.tint)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(

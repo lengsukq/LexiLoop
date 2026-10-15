@@ -14,6 +14,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 配对牌面。
@@ -145,12 +146,12 @@ class _Card extends StatelessWidget {
       child: Material(
         color: wrong
             ? Color.alphaBlend(
-                colors.danger.withValues(alpha: 0.1),
+                colors.danger.withValues(alpha: LexiTint.tint),
                 colors.card,
               )
             : (selected
                   ? Color.alphaBlend(
-                      colors.accent.withValues(alpha: 0.1),
+                      colors.accent.withValues(alpha: LexiTint.tint),
                       colors.card,
                     )
                   : colors.card),

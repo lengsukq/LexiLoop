@@ -13,6 +13,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 预览表格。
@@ -167,34 +168,15 @@ class ImportRowStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final (String label, Color color) = switch (status) {
-      ImportRowStatus.newWord => ('新增', colors.success),
-      ImportRowStatus.existing => ('已存在', colors.accent),
-      ImportRowStatus.duplicate => ('重复', colors.warning),
-      ImportRowStatus.invalid => ('无效', colors.danger),
-      ImportRowStatus.imported => ('已导入', colors.success),
-      ImportRowStatus.error => ('失败', colors.danger),
+    final (String label, LexiBadgeTone tone) = switch (status) {
+      ImportRowStatus.newWord => ('新增', LexiBadgeTone.success),
+      ImportRowStatus.existing => ('已存在', LexiBadgeTone.accent),
+      ImportRowStatus.duplicate => ('重复', LexiBadgeTone.warning),
+      ImportRowStatus.invalid => ('无效', LexiBadgeTone.danger),
+      ImportRowStatus.imported => ('已导入', LexiBadgeTone.success),
+      ImportRowStatus.error => ('失败', LexiBadgeTone.danger),
     };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+    return LexiBadge(label: label, tone: tone);
   }
 }
 

@@ -17,6 +17,7 @@ import 'package:lexiloop/features/add/widgets/manual_batch_row_card.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -497,7 +498,7 @@ class _ErrorBanner extends StatelessWidget {
       key: const Key('manualBatchError'),
       padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.1),
+        color: colors.danger.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Row(

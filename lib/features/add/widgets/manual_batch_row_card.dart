@@ -13,7 +13,9 @@ import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 一行在批量列表里的位置与内容。
 class ManualBatchEntry {
@@ -108,7 +110,7 @@ class _RowHeader extends StatelessWidget {
           height: indexBadgeSize,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: colors.accent.withValues(alpha: 0.12),
+            color: colors.accent.withValues(alpha: LexiTint.tint),
             shape: BoxShape.circle,
           ),
           child: Text(
@@ -140,9 +142,9 @@ class _RowHeader extends StatelessWidget {
                   if (preview != null)
                     _Badge(label: articleEntryTypeLabel(preview.contentType)),
                   if (preview?.existingWordId != null)
-                    const _Badge(label: '已存在', tone: _BadgeTone.warning),
+                    const _Badge(label: '已存在', tone: LexiBadgeTone.warning),
                   if (row.isConfirmed)
-                    const _Badge(label: '已确认', tone: _BadgeTone.success),
+                    const _Badge(label: '已确认', tone: LexiBadgeTone.success),
                 ],
               ),
               const SizedBox(height: LexiSpace.s2),
@@ -290,7 +292,7 @@ class _SummaryBlock extends StatelessWidget {
           children: <Widget>[
             _Badge(label: articleEntryTypeLabel(preview.contentType)),
             if (preview.existingWordId != null)
-              const _Badge(label: '词库中已存在', tone: _BadgeTone.warning),
+              const _Badge(label: '词库中已存在', tone: LexiBadgeTone.warning),
             Text(
               '${preview.sourceLanguageName} → ${preview.targetLanguageName}',
               style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
@@ -403,42 +405,16 @@ class _Block extends StatelessWidget {
 
 /// 小徽标。
 class _Badge extends StatelessWidget {
-  const new({required this.label, this.tone = _BadgeTone.neutral});
+  const new({required this.label, this.tone = LexiBadgeTone.accent});
 
   final String label;
-  final _BadgeTone tone;
+  final LexiBadgeTone tone;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final color = switch (tone) {
-      _BadgeTone.neutral => colors.accent,
-      _BadgeTone.warning => colors.warningDeep,
-      _BadgeTone.success => colors.successDeep,
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        label,
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(label: label, tone: tone);
 }
 
 /// 徽标色调。
-enum _BadgeTone { neutral, warning, success }
-
 String _text(Object? value) => value is String ? value.trim() : '';
 
 List<String> _phonetics(DictionaryContent content) => <String>[

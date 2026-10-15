@@ -17,7 +17,7 @@ import 'package:lexiloop/features/games/widgets/word_stack_view.dart';
 import 'package:lexiloop/features/games/widgets/word_tetris_view.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 小游戏进行中页面。
@@ -105,27 +105,8 @@ class _PriorityBadge extends StatelessWidget {
   const new();
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: LexiSpace.s10),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colors.danger.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(LexiRadius.sm),
-        ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: LexiSpace.s10,
-          vertical: LexiSpace.s4,
-        ),
-        child: Text(
-          '重点复习词',
-          style: LexiType.caption.copyWith(
-            color: colors.dangerDeep,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.only(bottom: LexiSpace.s10),
+    child: LexiBadge(label: '重点复习词', tone: LexiBadgeTone.danger),
+  );
 }

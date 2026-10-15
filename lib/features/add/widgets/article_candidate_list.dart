@@ -14,7 +14,9 @@ import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 候选列表。
 class ArticleCandidateList extends ConsumerWidget {
@@ -250,7 +252,10 @@ class _WordRow extends ConsumerWidget {
               ),
             ),
             if (candidate.cefrLevel != null)
-              ArticleBadge(label: candidate.cefrLevel!, color: colors.accent),
+              ArticleBadge(
+                label: candidate.cefrLevel!,
+                tone: LexiBadgeTone.accent,
+              ),
             const SizedBox(width: LexiSpace.s6),
             Text(
               '×${candidate.occurrences}',
@@ -283,13 +288,12 @@ class _StateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     if (candidate.isKnown) {
-      return ArticleBadge(label: '已掌握', color: colors.accent);
+      return const ArticleBadge(label: '已掌握', tone: LexiBadgeTone.accent);
     }
     return ArticleBadge(
       label: selected ? '待导入' : '未选',
-      color: selected ? colors.success : colors.secondaryLabel,
+      tone: selected ? LexiBadgeTone.success : LexiBadgeTone.neutral,
     );
   }
 }
@@ -344,11 +348,13 @@ class _CandidateCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: articleTightGap),
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: selected ? colors.accent.withValues(alpha: 0.06) : colors.fill,
+        color: selected
+            ? colors.accent.withValues(alpha: LexiTint.subtle)
+            : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         border: Border.all(
           color: selected
-              ? colors.accent.withValues(alpha: 0.3)
+              ? colors.accent.withValues(alpha: LexiTint.border)
               : colors.borderSubtle,
         ),
       ),
@@ -380,9 +386,9 @@ class _CandidateCard extends ConsumerWidget {
                     ),
                     ArticleBadge(
                       label: articleEntryTypeLabel(candidate.entryType),
-                      color: candidate.entryType == LexicalContentType.sentence
-                          ? colors.purple
-                          : colors.accent,
+                      tone: candidate.entryType == LexicalContentType.sentence
+                          ? LexiBadgeTone.purple
+                          : LexiBadgeTone.accent,
                     ),
                     _StateBadge(candidate: candidate, selected: selected),
                   ],
@@ -420,7 +426,7 @@ class _AiCardBody extends StatelessWidget {
       margin: const EdgeInsets.only(top: articleTightGap),
       padding: const EdgeInsets.all(LexiSpace.s8),
       decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.5),
+        color: colors.surface.withValues(alpha: LexiTint.half),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: Column(

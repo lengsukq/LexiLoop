@@ -23,6 +23,7 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 弹窗内容宽度。
@@ -295,7 +296,7 @@ class _SaveAfterFetchHint extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(LexiSpace.s10),
       decoration: BoxDecoration(
-        color: colors.accent.withValues(alpha: 0.07),
+        color: colors.accent.withValues(alpha: LexiTint.subtle),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(

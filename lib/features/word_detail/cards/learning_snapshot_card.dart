@@ -7,8 +7,8 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
@@ -100,7 +100,6 @@ class _WrongWordBlock extends StatelessWidget {
     if (snapshot.isUntouched) {
       return const DetailEmptyHint(text: '没有错词记录，这个词一直答得不错。');
     }
-    final colors = context.lexiColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -110,7 +109,9 @@ class _WrongWordBlock extends StatelessWidget {
           children: <Widget>[
             DetailChip(
               text: snapshot.isWrongWord ? '活跃错词' : '错词已解除',
-              color: snapshot.isWrongWord ? colors.danger : colors.success,
+              tone: snapshot.isWrongWord
+                  ? LexiBadgeTone.danger
+                  : LexiBadgeTone.success,
             ),
             DetailChip(text: '错误 ${snapshot.wrongCount} 次'),
             DetailChip(text: '困难 ${snapshot.hardCount} 次'),

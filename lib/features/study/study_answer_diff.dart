@@ -12,6 +12,7 @@ import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_diff.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 会做答案差异对比的题型。
@@ -129,9 +130,9 @@ class _DiffLine extends StatelessWidget {
               style: segment.isDiff
                   ? base.copyWith(
                       color: color,
-                      backgroundColor: color.withValues(alpha: 0.15),
+                      backgroundColor: color.withValues(alpha: LexiTint.tint),
                       decoration: TextDecoration.underline,
-                      decorationColor: color.withValues(alpha: 0.4),
+                      decorationColor: color.withValues(alpha: LexiTint.half),
                     )
                   : base,
             ),
@@ -198,12 +199,12 @@ class _WordChip extends StatelessWidget {
       SentenceDiffKind.equal => (colors.secondaryLabel, null, null),
       SentenceDiffKind.extra => (
         colors.danger,
-        colors.danger.withValues(alpha: 0.15),
+        colors.danger.withValues(alpha: LexiTint.tint),
         null,
       ),
       SentenceDiffKind.missing => (
         colors.success,
-        colors.success.withValues(alpha: 0.15),
+        colors.success.withValues(alpha: LexiTint.tint),
         TextDecoration.lineThrough,
       ),
     };
@@ -221,7 +222,7 @@ class _WordChip extends StatelessWidget {
         style: LexiType.footnote.copyWith(
           color: foreground,
           decoration: decoration,
-          decorationColor: colors.success.withValues(alpha: 0.5),
+          decorationColor: colors.success.withValues(alpha: LexiTint.half),
         ),
       ),
     );

@@ -28,6 +28,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 空库引导的标题 Key，供测试定位。
@@ -203,7 +204,7 @@ class _EmptyIcon extends StatelessWidget {
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: colors.accent.withValues(alpha: 0.3),
+            color: colors.accent.withValues(alpha: LexiTint.border),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),

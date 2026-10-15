@@ -9,6 +9,7 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 选项在提交前后的四种外观。
@@ -133,17 +134,17 @@ class _ChoiceTile extends StatelessWidget {
       _OptionState.idle => (colors.label, colors.fill, colors.borderDefault),
       _OptionState.selected => (
         colors.accentText,
-        colors.accent.withValues(alpha: 0.06),
+        colors.accent.withValues(alpha: LexiTint.subtle),
         colors.accent,
       ),
       _OptionState.correct => (
         colors.successText,
-        colors.success.withValues(alpha: 0.10),
+        colors.success.withValues(alpha: LexiTint.tint),
         colors.success,
       ),
       _OptionState.wrong => (
         colors.dangerText,
-        colors.danger.withValues(alpha: 0.10),
+        colors.danger.withValues(alpha: LexiTint.tint),
         colors.danger,
       ),
     };

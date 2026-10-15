@@ -14,6 +14,7 @@ import 'package:lexiloop/domain/games/word_builder.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 单词拼图视图。
@@ -121,12 +122,14 @@ class _BuiltRow extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         border: Border.all(
-          color: wrong ? colors.danger : colors.accent.withValues(alpha: 0.3),
+          color: wrong
+              ? colors.danger
+              : colors.accent.withValues(alpha: LexiTint.border),
           width: 2,
         ),
         color: wrong
-            ? colors.danger.withValues(alpha: 0.06)
-            : colors.accent.withValues(alpha: 0.04),
+            ? colors.danger.withValues(alpha: LexiTint.subtle)
+            : colors.accent.withValues(alpha: LexiTint.group),
       ),
       padding: const EdgeInsets.all(LexiSpace.s8),
       child: built.isEmpty

@@ -13,38 +13,14 @@
 /// 5. 音阶自身保持严格递增且不低于可读下限。
 library;
 
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
+import '../support/contrast.dart';
 import 'source_scan.dart';
-
-/// 相对亮度（WCAG 2.x）。
-double _luminance(Color color) {
-  double channel(double v) {
-    final c = v;
-    return c <= 0.03928
-        ? c / 12.92
-        : math.pow((c + 0.055) / 1.055, 2.4) as double;
-  }
-
-  return 0.2126 * channel(color.r) +
-      0.7152 * channel(color.g) +
-      0.0722 * channel(color.b);
-}
-
-/// 两个不透明颜色的对比度。
-double contrast(Color foreground, Color background) {
-  final a = _luminance(foreground);
-  final b = _luminance(background);
-  final hi = math.max(a, b);
-  final lo = math.min(a, b);
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 /// 页面底色（浅色）。
 const Color _lightSurface = Color(0xFFF2F2F7);
@@ -222,6 +198,32 @@ void main() {
     });
   });
 
+  group('淡色透明度', () {
+    test('lib 里不得出现 withValues(alpha: 数字)（token 文件除外）', () {
+      final violations = <String>[];
+      final pattern = RegExp(r'withValues\(alpha:\s*[0-9]');
+      for (final file in collectDartFiles('lib')) {
+        if (file.path == 'lib/ui/theme/lexi_tint.dart') continue;
+        for (var i = 0; i < file.lines.length; i += 1) {
+          if (pattern.hasMatch(file.lines[i])) {
+            violations.add(file.locate(i + 1));
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            '淡色透明度必须取自 LexiTint（`lib/ui/theme/lexi_tint.dart`）。\n'
+            '收敛前这里有 21 种取值：0.06 / 0.07 / 0.08 三档同时存在，\n'
+            '0.10 / 0.12 / 0.14 / 0.15 / 0.16 五档同时存在，描边散在\n'
+            '0.2 / 0.25 / 0.3 / 0.35。肉眼读不出 12% 与 14% 的差别，\n'
+            '只觉得「哪里不一致」——那正是这次要收掉的噪声。\n'
+            '违规项：\n${violations.join('\n')}',
+      );
+    });
+  });
+
   group('对比度', () {
     /// 浅色淡底（`fill` 压在页面底上）的实际颜色。
     final lightFill = Color.alphaBlend(LexiColors.light.fill, _lightSurface);
@@ -236,7 +238,7 @@ void main() {
     }) {
       foregrounds.forEach((name, color) {
         if (except.contains(name)) return;
-        final ratio = contrast(color, background);
+        final ratio = contrastRatio(color, background);
         expect(
           ratio,
           greaterThanOrEqualTo(minRatio),
@@ -259,7 +261,7 @@ void main() {
       final light = _textTokens(LexiColors.light)..remove('quaternaryLabel');
       expectAll(light, lightFill, 4.5, where: '淡底(fill)');
       expect(
-        contrast(LexiColors.light.quaternaryLabel, lightFill),
+        contrastRatio(LexiColors.light.quaternaryLabel, lightFill),
         lessThan(4.5),
         reason:
             'quaternaryLabel 在 fill 上不达标——这是**已知且被禁止**的配对，'
@@ -283,10 +285,10 @@ void main() {
       }.entries) {
         final (colors, background) = entry.value;
         final ratios = <double>[
-          contrast(colors.label, background),
-          contrast(colors.secondaryLabel, background),
-          contrast(colors.tertiaryLabel, background),
-          contrast(colors.quaternaryLabel, background),
+          contrastRatio(colors.label, background),
+          contrastRatio(colors.secondaryLabel, background),
+          contrastRatio(colors.tertiaryLabel, background),
+          contrastRatio(colors.quaternaryLabel, background),
         ];
         for (var i = 1; i < ratios.length; i += 1) {
           expect(
@@ -305,7 +307,7 @@ void main() {
         '浅色': LexiColors.light,
         '深色': LexiColors.dark,
       }.entries) {
-        final ratio = contrast(Colors.white, entry.value.accent);
+        final ratio = contrastRatio(Colors.white, entry.value.accent);
         expect(
           ratio,
           greaterThanOrEqualTo(3),

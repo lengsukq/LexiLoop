@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 「仅补全缺失字段」的说明。
@@ -37,7 +38,7 @@ class ApplyModeSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(LexiSpace.s12),
       decoration: BoxDecoration(
-        color: colors.label.withValues(alpha: 0.03),
+        color: colors.label.withValues(alpha: LexiTint.group),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Column(

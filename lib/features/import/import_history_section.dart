@@ -17,6 +17,7 @@ import 'package:lexiloop/features/import/rollback_blocked_message.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 撤销失败的提示停留时长。
@@ -341,30 +342,13 @@ class _BatchStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final (String label, Color color) = switch (status) {
-      ImportBatchStatus.pending => ('未提交', colors.warning),
-      ImportBatchStatus.committed => ('已提交', colors.success),
-      ImportBatchStatus.failed => ('失败', colors.danger),
-      ImportBatchStatus.rolledBack => ('已撤销', colors.tertiaryLabel),
+    final (String label, LexiBadgeTone tone) = switch (status) {
+      ImportBatchStatus.pending => ('未提交', LexiBadgeTone.warning),
+      ImportBatchStatus.committed => ('已提交', LexiBadgeTone.success),
+      ImportBatchStatus.failed => ('失败', LexiBadgeTone.danger),
+      ImportBatchStatus.rolledBack => ('已撤销', LexiBadgeTone.neutral),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        label,
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
+    return LexiBadge(label: label, tone: tone);
   }
 }
 

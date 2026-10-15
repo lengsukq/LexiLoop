@@ -24,7 +24,9 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「昨日质量」徽章文字的 Key，供测试定位（文字同时携带分数与语气色）。
@@ -185,25 +187,12 @@ class _QualityBadge extends StatelessWidget {
   final int? score;
 
   @override
-  Widget build(BuildContext context) {
-    final tone = qualityTone(context.lexiColors, score);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-        border: Border.all(color: tone.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        score == null ? '昨日质量 无记录' : '昨日质量 $score',
-        key: suggestionQualityTextKey,
-        style: LexiType.caption.copyWith(color: tone),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(
+    key: suggestionQualityTextKey,
+    label: score == null ? '昨日质量 无记录' : '昨日质量 $score',
+    tone: qualityBadgeTone(score),
+    emphasis: LexiBadgeEmphasis.outline,
+  );
 }
 
 /// 来源标签：AI 或规则。
@@ -213,25 +202,11 @@ class _SourceBadge extends StatelessWidget {
   final bool ai;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final tint = ai ? colors.purple : colors.tertiaryLabel;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-        border: Border.all(color: tint.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        ai ? 'AI 生成' : '规则生成',
-        style: LexiType.caption.copyWith(color: tint),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LexiBadge(
+    label: ai ? 'AI 生成' : '规则生成',
+    tone: ai ? LexiBadgeTone.purple : LexiBadgeTone.neutral,
+    emphasis: LexiBadgeEmphasis.outline,
+  );
 }
 
 /// 昨日的四项关键指标：作答 / 正确率 / 跳过 / 分钟。
@@ -297,7 +272,7 @@ class _MetricTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
       padding: const EdgeInsets.symmetric(vertical: LexiSpace.s8),
       decoration: BoxDecoration(
-        color: colors.fill.withValues(alpha: 0.5),
+        color: colors.fill.withValues(alpha: LexiTint.half),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: Column(
@@ -563,11 +538,11 @@ const int highQualityScore = 80;
 const int mediumQualityScore = 60;
 
 /// 质量分对应的语气色；[score] 为 `null`（昨天没有作答记录）时取中性灰。
-Color qualityTone(LexiColors colors, int? score) {
-  if (score == null) return colors.quaternaryLabel;
-  if (score >= highQualityScore) return colors.success;
-  if (score >= mediumQualityScore) return colors.warning;
-  return colors.danger;
+LexiBadgeTone qualityBadgeTone(int? score) {
+  if (score == null) return LexiBadgeTone.neutral;
+  if (score >= highQualityScore) return LexiBadgeTone.success;
+  if (score >= mediumQualityScore) return LexiBadgeTone.warning;
+  return LexiBadgeTone.danger;
 }
 
 /// 要点圆点尺寸。

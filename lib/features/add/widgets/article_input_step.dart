@@ -14,6 +14,7 @@ import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 
 /// 考试目标的中文名。
 const Map<VocabularyLevel, String> articleExamTargetLabels =
@@ -306,7 +307,7 @@ class _SegmentPlanCard extends ConsumerWidget {
               for (final batch in plan.batches)
                 ArticleBadge(
                   label: '第 ${batch.batchIndex + 1} 批 · ${batch.charCount} 字',
-                  color: colors.accent,
+                  tone: LexiBadgeTone.accent,
                 ),
             ],
           ),

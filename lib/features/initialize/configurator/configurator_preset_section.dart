@@ -9,6 +9,7 @@ import 'package:lexiloop/features/initialize/configurator/configurator_providers
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 
 /// 四个初始化预设。
 ///
@@ -135,7 +136,9 @@ class _TileBody extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(tilePadding),
         decoration: BoxDecoration(
-          color: selected ? colors.accent.withValues(alpha: 0.08) : colors.fill,
+          color: selected
+              ? colors.accent.withValues(alpha: LexiTint.tint)
+              : colors.fill,
           borderRadius: BorderRadius.circular(LexiRadius.sm),
         ),
         child: Column(

@@ -10,6 +10,7 @@ import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 复习历史卡片：最近 `reviewHistoryLimit` 条作答记录。
@@ -67,7 +68,9 @@ class _LogRow extends StatelessWidget {
           ),
           DetailChip(
             text: ratingLabel(entry.rating),
-            color: entry.isCorrect ? colors.success : colors.danger,
+            tone: entry.isCorrect
+                ? LexiBadgeTone.success
+                : LexiBadgeTone.danger,
           ),
           const SizedBox(width: LexiSpace.s6),
           Icon(

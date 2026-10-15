@@ -15,7 +15,9 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -287,7 +289,7 @@ class _TermBlock extends StatelessWidget {
             DetailChip(text: contentTypeLabel(detail.contentType)),
             DetailChip(text: contentSourceLabel(detail.contentSource)),
             if (detail.isSuspended)
-              DetailChip(text: '已暂停', color: colors.danger),
+              const DetailChip(text: '已暂停', tone: LexiBadgeTone.danger),
           ],
         ),
       ],
@@ -407,7 +409,7 @@ class _AccentToggle extends ConsumerWidget {
             ),
             decoration: BoxDecoration(
               color: selected
-                  ? colors.accent.withValues(alpha: 0.16)
+                  ? colors.accent.withValues(alpha: LexiTint.tint)
                   : Colors.transparent,
               border: Border.all(
                 color: selected ? colors.accent : colors.separator,

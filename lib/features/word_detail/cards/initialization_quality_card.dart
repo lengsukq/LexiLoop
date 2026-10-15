@@ -16,6 +16,7 @@ import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 初始化质量卡片（默认折叠）。
@@ -139,7 +140,7 @@ class _AttemptRow extends StatelessWidget {
             children: <Widget>[
               DetailChip(
                 text: attemptStatusLabel(attempt.status),
-                color: attemptStatusColor(attempt.status, colors),
+                tone: attemptStatusTone(attempt.status),
               ),
               const SizedBox(width: LexiSpace.s6),
               Expanded(
@@ -204,9 +205,9 @@ String attemptStatusLabel(ProviderAttemptStatus status) => switch (status) {
 };
 
 /// 调用状态的语义色。
-Color attemptStatusColor(ProviderAttemptStatus status, LexiColors colors) =>
+LexiBadgeTone attemptStatusTone(ProviderAttemptStatus status) =>
     switch (status) {
-      ProviderAttemptStatus.success => colors.success,
-      ProviderAttemptStatus.empty => colors.secondaryLabel,
-      ProviderAttemptStatus.failed => colors.danger,
+      ProviderAttemptStatus.success => LexiBadgeTone.success,
+      ProviderAttemptStatus.empty => LexiBadgeTone.neutral,
+      ProviderAttemptStatus.failed => LexiBadgeTone.danger,
     };

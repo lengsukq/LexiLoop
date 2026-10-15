@@ -16,6 +16,7 @@ import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
@@ -80,7 +81,9 @@ class _ModeOption extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: articleTightGap),
       child: Material(
-        color: selected ? colors.accent.withValues(alpha: 0.1) : colors.fill,
+        color: selected
+            ? colors.accent.withValues(alpha: LexiTint.tint)
+            : colors.fill,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           key: Key('articleMode${mode.wire}'),

@@ -19,6 +19,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「开始学习」按钮的 Key，供测试定位。
@@ -202,27 +203,11 @@ class _GoalReachedBadge extends StatelessWidget {
   const new();
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      key: goalReachedBadgeKey,
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: colors.success.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-      ),
-      child: Text(
-        '今日目标已达成',
-        style: LexiType.caption.copyWith(
-          color: colors.success,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const LexiBadge(
+    key: goalReachedBadgeKey,
+    label: '今日目标已达成',
+    tone: LexiBadgeTone.success,
+  );
 }
 
 /// 三条可跳转的队列行 + 只读的句子复习行。

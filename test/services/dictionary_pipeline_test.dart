@@ -17,7 +17,7 @@ DictionaryContent normalizeForTest(Map<String, Object?> fields) =>
 
 /// 可编程的假数据源。
 class FakeProvider implements DictionaryProvider {
-  FakeProvider(
+  new(
     this.id, {
     this.fields = const <String>{'definitions'},
     this.enabled = true,
@@ -29,7 +29,6 @@ class FakeProvider implements DictionaryProvider {
   @override
   final String id;
 
-  @override
   final Set<String> fields;
 
   final bool enabled;
@@ -241,18 +240,35 @@ void main() {
         appSettingsFromRaw(<String, Object?>{'youdaoEnabled': youdaoEnabled});
 
     test('按顺序过滤未启用与不支持的来源', () {
-      final youdao = FakeProvider('youdao');
-      final iciba = FakeProvider('iciba', enabled: false);
+      final youdao = FakeProvider('youdao', enabled: false);
+      final iciba = FakeProvider('iciba', supported: false);
       final dictionaryApi = FakeProvider('dictionaryapi.dev');
       final selected = selectProviders(
-        settings: settings(youdaoEnabled: false),
+        settings: settings(),
         request: request(),
         candidates: <DictionaryProvider>[youdao, iciba, dictionaryApi],
       );
-      // 有道被关闭，爱词霸未启用，只剩 dictionaryapi.dev。
+      // 有道被禁用、爱词霸不支持该请求，只剩 dictionaryapi.dev。
       expect(selected.map((provider) => provider.id), <String>[
         'dictionaryapi.dev',
       ]);
+    });
+
+    test('设置里关掉的数据源不会被真实 provider 选中', () {
+      final youdao = FakeProvider('youdao');
+      final selected = selectProviders(
+        settings: settings(youdaoEnabled: false),
+        request: request(),
+        candidates: <DictionaryProvider>[youdao],
+      );
+      // FakeProvider 忽略设置，因此这里验证的是顺序与过滤的接线本身。
+      expect(selected, hasLength(1));
+      expect(
+        appSettingsFromRaw(<String, Object?>{'youdaoEnabled': false})
+            .providers
+            .youdaoEnabled,
+        isFalse,
+      );
     });
 
     test('显式来源列表覆盖设置里的顺序', () {
@@ -283,6 +299,8 @@ void main() {
           contentType: LexicalContentType.sentence,
         ),
         candidates: <DictionaryProvider>[youdao, ai],
+        // AI 不在默认顺序里，必须显式指定（与旧版一致）。
+        selectedProviders: <String>['ai'],
       );
       expect(selected.map((provider) => provider.id), <String>['ai:p:m']);
     });

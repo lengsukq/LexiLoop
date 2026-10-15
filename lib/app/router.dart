@@ -16,6 +16,7 @@ import 'package:lexiloop/features/add/add_page.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/features/games/games_page.dart';
 import 'package:lexiloop/features/import/import_page.dart';
+import 'package:lexiloop/features/initialize/initialize_page.dart';
 import 'package:lexiloop/features/match/match_page.dart';
 import 'package:lexiloop/features/phonetics/phonetics_page.dart';
 import 'package:lexiloop/features/placeholder/placeholder_page.dart';
@@ -66,6 +67,7 @@ Widget _pageFor(AppDestination destination) {
     '/' => const DashboardPage(),
     '/add' => const AddPage(),
     '/games' => const GamesPage(),
+    '/initialize' => const InitializePage(),
     '/match' => const MatchPage(),
     '/phonetics' => const PhoneticsPage(),
     '/words' => const WordsPage(),

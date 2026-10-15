@@ -281,7 +281,7 @@ void main() {
     });
 
     test('损坏的 JSON 不抛异常', () {
-      final html = '<html><script id="__NEXT_DATA__">{not json</script></html>';
+      const html = '<html><script id="__NEXT_DATA__">{not json</script></html>';
       expect(parseIcibaHtml(html, targetLanguage: 'zh-CN'), isNull);
     });
   });

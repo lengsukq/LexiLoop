@@ -119,7 +119,7 @@ class InitializationQueries {
     final totalRow = await _db
         .customSelect(
           'SELECT COUNT(*) AS total FROM (SELECT w.id $_listFrom '
-          '${filter.whereClause} GROUP BY w.id) grouped',
+          '${filter.whereClause} GROUP BY w.id ${filter.havingClause}) grouped',
           variables: filter.variables,
         )
         .getSingle();
@@ -135,6 +135,7 @@ class InitializationQueries {
           'THEN 1 ELSE 0 END) AS active_task_count, '
           'MAX(j.updated_at) AS updated_at '
           '$_listFrom ${filter.whereClause} GROUP BY w.id '
+          '${filter.havingClause} '
           'ORDER BY MAX(j.updated_at) DESC, w.id DESC LIMIT ? OFFSET ?',
           variables: <Variable<Object>>[
             ...filter.variables,
@@ -400,12 +401,17 @@ const String _listFrom =
     'WHERE 1 = 1';
 
 class _ListFilter {
-  const new(this.whereClause, this.variables);
+  const new(this.whereClause, this.havingClause, this.variables);
 
   final String whereClause;
+  final String havingClause;
   final List<Variable<Object>> variables;
 }
 
+/// 关键词走 `WHERE`，聚合状态必须走 `HAVING`。
+///
+/// 把聚合表达式放进 `WHERE` 会被 SQLite 判为 `misuse of aggregate`——
+/// 旧版也是靠 `HAVING` 才成立的。
 _ListFilter _listFilter(InitializationStatus? status, String search) {
   final conditions = <String>[];
   final variables = <Variable<Object>>[];
@@ -422,11 +428,12 @@ _ListFilter _listFilter(InitializationStatus? status, String search) {
       Variable<String>('%$escaped%'),
     ]);
   }
+  var having = '';
   if (status != null) {
-    conditions.add('AND $_aggregateStatus = ?');
+    having = 'HAVING $_aggregateStatus = ?';
     variables.add(Variable<String>(status.wire));
   }
-  return _ListFilter(conditions.join(' '), variables);
+  return _ListFilter(conditions.join(' '), having, variables);
 }
 
 int _offset(int page, int pageSize) {

@@ -127,7 +127,37 @@ void main() {
       }
     });
 
-    test('音标类选项全部来自同类或易混音标', () {
+    test('同类候选够用时，音标类干扰项全部同类或易混', () {
+      final questions = buildPhoneticQuestions(
+        sources: mixedSources(),
+        count: phoneticItemCount,
+        random: constantRandom(),
+      );
+      var checked = 0;
+      for (final question in questions) {
+        if (!question.challenge.hasPhoneticChoices) continue;
+        final siblings = <String>{
+          for (final other in mixedSources())
+            if (other.phonetic != question.answer &&
+                isSimilarEntry(question.entry, matchPhoneme(other.phonetic)))
+              other.phonetic,
+        };
+        // 同类候选不足 3 个时无法要求「全部同类」，由下一个用例覆盖。
+        if (siblings.length < phoneticChoiceCount - 1) continue;
+        checked += 1;
+        for (final option in question.base.choices.options) {
+          if (option == question.answer) continue;
+          expect(
+            isSimilarEntry(question.entry, matchPhoneme(option)),
+            isTrue,
+            reason: '$option 与 ${question.entry.symbol} 既不同类也不易混',
+          );
+        }
+      }
+      expect(checked, greaterThan(0), reason: '至少要有一道题满足同类候选充足');
+    });
+
+    test('同类不足时退到同大类，绝不混入另一大类', () {
       final questions = buildPhoneticQuestions(
         sources: mixedSources(),
         count: phoneticItemCount,
@@ -138,10 +168,11 @@ void main() {
         for (final option in question.base.choices.options) {
           if (option == question.answer) continue;
           final entry = matchPhoneme(option);
+          expect(entry, isNotNull);
           expect(
-            isSimilarEntry(question.entry, entry),
-            isTrue,
-            reason: '$option 与 ${question.entry.symbol} 既不同类也不易混',
+            entry!.kind,
+            question.entry.kind,
+            reason: '元音题不该出现辅音选项（$option）',
           );
         }
       }
@@ -158,7 +189,9 @@ void main() {
       );
       expect(wordQuestion.answer, isNot(startsWith('/')));
       expect(
-        wordQuestion.base.choices.options.every((item) => !item.startsWith('/')),
+        wordQuestion.base.choices.options.every(
+          (item) => !item.startsWith('/'),
+        ),
         isTrue,
       );
     });
@@ -220,7 +253,10 @@ void main() {
         questions: questions,
       );
       expect(ready.core.progress.phase, GamePhase.ready);
-      expect(phoneticQuizNext(ready, const StartPhoneticQuiz()).core.isPlaying, isTrue);
+      expect(
+        phoneticQuizNext(ready, const StartPhoneticQuiz()).core.isPlaying,
+        isTrue,
+      );
     });
 
     test('答错记失误、清零连击，并停留在本题', () {
@@ -240,13 +276,13 @@ void main() {
       expect(blocked.revealed, isFalse);
       final cleared = phoneticQuizNext(blocked, const ContinuePhonetic());
       expect(cleared.hasWrongSelection, isFalse);
-      final solved = phoneticQuizNext(
-        cleared,
-        ChoosePhonetic(question.answer),
-      );
+      final solved = phoneticQuizNext(cleared, ChoosePhonetic(question.answer));
       expect(solved.revealed, isTrue);
       expect(solved.core.tally.combo, 1);
-      expect(solved.core.outcomeFor(question.base.itemId), GameOutcome.recovered);
+      expect(
+        solved.core.outcomeFor(question.base.itemId),
+        GameOutcome.recovered,
+      );
     });
 
     test('答对后继续进入下一题', () {
@@ -271,21 +307,29 @@ void main() {
       expect(quiz.current!.base.itemId, isNot(question.base.itemId));
     });
 
-    test('揭示答案期间不计时，时间耗尽结束本局', () {
+    test('揭示答案期间不计时（含整体倒计时）', () {
       var quiz = start();
       quiz = phoneticQuizNext(quiz, const SkipPhonetic());
       final frozen = quiz.itemElapsedMs;
-      quiz = phoneticQuizNext(quiz, const TickPhoneticQuiz(1000));
+      final remaining = quiz.core.remainingMs;
+      quiz = phoneticQuizNext(
+        quiz,
+        const TickPhoneticQuiz(phoneticDurationSeconds * 1000),
+      );
       expect(quiz.itemElapsedMs, frozen);
+      expect(quiz.core.remainingMs, remaining);
+      expect(quiz.core.isFinished, isFalse);
+    });
+
+    test('时间耗尽结束本局，结束态不可再推进', () {
+      var quiz = start();
       quiz = phoneticQuizNext(
         quiz,
         const TickPhoneticQuiz(phoneticDurationSeconds * 1000),
       );
       expect(quiz.core.isFinished, isTrue);
-      final after = phoneticQuizNext(
-        quiz,
-        const TickPhoneticQuiz(1000),
-      );
+      expect(quiz.current, isNull);
+      final after = phoneticQuizNext(quiz, const TickPhoneticQuiz(1000));
       expect(after.core.tally.score, quiz.core.tally.score);
     });
 
@@ -293,10 +337,7 @@ void main() {
       final quiz = start();
       final records = phoneticAnswerRecords(quiz);
       expect(records.length, quiz.questions.length);
-      expect(
-        records.map((item) => item.itemId).toSet().length,
-        records.length,
-      );
+      expect(records.map((item) => item.itemId).toSet().length, records.length);
     });
   });
 }

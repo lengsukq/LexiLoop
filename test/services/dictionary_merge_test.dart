@@ -10,6 +10,20 @@ import 'package:lexiloop/services/dictionary/merge.dart';
 DictionaryContent content(Map<String, Object?> fields) =>
     normalizeDictionaryContent(fields);
 
+/// 取对象字段内部的数组（原样，可能是字符串或对象）。
+List<Object?> nestedList(DictionaryContent content, String field, String key) =>
+    (content.record(field)[key] as List? ?? <Object?>[]).cast<Object?>();
+
+/// 取对象字段内部的对象数组条目。
+List<Map<String, Object?>> nested(
+  DictionaryContent content,
+  String field,
+  String key,
+) => <Map<String, Object?>>[
+  for (final item in (content.record(field)[key] as List? ?? <Object?>[]))
+    if (item is Map) item.cast<String, Object?>(),
+];
+
 Map<String, Object?> definition(String text, {String language = 'zh'}) =>
     <String, Object?>{
       'language': language,
@@ -126,7 +140,10 @@ void main() {
       final learning = merged.record('learning');
       expect(learning['mnemonic'], '谐音记忆');
       expect(learning['pronunciationTip'], '重音在后');
-      expect(learning['commonMistakes'], <String>['拼写错误', '时态错误']);
+      expect(nestedList(merged, 'learning', 'commonMistakes'), <Object?>[
+        '拼写错误',
+        '时态错误',
+      ]);
     });
 
     test('sentenceAnalysis 的 keyExpressions 按 expression 去重', () {
@@ -147,7 +164,7 @@ void main() {
           },
         }),
       ]);
-      final expressions = merged.records('keyExpressions');
+      final expressions = nested(merged, 'sentenceAnalysis', 'keyExpressions');
       expect(expressions, hasLength(2));
       expect(expressions.first['meaning'], '照顾');
     });

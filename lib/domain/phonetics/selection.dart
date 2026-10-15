@@ -208,42 +208,50 @@ PhoneticQuestion _buildQuestion({
   );
 }
 
-/// 音标类选项的候选池：**只取同类或易混的音标**。
+/// 音标类选项的候选池：**同类或易混优先，其次同大类（元音 / 辅音）**。
 ///
-/// 「同类优先」必须在进入 `createChoicePool` **之前**完成截断：
-/// 那个函数会先把整个候选池打乱再截取，若把同类与不同类混在一个池里，
-/// 「优先」就退化成随机。同类不足时才用其余候选补齐。
+/// 「优先」必须在进入 `createChoicePool` **之前**完成截断：那个函数会先把
+/// 整个候选池打乱再截取，若把不同层级的候选混在一个池里，「优先」就退化成
+/// 随机。三层分级是必要的——`/ɪ/` 的同类只有 `iː` 与 `e` 两个，凑不出
+/// 三个干扰项；此时宁可补 `uː`（同为大类「元音」），也不能混进 `p`（辅音），
+/// 否则一道元音题会出现辅音选项，练不出对立。
 List<String> _phoneticPool({
   required PhoneticSource source,
   required List<PhoneticSource> sources,
 }) {
-  final entry = matchPhoneme(source.phonetic);
-  final related = <String>[];
-  final others = <String>[];
+  final values = <String>[];
+  final entries = <PhonemeEntry?>[];
   final seen = <String>{_identity(source.phonetic)};
   for (final other in sources) {
     if (!seen.add(_identity(other.phonetic))) continue;
-    (isSimilarEntry(entry, matchPhoneme(other.phonetic)) ? related : others)
-        .add(other.phonetic);
+    values.add(other.phonetic);
+    entries.add(matchPhoneme(other.phonetic));
   }
-  return _boundedPool(related: related, others: others);
+  return _tieredPool(
+    correct: matchPhoneme(source.phonetic),
+    values: values,
+    entries: entries,
+  );
 }
 
-/// 单词类选项的候选池：同样只取同类音标的词。
+/// 单词类选项的候选池：分级规则与音标类完全一致。
 List<String> _wordPool({
   required PhoneticSource source,
   required List<PhoneticSource> sources,
 }) {
-  final entry = matchPhoneme(source.phonetic);
-  final related = <String>[];
-  final others = <String>[];
+  final values = <String>[];
+  final entries = <PhonemeEntry?>[];
   final seen = <String>{source.word.term.trim().toLowerCase()};
   for (final other in sources) {
     if (!seen.add(other.word.term.trim().toLowerCase())) continue;
-    (isSimilarEntry(entry, matchPhoneme(other.phonetic)) ? related : others)
-        .add(other.word.term);
+    values.add(other.word.term);
+    entries.add(matchPhoneme(other.phonetic));
   }
-  return _boundedPool(related: related, others: others);
+  return _tieredPool(
+    correct: matchPhoneme(source.phonetic),
+    values: values,
+    entries: entries,
+  );
 }
 
 /// 两个音标条目是否「同类或易混」。
@@ -256,11 +264,27 @@ bool isSimilarEntry(PhonemeEntry? correct, PhonemeEntry? other) {
   return correct.category == other.category;
 }
 
-/// 同类候选够用时只返回同类；不够时再补其余候选。
-List<String> _boundedPool({
-  required List<String> related,
-  required List<String> others,
+/// 按「易混同类 → 同大类 → 其余」三级取干扰项，够用即止。
+List<String> _tieredPool({
+  required PhonemeEntry? correct,
+  required List<String> values,
+  required List<PhonemeEntry?> entries,
 }) {
+  final similar = <String>[];
+  final sameKind = <String>[];
+  final others = <String>[];
+  for (var index = 0; index < values.length; index += 1) {
+    final entry = entries[index];
+    if (isSimilarEntry(correct, entry)) {
+      similar.add(values[index]);
+    } else if (correct != null && entry != null && correct.kind == entry.kind) {
+      sameKind.add(values[index]);
+    } else {
+      others.add(values[index]);
+    }
+  }
   const need = phoneticChoiceCount - 1;
-  return related.length >= need ? related : <String>[...related, ...others];
+  if (similar.length >= need) return similar;
+  final pool = <String>[...similar, ...sameKind];
+  return pool.length >= need ? pool : <String>[...pool, ...others];
 }

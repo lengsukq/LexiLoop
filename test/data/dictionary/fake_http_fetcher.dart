@@ -9,7 +9,7 @@ import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 /// 按 URL 决定响应的假客户端。
 class FakeHttpFetcher implements HttpFetcher {
   /// 以处理函数构造。
-  FakeHttpFetcher(this.handler);
+  new(this.handler);
 
   /// 按「URL + 请求体」产生响应；抛 [HttpFailure] 表示网络层失败。
   final Future<HttpFetchResponse> Function(String url, String? body) handler;

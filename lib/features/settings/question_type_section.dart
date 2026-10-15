@@ -1,6 +1,9 @@
 /// 题型设置分组。
 ///
-/// 8 种题型各一个开关 + 权重滑条。
+/// 8 种题型按「看词认义 / 拼写输出 / 听力训练 / 语境运用」分 4 组展示，
+/// 每组一个子卡片，内含各题型的开关、权重滑条与权重占比。
+/// 顶部是 4 个权重预设（旧版 `question-type-settings.tsx:31-36`）、
+/// 一条 100% 占比条与「重置均衡」。
 ///
 /// **「至少启用一种」在界面层提前拦截**：`QuestionTypeConfig.normalized`
 /// 会在全部关闭时整体回退到默认配置，但那是兜底——如果界面允许用户把
@@ -53,6 +56,8 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    final config = QuestionTypeConfig(_draft);
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 24),
       children: <Widget>[
@@ -66,16 +71,26 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
         ],
         SettingsSectionCard(
           title: '题型开关与权重',
-          subtitle: '权重决定该题型被抽中的相对概率；权重 1 与权重 10 的比例是 1:10。',
+          subtitle: '权重决定该题型被抽中的相对概率；色条是各题型当前的实际占比。',
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              for (final type in QuestionType.values)
-                _QuestionTypeRow(
-                  type: type,
-                  setting: _draft[type] ?? defaultQuestionTypeSetting,
-                  onToggle: (enabled) => _toggle(type, enabled: enabled),
-                  onWeightEnd: (weight) => _setWeight(type, weight),
+              _PresetBar(onApply: _applyPreset, onReset: _resetBalanced),
+              const SizedBox(height: 12),
+              _ShareBar(config: config),
+              const SizedBox(height: 12),
+              for (final group in _typeGroups)
+                _TypeGroupCard(
+                  group: group,
+                  config: config,
+                  onToggle: _toggle,
+                  onWeightEnd: _setWeight,
                 ),
+              const SizedBox(height: 2),
+              Text(
+                _availabilityHint,
+                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+              ),
             ],
           ),
         ),
@@ -93,11 +108,7 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
       setState(() => _blocked = true);
       return;
     }
-    setState(() {
-      _draft = next;
-      _blocked = false;
-    });
-    _persist(config);
+    _commit(config);
   }
 
   void _setWeight(QuestionType type, double weight) {
@@ -107,8 +118,25 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
       enabled: current.enabled,
       weight: weight.round(),
     );
-    setState(() => _draft = next);
-    _persist(QuestionTypeConfig(next));
+    _commit(QuestionTypeConfig(next));
+  }
+
+  void _applyPreset(QuestionTypeWeightPreset preset) {
+    _commit(preset.applyTo(QuestionTypeConfig(_draft)));
+  }
+
+  void _resetBalanced() {
+    // 「重置均衡」比「均衡」预设多一步：它还把被关掉的题型重新打开。
+    // 用户能按的按钮只有一个，就该是那个真正回到出厂状态的。
+    _commit(QuestionTypeConfig.defaults);
+  }
+
+  void _commit(QuestionTypeConfig config) {
+    setState(() {
+      _draft = _draftOfConfig(config);
+      _blocked = false;
+    });
+    _persist(config);
   }
 
   void _persist(QuestionTypeConfig config) {
@@ -120,54 +148,212 @@ class _QuestionTypeSectionState extends ConsumerState<QuestionTypeSection> {
   }
 }
 
+/// 预设按钮行：4 个预设 + 「重置均衡」。
+class _PresetBar extends StatelessWidget {
+  const new({required this.onApply, required this.onReset});
+
+  final void Function(QuestionTypeWeightPreset preset) onApply;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              for (final preset in questionTypeWeightPresets)
+                ActionChip(
+                  key: Key('questionTypePreset-${preset.id}'),
+                  label: Text(preset.label),
+                  onPressed: () => onApply(preset),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          key: const Key('questionTypeResetBalanced'),
+          onPressed: onReset,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('重置均衡'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colors.secondaryLabel,
+            side: BorderSide(color: colors.borderDefault),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 权重占比总览条：各启用题型按占比切分，合计 100%。
+class _ShareBar extends StatelessWidget {
+  const new({required this.config});
+
+  final QuestionTypeConfig config;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final shares = config.sharePercents();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(LexiRadius.sm),
+      child: SizedBox(
+        height: 8,
+        child: Row(
+          // 必须 stretch：`ColoredBox` 没有子节点，默认的 center 会把它量成 0 高。
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (final type in QuestionType.values)
+              if (config.sharePercentOf(type) > 0)
+                Expanded(
+                  flex: _flexOf(shares[type.index]),
+                  child: ColoredBox(color: questionTypeColor(colors, type)),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 百分比换算成 `Expanded.flex`。
+///
+/// **为什么乘 100**：`flex` 是整数，2% 与 2.4% 都会截断成 2，8 个题型各截一次
+/// 足以让色条明显短于轨道；放大 100 倍后误差落在 1/100 百分比以下，
+/// 肉眼与截图都看不出来。
+int _flexOf(double percent) => (percent * 100).round().clamp(1, _flexCeiling);
+
+/// `flex` 上限：防止某个题型独占时把其余段挤成 0 宽。
+const int _flexCeiling = 100000;
+
+/// 一个题型分组。
+class _TypeGroupCard extends StatelessWidget {
+  const new({
+    required this.group,
+    required this.config,
+    required this.onToggle,
+    required this.onWeightEnd,
+  });
+
+  final _TypeGroup group;
+  final QuestionTypeConfig config;
+  final void Function(QuestionType type, {required bool enabled}) onToggle;
+  final void Function(QuestionType type, double weight) onWeightEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final enabledCount = group.types.where(config.isEnabled).length;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                group.label,
+                style: TextStyle(
+                  color: colors.secondaryLabel,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$enabledCount/${group.types.length} 已启用',
+                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+              ),
+            ],
+          ),
+          for (final type in group.types)
+            _QuestionTypeRow(
+              type: type,
+              config: config,
+              onToggle: onToggle,
+              onWeightEnd: onWeightEnd,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _QuestionTypeRow extends StatelessWidget {
   const new({
     required this.type,
-    required this.setting,
+    required this.config,
     required this.onToggle,
     required this.onWeightEnd,
   });
 
   final QuestionType type;
-  final QuestionTypeSetting setting;
-  final ValueChanged<bool> onToggle;
-  final ValueChanged<double> onWeightEnd;
+  final QuestionTypeConfig config;
+  final void Function(QuestionType type, {required bool enabled}) onToggle;
+  final void Function(QuestionType type, double weight) onWeightEnd;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    final enabled = config.isEnabled(type);
+    final share = config.sharePercentOf(type).round();
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: questionTypeColor(colors, type),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   questionTypeLabel(type),
                   style: TextStyle(
-                    color: setting.enabled
-                        ? colors.label
-                        : colors.tertiaryLabel,
+                    color: enabled ? colors.label : colors.tertiaryLabel,
                     fontSize: 13.5,
                   ),
                 ),
               ),
+              Text(
+                enabled ? '$share%' : '未启用',
+                style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+              ),
               Switch(
                 key: Key('questionTypeSwitch-${type.wire}'),
-                value: setting.enabled,
-                onChanged: onToggle,
+                value: enabled,
+                onChanged: (value) => onToggle(type, enabled: value),
               ),
             ],
+          ),
+          Text(
+            questionTypeHint(type),
+            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
           ),
           SettingsSliderRow(
             key: Key('questionTypeWeight-${type.wire}'),
             label: '权重',
-            value: setting.weight.toDouble(),
+            value: config.weightOf(type),
             min: minQuestionTypeWeight.toDouble(),
             max: maxQuestionTypeWeight.toDouble(),
             divisions: maxQuestionTypeWeight - minQuestionTypeWeight,
-            onChangeEnd: onWeightEnd,
+            onChangeEnd: (value) => onWeightEnd(type, value),
           ),
         ],
       ),
@@ -175,16 +361,56 @@ class _QuestionTypeRow extends StatelessWidget {
   }
 }
 
-Map<QuestionType, QuestionTypeSetting> _draftOf(AppSettings settings) {
-  final config = settings.questionTypeConfig;
-  return <QuestionType, QuestionTypeSetting>{
-    for (final type in QuestionType.values)
-      type: QuestionTypeSetting(
-        enabled: config.isEnabled(type),
-        weight: config.weightOf(type).round(),
-      ),
-  };
+/// 一个题型分组。
+class _TypeGroup {
+  const new({required this.label, required this.types});
+
+  final String label;
+  final List<QuestionType> types;
 }
+
+/// 分组顺序取自旧版 `question-type-settings.tsx:129-138` 的 `GROUPS`：
+/// 按「认词 → 输出 → 听辨 → 语境」的学习顺序，而不是按枚举顺序。
+const List<_TypeGroup> _typeGroups = <_TypeGroup>[
+  _TypeGroup(
+    label: '看词认义',
+    types: <QuestionType>[
+      QuestionType.enToZh,
+      QuestionType.enToZhChoice,
+      QuestionType.zhToEnChoice,
+    ],
+  ),
+  _TypeGroup(
+    label: '拼写输出',
+    types: <QuestionType>[QuestionType.zhToEnSpelling, QuestionType.letterBank],
+  ),
+  _TypeGroup(
+    label: '听力训练',
+    types: <QuestionType>[
+      QuestionType.listeningChoice,
+      QuestionType.listeningSpelling,
+    ],
+  ),
+  _TypeGroup(label: '语境运用', types: <QuestionType>[QuestionType.clozeSentence]),
+];
+
+/// 题型可用性提示：两类题型有前置条件，用户不设预期会以为设置没生效。
+const String _availabilityHint =
+    '完形填空需要例句，字母拼词仅对 3–14 个纯字母的单词生效； '
+    '词条不满足条件时会自动改用同组其他题型。';
+
+Map<QuestionType, QuestionTypeSetting> _draftOf(AppSettings settings) =>
+    _draftOfConfig(settings.questionTypeConfig);
+
+Map<QuestionType, QuestionTypeSetting> _draftOfConfig(
+  QuestionTypeConfig config,
+) => <QuestionType, QuestionTypeSetting>{
+  for (final type in QuestionType.values)
+    type: QuestionTypeSetting(
+      enabled: config.isEnabled(type),
+      weight: config.weightOf(type).round(),
+    ),
+};
 
 /// 两份设置里的题型配置是否等价（按序列化结果比对，避免实例身份比较）。
 bool _sameConfig(AppSettings oldSettings, AppSettings newSettings) {
@@ -214,3 +440,37 @@ String questionTypeLabel(QuestionType type) => switch (type) {
   QuestionType.listeningChoice => '听音选择',
   QuestionType.letterBank => '字母拼词',
 };
+
+/// 题型的适用条件说明。
+///
+/// 前两种题型有硬性前置条件（需要例句 / 需要纯字母词），不说清楚用户会
+/// 以为「开了却一道都没抽到」是 bug。
+String questionTypeHint(QuestionType type) => switch (type) {
+  QuestionType.enToZh => '看英文判断是否认识',
+  QuestionType.enToZhChoice => '看英文选释义',
+  QuestionType.zhToEnChoice => '看释义选英文',
+  QuestionType.zhToEnSpelling => '看释义拼写英文',
+  QuestionType.listeningSpelling => '听发音拼写',
+  QuestionType.clozeSentence => '例句挖空，需要词条带例句',
+  QuestionType.listeningChoice => '听发音选词',
+  QuestionType.letterBank => '打乱字母拼回，仅限 3–14 个纯字母',
+};
+
+/// 题型在占比条与圆点上的颜色。
+///
+/// **为什么按枚举下标轮转色相而不是写死 8 个色值**：旧版在组件里写死了 8 个
+/// hex（`SEG_COLORS`），换主题时这套色板不会跟着变。以 `accent` 的色相为起点
+/// 均匀轮转，明暗两套色板都能拿到对比度合适的颜色，且新增题型不用补色值。
+Color questionTypeColor(LexiColors colors, QuestionType type) {
+  final base = HSVColor.fromColor(colors.accent);
+  final step = hueSpan / QuestionType.values.length;
+  return HSVColor.fromAHSV(
+    1,
+    (base.hue + type.index * step) % hueSpan,
+    base.saturation,
+    base.value,
+  ).toColor();
+}
+
+/// 一整圈色相（度）。
+const double hueSpan = 360;

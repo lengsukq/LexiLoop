@@ -1,8 +1,9 @@
 /// 导入历史区域。
 ///
 /// 支持展开看行明细与撤销。撤销按钮的可用性由
-/// [ImportBatchSummary.canRollback] 决定（纯新增且已提交），真正的依赖
-/// 检查（复习日志、错词、会话）在服务层，失败时把中文原因弹给用户。
+/// [ImportBatchSummary.canRollback] 决定（与 `CsvImportService` 的静态资格
+/// 检查逐条对齐），真正的依赖检查（复习日志、错词、会话）在服务层；
+/// 失败时用 [rollbackBlockedMessage] 把挡住的词条摆给用户看。
 library;
 
 import 'package:flutter/material.dart';
@@ -12,8 +13,15 @@ import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
+import 'package:lexiloop/features/import/rollback_blocked_message.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+
+/// 撤销失败的提示停留时长。
+///
+/// 比默认的四秒长：撤销被拒的理由常常是一长串词条，用户需要时间读完
+/// 才能判断「那我该怎么办」。
+const Duration rollbackErrorDuration = Duration(seconds: 8);
 
 /// 导入历史区域。
 class ImportHistorySection extends ConsumerWidget {
@@ -111,7 +119,12 @@ class _BatchTileState extends ConsumerState<_BatchTile> {
       _refresh();
       messenger.showSnackBar(const SnackBar(content: Text('已撤销该批次。')));
     } on AppError catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(rollbackBlockedMessage(error)),
+          duration: rollbackErrorDuration,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -231,6 +244,15 @@ class _BatchSummaryRow extends StatelessWidget {
           TextButton(
             onPressed: busy ? null : onRollback,
             child: Text(busy ? '撤销中…' : '撤销'),
+          )
+        else
+          Tooltip(
+            message: staticRollbackBlockedReason(batch) ?? '',
+            child: const TextButton(
+              key: Key('rollbackDisabled'),
+              onPressed: null,
+              child: Text('撤销'),
+            ),
           ),
       ],
     );

@@ -4,6 +4,9 @@
 /// 旧版设置页把 13 + 8 个回调 props 一次性传给一个大表单
 /// （见 `docs/CLEAN_CODE_BASELINE.md`），任何一处改动都要动整条链路；
 /// 这里每个分组只依赖 `appSettingsProvider` 与 `saveSettings`。
+///
+/// **「AI 模型」不在 `AppSettings` 的分组里**：那份配置刻意只存在于
+/// `raw['llmConfig']`，但它仍然是用户必须能改的东西，因此单列一个 tab。
 library;
 
 import 'package:flutter/material.dart';
@@ -11,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/features/settings/ai/ai_settings_section.dart';
 import 'package:lexiloop/features/settings/data_management_section.dart';
 import 'package:lexiloop/features/settings/playback_section.dart';
 import 'package:lexiloop/features/settings/providers_section.dart';
@@ -75,6 +79,7 @@ class _SettingsTabs extends StatelessWidget {
                   PlaybackSection(settings: settings),
                   ProvidersSection(settings: settings),
                   VocabularySection(settings: settings),
+                  AiSettingsSection(settings: settings),
                   const DataManagementSection(),
                 ],
               ),
@@ -148,12 +153,14 @@ class _SettingsError extends StatelessWidget {
   }
 }
 
-/// tab 顺序与 `AppSettings` 的分组顺序一致。
+/// tab 顺序与 `AppSettings` 的分组顺序一致，「AI 模型」紧随词汇设置——
+/// 它同样是「与学习内容无关、但用户必须能改」的一组。
 const List<String> _tabLabels = <String>[
   '学习计划',
   '题型',
   '播放',
   '数据源',
   '词汇与考试',
+  'AI 模型',
   '数据管理',
 ];

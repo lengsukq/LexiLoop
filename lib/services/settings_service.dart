@@ -36,17 +36,21 @@ class SettingsService {
     final current = await load();
     final merged = <String, Object?>{...current.raw};
     final effective = <String, Object?>{};
+    // 值为 `null` 表示「删除该键、回到默认值」。删除必须落到表上：
+    // 只从内存的 merged 里去掉的话，缓存一失效（或应用重启）旧值就回来了。
+    final removed = <String>[];
 
     for (final entry in changes.entries) {
       if (entry.value == null) {
         merged.remove(entry.key);
+        removed.add(entry.key);
       } else {
         merged[entry.key] = entry.value;
         effective[entry.key] = entry.value;
       }
     }
 
-    await _dao.saveAll(effective, now);
+    await _dao.saveAll(effective, now, removedKeys: removed);
     _cached = appSettingsFromRaw(merged);
     return _cached!;
   }

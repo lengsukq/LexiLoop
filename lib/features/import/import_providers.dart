@@ -72,6 +72,7 @@ class ImportWizardState {
     this.preview,
     this.mode = ImportMode.skipExisting,
     this.onlyProblems = false,
+    this.resetLearningProgress = false,
     this.busy = false,
     this.errorMessage,
     this.result,
@@ -91,6 +92,11 @@ class ImportWizardState {
 
   /// 预览表格是否只看问题行。
   final bool onlyProblems;
+
+  /// 是否勾选了「重置已有词条的学习进度」。
+  ///
+  /// 缺省为 `false`：这是会销毁学习历史的开关，默认必须是安全的那个。
+  final bool resetLearningProgress;
 
   /// 是否有正在进行的异步操作。
   final bool busy;
@@ -115,6 +121,7 @@ class ImportWizardState {
     bool clearPreview = false,
     ImportMode? mode,
     bool? onlyProblems,
+    bool? resetLearningProgress,
     bool? busy,
     String? errorMessage,
     bool clearError = false,
@@ -127,6 +134,8 @@ class ImportWizardState {
       preview: clearPreview ? null : (preview ?? this.preview),
       mode: mode ?? this.mode,
       onlyProblems: onlyProblems ?? this.onlyProblems,
+      resetLearningProgress:
+          resetLearningProgress ?? this.resetLearningProgress,
       busy: busy ?? this.busy,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       result: clearResult ? null : (result ?? this.result),
@@ -171,6 +180,10 @@ class ImportWizardNotifier extends Notifier<ImportWizardState> {
   void setOnlyProblems({required bool value}) =>
       state = state.copyWith(onlyProblems: value);
 
+  /// 切换「重置已有词条的学习进度」。
+  void setResetLearningProgress({required bool value}) =>
+      state = state.copyWith(resetLearningProgress: value);
+
   /// 选择文件并解析预览。
   ///
   /// 用户取消选择不是错误，静默回到原状态——否则每次点开又关掉文件
@@ -197,6 +210,9 @@ class ImportWizardNotifier extends Notifier<ImportWizardState> {
   }
 
   /// 提交当前预览。
+  ///
+  /// 破坏性确认放在 UI 层（`import_page.dart`）——Riverpod 的 `Notifier`
+  /// 不持有 `BuildContext`，对话框不属于这里。
   Future<void> commit() async {
     final preview = state.preview;
     if (preview == null) return;
@@ -204,7 +220,12 @@ class ImportWizardNotifier extends Notifier<ImportWizardState> {
     try {
       final result = await ref
           .read(csvImportServiceProvider)
-          .commit(batchId: preview.batchId, mode: state.mode, now: _now());
+          .commit(
+            batchId: preview.batchId,
+            mode: state.mode,
+            resetLearningProgress: state.resetLearningProgress,
+            now: _now(),
+          );
       state = state.copyWith(busy: false, result: result, clearPreview: true);
       ref.invalidate(importHistoryProvider);
     } on AppError catch (error) {

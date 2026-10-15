@@ -49,6 +49,7 @@ class _FakeImportService extends CsvImportService {
 
   /// 最近一次提交使用的模式，用于断言界面把选择传了下去。
   ImportMode? lastMode;
+  bool? lastResetLearningProgress;
 
   @override
   Future<ImportPreview> preview({
@@ -65,9 +66,11 @@ class _FakeImportService extends CsvImportService {
   Future<ImportCommitResult> commit({
     required int batchId,
     required ImportMode mode,
+    required bool resetLearningProgress,
     required int now,
   }) async {
     lastMode = mode;
+    lastResetLearningProgress = resetLearningProgress;
     return commitResult!;
   }
 }
@@ -224,5 +227,84 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(service.lastMode, ImportMode.fillMissing);
+  });
+
+  group('重置学习进度', () {
+    ImportCommitResult commitResult() => const ImportCommitResult(
+      batchId: 7,
+      created: 1,
+      existing: 0,
+      duplicate: 0,
+      invalid: 0,
+      failed: 0,
+      queuedInitializations: 1,
+    );
+
+    testWidgets('默认不勾选，提交时也不重置', (tester) async {
+      final service = _FakeImportService(
+        deps(),
+        previewResult: buildPreview('单词,释义\napple,苹果\n'),
+        commitResult: commitResult(),
+      );
+      await pumpPage(tester, service);
+      await tester.tap(find.byKey(const Key('importPickFile')));
+      await tester.pumpAndSettle();
+
+      final checkbox = tester.widget<Checkbox>(
+        find.byKey(const Key('resetLearningProgress')),
+      );
+      expect(checkbox.value, isFalse);
+
+      await tester.tap(find.byKey(const Key('importSubmit')));
+      await tester.pumpAndSettle();
+
+      expect(service.lastResetLearningProgress, isFalse);
+    });
+
+    testWidgets('勾选后必须二次确认才提交', (tester) async {
+      final service = _FakeImportService(
+        deps(),
+        previewResult: buildPreview('单词,释义\napple,苹果\n'),
+        commitResult: commitResult(),
+      );
+      await pumpPage(tester, service);
+      await tester.tap(find.byKey(const Key('importPickFile')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('resetLearningProgress')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('importSubmit')));
+      await tester.pumpAndSettle();
+
+      // 取消 = 什么都不发生。
+      expect(find.byKey(const Key('resetProgressConfirm')), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(service.lastResetLearningProgress, isNull);
+
+      // 确认 = 把开关传下去。
+      await tester.tap(find.byKey(const Key('importSubmit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('resetProgressConfirm')));
+      await tester.pumpAndSettle();
+      expect(service.lastResetLearningProgress, isTrue);
+    });
+
+    testWidgets('说明文案点明删除什么与不删什么', (tester) async {
+      await pumpPage(
+        tester,
+        _FakeImportService(
+          deps(),
+          previewResult: buildPreview('单词,释义\napple,苹果\n'),
+          commitResult: commitResult(),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('importPickFile')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('重置已有词条的学习进度'), findsOneWidget);
+      expect(find.textContaining('复习卡、复习日志、错词状态'), findsOneWidget);
+      expect(find.textContaining('词典内容不删除'), findsOneWidget);
+    });
   });
 }

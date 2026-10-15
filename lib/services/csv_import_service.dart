@@ -26,6 +26,16 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
 import 'package:lexiloop/services/settings_service.dart';
 
+/// `study_session_items.skip_reason`：因导入勾选了「重置学习进度」而撤下的题目。
+///
+/// **字面量必须与旧版 `src/modules/imports/commit.ts` 的 `'PROGRESS_RESET'`
+/// 逐字符一致**：`core/constants.dart` 里 `wordSuspendedSkipReason` 的表级文档
+/// 已经写明，跳过原因参与 `study_dao.dart` 的 `_availabilitySql` 候选排除
+/// （`SESSION_EXPIRED` / `PROGRESS_RESET` 属系统收尾，不算用户意愿），
+/// 备份回放与跨端统计也按该字符串分组；换一个字面量等于让历史会话的
+/// 聚合统计对不上。
+const String progressResetSkipReason = 'PROGRESS_RESET';
+
 /// CSV 导入服务。
 class CsvImportService {
   /// 以数据库与设置服务构造。
@@ -97,17 +107,33 @@ class CsvImportService {
 
   /// 提交某个批次：写词条与内容，并为新词条入队初始化任务。
   ///
+  /// [resetLearningProgress] 对应旧版 `csv-tab.tsx` 的
+  /// 「重置本次已有词条的学习进度」勾选框：命中的**已有**词条会被清空
+  /// 复习日志、复习卡、错词状态与物化统计，并撤下它在会话里未作答的题目。
+  /// 新增词条本来就没有进度，不受影响。
+  ///
+  /// 该参数**没有默认值**是有意的：这是一枚会销毁历史数据的开关，
+  /// 让每个调用点都必须显式表态，而不是继承一个隐式的 `false`。
+  ///
   /// 整个过程在**一个事务**内：要么整批写入，要么一行都不写。
   /// 否则中途失败会留下「批次已提交但只导入了一半」的状态。
   Future<ImportCommitResult> commit({
     required int batchId,
     required ImportMode mode,
+    required bool resetLearningProgress,
     required int now,
   }) async {
     if (batchId <= 0) {
       throw const ValidationError(AppErrorCode.importBatchIdInvalid);
     }
-    return await _db.transaction(() => _commit(batchId, mode, now));
+    return await _db.transaction(
+      () => _commit(
+        batchId: batchId,
+        mode: mode,
+        resetLearningProgress: resetLearningProgress,
+        now: now,
+      ),
+    );
   }
 
   /// 撤销某个批次。
@@ -302,11 +328,12 @@ class CsvImportService {
 
   // ── 提交 ──
 
-  Future<ImportCommitResult> _commit(
-    int batchId,
-    ImportMode mode,
-    int now,
-  ) async {
+  Future<ImportCommitResult> _commit({
+    required int batchId,
+    required ImportMode mode,
+    required bool resetLearningProgress,
+    required int now,
+  }) async {
     final batch = await _requirePendingBatch(batchId, now);
     final inputs = await _loadRowInputs(batchId);
     final languages = _languagesOf(inputs);
@@ -316,13 +343,20 @@ class CsvImportService {
       await _commitRows(
         inputs,
         mode: mode,
+        resetLearningProgress: resetLearningProgress,
         languages: languages,
         counters: counters,
         now: now,
       );
     }
 
-    await _finishBatch(batch.id, mode, counters, now);
+    await _finishBatch(
+      batchId: batch.id,
+      mode: mode,
+      resetLearningProgress: resetLearningProgress,
+      counters: counters,
+      now: now,
+    );
     return ImportCommitResult(
       batchId: batch.id,
       created: counters.created,
@@ -337,6 +371,7 @@ class CsvImportService {
   Future<void> _commitRows(
     List<_RowInput> inputs, {
     required ImportMode mode,
+    required bool resetLearningProgress,
     required _LanguagePair languages,
     required _CommitCounters counters,
     required int now,
@@ -352,6 +387,7 @@ class CsvImportService {
           await _applyRow(
             input,
             mode: mode,
+            resetLearningProgress: resetLearningProgress,
             existing: existing,
             contents: contents,
             providers: providers,
@@ -372,6 +408,7 @@ class CsvImportService {
   Future<_RowOutcome> _applyRow(
     _RowInput input, {
     required ImportMode mode,
+    required bool resetLearningProgress,
     required Map<String, int> existing,
     required Map<int, WordContentRow> contents,
     required String? providers,
@@ -394,6 +431,7 @@ class CsvImportService {
       wordId: wordId,
       current: contents[wordId],
       mode: mode,
+      resetLearningProgress: resetLearningProgress,
       counters: counters,
       now: now,
     );
@@ -474,25 +512,19 @@ class CsvImportService {
     required int wordId,
     required WordContentRow? current,
     required ImportMode mode,
+    required bool resetLearningProgress,
     required _CommitCounters counters,
     required int now,
   }) {
     counters.existing += 1;
+    final resetAt = _resetAtFor(mode, resetLearningProgress, now);
     if (mode == ImportMode.skipExisting) {
-      return _RowOutcome(
-        rowId: input.rowId,
-        status: ImportRowStatus.existing,
-        wordId: wordId,
-      );
+      return _existingOutcome(input, wordId: wordId);
     }
 
     final merged = _mergeColumns(row, current, mode: mode);
     if (merged.isEmpty) {
-      return _RowOutcome(
-        rowId: input.rowId,
-        status: ImportRowStatus.existing,
-        wordId: wordId,
-      );
+      return _existingOutcome(input, wordId: wordId, resetProgressAt: resetAt);
     }
     return _RowOutcome(
       rowId: input.rowId,
@@ -504,8 +536,32 @@ class CsvImportService {
         version: current == null ? null : current.contentVersion + 1,
       ),
       insertContents: current == null,
+      resetProgressAt: resetAt,
     );
   }
+
+  /// 只登记「这一行命中了已有词条」，不写任何内容。
+  _RowOutcome _existingOutcome(
+    _RowInput input, {
+    required int wordId,
+    int? resetProgressAt,
+  }) {
+    return _RowOutcome(
+      rowId: input.rowId,
+      status: ImportRowStatus.existing,
+      wordId: wordId,
+      resetProgressAt: resetProgressAt,
+    );
+  }
+
+  /// 本行是否需要重置学习进度，返回重置时间戳或 `null`。
+  ///
+  /// **与旧版 `imports/commit.ts:92-96` 的唯一差别**：旧版在
+  /// `SKIP_EXISTING` 模式下也会重置，但那一整个分支的语义是「已有的词条
+  /// 完全不动」。保留旧行为会让用户在「仅新增 + 重置进度」时看到一批毫无
+  /// 关联的词条进度被清空，且撤销检查还会因为 `import_mode` 不符而拒绝。
+  static int? _resetAtFor(ImportMode mode, bool requested, int now) =>
+      mode == ImportMode.skipExisting || !requested ? null : now;
 
   /// 按 [ImportMode] 计算要写入的列。
   ///
@@ -580,19 +636,77 @@ class CsvImportService {
     }
     final job = outcome.job;
     if (job != null) batch.insert(_db.initializationJobs, job);
+
+    final resetAt = outcome.resetProgressAt;
+    final wordId = outcome.wordId;
+    if (resetAt != null && wordId != null) {
+      _writeProgressReset(batch, wordId: wordId, now: resetAt);
+    }
   }
 
-  Future<void> _finishBatch(
-    int batchId,
-    ImportMode mode,
-    _CommitCounters counters,
-    int now,
-  ) async {
+  /// 清空一个**已有**词条的学习进度。
+  ///
+  /// 对应旧版 `src/modules/imports/commit.ts:92-96`。五条语句与旧版一一对应，
+  /// 外加一条本版才需要的：
+  ///
+  /// 1. `review_logs` / `review_cards` / `wrong_word_states` 整行删除——
+  ///    复习卡与错词状态都只是 `review_logs` 的物化，删日志必然要连带删；
+  /// 2. `study_session_items` 里该词条**未作答**的题目标记为 `SKIPPED`，
+  ///    `skip_reason` 记 [progressResetSkipReason]：一道已经作答的题保留原状，
+  ///    它属于学习历史，不该被这次导入改写；
+  /// 3. `words` 的掌握度归零，否则词条仍会以「已掌握」的姿态留在词库里，
+  ///    而它的复习卡已经不存在了；
+  /// 4. `word_review_stats` 整行删除——**这条是本版新增的**：该表是
+  ///    `review_logs` 的聚合缓存，学习队列与游戏选词都用 `LEFT JOIN` 读它。
+  ///    只删日志会留下一份说「复习过 200 次」的陈旧统计，让队列继续给一个
+  ///    进度已被重置的词条加权。缺行在所有读点都等价于「没有历史」。
+  void _writeProgressReset(
+    Batch batch, {
+    required int wordId,
+    required int now,
+  }) {
+    batch
+      ..deleteWhere(_db.reviewLogs, (t) => t.wordId.equals(wordId))
+      ..deleteWhere(_db.reviewCards, (t) => t.wordId.equals(wordId))
+      ..deleteWhere(_db.wrongWordStates, (t) => t.wordId.equals(wordId))
+      ..deleteWhere(_db.wordReviewStats, (t) => t.wordId.equals(wordId))
+      ..update(
+        _db.studySessionItems,
+        StudySessionItemsCompanion(
+          status: const Value(StudyItemStatus.skipped),
+          answeredAt: Value(now),
+          skipReason: const Value(progressResetSkipReason),
+        ),
+        where: (t) =>
+            t.wordId.equals(wordId) &
+            t.status.equalsValue(StudyItemStatus.pending),
+      )
+      ..update(
+        _db.words,
+        WordsCompanion(
+          masteryLevel: const Value(MasteryLevel.newWord),
+          masteryScore: const Value(0),
+          updatedAt: Value(now),
+        ),
+        where: (t) => t.id.equals(wordId),
+      );
+  }
+
+  Future<void> _finishBatch({
+    required int batchId,
+    required ImportMode mode,
+    required bool resetLearningProgress,
+    required _CommitCounters counters,
+    required int now,
+  }) async {
     final query = _db.update(_db.importBatches)
       ..where((table) => table.id.equals(batchId));
     await query.write(
       ImportBatchesCompanion(
         importMode: Value(mode),
+        // 必须落库：`rollback` 的静态资格检查会读这一列，否则一个重置过
+        // 学习进度的批次会被当成可无损撤销，把已经删掉的历史算作「无副作用」。
+        resetLearningProgress: Value(resetLearningProgress),
         status: const Value(ImportBatchStatus.committed),
         createdWords: Value(counters.created),
         existingWords: Value(counters.existing),
@@ -897,6 +1011,7 @@ class CsvImportService {
     existingWords: row.existingWords,
     queuedInitializations: row.queuedInitializations,
     createdAt: row.createdAt,
+    resetLearningProgress: row.resetLearningProgress,
     completedAt: row.completedAt,
     rolledBackAt: row.rolledBackAt,
   );
@@ -984,6 +1099,7 @@ class _RowOutcome {
     this.contents,
     this.insertContents = false,
     this.job,
+    this.resetProgressAt,
   });
 
   final int rowId;
@@ -994,6 +1110,11 @@ class _RowOutcome {
   final WordContentsCompanion? contents;
   final bool insertContents;
   final InitializationJobsCompanion? job;
+
+  /// 非空表示这一行要连带清空 [wordId] 的学习进度，值即重置时间戳。
+  ///
+  /// 只对**命中已有词条**的行设置：新增词条本就没有进度可清。
+  final int? resetProgressAt;
 }
 
 /// 提交过程的计数器。

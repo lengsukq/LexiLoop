@@ -30,10 +30,20 @@ class SettingsDao {
     return result;
   }
 
-  /// 写入若干设置项（不存在则插入）。
-  Future<void> saveAll(Map<String, Object?> values, int now) async {
-    if (values.isEmpty) return;
+  /// 写入若干设置项；[removedKeys] 里的键从表中删除。
+  ///
+  /// 删除与写入放在同一个 batch 里：设置页的「恢复默认」是一次原子操作，
+  /// 拆成两次调用会在中途失败时留下一半旧值一半默认值。
+  Future<void> saveAll(
+    Map<String, Object?> values,
+    int now, {
+    List<String> removedKeys = const <String>[],
+  }) async {
+    if (values.isEmpty && removedKeys.isEmpty) return;
     await _db.batch((batch) {
+      for (final key in removedKeys) {
+        batch.deleteWhere(_db.settings, (_) => _db.settings.key.equals(key));
+      }
       for (final entry in values.entries) {
         batch.insert(
           _db.settings,

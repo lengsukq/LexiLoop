@@ -133,6 +133,7 @@ class ImportBatchSummary {
     required this.existingWords,
     required this.queuedInitializations,
     required this.createdAt,
+    required this.resetLearningProgress,
     this.completedAt,
     this.rolledBackAt,
   });
@@ -170,6 +171,9 @@ class ImportBatchSummary {
   /// 入队初始化任务数。
   final int queuedInitializations;
 
+  /// 提交时是否勾选了「重置已有词条的学习进度」。
+  final bool resetLearningProgress;
+
   /// 创建时间（epoch 毫秒）。
   final int createdAt;
 
@@ -184,11 +188,18 @@ class ImportBatchSummary {
 
   /// 是否可无损撤销。
   ///
-  /// 与旧版 `rollback_eligibility` 一致：只有「纯新增 + 未改动已有词条 +
-  /// 已提交」的批次才允许撤销。真正的依赖检查（复习日志、错词、会话）
-  /// 在服务层执行，此处只做静态判断，用于提前禁用按钮。
+  /// 必须与 `CsvImportService._assertStaticEligibility` 的四个条件**逐条相同**：
+  /// 已提交 + 仅新增 + 未重置学习进度 + 未改动已有词条。少一条，按钮就会亮起
+  /// 然后被服务层拒绝——用户看到的是「按钮能点，但一按就报错」，
+  /// 比一开始就置灰更难信任。
+  ///
+  /// 真正的依赖检查（复习日志、错词、会话引用）在服务层执行，
+  /// 此处只做静态判断，用于提前禁用按钮。
   bool get canRollback =>
-      status == ImportBatchStatus.committed && existingWords == 0;
+      status == ImportBatchStatus.committed &&
+      importMode == ImportMode.skipExisting &&
+      !resetLearningProgress &&
+      existingWords == 0;
 }
 
 /// 批次中的一行摘要（明细列表用）。

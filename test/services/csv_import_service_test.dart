@@ -151,6 +151,7 @@ void main() {
       final committed = await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
 
@@ -221,6 +222,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
 
@@ -236,6 +238,7 @@ void main() {
       final committed = await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
 
@@ -262,6 +265,7 @@ void main() {
         service.commit(
           batchId: result.batchId,
           mode: ImportMode.skipExisting,
+          resetLearningProgress: false,
           now: now + importPreviewTtlMs + 1,
         ),
         throwsA(
@@ -279,12 +283,14 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
       await expectLater(
         service.commit(
           batchId: result.batchId,
           mode: ImportMode.skipExisting,
+          resetLearningProgress: false,
           now: now,
         ),
         throwsA(
@@ -299,7 +305,12 @@ void main() {
 
     test('批次 ID 非法时抛 importBatchIdInvalid', () async {
       await expectLater(
-        service.commit(batchId: 0, mode: ImportMode.skipExisting, now: now),
+        service.commit(
+          batchId: 0,
+          mode: ImportMode.skipExisting,
+          resetLearningProgress: false,
+          now: now,
+        ),
         throwsA(
           isA<AppError>().having(
             (error) => error.code,
@@ -319,6 +330,7 @@ void main() {
       final committed = await service.commit(
         batchId: result.batchId,
         mode: mode,
+        resetLearningProgress: false,
         now: now,
       );
       expect(committed.existing, 1);
@@ -381,6 +393,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.fillMissing,
+        resetLearningProgress: false,
         now: now,
       );
       expect(await countOf('initialization_jobs'), 0);
@@ -393,6 +406,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
       expect(await countOf('words'), 2);
@@ -420,6 +434,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
       final words = await db.select(db.words).get();
@@ -446,6 +461,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
       final word = await db.select(db.words).getSingle();
@@ -478,6 +494,7 @@ void main() {
       await service.commit(
         batchId: result.batchId,
         mode: ImportMode.fillMissing,
+        resetLearningProgress: false,
         now: now,
       );
 
@@ -542,6 +559,7 @@ void main() {
       await service.commit(
         batchId: committed.batchId,
         mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
         now: now,
       );
 

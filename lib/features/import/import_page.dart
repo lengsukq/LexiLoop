@@ -289,6 +289,20 @@ class _PreviewStep extends ConsumerWidget {
 
   final ImportPreview preview;
 
+  /// 勾了「重置学习进度」就先拦一道：这一步不可撤销，也不能靠「撤销批次」
+  /// 找回——撤销要求批次纯新增，而重置过的批次恰恰不是。
+  Future<void> _submit(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(importWizardProvider.notifier);
+    if (ref.read(importWizardProvider).resetLearningProgress) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => const _ResetProgressDialog(),
+      );
+      if (confirmed != true) return;
+    }
+    await notifier.commit();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(importWizardProvider);
@@ -322,10 +336,101 @@ class _PreviewStep extends ConsumerWidget {
             onTap: () => notifier.setMode(mode),
           ),
         const SizedBox(height: 12),
+        _ResetProgressOption(
+          value: state.resetLearningProgress,
+          onChanged: (next) => notifier.setResetLearningProgress(value: next),
+        ),
+        const SizedBox(height: 12),
         _SubmitButton(
           busy: state.busy,
           enabled: preview.importableRows > 0,
-          onSubmit: notifier.commit,
+          onSubmit: () => _submit(context, ref),
+        ),
+      ],
+    );
+  }
+}
+
+/// 「重置已有词条的学习进度」勾选项。
+///
+/// 缺省关闭（见 [ImportWizardState.resetLearningProgress]），并且用危险色
+/// 描边：它是本页唯一一个会删除既有数据的开关，必须和上面的模式选择
+/// 在视觉上分开。
+class _ResetProgressOption extends StatelessWidget {
+  const new({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.danger.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
+        border: Border.all(color: colors.danger.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Checkbox(
+            key: const Key('resetLearningProgress'),
+            value: value,
+            onChanged: (next) => onChanged(next ?? false),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '重置已有词条的学习进度',
+                  style: TextStyle(
+                    color: colors.danger,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '删除复习卡、复习日志、错词状态与掌握度，并撤下正在进行的'
+                  '复习题目。词典内容不删除，但这些学习历史无法恢复。'
+                  '本次新增的词条不受影响。',
+                  style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 重置学习进度前的不可撤销确认。
+class _ResetProgressDialog extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('重置已有词条的学习进度？'),
+      content: const Text(
+        '本次导入覆盖到的已有词条，其复习卡、复习日志、错词状态与掌握度'
+        '都会被删除，正在进行的复习题目也会被撤下。\n\n'
+        '词典内容不会删除，但这些学习历史无法恢复，也无法通过「撤销批次」找回。',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('resetProgressConfirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('仍然重置'),
         ),
       ],
     );

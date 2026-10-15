@@ -257,6 +257,42 @@ const double questionTypeWeightFloor = 0.001;
 /// 加权随机取值上限，避免 `cursor` 恰好落在边界外。
 const double questionTypeRandomCeiling = 0.999999;
 
+/// 权重占比换算成百分数的基数。
+///
+/// 命名带 `questionType` 前缀：`data/dictionary/dictionary_constants.dart` 已有一个
+/// 同值的 `percentScale`，而同时 import 两个文件的 `services/` 会在重名上报错。
+const int questionTypePercentScale = 100;
+
+// 题型权重预设：对应旧版
+// `src/app/(main)/settings/components/question-type-settings.tsx:31-36` 的 `PRESETS`。
+// 旧版把权重直接写在组件字面量里；本版按「数值常量唯一出处」的约定逐条具名，
+// 便于与旧版逐行对照，也便于单测钉住「预设到底设了哪些权重」。
+// 「记忆为主」里的英译中（自评）沿用 [defaultQuestionTypeWeight]，不再单列常量。
+
+/// 预设「记忆为主」给英译中（选择）的权重。
+const int recallFirstChoiceWeight = 8;
+
+/// 预设「拼写强化」给字母拼词的权重。
+const int spellingFocusLetterBankWeight = 8;
+
+/// 预设「记忆为主」给中译英（选择）的权重。
+const int recallFirstTranslateWeight = 7;
+
+/// 预设「拼写强化」给例句填空的权重。
+const int spellingFocusClozeWeight = 7;
+
+/// 预设「拼写强化」给中译英（拼写）的权重。
+const int spellingFocusSpellWeight = 9;
+
+/// 预设「听力强化」给两种听力题型的权重。
+const int listeningFocusWeight = 9;
+
+/// 预设「记忆为主」给中译英（拼写）的权重。
+///
+/// 刻意压到最低：这一档的主张是「先用选择题认词，再用拼写输出」，
+/// 拼写题在认词之前出现只会制造挫败感。
+const int recallFirstSpellingWeight = 4;
+
 /// `LETTER_BANK` 题型适用的词条模式：3–14 个纯字母。
 const String letterBankTermPattern = r'^[a-zA-Z]{3,14}$';
 
@@ -689,6 +725,28 @@ const Set<int> transientHttpStatusCodes = <int>{408, 409, 429};
 
 /// 瞬时错误的 HTTP 状态码下界（5xx）。
 const int transientServerErrorFloor = 500;
+
+/// AI 重试遍数下限。
+///
+/// 来源：旧版 `modules/settings/service.ts:77` 的 `.min(0)`。
+/// 0 与 1 在当前实现下等价——`LlmConfig` 会把候选链遍数夹到至少 1 遍。
+///
+/// **为什么叫 Floor/Ceiling/Default 而不是 `minAiRetryCount` /
+/// `defaultAiRetryCount`**：`lib/data/dictionary/dictionary_constants.dart`
+/// 已经占了后两个名字，而 `lib/services/llm/llm_config.dart` 同时 import
+/// 这两个文件，同名会让引用产生歧义。两组常量取值必须一致，
+/// 由 `test/domain/models/app_settings_test.dart` 断言。
+const int aiRetryCountFloor = 0;
+
+/// AI 重试遍数上限。
+///
+/// 来源：旧版 `modules/settings/service.ts:77` 的 `.max(5)`。
+const int aiRetryCountCeiling = 5;
+
+/// AI 重试遍数默认值。
+///
+/// 来源：旧版 `lib/config.ts` 的 `aiRetryCount: 1`，即候选链只跑一遍不重放。
+const int aiRetryCountDefault = 1;
 
 // ═══════════════════════════════════════════════════════════════
 // 词典 provider（对应旧版各 provider 实现）

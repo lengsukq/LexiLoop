@@ -95,15 +95,54 @@ class QuestionTypeConfig {
   );
 
   /// 该题型是否启用（未配置时取默认项）。
-  bool isEnabled(QuestionType type) =>
-      (_entries[type] ?? defaultQuestionTypeSetting).enabled;
+  bool isEnabled(QuestionType type) => _settingOf(type).enabled;
 
   /// 该题型的权重（未配置时取默认值）。
-  double weightOf(QuestionType type) =>
-      (_entries[type] ?? defaultQuestionTypeSetting).weight.toDouble();
+  double weightOf(QuestionType type) => _settingOf(type).weight.toDouble();
 
   /// 是否存在至少一种启用的题型。
   bool get hasEnabledType => _entries.values.any((entry) => entry.enabled);
+
+  /// 启用题型的权重之和。
+  ///
+  /// 抽题只在启用的题型之间按权重分配（对应旧版
+  /// `question-type-settings.tsx` 里 `totalWeight` 的算法），所以占比的分母
+  /// 是启用项之和而不是全部项之和——关掉一种题型必须让它剩下的分母重新归一。
+  int get totalEnabledWeight {
+    var total = 0;
+    for (final type in QuestionType.values) {
+      if (isEnabled(type)) total += _settingOf(type).weight;
+    }
+    return total;
+  }
+
+  /// 该题型占已启用总权重的百分比；未启用或没有启用项时为 0。
+  double sharePercentOf(QuestionType type) {
+    final total = totalEnabledWeight;
+    if (total <= 0 || !isEnabled(type)) return 0;
+    return weightOf(type) / total * questionTypePercentScale;
+  }
+
+  /// 全部题型的权重占比（按 [QuestionType.values] 顺序，未启用记 0）。
+  ///
+  /// 只要存在启用的题型，合计就是 [questionTypePercentScale]——界面用它画 100% 占比条，
+  /// 「各段之和」与「权重之和」必须保持同一口径，否则色条会溢出或留白。
+  List<double> sharePercents() => <double>[
+    for (final type in QuestionType.values) sharePercentOf(type),
+  ];
+
+  /// 叠加一组权重覆盖：列出的题型换权重，其余题型与所有开关原样保留。
+  QuestionTypeConfig withWeights(Map<QuestionType, int> weights) {
+    final result = <QuestionType, QuestionTypeSetting>{};
+    for (final type in QuestionType.values) {
+      final entry = _settingOf(type);
+      result[type] = QuestionTypeSetting(
+        enabled: entry.enabled,
+        weight: weights[type] ?? entry.weight,
+      );
+    }
+    return QuestionTypeConfig(result);
+  }
 
   /// 收敛到合法配置：权重夹到合法区间，且保证至少启用一种题型。
   ///
@@ -112,7 +151,7 @@ class QuestionTypeConfig {
   QuestionTypeConfig get normalized {
     final result = <QuestionType, QuestionTypeSetting>{};
     for (final type in QuestionType.values) {
-      final entry = _entries[type] ?? defaultQuestionTypeSetting;
+      final entry = _settingOf(type);
       result[type] = QuestionTypeSetting(
         enabled: entry.enabled,
         weight: entry.weight.clamp(
@@ -124,6 +163,13 @@ class QuestionTypeConfig {
     final normalized = QuestionTypeConfig(result);
     return normalized.hasEnabledType ? normalized : defaults;
   }
+
+  /// 取单个题型的配置项；未配置时取 [defaultQuestionTypeSetting]。
+  ///
+  /// 收敛成一处是因为「未配置」在这八个方法里出现了七次，
+  /// 每处各写一遍兜底迟早会漏改一处。
+  QuestionTypeSetting _settingOf(QuestionType type) =>
+      _entries[type] ?? defaultQuestionTypeSetting;
 
   /// 转回可 JSON 序列化的映射。
   Map<String, Object?> toJson() => <String, Object?>{
@@ -154,6 +200,78 @@ QuestionTypeConfig questionTypeConfigFromJson(Object? value) {
   return QuestionTypeConfig(entries).normalized;
 }
 
+/// 题型权重预设：一组「题型 → 目标权重」。
+///
+/// **权重值逐条取自旧版**
+/// `src/app/(main)/settings/components/question-type-settings.tsx:31-36` 的 `PRESETS`，
+/// 对应的数值常量在 `core/constants.dart` 中具名。
+///
+/// **预设只覆盖列出的题型**：与旧版 `applyPreset` 一致，用户手动调过的
+/// 其它题型不该被「拼写强化」顺手抹平；开关状态一律保留。
+class QuestionTypeWeightPreset {
+  /// 以标识、文案与目标权重构造。
+  const new({required this.id, required this.label, required this.weights});
+
+  /// 稳定标识（界面 Key 与测试定位用，不随文案变化）。
+  final String id;
+
+  /// 界面文案。
+  final String label;
+
+  /// 目标权重；未列出的题型保持当前值。
+  final Map<QuestionType, int> weights;
+
+  /// 把预设叠加到 [base] 上，得到可直接写回的新配置。
+  QuestionTypeConfig applyTo(QuestionTypeConfig base) =>
+      base.withWeights(weights);
+}
+
+/// 全部权重预设，按界面展示顺序排列。
+const List<QuestionTypeWeightPreset> questionTypeWeightPresets =
+    <QuestionTypeWeightPreset>[
+      QuestionTypeWeightPreset(
+        id: 'balanced',
+        label: '均衡',
+        weights: <QuestionType, int>{
+          QuestionType.enToZh: defaultQuestionTypeWeight,
+          QuestionType.enToZhChoice: defaultQuestionTypeWeight,
+          QuestionType.zhToEnChoice: defaultQuestionTypeWeight,
+          QuestionType.zhToEnSpelling: defaultQuestionTypeWeight,
+          QuestionType.listeningSpelling: defaultQuestionTypeWeight,
+          QuestionType.clozeSentence: defaultQuestionTypeWeight,
+          QuestionType.listeningChoice: defaultQuestionTypeWeight,
+          QuestionType.letterBank: defaultQuestionTypeWeight,
+        },
+      ),
+      QuestionTypeWeightPreset(
+        id: 'recallFirst',
+        label: '记忆为主',
+        weights: <QuestionType, int>{
+          QuestionType.enToZhChoice: recallFirstChoiceWeight,
+          QuestionType.zhToEnChoice: recallFirstTranslateWeight,
+          QuestionType.enToZh: defaultQuestionTypeWeight,
+          QuestionType.zhToEnSpelling: recallFirstSpellingWeight,
+        },
+      ),
+      QuestionTypeWeightPreset(
+        id: 'spellingFocus',
+        label: '拼写强化',
+        weights: <QuestionType, int>{
+          QuestionType.zhToEnSpelling: spellingFocusSpellWeight,
+          QuestionType.letterBank: spellingFocusLetterBankWeight,
+          QuestionType.clozeSentence: spellingFocusClozeWeight,
+        },
+      ),
+      QuestionTypeWeightPreset(
+        id: 'listeningFocus',
+        label: '听力强化',
+        weights: <QuestionType, int>{
+          QuestionType.listeningChoice: listeningFocusWeight,
+          QuestionType.listeningSpelling: listeningFocusWeight,
+        },
+      ),
+    ];
+
 /// 学习计划设置。
 class StudyPlanSettings {
   /// 以各字段构造。
@@ -162,6 +280,7 @@ class StudyPlanSettings {
     required this.dailyWrongWordLimit,
     required this.dailyDueReviewLimit,
     required this.targetRetentionRate,
+    required this.aiRetryCount,
   });
 
   /// 每日新词配额。
@@ -176,12 +295,20 @@ class StudyPlanSettings {
   /// 目标记忆保持率（[minRetentionRate]–[maxRetentionRate]）。
   final double targetRetentionRate;
 
+  /// AI 重试遍数（[aiRetryCountFloor]–[aiRetryCountCeiling]）。
+  ///
+  /// **为什么放在学习计划分组**：旧版把它和配额放在同一张卡片里
+  /// （`study-plan-settings.tsx:29`），用户的心智模型是「这套学习流程要花
+  /// 多少 AI 调用」。但它的读取方是 LLM 客户端而不是任何队列逻辑。
+  final int aiRetryCount;
+
   /// 默认值。
   static const StudyPlanSettings defaults = StudyPlanSettings(
     dailyNewWords: defaultDailyNewWords,
     dailyWrongWordLimit: defaultDailyWrongWordLimit,
     dailyDueReviewLimit: defaultDailyDueReviewLimit,
     targetRetentionRate: defaultRetentionRate,
+    aiRetryCount: aiRetryCountDefault,
   );
 
   /// 转回存储键值。
@@ -190,6 +317,7 @@ class StudyPlanSettings {
     'dailyWrongWordLimit': dailyWrongWordLimit,
     'dailyDueReviewLimit': dailyDueReviewLimit,
     'targetRetentionRate': targetRetentionRate,
+    'aiRetryCount': aiRetryCount,
   };
 }
 
@@ -399,6 +527,12 @@ StudyPlanSettings _parseStudyPlan(_SettingsReader reader) {
       fallback.targetRetentionRate,
       min: minRetentionRate,
       max: maxRetentionRate,
+    ),
+    aiRetryCount: reader.intValue(
+      'aiRetryCount',
+      fallback.aiRetryCount,
+      min: aiRetryCountFloor,
+      max: aiRetryCountCeiling,
     ),
   );
 }

@@ -24,17 +24,23 @@ final FutureProvider<DailyStudyPlan> dailyPlanProvider =
           .dailyPlan(now: ref.watch(dashboardNowProvider)),
     );
 
-/// 全局概览（总词数、掌握分布、到期、错词、今日已答、连续天数、新词）。
+/// 全局概览（总词数、掌握分布、到期、错词、今日已答、连续天数、新词、
+/// 今日完成度与正确率、初始化失败数）。
 ///
 /// 这里直接构造 [WordDetailDao] 而不再包一层提供者：详情页已经有一个
 /// 同类型提供者，若从那边取会形成「详情 ↔ 仪表盘」的相互依赖；
 /// DAO 本身无状态且构造是 `const`，直接构造没有额外成本。
+///
+/// **今日目标总题数取自 [DailyStudyPlan]**：剩余题数由抽题与每日配额
+/// 决定，那套逻辑在服务层；概览自己再算一遍必然与卡片上「N 题待完成」
+/// 对不上，目标也就失去了参照物。
 final FutureProvider<DashboardOverview> dashboardOverviewProvider =
-    FutureProvider<DashboardOverview>(
-      (ref) =>
-          WordDetailDao(ref.watch(databaseProvider))
-              .overview(ref.watch(dashboardNowProvider)),
-    );
+    FutureProvider<DashboardOverview>((ref) async {
+      final now = ref.watch(dashboardNowProvider);
+      final plan = await ref.watch(studyServiceProvider).dailyPlan(now: now);
+      final dao = WordDetailDao(ref.watch(databaseProvider));
+      return await dao.overview(now, plannedRemaining: plan.plannedTotal);
+    });
 
 /// 每日建议服务的提供者。
 final Provider<SuggestionService> suggestionServiceProvider =

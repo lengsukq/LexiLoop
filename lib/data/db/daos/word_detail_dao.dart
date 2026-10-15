@@ -523,6 +523,10 @@ class DashboardOverview {
     required this.reviewedToday,
     required this.streakDays,
     required this.newWordsAvailable,
+    required this.completedToday,
+    required this.todayGoalTotal,
+    required this.todayAccuracy,
+    required this.failedWords,
   });
 
   /// 词条总数。
@@ -545,6 +549,29 @@ class DashboardOverview {
 
   /// 尚未建立复习卡片、可以开始学的新词数。
   final int newWordsAvailable;
+
+  /// 今日已处理的题数（已作答 + 用户主动跳过）。
+  ///
+  /// 系统收尾的跳过（会话过期、进度重置）不算：它们不是用户的意愿，
+  /// 计入会让「今日完成度」凭空前进。
+  final int completedToday;
+
+  /// 今日目标总题数 = 今日已处理 + 今日还剩。
+  ///
+  /// 目标是**当天结束时应当完成的累计量**，而不是「今天新开的题数」；
+  /// 否则上午看到 0/20、下午看到 0/20，进度条永远不会动。
+  /// 剩余部分由调用方用 [DailyStudyPlan.plannedTotal] 注入，本 DAO
+  /// 不重算抽题逻辑（那会让首页与学习页的题数各算各的）。
+  final int todayGoalTotal;
+
+  /// 今日正确率（0–1）；今日没有作答时为 `0`。
+  final double todayAccuracy;
+
+  /// 初始化失败的词条数。
+  ///
+  /// 与「今日到期」「错词」不同，这不是学习指标而是**待修的故障**，
+  /// 首页用它提示用户去初始化页处理。
+  final int failedWords;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -593,10 +620,21 @@ WHERE word_id = ?
 ORDER BY reviewed_at DESC, id DESC
 LIMIT ?''';
 
+/// 系统收尾写入的跳过原因：会话过期。
+///
+/// 与 `StudyDao` 的同名常量逐字一致（两处都不是 `public`，只能各留一份，
+/// 靠这里与那里的注释互相对照）。它们**不计入**今日已处理：超时收尾时
+/// 用户并没有主动放弃，把它们算成完成会让进度条虚高。
+const String _sessionExpiredSkipReason = 'SESSION_EXPIRED';
+
+/// 系统收尾写入的跳过原因：学习进度被重置。
+const String _progressResetSkipReason = 'PROGRESS_RESET';
+
 /// 概览查询。
 ///
-/// 五个计数用标量子查询一次取回，省去五次往返；`?` 的顺序为
-/// 「当前时间」「今日零点」，与 [WordDetailDao.overview] 的绑定顺序一致。
+/// 计数用标量子查询一次取回，省去多次往返；`?` 的顺序为
+/// 「当前时间」「今日零点」「今日零点」「FAILED」，与
+/// [WordDetailDao.overview] 的绑定顺序一致。
 ///
 /// `READY`/`PARTIAL` 的过滤条件与 `StudyDao` 的候选准入条件保持一致：
 /// 未就绪的词条不该被算进「今天要复习多少」。
@@ -610,12 +648,21 @@ SELECT
       AND w.initialization_status IN ('READY', 'PARTIAL')) AS due_today,
   (SELECT count(*) FROM wrong_word_states WHERE active = 1) AS wrong_words,
   (SELECT count(*) FROM review_logs WHERE reviewed_at >= ?) AS reviewed_today,
+  (SELECT count(*) FROM study_session_items i
+    WHERE i.status = 'SKIPPED'
+      AND i.answered_at >= ?
+      AND i.skip_reason IS NOT ?
+      AND i.skip_reason IS NOT ?) AS skipped_today,
+  (SELECT count(*) FROM review_logs
+    WHERE reviewed_at >= ? AND is_correct = 1) AS correct_today,
   (SELECT count(*) FROM words w
     WHERE w.is_suspended = 0
       AND w.initialization_status IN ('READY', 'PARTIAL')
       AND NOT EXISTS (
         SELECT 1 FROM review_cards rc WHERE rc.word_id = w.id
-      )) AS new_words''';
+      )) AS new_words,
+  (SELECT count(*) FROM words
+    WHERE initialization_status = ?) AS failed_words''';
 
 // ═══════════════════════════════════════════════════════════════
 // DAO
@@ -689,30 +736,60 @@ class WordDetailDao {
     return rows.map(_mapLog).toList(growable: false);
   }
 
-  /// 全局概览：词条总数、掌握分布、今日到期、错词、今日已答、连续天数、新词。
-  Future<DashboardOverview> overview(int now) async {
-    final row = await _db
-        .customSelect(
-          _overviewSql,
-          variables: <Variable<Object>>[
-            Variable<int>(now),
-            Variable<int>(startOfLocalDay(now)),
-          ],
-        )
-        .getSingle();
-    final byMastery = await WordDao(_db).countByMastery();
-    final streak = await _streakDays(now);
+  /// 全局概览：词条总数、掌握分布、今日到期、错词、今日已答、连续天数、
+  /// 新词、今日完成度、今日正确率与初始化失败数。
+  ///
+  /// [plannedRemaining] 由调用方从 [DailyStudyPlan.plannedTotal] 取，
+  /// 本方法不重算抽题——配额与随机抽题属于服务层，DAO 再实现一遍必然
+  /// 与首页显示的题数对不上。
+  Future<DashboardOverview> overview(
+    int now, {
+    int plannedRemaining = 0,
+  }) async {
+    final row = await _overviewRow(now);
+    final completedToday =
+        row.read<int>('reviewed_today') + row.read<int>('skipped_today');
 
     return DashboardOverview(
       totalWords: row.read<int>('total_words'),
-      byMastery: byMastery,
+      byMastery: await WordDao(_db).countByMastery(),
       dueToday: row.read<int>('due_today'),
       wrongWords: row.read<int>('wrong_words'),
       reviewedToday: row.read<int>('reviewed_today'),
-      streakDays: streak,
+      streakDays: await _streakDays(now),
       newWordsAvailable: row.read<int>('new_words'),
+      completedToday: completedToday,
+      todayGoalTotal: completedToday + plannedRemaining,
+      todayAccuracy: _accuracyOf(
+        correct: row.read<int>('correct_today'),
+        total: row.read<int>('reviewed_today'),
+      ),
+      failedWords: row.read<int>('failed_words'),
     );
   }
+
+  /// 执行概览查询。
+  Future<QueryRow> _overviewRow(int now) => _db
+      .customSelect(
+        _overviewSql,
+        variables: <Variable<Object>>[
+          Variable<int>(now),
+          Variable<int>(startOfLocalDay(now)),
+          Variable<int>(startOfLocalDay(now)),
+          const Variable<String>(_sessionExpiredSkipReason),
+          const Variable<String>(_progressResetSkipReason),
+          Variable<int>(startOfLocalDay(now)),
+          Variable<String>(InitializationStatus.failed.wire),
+        ],
+      )
+      .getSingle();
+
+  /// 今日正确率。
+  ///
+  /// 没有作答时给 `0` 而不是 `null`：首页把它当数值直接参与布局，
+  /// 可空会让「今日完成度」一行多出一套空态分支。
+  double _accuracyOf({required int correct, required int total}) =>
+      total == 0 ? 0 : correct / total;
 
   /// 连续复习天数：从今天（或昨天）起逐日向前数。
   ///

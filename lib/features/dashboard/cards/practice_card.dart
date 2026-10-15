@@ -5,11 +5,17 @@
 /// **为什么这些入口在首页而不是导航栏**：小游戏与音标训练是「独立模式，
 /// 不占用今日复习队列」（旧版原文），放进主导航会让人误以为它们是日常
 /// 必做项。放在首页作为可选项，语义更准确。
+///
+/// 专项学习模式（听力、拼写、句子）也归在这里：它们同样不计入每日计划的
+/// 配额（旧版 `dailyProgress` 只统计 `DAILY` 会话），但走的是学习会话页，
+/// 因此地址是 `/study?mode=…` 而不是小游戏页。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
+import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 趣味训练入口。
@@ -70,43 +76,66 @@ class PracticeEntry {
 
 /// 全部训练入口。
 ///
-/// 顺序与旧版首页一致：配对 → 音标 → 四个小游戏。
-const List<PracticeEntry> practiceEntries = <PracticeEntry>[
-  PracticeEntry(
+/// 顺序与旧版首页一致：配对 → 音标 → 四个小游戏 → 三个专项模式。
+/// 专项模式排在最后：它们借用同一个学习会话页，与小游戏的「玩一把」
+/// 心智不同，混排会让用户以为点开还是游戏。
+///
+/// **不是 `const` 列表**：专项入口的地址由 [studyModeLocation] 解析，
+/// 它要读导航表才能得到 `/study`，编译期算不出来。
+final List<PracticeEntry> practiceEntries = <PracticeEntry>[
+  const PracticeEntry(
     label: '限时配对',
     subtitle: '英文与释义组队',
     icon: Icons.grid_view_rounded,
     location: '/match',
   ),
-  PracticeEntry(
+  const PracticeEntry(
     label: '音标辨音',
     subtitle: '听音、音标与拼写',
     icon: Icons.graphic_eq_rounded,
     location: '/phonetics',
   ),
-  PracticeEntry(
+  const PracticeEntry(
     label: '单词拼图',
     subtitle: '点击字母完成拼写',
     icon: Icons.extension_outlined,
     location: '/games?mode=WORD_BUILDER',
   ),
-  PracticeEntry(
+  const PracticeEntry(
     label: '词汇地鼠',
     subtitle: '锤出正确单词',
     icon: Icons.hardware_outlined,
     location: '/games?mode=WHACK_A_MOLE',
   ),
-  PracticeEntry(
+  const PracticeEntry(
     label: '单词堆堆乐',
     subtitle: '点词块搭高塔',
     icon: Icons.layers_outlined,
     location: '/games?mode=WORD_STACK',
   ),
-  PracticeEntry(
+  const PracticeEntry(
     label: '词汇俄罗斯方块',
     subtitle: '点中下落的正确单词',
     icon: Icons.view_module_outlined,
     location: '/games?mode=WORD_TETRIS',
+  ),
+  PracticeEntry(
+    label: '听力拼写',
+    subtitle: '听发音后输入词条',
+    icon: Icons.headphones_rounded,
+    location: studyModeLocation(StudyMode.listening),
+  ),
+  PracticeEntry(
+    label: '中文拼写',
+    subtitle: '根据释义回忆英文',
+    icon: Icons.draw_rounded,
+    location: studyModeLocation(StudyMode.spelling),
+  ),
+  PracticeEntry(
+    label: '句子复习',
+    subtitle: '理解与还原完整句子',
+    icon: Icons.forum_outlined,
+    location: studyModeLocation(StudyMode.sentenceReview),
   ),
 ];
 

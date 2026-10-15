@@ -5,6 +5,7 @@
 /// 才发现；这里全部具名。
 library;
 
+import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 
 /// 一次入队请求。
@@ -199,13 +200,42 @@ class InitializationJobPage {
   final int total;
 }
 
+/// 词条级完成度。
+///
+/// 队列页真正回答的问题是「我导入的词条补全到几成了」，
+/// 而不是「有多少个任务跑完了」——一个词条挂 3 个任务，
+/// 任务口径会把它的权重放大三倍。
+class InitializationWordCompletion {
+  /// 以词条总数与已完成数构造。
+  const new({required this.totalWords, required this.completedWords});
+
+  /// 队列里出现过任务的词条总数。
+  ///
+  /// 分母与 `listJobs` 的取数口径一致（只算有任务的词条），
+  /// 否则进度条会和下面的列表对不上。
+  final int totalWords;
+
+  /// 全部任务都已进入终态的词条数。
+  final int completedWords;
+
+  /// 完成百分比（0–100，整数）。
+  ///
+  /// 队列为空时是 0 而不是除零：空队列没有「完成」可言。
+  int get percent => totalWords == 0
+      ? 0
+      : (completedWords * percentScale / totalWords).round();
+}
+
 /// 各状态的任务计数。
 class InitializationProgress {
-  /// 以各状态计数构造。
-  const new(this.counts);
+  /// 以各状态计数与词条完成度构造。
+  const new(this.counts, {required this.completion});
 
   /// 状态 → 计数。
   final Map<InitializationStatus, int> counts;
+
+  /// 词条级完成度。
+  final InitializationWordCompletion completion;
 
   /// 取某状态的计数（缺失为 0）。
   int countOf(InitializationStatus status) => counts[status] ?? 0;

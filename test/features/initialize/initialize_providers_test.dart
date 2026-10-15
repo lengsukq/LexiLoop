@@ -64,12 +64,13 @@ void main() {
   late _AdvancingRunner runner;
   late ProviderContainer container;
   late int now;
+  late int jobWordId;
 
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     runner = _AdvancingRunner(db);
     now = DateTime(2026, 3, 1, 10).millisecondsSinceEpoch;
-    final wordId = await db
+    jobWordId = await db
         .into(db.words)
         .insert(
           WordsCompanion.insert(
@@ -89,7 +90,7 @@ void main() {
         .into(db.initializationJobs)
         .insert(
           InitializationJobsCompanion.insert(
-            wordId: wordId,
+            wordId: jobWordId,
             mode: InitializationMode.skipInitialized,
             status: const Value<InitializationStatus>(
               InitializationStatus.queued,
@@ -166,4 +167,130 @@ void main() {
     expect(container.read(backgroundTickProvider), stamp);
     expect(identical(container.read(queuePageProvider), pageBefore), isTrue);
   });
+
+  test('翻页会带着页码重查，翻过头就查不到数据', () async {
+    expect(
+      (await container.read(queuePageProvider.future)).items,
+      hasLength(1),
+    );
+
+    container
+        .read(queueFilterProvider.notifier)
+        .replace(const QueueFilter(page: 2));
+
+    final page = await container.read(queuePageProvider.future);
+    // 页码进了 SQL（结果为空），且 total 不随页码变化。
+    expect(page.items, isEmpty);
+    expect(page.total, 1);
+  });
+
+  test('页码可以停在用户翻到的页上', () {
+    final moved = filterAfter(
+      container,
+      (current) => const QueueFilter(page: 3, search: 'a'),
+    );
+
+    expect(moved.page, 3);
+  });
+
+  test('改关键词会把页码复位到 1', () {
+    filterAfter(
+      container,
+      (current) => const QueueFilter(page: 3, search: 'a'),
+    );
+    final searched = filterAfter(
+      container,
+      (current) => current.copyWith(search: 'ab'),
+    );
+
+    expect(searched.page, 1);
+    expect(searched.search, 'ab');
+  });
+
+  test('改状态筛选会把页码复位到 1', () {
+    filterAfter(container, (current) => const QueueFilter(page: 4));
+    final filtered = filterAfter(
+      container,
+      (current) => current.copyWith(status: InitializationStatus.failed),
+    );
+
+    expect(filtered.page, 1);
+    expect(filtered.status, InitializationStatus.failed);
+  });
+
+  test('多选只跟着点名过的词条走', () {
+    expect(selectionAfter(container, (notifier) => notifier.toggle(1)), <int>{
+      1,
+    });
+    // 再点一次就是取消，而不是「又加了一个」。
+    expect(
+      selectionAfter(container, (notifier) => notifier.toggle(1)),
+      isEmpty,
+    );
+
+    expect(selectionAfter(container, (notifier) => notifier.toggle(1)), <int>{
+      1,
+    });
+    expect(selectionAfter(container, (notifier) => notifier.toggle(3)), <int>{
+      1,
+      3,
+    });
+    // 全选当前页只增不减，别的页勾过的词条不会被这里带走。
+    expect(
+      selectionAfter(
+        container,
+        (notifier) => notifier.setVisible(<int>[1, 3], selected: true),
+      ),
+      <int>{1, 3},
+    );
+    expect(
+      selectionAfter(
+        container,
+        (notifier) => notifier.setVisible(<int>[3], selected: false),
+      ),
+      <int>{1},
+    );
+    expect(selectionAfter(container, (notifier) => notifier.clear()), isEmpty);
+  });
+
+  test('词条级重试把选中的任务重排并让界面重查', () async {
+    await container.read(queuePageProvider.future);
+    await db.customUpdate(
+      'UPDATE initialization_jobs SET status = ? WHERE word_id = ?',
+      variables: <Variable<Object>>[
+        Variable<String>(InitializationStatus.failed.wire),
+        Variable<int>(jobWordId),
+      ],
+      updateKind: UpdateKind.update,
+    );
+
+    final retried = await container.read(queueActionsProvider).retryWords(<int>[
+      jobWordId,
+    ]);
+
+    expect(retried, 1);
+    final page = await container.read(queuePageProvider.future);
+    expect(page.items.single.status, InitializationStatus.queued);
+  });
+}
+
+/// 施加一次筛选变更并返回变更后的筛选条件。
+///
+/// 「变更 + 取值」收进同一个调用，断言之间不会出现可级联的重复接收者。
+QueueFilter filterAfter(
+  ProviderContainer container,
+  QueueFilter Function(QueueFilter current) change,
+) {
+  final next = change(container.read(queueFilterProvider));
+  container.read(queueFilterProvider.notifier).replace(next);
+  return container.read(queueFilterProvider);
+}
+
+/// 施加一次多选操作并返回变更后的选中集合。
+Set<int> selectionAfter(
+  ProviderContainer container,
+  void Function(QueueSelectionNotifier notifier) action,
+) {
+  action(container.read(queueSelectionProvider.notifier));
+  return container.read(queueSelectionProvider);
 }

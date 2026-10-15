@@ -7,6 +7,11 @@
 /// - 需要保留外壳（侧边栏 / 底部 Tab）的页面挂在分支下，例如词条详情；
 /// - 需要独占屏幕的向导类页面（CSV 导入）挂在顶层，避免用户在多步流程里
 ///   被导航分散注意力。
+///
+/// **专项学习模式走 query 而非独立路径**：8 种模式共用同一个会话页与
+/// 同一套出题逻辑，拆成 8 条路径会让 `immersivePaths`、分支高亮与返回栈
+/// 各自多出 8 个分支。`/study?mode=WRONG_WORDS` 既是旧版地址，也是首页
+/// 队列卡片的落点。
 library;
 
 import 'package:flutter/material.dart';
@@ -32,11 +37,18 @@ import 'package:lexiloop/ui/navigation/destinations.dart';
 const String importPath = '/import';
 
 /// 全局路由实例。
-final GoRouter appRouter = _createRouter();
+final GoRouter appRouter = createAppRouter();
 
-GoRouter _createRouter() {
+/// 构造一份新的路由表。
+///
+/// 导出成函数而不是只用全局单例：GoRouter 持有匹配结果与导航栈，
+/// 跨用例复用会让路由断言依赖执行顺序，测试必须每个用例拿一份干净的。
+///
+/// [initialLocation] 允许测试直接落在目标路由上，不必先渲染首页——
+/// 首页会牵出 AI 建议等与被测行为无关的异步工作。
+GoRouter createAppRouter({String initialLocation = '/'}) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: initialLocation,
     routes: <RouteBase>[
       GoRoute(
         path: importPath,
@@ -59,7 +71,7 @@ GoRouter _createRouter() {
               routes: <RouteBase>[
                 GoRoute(
                   path: destination.path,
-                  builder: (context, state) => _pageFor(destination),
+                  builder: (context, state) => _pageFor(destination, state),
                   routes: _subRoutesFor(destination),
                 ),
               ],
@@ -70,7 +82,7 @@ GoRouter _createRouter() {
   );
 }
 
-Widget _pageFor(AppDestination destination) {
+Widget _pageFor(AppDestination destination, GoRouterState state) {
   return switch (destination.path) {
     '/' => const DashboardPage(),
     '/add' => const AddPage(),
@@ -81,9 +93,19 @@ Widget _pageFor(AppDestination destination) {
     '/words' => const WordsPage(),
     '/settings' => const SettingsPage(),
     '/statistics' => const StatisticsPage(),
-    '/study' => const StudyPage(mode: StudyMode.daily),
+    '/study' => StudyPage(mode: studyModeOf(state.uri.queryParameters['mode'])),
     _ => PlaceholderPage(destination: destination),
   };
+}
+
+/// 把 `/study?mode=` 的取值解析成 [StudyMode]。
+///
+/// **必须兜底而不是抛错**：首页「开始学习」、导航 `⌘2` 与旧书签都直接
+/// 落到裸 `/study`，一个拼错的 `mode` 若抛异常，整页会白屏且没有返回
+/// 入口。兜底到 [StudyMode.daily] 也正是旧版 `study` 页的行为。
+StudyMode studyModeOf(String? wire) {
+  if (wire == null) return StudyMode.daily;
+  return wireLookup(StudyMode.values, wire) ?? StudyMode.daily;
 }
 
 /// 子路由。

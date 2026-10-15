@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
@@ -22,7 +23,21 @@ class QueueProgressCard extends ConsumerWidget {
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(cardPadding),
       child: progress.when(
-        data: (data) => _Counts(progress: data),
+        data: (data) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _Completion(progress: data.completion),
+            if (data.total > 0) ...<Widget>[
+              const SizedBox(height: cardGap),
+              _Counts(progress: data),
+            ] else
+              Text(
+                '队列为空。导入词条后任务会出现在这里。',
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: context.lexiColors.tertiaryLabel),
+              ),
+          ],
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Text(
           '加载失败：$error',
@@ -30,6 +45,59 @@ class QueueProgressCard extends ConsumerWidget {
               ?.copyWith(color: context.lexiColors.danger),
         ),
       ),
+    );
+  }
+}
+
+/// 词条级完成百分比与进度条。
+///
+/// 放在计数行之上：用户想知道的是「还剩多少词条没补全」，
+/// 而不是队列里 QUEUED 和 RUNNING 各堆了多少条。
+class _Completion extends StatelessWidget {
+  const new({required this.progress});
+
+  final InitializationWordCompletion progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                '已完成 ${progress.completedWords} / ${progress.totalWords} 个词条',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.secondaryLabel,
+                ),
+              ),
+            ),
+            Text(
+              '${progress.percent}%',
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: colors.label,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: barGap),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(LexiRadius.sm),
+          child: LinearProgressIndicator(
+            value: progress.totalWords == 0
+                ? 0
+                : progress.percent / percentScale,
+            minHeight: barHeight,
+            backgroundColor: colors.fill,
+            color: colors.accent,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -42,13 +110,6 @@ class _Counts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (progress.total == 0) {
-      return Text(
-        '队列为空。导入词条后任务会出现在这里。',
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: context.lexiColors.tertiaryLabel),
-      );
-    }
     return Wrap(
       spacing: columnGap,
       runSpacing: rowGap,
@@ -117,6 +178,15 @@ Color statusColor(InitializationStatus status, LexiColors colors) =>
 
 /// 卡片内边距。
 const double cardPadding = 16;
+
+/// 完成度与计数行之间的间距。
+const double cardGap = 14;
+
+/// 标题与进度条之间的间距。
+const double barGap = 8;
+
+/// 进度条高度。
+const double barHeight = 6;
 
 /// 计数单元宽度。
 const double cellWidth = 84;

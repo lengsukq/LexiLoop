@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/features/initialize/widgets/queue_bulk_bar.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_list.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_progress_card.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart';
@@ -23,36 +24,56 @@ class InitializePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return AmbientBackground(
+    return const AmbientBackground(
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            pagePadding,
-            pagePadding,
-            pagePadding,
-            pagePaddingBottom,
-          ),
+        child: Stack(
           children: <Widget>[
-            Text(
-              '初始化队列',
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(color: context.lexiColors.label),
-            ),
-            const SizedBox(height: subtitleGap),
-            Text(
-              '词条导入后会排队补全释义、音标、例句等字段。',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: context.lexiColors.tertiaryLabel),
-            ),
-            const SizedBox(height: sectionGap),
-            const QueueProgressCard(),
-            const SizedBox(height: sectionGap),
-            const QueueToolbar(),
-            const SizedBox(height: itemGap),
-            const QueueList(),
+            _PageBody(),
+            // 浮条压在列表之上：多选条要跟着视线出现在底部，
+            // 而不是把列表往下推（那会让刚选中的行离开视野）。
+            Align(alignment: Alignment.bottomCenter, child: QueueBulkBar()),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 页头、概览、工具栏与列表。
+///
+/// 拆成独立控件是为了守住 `build()` 的 80 行上限：这一页还在长，
+/// 每一块内容都应该能单独换掉而不动骨架。
+class _PageBody extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        pagePadding,
+        pagePadding,
+        pagePadding,
+        pagePaddingBottom,
+      ),
+      children: <Widget>[
+        Text(
+          '初始化队列',
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(color: context.lexiColors.label),
+        ),
+        const SizedBox(height: subtitleGap),
+        Text(
+          '词条导入后会排队补全释义、音标、例句等字段。',
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: context.lexiColors.tertiaryLabel),
+        ),
+        const SizedBox(height: sectionGap),
+        const QueueProgressCard(),
+        const SizedBox(height: sectionGap),
+        const QueueToolbar(),
+        const SizedBox(height: itemGap),
+        const QueueList(),
+      ],
     );
   }
 }

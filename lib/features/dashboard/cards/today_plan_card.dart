@@ -1,8 +1,17 @@
 /// 今日计划卡片。
+///
+/// 对应旧版首页的 hero + 「今日队列」：计划总题数、今日完成度进度条、
+/// 到期复习 / 错词 / 新词三条队列，以及进入学习的入口。
+///
+/// **队列行是入口而不是只读统计**：旧版 `QueueCard` 带 `href`，
+/// 本版一度把它们做成纯文本行，于是「错词强化」在首页只能看不能点，
+/// 唯一的入口是学习页里的模式选择。本版按 query 深链回到对应模式。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
@@ -15,7 +24,13 @@ const Key startStudyButtonKey = Key('dashboard-start-study');
 /// 今日计划总题数的 Key，供测试定位。
 const Key plannedTotalKey = Key('dashboard-planned-total');
 
-/// 今日计划卡片：到期复习 / 错词 / 新词的计划数与可用数、预估耗时。
+/// 今日完成度文字（含百分比）的 Key，供测试定位。
+const Key goalProgressKey = Key('dashboard-goal-progress');
+
+/// 「今日目标已达成」徽章的 Key，供测试定位。
+const Key goalReachedBadgeKey = Key('dashboard-goal-reached');
+
+/// 今日计划卡片：到期复习 / 错词 / 新词的计划数与可用数、今日完成度。
 class TodayPlanCard extends ConsumerWidget {
   /// 创建今日计划卡片。
   const new({super.key});
@@ -23,6 +38,7 @@ class TodayPlanCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plan = ref.watch(dailyPlanProvider);
+    final overview = ref.watch(dashboardOverviewProvider);
     return DashboardCard(
       title: '今日计划',
       icon: Icons.today_rounded,
@@ -32,13 +48,47 @@ class TodayPlanCard extends ConsumerWidget {
           message: '学习计划加载失败：$error',
           onRetry: () => ref.invalidate(dailyPlanProvider),
         ),
-        data: (value) => _PlanBody(plan: value),
+        data: (value) => _PlanBody(
+          plan: value,
+          overview: switch (overview) {
+            AsyncData<DashboardOverview>(:final value) => value,
+            _ => null,
+          },
+        ),
       ),
     );
   }
 }
 
 class _PlanBody extends StatelessWidget {
+  const new({required this.plan, required this.overview});
+
+  final DailyStudyPlan plan;
+
+  /// 概览；尚未加载或失败时为 `null`，此时不显示完成度而不是显示 0%。
+  final DashboardOverview? overview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _PlannedHeadline(plan: plan),
+        const SizedBox(height: 12),
+        if (overview != null) ...<Widget>[
+          _GoalProgress(overview: overview!),
+          const SizedBox(height: 12),
+        ],
+        _PlanQueues(plan: plan),
+        const SizedBox(height: 12),
+        const _StartStudyButton(),
+      ],
+    );
+  }
+}
+
+/// 计划总题数与预估耗时。
+class _PlannedHeadline extends StatelessWidget {
   const new({required this.plan});
 
   final DailyStudyPlan plan;
@@ -46,49 +96,139 @@ class _PlanBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: <Widget>[
+        Text(
+          '${plan.plannedTotal}',
+          key: plannedTotalKey,
+          style: TextStyle(
+            color: colors.label,
+            fontSize: 34,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.8,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '题待完成',
+          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+        ),
+        const Spacer(),
+        Text(
+          '预估 ${plan.estimatedMinutes} 分钟',
+          style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
+
+/// 今日完成度：进度条 + 达成徽章。
+///
+/// **目标为 0 时不显示达成徽章**：没有计划就没有目标，
+/// 「0 >= 0」成立会让徽章在空库用户首页永远亮着。
+class _GoalProgress extends StatelessWidget {
+  const new({required this.overview});
+
+  final DashboardOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final total = overview.todayGoalTotal;
+    final reached = total > 0 && overview.completedToday >= total;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
           children: <Widget>[
             Text(
-              '${plan.plannedTotal}',
-              key: plannedTotalKey,
-              style: TextStyle(
-                color: colors.label,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.8,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '题待完成',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              '今日完成度',
+              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
             ),
             const Spacer(),
+            if (reached) ...<Widget>[
+              const _GoalReachedBadge(),
+              const SizedBox(width: 8),
+            ],
             Text(
-              '预估 ${plan.estimatedMinutes} 分钟',
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
+              _progressLabel(overview),
+              key: goalProgressKey,
+              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        DashboardStatRow(
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(LexiRadius.sm),
+          child: LinearProgressIndicator(
+            value: _progressValue(overview),
+            minHeight: 6,
+            backgroundColor: colors.fill,
+            valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 「今日目标已达成」徽章。
+class _GoalReachedBadge extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Container(
+      key: goalReachedBadgeKey,
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: colors.success.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+      ),
+      child: Text(
+        '今日目标已达成',
+        style: TextStyle(
+          color: colors.success,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// 三条可跳转的队列行 + 只读的句子复习行。
+class _PlanQueues extends StatelessWidget {
+  const new({required this.plan});
+
+  final DailyStudyPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _QueueRow(
+          mode: StudyMode.dueReview,
           label: '到期复习',
           value: '${plan.plannedDueReviewCount}',
           note: ' / ${plan.dueReviewCount} 可用',
           valueKey: const Key('dashboard-due-review'),
         ),
-        DashboardStatRow(
+        _QueueRow(
+          mode: StudyMode.wrongWords,
           label: '错词',
           value: '${plan.plannedWrongWordCount}',
           note: ' / ${plan.wrongWordCount} 可用',
           valueKey: const Key('dashboard-wrong-words'),
         ),
-        DashboardStatRow(
+        _QueueRow(
+          mode: StudyMode.newWords,
           label: '新词',
           value: '${plan.plannedNewWordCount}',
           note: ' / ${plan.newWordCount} 可用',
@@ -100,17 +240,79 @@ class _PlanBody extends StatelessWidget {
           note: ' / ${plan.sentenceReviewCount} 可用',
           valueKey: const Key('dashboard-sentences'),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            key: startStudyButtonKey,
-            onPressed: () => goToDestination(context, '复习'),
-            icon: const Icon(Icons.play_arrow_rounded, size: 19),
-            label: const Text('开始学习'),
-          ),
-        ),
       ],
     );
   }
+}
+
+/// 可点击的队列行：点击进入该模式的会话。
+class _QueueRow extends StatelessWidget {
+  const new({
+    required this.mode,
+    required this.label,
+    required this.value,
+    required this.note,
+    required this.valueKey,
+  });
+
+  final StudyMode mode;
+  final String label;
+  final String value;
+  final String note;
+  final Key valueKey;
+
+  @override
+  Widget build(BuildContext context) {
+    // 行看起来仍像统计数字，tooltip 负责说明「点了会去哪儿」，
+    // 桌面端悬停与读屏都能得到这条信息。
+    return Tooltip(
+      message: '开始${studyModeLabel(mode)}',
+      child: InkWell(
+        onTap: () => goToStudyMode(context, mode),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+        child: DashboardStatRow(
+          label: label,
+          value: value,
+          note: note,
+          valueKey: valueKey,
+        ),
+      ),
+    );
+  }
+}
+
+/// 「开始学习」入口。
+class _StartStudyButton extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        key: startStudyButtonKey,
+        onPressed: () => goToDestination(context, studyDestinationLabel),
+        icon: const Icon(Icons.play_arrow_rounded, size: 19),
+        label: const Text('开始学习'),
+      ),
+    );
+  }
+}
+
+/// 完成度百分比文案。
+///
+/// 目标为 0 时给 `0%`：空进度条配「100%」是自相矛盾的展示。
+String _progressLabel(DashboardOverview overview) {
+  final total = overview.todayGoalTotal;
+  final percent = total == 0
+      ? 0
+      : (overview.completedToday * 100 / total).round();
+  return '${overview.completedToday}/$total ($percent%)';
+}
+
+/// 进度条取值，上限 1（超额完成时不应画到两倍宽）。
+double _progressValue(DashboardOverview overview) {
+  final total = overview.todayGoalTotal;
+  if (total == 0) return 0;
+  return overview.completedToday / total;
 }

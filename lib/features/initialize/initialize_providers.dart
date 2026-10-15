@@ -99,6 +99,47 @@ final FutureProvider<InitializationJobPage> queuePageProvider =
           );
     });
 
+/// 多选中的词条 ID。
+///
+/// 存的是 ID 而不是行号：翻页、后台刷新都会重排列表，
+/// 存索引会让底部的「已选 N 个」指向别的词条。
+final NotifierProvider<QueueSelectionNotifier, Set<int>>
+queueSelectionProvider = NotifierProvider<QueueSelectionNotifier, Set<int>>(
+  QueueSelectionNotifier.new,
+);
+
+/// 多选状态的控制器。
+class QueueSelectionNotifier extends Notifier<Set<int>> {
+  @override
+  Set<int> build() => <int>{};
+
+  /// 选中 / 取消选中一个词条。
+  void toggle(int wordId) {
+    final next = <int>{...state};
+    if (!next.remove(wordId)) next.add(wordId);
+    state = next;
+  }
+
+  /// 把当前页显示出来的词条整体并入 / 移出选择。
+  ///
+  /// 只影响「当前可见」的词条：用户勾选是为了对眼前这一页做批量操作，
+  /// 跨页累积会让翻页后的批量重试作用到看不见的词条上。
+  void setVisible(Iterable<int> wordIds, {required bool selected}) {
+    final next = <int>{...state};
+    for (final wordId in wordIds) {
+      if (selected) {
+        next.add(wordId);
+      } else {
+        next.remove(wordId);
+      }
+    }
+    state = next;
+  }
+
+  /// 清空选择。
+  void clear() => state = <int>{};
+}
+
 /// 各状态的任务计数。
 final FutureProvider<InitializationProgress> queueProgressProvider =
     FutureProvider<InitializationProgress>((ref) {
@@ -140,6 +181,27 @@ class QueueActions {
     await _ref.read(initializationQueriesProvider).retryJob(jobId, now: _now());
     _invalidate();
   }
+
+  /// 重试一个词条下的全部可重试任务，返回真正重排的任务数。
+  Future<int> retryWord(int wordId) => retryWords(<int>[wordId]);
+
+  /// 重试一批词条下的全部可重试任务，返回真正重排的任务数。
+  ///
+  /// 走一条 SQL 而不是逐个 `retryJob`：一次导入可能有几百个词条，
+  /// 逐条读改写会把批量操作变成几百次往返。
+  Future<int> retryWords(List<int> wordIds) async {
+    final retried = await _ref
+        .read(initializationQueriesProvider)
+        .retryWordJobs(wordIds, now: _now());
+    _invalidate();
+    return retried;
+  }
+
+  /// 手动刷新列表与计数。
+  ///
+  /// 后台保活已经会自动重查，这条只是给「我刚在别的页面改了设置、
+  /// 想立刻看到」的场合一个确定性的入口，不必等下一轮定时器。
+  void refresh() => _invalidate();
 
   /// 把一批词条加入队列，返回真正入队的任务数。
   Future<int> enqueueBulk({

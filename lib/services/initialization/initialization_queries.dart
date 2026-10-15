@@ -127,7 +127,7 @@ class InitializationQueries {
         .customSelect(
           'SELECT w.id AS word_id, w.term, $_aggregateStatus AS status, '
           'COUNT(j.id) AS task_count, '
-          "SUM(CASE WHEN j.status IN ('READY','PARTIAL','DISABLED') "
+          'SUM(CASE WHEN j.status IN $_terminalGoodStatuses '
           'THEN 1 ELSE 0 END) AS completed_task_count, '
           "SUM(CASE WHEN j.status = 'FAILED' THEN 1 ELSE 0 END) "
           'AS failed_task_count, '
@@ -205,7 +205,7 @@ class InitializationQueries {
     );
   }
 
-  /// 各状态的任务计数。
+  /// 各状态的任务计数 + 词条级完成度。
   Future<InitializationProgress> progressSummary() async {
     final rows = await _db
         .customSelect(
@@ -223,7 +223,79 @@ class InitializationQueries {
       );
       if (status != null) counts[status] = row.read<int>('count');
     }
-    return InitializationProgress(counts);
+    return InitializationProgress(counts, completion: await wordCompletion());
+  }
+
+  /// 词条级完成度。
+  ///
+  /// **「完成」的定义**：一个词条的全部任务都落在
+  /// [_terminalGoodStatuses]（READY / PARTIAL / DISABLED）里。
+  /// 三者都是「不再需要执行」的终态——READY 是内容齐了，PARTIAL 是尽力而为
+  /// 后的可接受结果（数据源本身没这个字段），DISABLED 是数据源被禁用，
+  /// 用户改完设置后自然要重新入队而不是留在队列里刷进度。
+  /// 任何一个任务还在 PENDING / QUEUED / RUNNING / FAILED，这个词条就没完成。
+  ///
+  /// 这条定义与 `listJobs` 的 `completed_task_count` 口径一致
+  /// （都是 `completedTaskCount == taskCount`），也与聚合状态一致：
+  /// 聚合状态的 `ELSE 'READY'` 分支只在没有任何非终态任务时才会命中。
+  /// 旧版 `initialize-progress.tsx` 把 READY + PARTIAL 的词条算作完成，
+  /// 在这里等价于「没有活跃或失败的任务」，两者结论相同。
+  Future<InitializationWordCompletion> wordCompletion() async {
+    final row = await _db
+        .customSelect(
+          'SELECT COUNT(*) AS total_words, '
+          'COALESCE(SUM(done), 0) AS completed_words FROM ( '
+          'SELECT j.word_id, MIN(CASE WHEN j.status IN $_terminalGoodStatuses '
+          ' THEN 1 ELSE 0 END) AS done '
+          'FROM initialization_jobs j GROUP BY j.word_id) grouped',
+        )
+        .getSingle();
+    return InitializationWordCompletion(
+      totalWords: row.read<int>('total_words'),
+      completedWords: row.read<int>('completed_words'),
+    );
+  }
+
+  /// 重排一批词条下的所有可重试任务，返回真正被重排的任务数。
+  ///
+  /// **可重试范围** = [_retryableJobStatuses]：失败、停用、排队中、待处理，
+  /// 运行中不在其中（改了状态会让执行中的 worker 覆盖回去）。
+  /// 排队中的也算可重试，是因为用户按下重试时的意图是「现在、从头再跑一遍」，
+  /// 顺带把退避计数归零；代价是反复点重试可以变相延长尝试上限，
+  /// 但这个代价是用户主动承担的，旧版只重试 FAILED 是因为它没有行内重试入口。
+  ///
+  /// **不清空 `last_error`**：与 [retryJob] 一致，重试之后仍然要能看到
+  /// 上一次为什么失败，否则数据源下线这类问题会变得无法排查。
+  /// 已经取消的任务也会回到队列——`cancelJob` 把它们写成 FAILED + CANCELLED，
+  /// 「取消错了」正是批量重试最典型的用途。
+  ///
+  /// **跳过同一词条同一任务类型已经在跑的任务**：
+  /// `initialization_jobs_active_word_task_unique` 只允许一个活跃任务，
+  /// 硬改会直接撞唯一索引；而且那个在跑的任务做的本来就是同一件事，
+  /// 再排一个既排不上也没有收益。
+  Future<int> retryWordJobs(List<int> wordIds, {required int now}) {
+    final ids = <int>{...wordIds.where((id) => id > 0)};
+    if (ids.isEmpty) return Future<int>.value(0);
+    final placeholders = List<String>.filled(ids.length, '?').join(',');
+    return _db.customUpdate(
+      'UPDATE initialization_jobs SET status = ?, attempt_count = 0, '
+      'available_at = ?, completed_at = NULL, locked_at = NULL, '
+      'locked_by = NULL, last_error_code = ?, updated_at = ? '
+      'WHERE word_id IN ($placeholders) AND status IN $_retryableJobStatuses '
+      'AND NOT EXISTS (SELECT 1 FROM initialization_jobs active '
+      'WHERE active.word_id = initialization_jobs.word_id '
+      'AND active.task_type = initialization_jobs.task_type '
+      'AND active.id != initialization_jobs.id '
+      'AND active.status IN $_activeJobStatuses)',
+      variables: <Variable<Object>>[
+        Variable<String>(InitializationStatus.queued.wire),
+        Variable<int>(now),
+        const Variable<String>(manualRetryJobErrorCode),
+        Variable<int>(now),
+        for (final id in ids) Variable<int>(id),
+      ],
+      updateKind: UpdateKind.update,
+    );
   }
 
   Future<bool> _isSuspended(int wordId) async {
@@ -381,6 +453,23 @@ class InitializationQueries {
     );
   }
 }
+
+/// 终态且「不再需要执行」的任务状态。
+///
+/// `PARTIAL` 计入完成：数据源本身没有那个字段时，重试多少次都不会变成 READY，
+/// 卡在这类词条上永远到不了 100%。
+/// `DISABLED` 计入完成：数据源被停用是配置问题，用户改完设置后自然会重新入队，
+/// 不该让它一直挂在队列里刷进度。
+const String _terminalGoodStatuses = "('READY','PARTIAL','DISABLED')";
+
+/// 允许被手动重试重排的任务状态。
+///
+/// 不含 `RUNNING`：改运行中任务的状态会被 worker 用自己的结果覆盖回去，
+/// 用户点了也看不到效果。
+const String _retryableJobStatuses = "('FAILED','DISABLED','QUEUED','PENDING')";
+
+/// 占用「唯一活跃任务」名额的状态（对应那条部分唯一索引）。
+const String _activeJobStatuses = "('QUEUED','RUNNING')";
 
 /// 按词条聚合状态的 SQL。
 ///

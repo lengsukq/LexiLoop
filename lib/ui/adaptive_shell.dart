@@ -38,29 +38,50 @@ class AdaptiveShell extends StatelessWidget {
         // 早先的实现把两者一起隐藏了，于是在沉浸页上：栈里没有上一页、
         // 侧边栏又不在，用户只能靠页面自己的退出按钮——那个按钮一旦写错
         // （见 `study_page.dart` 的 `_leaveToHome`），整页就没有出路。
-        if (useSidebar) return AmbientBackground(child: _buildWide(context));
-        if (immersive) return navigationShell;
-        return AmbientBackground(child: _buildCompact(context));
+        final content = _content();
+        if (useSidebar) {
+          return AmbientBackground(child: _buildWide(context, content));
+        }
+        if (immersive) return content;
+        return AmbientBackground(child: _buildCompact(context, content));
       },
     );
   }
 
-  Widget _buildWide(BuildContext context) {
+  /// 内容区，并保证它有一个 [Material] 祖先。
+  ///
+  /// **这不是装饰，是必需的**：`TextField`、`Checkbox`、`InkWell`、`Switch`
+  /// 等一大票 Material 组件都会向上查找最近的 `Material`，找不到就抛
+  /// 「No Material widget found」。而外壳的内容区只有
+  /// `AmbientBackground`（`DecoratedBox` + `Stack`），页面若自己没有
+  /// `Scaffold` 就没有 `Material` 祖先——添加页正是这样：它的
+  /// `ManualEntryForm` 里有 6 个 `TextField`，一进页面就是整屏红字。
+  ///
+  /// **为什么在调试下才炸**：`debugCheckHasMaterial` 是 `assert`，release
+  /// 构建会被剥掉，所以 Web 的 release 端到端测试照样跑通，只有 debug 构建
+  /// 会当场报错——这类缺陷只有「让每个页面都有一条真实的路由级测试」才拦得住。
+  ///
+  /// 用 `MaterialType.transparency`：只登记祖先，不画任何底色，页面自己的
+  /// 背景与玻璃层不受影响。
+  Widget _content() =>
+      Material(type: MaterialType.transparency, child: navigationShell);
+
+  Widget _buildWide(BuildContext context, Widget content) {
     return Row(
       children: <Widget>[
         SizedBox(
           width: sidebarWidth,
           child: _Sidebar(navigationShell: navigationShell),
         ),
-        Expanded(child: navigationShell),
+        Expanded(child: content),
       ],
     );
   }
 
-  Widget _buildCompact(BuildContext context) {
+  Widget _buildCompact(BuildContext context, Widget content) {
     return Column(
       children: <Widget>[
-        Expanded(child: navigationShell),
+        Expanded(child: content),
         _BottomBar(navigationShell: navigationShell),
       ],
     );

@@ -6,6 +6,11 @@
 /// 界面不区分「AI 生成」与「规则生成」的视觉层级——对用户来说
 /// 两者都是「今天的建议」，只有来源标签不同。AI 生成失败时也照常
 /// 展示规则式结果，只附一行说明。
+///
+/// **质量分与推荐列表是一体的，不是装饰**：旧版把质量分做成一个圆环，
+/// 把推荐词条做成两列卡片，并且给了一个直接跳进重点复习的入口；本版一度
+/// 只留下「一句标题 + 一排词条芯片」，把已经算好的指标、推荐理由与入口
+/// 全部丢掉，用户看完不知道「我昨天做得怎么样」「该先背哪几个」。
 library;
 
 import 'package:flutter/material.dart';
@@ -13,9 +18,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
+import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
+import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+
+/// 「昨日质量」徽章文字的 Key，供测试定位（文字同时携带分数与语气色）。
+const Key suggestionQualityTextKey = Key('suggestion-quality');
+
+/// 「开始重点复习」按钮的 Key，供测试定位。
+const Key focusReviewButtonKey = Key('suggestion-focus-review');
 
 /// 今日建议卡片。
 class SuggestionCard extends ConsumerStatefulWidget {
@@ -68,6 +81,10 @@ class _SuggestionCardState extends ConsumerState<SuggestionCard> {
 }
 
 /// 建议正文。
+///
+/// 分区顺序沿用旧版的信息密度：先「结论 + 质量」，再「昨天发生了什么」，
+/// 最后「今天该做什么」。亮点 / 风险 / 行动三条要点此前只渲染了后两条，
+/// 亮点被整段丢弃——它由服务与 AI 都会填充，丢掉等于白算。
 class _SuggestionBody extends StatelessWidget {
   const new({
     required this.suggestion,
@@ -82,25 +99,11 @@ class _SuggestionBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    final items = suggestion.recommendedItems;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                suggestion.headline,
-                style: TextStyle(
-                  color: colors.label,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            _SourceBadge(suggestion: suggestion),
-          ],
-        ),
+        _SuggestionHeader(suggestion: suggestion),
         if (suggestion.summary.isNotEmpty) ...<Widget>[
           const SizedBox(height: 6),
           Text(
@@ -108,32 +111,24 @@ class _SuggestionBody extends StatelessWidget {
             style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
           ),
         ],
-        if (suggestion.actions.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 10),
-          for (final action in suggestion.actions)
-            _Bullet(text: action, color: colors.accent),
-        ],
-        if (suggestion.risks.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 8),
-          for (final risk in suggestion.risks)
-            _Bullet(text: risk, color: colors.warning),
-        ],
-        if (suggestion.recommendedItems.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 10),
-          Text(
-            '推荐复习 ${suggestion.recommendedItems.length} 个词条',
-            style: TextStyle(color: colors.tertiaryLabel, fontSize: 12),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: chipGap,
-            runSpacing: chipGap,
-            children: <Widget>[
-              for (final item in suggestion.recommendedItems.take(maxChips))
-                _WordChip(item: item),
-            ],
-          ),
-        ],
+        const SizedBox(height: 10),
+        _MetricRow(metrics: suggestion.metrics),
+        _BulletGroup(
+          title: '亮点',
+          items: suggestion.strengths,
+          color: colors.success,
+        ),
+        _BulletGroup(
+          title: '风险',
+          items: suggestion.risks,
+          color: colors.warning,
+        ),
+        _BulletGroup(
+          title: '行动建议',
+          items: suggestion.actions,
+          color: colors.accent,
+        ),
+        if (items.isNotEmpty) _RecommendedSection(items: items),
         if (suggestion.generationWarning != null) ...<Widget>[
           const SizedBox(height: 8),
           Text(
@@ -141,28 +136,14 @@ class _SuggestionBody extends StatelessWidget {
             style: TextStyle(color: colors.warning, fontSize: 11.5),
           ),
         ],
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: busy ? null : onRegenerate,
-            icon: busy
-                ? const SizedBox(
-                    width: indicatorSize,
-                    height: indicatorSize,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh, size: 16),
-            label: const Text('重新生成'),
-          ),
-        ),
+        _RegenerateButton(busy: busy, onRegenerate: onRegenerate),
       ],
     );
   }
 }
 
-/// 来源标签：AI 或规则。
-class _SourceBadge extends StatelessWidget {
+/// 标题 + 来源标签 + 昨日质量徽章。
+class _SuggestionHeader extends StatelessWidget {
   const new({required this.suggestion});
 
   final DailySuggestion suggestion;
@@ -170,7 +151,65 @@ class _SourceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final ai = suggestion.generator == SuggestionGenerator.ai;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            suggestion.headline,
+            style: TextStyle(
+              color: colors.label,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        _QualityBadge(score: suggestion.qualityScore),
+        const SizedBox(width: 6),
+        _SourceBadge(ai: suggestion.generator == SuggestionGenerator.ai),
+      ],
+    );
+  }
+}
+
+/// 昨日质量徽章：分数越高颜色越「好」。
+///
+/// **没有分数时用中性灰而不是红色**：质量分为空意味着昨天根本没有作答记录，
+/// 染成红色会读成「昨天表现很差」，与事实相反（旧版用 `slate` 表达同一件事）。
+class _QualityBadge extends StatelessWidget {
+  const new({required this.score});
+
+  final int? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = qualityTone(context.lexiColors, score);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+        border: Border.all(color: tone.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        score == null ? '昨日质量 无记录' : '昨日质量 $score',
+        key: suggestionQualityTextKey,
+        style: TextStyle(color: tone, fontSize: 11),
+      ),
+    );
+  }
+}
+
+/// 来源标签：AI 或规则。
+class _SourceBadge extends StatelessWidget {
+  const new({required this.ai});
+
+  final bool ai;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
     final tint = ai ? colors.purple : colors.tertiaryLabel;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -182,6 +221,127 @@ class _SourceBadge extends StatelessWidget {
       child: Text(
         ai ? 'AI 生成' : '规则生成',
         style: TextStyle(color: tint, fontSize: 11),
+      ),
+    );
+  }
+}
+
+/// 昨日的四项关键指标：作答 / 正确率 / 跳过 / 分钟。
+///
+/// 四项都来自 [DailySuggestionMetrics]，此前一个都没渲染；正确率在昨天
+/// 没有作答时是 `null`，显示破折号而不是 `0%`——同样是「没数据」，
+/// `0%` 会被读成「昨天全错了」。
+class _MetricRow extends StatelessWidget {
+  const new({required this.metrics});
+
+  final DailySuggestionMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = metrics.accuracy;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: _MetricTile(
+            label: '作答',
+            value: '${metrics.reviewCount}',
+            metric: 'answers',
+          ),
+        ),
+        Expanded(
+          child: _MetricTile(
+            label: '正确率',
+            value: accuracy == null ? '—' : '$accuracy%',
+            metric: 'accuracy',
+          ),
+        ),
+        Expanded(
+          child: _MetricTile(
+            label: '跳过',
+            value: '${metrics.skippedCount}',
+            metric: 'skipped',
+          ),
+        ),
+        Expanded(
+          child: _MetricTile(
+            label: '分钟',
+            value: '${metrics.studyMinutes}',
+            metric: 'minutes',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 单个指标格。
+class _MetricTile extends StatelessWidget {
+  const new({required this.label, required this.value, required this.metric});
+
+  final String label;
+  final String value;
+  final String metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.fill.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            value,
+            key: Key('suggestion-metric-$metric'),
+            style: TextStyle(
+              color: colors.label,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: TextStyle(color: colors.quaternaryLabel, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 一组带小标题的要点。
+///
+/// 三组要点共用一个组件而不是三份 `_Bullet` 循环：亮点 / 风险 / 行动建议
+/// 的差别只有标题与颜色，展开写就是旧版基线里的「重复逻辑」。
+class _BulletGroup extends StatelessWidget {
+  const new({required this.title, required this.items, required this.color});
+
+  final String title;
+  final List<String> items;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final colors = context.lexiColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+          ),
+          const SizedBox(height: 5),
+          for (final item in items) _Bullet(text: item, color: color),
+        ],
       ),
     );
   }
@@ -224,8 +384,55 @@ class _Bullet extends StatelessWidget {
   );
 }
 
-/// 推荐词条芯片。
-class _WordChip extends StatelessWidget {
+/// 今日重点复习：推荐词条清单 + 进入重点复习的入口。
+///
+/// **没有推荐词条时整段不渲染**：入口指向 `/study?mode=AI_RECOMMENDED`，
+/// 而该模式的候选池就是这些推荐词条；清单为空还摆一个按钮，点进去只会
+/// 撞上一次空会话。
+class _RecommendedSection extends StatelessWidget {
+  const new({required this.items});
+
+  final List<RecommendedStudyItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 12),
+        Row(
+          children: <Widget>[
+            Text(
+              '今日重点复习',
+              style: TextStyle(
+                color: colors.label,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${items.length} 题',
+              style: TextStyle(color: colors.danger, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        for (final item in items) _RecommendedEntry(item: item),
+        const SizedBox(height: 8),
+        const _FocusReviewButton(),
+      ],
+    );
+  }
+}
+
+/// 一条推荐词条：词条 + 题型 + 释义 + 推荐理由。
+///
+/// **四项一起显示，而不是把理由塞进 Tooltip**：理由只在悬停时可见，
+/// 移动端没有悬停，推荐理由等于不存在；词条与释义则让人一眼确认
+/// 「要背的到底是哪个词」。
+class _RecommendedEntry extends StatelessWidget {
   const new({required this.item});
 
   final RecommendedStudyItem item;
@@ -233,18 +440,101 @@ class _WordChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return Tooltip(
-      message: item.reason.isEmpty ? item.term : item.reason,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: colors.fill,
-          borderRadius: BorderRadius.circular(LexiRadius.sm),
-        ),
-        child: Text(
-          item.term,
-          style: TextStyle(color: colors.label, fontSize: 12.5),
-        ),
+    final definition = item.definition;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  item.term,
+                  style: TextStyle(
+                    color: colors.label,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1.5,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.fill,
+                  borderRadius: BorderRadius.circular(LexiRadius.sm),
+                ),
+                child: Text(
+                  questionTypeLabel(item.questionType),
+                  style: TextStyle(
+                    color: colors.secondaryLabel,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (definition != null && definition.isNotEmpty)
+            Text(
+              definition,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+            ),
+          if (item.reason.isNotEmpty)
+            Text(
+              item.reason,
+              style: TextStyle(color: colors.quaternaryLabel, fontSize: 11.5),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 「开始重点复习」入口。
+class _FocusReviewButton extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        key: focusReviewButtonKey,
+        onPressed: () => goToStudyMode(context, StudyMode.aiRecommended),
+        icon: const Icon(Icons.psychology_alt_rounded, size: 18),
+        label: const Text('开始重点复习'),
+      ),
+    );
+  }
+}
+
+/// 「重新生成」入口。
+class _RegenerateButton extends StatelessWidget {
+  const new({required this.busy, required this.onRegenerate});
+
+  final bool busy;
+  final VoidCallback onRegenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: busy ? null : onRegenerate,
+        icon: busy
+            ? const SizedBox(
+                width: indicatorSize,
+                height: indicatorSize,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh, size: 16),
+        label: const Text('重新生成'),
       ),
     );
   }
@@ -261,14 +551,25 @@ class _EmptyHint extends StatelessWidget {
   );
 }
 
-/// 芯片间距。
-const double chipGap = 6;
+/// 质量分的「好」阈值。
+///
+/// 与旧版 `scoreTone` 的 80/60 分档一致：80 以上绿色、60 以上琥珀、
+/// 以下红色。
+const int highQualityScore = 80;
 
-/// 最多展示的推荐词条数。
-const int maxChips = 8;
+/// 质量分的「一般」阈值；低于此值为红色。
+const int mediumQualityScore = 60;
 
-/// 指示器尺寸。
-const double indicatorSize = 14;
+/// 质量分对应的语气色；[score] 为 `null`（昨天没有作答记录）时取中性灰。
+Color qualityTone(LexiColors colors, int? score) {
+  if (score == null) return colors.quaternaryLabel;
+  if (score >= highQualityScore) return colors.success;
+  if (score >= mediumQualityScore) return colors.warning;
+  return colors.danger;
+}
 
 /// 要点圆点尺寸。
 const double dotSize = 4;
+
+/// 指示器尺寸。
+const double indicatorSize = 14;

@@ -22,6 +22,13 @@ const String merriamWebsterDictionaryKeyName = 'merriamWebsterDictionaryKey';
 /// Merriam-Webster 同义词典 Key 在 `settings.raw` 中的键名。
 const String merriamWebsterThesaurusKeyName = 'merriamWebsterThesaurusKey';
 
+/// Merriam-Webster 的稳定标识。
+///
+/// 与 [DictionaryProvider.id] 逐字一致；单列一个常量是因为「缺凭据时
+/// 不可用」这条判断要按标识分派（见 `providerAvailability`），
+/// 界面与配置层也会引用它。
+const String merriamWebsterProviderId = 'merriam-webster';
+
 /// 同义 / 反义词最多返回的条数。
 const int _maxRelatedWords = 24;
 
@@ -43,10 +50,11 @@ class MerriamWebsterProvider implements DictionaryProvider {
   String get thesaurusKey => _raw(merriamWebsterThesaurusKeyName);
 
   @override
-  String get id => 'merriam-webster';
+  String get id => merriamWebsterProviderId;
 
   @override
-  Set<String> get providedFields => providerCapabilities['merriam-webster']!;
+  Set<String> get providedFields =>
+      providerCapabilities[merriamWebsterProviderId]!;
 
   @override
   bool isEnabled(AppSettings settings) =>

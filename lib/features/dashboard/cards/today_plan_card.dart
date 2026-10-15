@@ -70,28 +70,46 @@ class _PlanBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final overview = this.overview;
+    // 概览未到达时按「未达成」渲染：按钮文案与副标题都只在达成时换一套说法，
+    // 宁可晚一拍也不要先闪一次「继续无限学习」。
+    final reached = overview != null && _goalReached(overview);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _PlannedHeadline(plan: plan),
+        _PlannedHeadline(
+          plan: plan,
+          goalReached: reached,
+          completedToday: overview?.completedToday ?? 0,
+        ),
         const SizedBox(height: 12),
         if (overview != null) ...<Widget>[
-          _GoalProgress(overview: overview!),
+          _GoalProgress(overview: overview),
           const SizedBox(height: 12),
         ],
         _PlanQueues(plan: plan),
         const SizedBox(height: 12),
-        const _StartStudyButton(),
+        _StartStudyButton(goalReached: reached),
       ],
     );
   }
 }
 
-/// 计划总题数与预估耗时。
+/// 计划总题数与预估耗时；目标达成后改用「已完成」话术。
 class _PlannedHeadline extends StatelessWidget {
-  const new({required this.plan});
+  const new({
+    required this.plan,
+    required this.goalReached,
+    required this.completedToday,
+  });
 
   final DailyStudyPlan plan;
+
+  /// 今日目标是否已达成，决定右侧那句话用「预计」还是「已完成」。
+  final bool goalReached;
+
+  /// 今日已处理题数；仅在 [goalReached] 为真时被读到。
+  final int completedToday;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +135,9 @@ class _PlannedHeadline extends StatelessWidget {
         ),
         const Spacer(),
         Text(
-          '预估 ${plan.estimatedMinutes} 分钟',
+          goalReached
+              ? '已处理 $completedToday 题，继续保持'
+              : '预估 ${plan.estimatedMinutes} 分钟',
           style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
         ),
       ],
@@ -137,8 +157,7 @@ class _GoalProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final total = overview.todayGoalTotal;
-    final reached = total > 0 && overview.completedToday >= total;
+    final reached = _goalReached(overview);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,8 +301,14 @@ class _QueueRow extends StatelessWidget {
 }
 
 /// 「开始学习」入口。
+///
+/// **目标达成后换成「继续无限学习」**：沿用旧版 hero 的说法，让用户一眼看出
+/// 「今天已经做完了，接下来是自愿加练」。这里只换文案——无限学习本身是
+/// 后续阶段的能力，按钮的行为仍是进入每日综合模式。
 class _StartStudyButton extends StatelessWidget {
-  const new();
+  const new({required this.goalReached});
+
+  final bool goalReached;
 
   @override
   Widget build(BuildContext context) {
@@ -293,11 +318,19 @@ class _StartStudyButton extends StatelessWidget {
         key: startStudyButtonKey,
         onPressed: () => goToDestination(context, studyDestinationLabel),
         icon: const Icon(Icons.play_arrow_rounded, size: 19),
-        label: const Text('开始学习'),
+        label: Text(goalReached ? '继续无限学习' : '开始学习'),
       ),
     );
   }
 }
+
+/// 今日目标是否已达成。
+///
+/// **目标为 0 时不算达成**：没有计划就没有目标，「0 >= 0」会让徽章与
+/// 「继续无限学习」在空库用户的首页永远亮着。
+bool _goalReached(DashboardOverview overview) =>
+    overview.todayGoalTotal > 0 &&
+    overview.completedToday >= overview.todayGoalTotal;
 
 /// 完成度百分比文案。
 ///

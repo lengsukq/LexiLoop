@@ -212,14 +212,19 @@ void main() {
     expect(find.text('学习页'), findsOneWidget);
   });
 
-  testWidgets('空库时仪表盘仍可渲染且不溢出', (tester) async {
+  testWidgets('空库时切到导入引导且不溢出', (tester) async {
     useTallViewport(tester);
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
+    // 总词数为 0 时首页换成导入引导，六张卡片不再渲染——零词条时它们
+    // 只会显示一排 0，对「下一步做什么」没有任何信息量。
     expect(find.text('今日'), findsOneWidget);
-    expect(find.textContaining('LexiLoop'), findsOneWidget);
-    expect(textOf(tester, totalWordsKey), '0');
+    // 断言整句而不是 `textContaining('LexiLoop')`：空态的说明文案里
+    // 也出现了「LexiLoop」，模糊匹配会命中两处。
+    expect(find.text('LexiLoop 词环 · 纯本地'), findsOneWidget);
+    expect(find.byKey(emptyStateTitleKey), findsOneWidget);
+    expect(find.byKey(totalWordsKey), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

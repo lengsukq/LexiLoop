@@ -1,9 +1,13 @@
 /// 多选后浮在底部的批量操作条。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
+import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -48,9 +52,15 @@ class QueueBulkBar extends ConsumerWidget {
                 spacing: barPadding,
                 alignment: WrapAlignment.end,
                 children: <Widget>[
-                  // 扩展点：后续的「配置初始化」（选模式 / 选字段 / 选数据源）
-                  // 就挂在这两个动作之间，届时复用同一份选中集合，
-                  // 不用再往页面里塞状态。
+                  FilledButton(
+                    onPressed: () => unawaited(
+                      showInitializationConfigurator(
+                        context,
+                        initialScope: ConfiguratorScope.selection,
+                      ),
+                    ),
+                    child: const Text('配置初始化'),
+                  ),
                   FilledButton(
                     onPressed: () => _retry(context, ref),
                     child: const Text('重试这些词条的全部任务'),

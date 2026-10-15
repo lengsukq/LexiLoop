@@ -9,6 +9,8 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
+import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/glass.dart';
@@ -60,6 +62,10 @@ class _QueueToolbarState extends ConsumerState<QueueToolbar> {
           onProcessNow: () => unawaited(processNow()),
           onRetryFailed: () => unawaited(retryFailed()),
           onRefresh: () => ref.read(queueActionsProvider).refresh(),
+          onConfigure: () => showInitializationConfigurator(
+            context,
+            initialScope: ConfiguratorScope.all,
+          ),
         ),
         const SizedBox(height: toolbarGap),
         const _StatusFilters(),
@@ -150,6 +156,7 @@ class _ToolbarActions extends StatelessWidget {
     required this.onProcessNow,
     required this.onRetryFailed,
     required this.onRefresh,
+    required this.onConfigure,
   });
 
   /// 是否有批量操作在执行（执行期间禁用会改数据的按钮）。
@@ -163,6 +170,9 @@ class _ToolbarActions extends StatelessWidget {
 
   /// 「刷新」。
   final VoidCallback onRefresh;
+
+  /// 「创建任务」：打开初始化配置器。
+  final VoidCallback onConfigure;
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +189,11 @@ class _ToolbarActions extends StatelessWidget {
           onPressed: busy ? null : onRetryFailed,
           icon: const Icon(Icons.restart_alt, size: 16),
           label: const Text('重试失败'),
+        ),
+        FilledButton.icon(
+          onPressed: busy ? null : onConfigure,
+          icon: const Icon(Icons.tune, size: 16),
+          label: const Text('创建任务'),
         ),
         // 刷新不参与 busy：它只读不写，正在跑批处理时也需要它。
         TextButton.icon(

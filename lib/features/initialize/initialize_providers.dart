@@ -225,6 +225,28 @@ class QueueActions {
     return ids.length;
   }
 
+  /// 按配置器给出的请求入队，返回新建与合并的分项计数。
+  ///
+  /// 请求由界面组装（字段、来源、策略都在界面草稿里），这一层只负责
+  /// 落库与刷新列表；这样配置器不必知道查询层的方法签名，
+  /// 而「新建 / 合并」的判定始终只有查询层一份实现。
+  Future<EnqueueBulkReport> enqueueRequests(
+    List<EnqueueRequest> requests,
+  ) async {
+    if (requests.isEmpty) {
+      return const EnqueueBulkReport(
+        created: <int>[],
+        merged: <int>[],
+        skipped: 0,
+      );
+    }
+    final report = await _ref
+        .read(initializationQueriesProvider)
+        .enqueueBulkReport(requests, now: _now());
+    _invalidate();
+    return report;
+  }
+
   void _invalidate() {
     _ref
       ..invalidate(queuePageProvider)

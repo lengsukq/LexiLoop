@@ -14,9 +14,12 @@ import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/data/dictionary/content.dart';
+import 'package:lexiloop/data/dictionary/content_normalize.dart';
 import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/services/settings_service.dart';
 
@@ -66,32 +69,198 @@ class InitializationQueries {
   ///
   /// 返回任务 ID；词条已暂停时返回 `null`（不入队）。
   /// 已存在活跃任务时**升级**它而不是新建，避免丢失已累计的尝试次数。
-  Future<int?> enqueueWord(EnqueueRequest request, {required int now}) async {
-    if (await _isSuspended(request.wordId)) return null;
+  Future<int?> enqueueWord(EnqueueRequest request, {required int now}) async =>
+      (await enqueueWordOutcome(request, now: now)).jobId;
+
+  /// 入队一个任务，并报告它是新建还是合并。
+  ///
+  /// 与 [enqueueWord] 同一段实现；界面要区分「新建」与「合并」就必须能
+  /// 拿到这一位，而重复实现一遍入队逻辑迟早会让两条路径漂移。
+  Future<EnqueueOutcome> enqueueWordOutcome(
+    EnqueueRequest request, {
+    required int now,
+  }) async {
+    if (await _isSuspended(request.wordId)) return EnqueueOutcome.skipped;
     final active = await _activeJobId(request.wordId, request.taskType);
     if (active != null) {
       await _upgradeJob(active, request, now);
-      return active;
+      return EnqueueOutcome(jobId: active, created: false);
     }
     final inserted = await _insertJob(request, now);
-    if (inserted != null) return inserted;
+    if (inserted != null) return EnqueueOutcome(jobId: inserted, created: true);
     final conflicted = await _activeJobId(request.wordId, request.taskType);
-    if (conflicted == null) return null;
+    if (conflicted == null) return EnqueueOutcome.skipped;
     await _upgradeJob(conflicted, request, now);
-    return conflicted;
+    return EnqueueOutcome(jobId: conflicted, created: false);
   }
 
   /// 批量入队。
   Future<List<int>> enqueueBulk(
     List<EnqueueRequest> requests, {
     required int now,
+  }) async => (await enqueueBulkReport(requests, now: now)).jobIds;
+
+  /// 批量入队并返回新建 / 合并 / 跳过的分项计数。
+  Future<EnqueueBulkReport> enqueueBulkReport(
+    List<EnqueueRequest> requests, {
+    required int now,
   }) async {
-    final result = <int>[];
+    final created = <int>[];
+    final merged = <int>[];
+    var skipped = 0;
     for (final request in requests) {
-      final id = await enqueueWord(request, now: now);
-      if (id != null) result.add(id);
+      final outcome = await enqueueWordOutcome(request, now: now);
+      final jobId = outcome.jobId;
+      if (jobId == null) {
+        skipped += 1;
+      } else if (outcome.created) {
+        created.add(jobId);
+      } else {
+        merged.add(jobId);
+      }
+    }
+    return EnqueueBulkReport(
+      created: created,
+      merged: merged,
+      skipped: skipped,
+    );
+  }
+
+  /// 预览一次批量初始化会作用到哪些词条。
+  ///
+  /// **入队只发生在「本次会入队」这一集合上**，与旧版
+  /// `previewConfiguredInitialization` 的口径一致：
+  /// - `FILL_MISSING_FIELDS` + 勾了字段时，内容已满足这些字段的词条直接跳过，
+  ///   不入队——它们本来就是这次配置想达到的状态；
+  /// - `FORCE_OVERWRITE` 一律不按内容跳过，暂停的词条也仍然跳过
+  ///   （暂停的词条入队后也会被 worker 直接判失败，没有意义）。
+  ///
+  /// **为什么可以在这里判定**：用的是 [requestedFieldStatusForLanguages]，
+  /// 与 `InitializationWorker._skipStatus` 完全同一条判定，
+  /// 因此预览说「会跳过」的词条，worker 拿到任务时也确实会直接完成。
+  Future<InitializationPreview> previewBulk({
+    required List<String> requestedFields,
+    required InitializationMode mode,
+    List<int> wordIds = const <int>[],
+  }) async {
+    final fields = normalizeRequestedFields(requestedFields);
+    final active = await _activeInitializeWordIds();
+    final rows = await _scopeRows(wordIds);
+    return _summarize(rows, fields, mode, active);
+  }
+
+  /// 把范围内的词条分成「会入队」与「会跳过」两堆。
+  InitializationPreview _summarize(
+    List<QueryRow> rows,
+    List<String> fields,
+    InitializationMode mode,
+    Set<int> activeWordIds,
+  ) {
+    final selected = <int>[];
+    final skips = <InitializationSkip>[];
+    var merged = 0;
+    var satisfied = 0;
+    var suspended = 0;
+    for (final row in rows) {
+      final wordId = row.read<int>('word_id');
+      final term = row.read<String>('term');
+      final reason = _skipReason(row, fields, mode);
+      if (reason == null) {
+        selected.add(wordId);
+        if (activeWordIds.contains(wordId)) merged += 1;
+        continue;
+      }
+      if (reason == satisfiedFieldsReason) satisfied += 1;
+      if (reason == suspendedWordReason) suspended += 1;
+      if (skips.length < initializationPreviewSkipLimit) {
+        skips.add(
+          InitializationSkip(wordId: wordId, term: term, reason: reason),
+        );
+      }
+    }
+    return InitializationPreview(
+      existingWords: rows.length,
+      selectedWordIds: selected,
+      samples: _samples(rows, selected),
+      mergedWords: merged,
+      satisfiedWords: satisfied,
+      suspendedWords: suspended,
+      skips: skips,
+    );
+  }
+
+  /// 会入队的词条示例（按 ID 升序取前若干条）。
+  List<InitializationPreviewWord> _samples(
+    List<QueryRow> rows,
+    List<int> selected,
+  ) {
+    final result = <InitializationPreviewWord>[];
+    for (final row in rows) {
+      if (result.length >= initializationPreviewSampleLimit) break;
+      final wordId = row.read<int>('word_id');
+      if (!selected.contains(wordId)) continue;
+      result.add(
+        InitializationPreviewWord(
+          wordId: wordId,
+          term: row.read<String>('term'),
+        ),
+      );
     }
     return result;
+  }
+
+  /// 该词条会被跳过的原因；`null` 表示会入队。
+  String? _skipReason(
+    QueryRow row,
+    List<String> fields,
+    InitializationMode mode,
+  ) {
+    if (row.read<int>('is_suspended') != 0) return suspendedWordReason;
+    if (mode != InitializationMode.fillMissingFields || fields.isEmpty) {
+      return null;
+    }
+    final content = dictionaryContentFromColumns(
+      row.data.cast<String, Object?>(),
+    );
+    final status = requestedFieldStatusForLanguages(
+      content,
+      fields,
+      row.read<String>('source_language'),
+      row.read<String>('target_language'),
+    );
+    return status == InitializationStatus.ready ? satisfiedFieldsReason : null;
+  }
+
+  /// 范围内的词条连同它们的 `word_contents` 内容列。
+  Future<List<QueryRow>> _scopeRows(List<int> wordIds) async {
+    final ids = <int>{...wordIds.where((id) => id > 0)};
+    final placeholders = List<String>.filled(ids.length, '?').join(',');
+    final where = ids.isEmpty ? '' : 'WHERE w.id IN ($placeholders)';
+    final rows = await _db
+        .customSelect(
+          'SELECT w.id AS word_id, w.term, w.source_language, '
+          'w.target_language, w.is_suspended, ${_contentColumns()} '
+          'FROM words w LEFT JOIN word_contents wc ON wc.word_id = w.id '
+          '$where ORDER BY w.id ASC',
+          variables: <Variable<Object>>[
+            for (final id in ids) Variable<int>(id),
+          ],
+        )
+        .get();
+    return rows;
+  }
+
+  /// 已经有活跃内容初始化任务的词条。
+  ///
+  /// 这些词条再入队会走「合并」而不是「新建」，预览要分开报。
+  Future<Set<int>> _activeInitializeWordIds() async {
+    final rows = await _db
+        .customSelect(
+          'SELECT DISTINCT word_id FROM initialization_jobs '
+          "WHERE task_type = 'INITIALIZE' AND status IN $_activeJobStatuses",
+        )
+        .get();
+    return <int>{for (final row in rows) row.read<int>('word_id')};
   }
 
   /// 读取单条任务详情。
@@ -532,3 +701,17 @@ int _offset(int page, int pageSize) {
 
 String _encodeList(List<String> values) =>
     values.isEmpty ? '[]' : jsonEncode(values);
+
+/// `word_contents` 的内容列（供预览一次读出词条的已有内容）。
+///
+/// 列名只从 [contentColumnNames] 取，因此预览读的列与
+/// `dictionaryContentFromColumns` 消费的列天然一致，
+/// 不必在这里再抄一遍 16 个 `*_json`。
+String _contentColumns() =>
+    contentColumnNames.values.map((column) => 'wc.$column').join(', ');
+
+/// 预览里「内容已满足所选字段」的原因文案。
+const String satisfiedFieldsReason = '内容已满足所选字段';
+
+/// 预览里「词条已暂停」的原因文案。
+const String suspendedWordReason = '词条已暂停，不会入队';

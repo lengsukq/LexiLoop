@@ -217,6 +217,13 @@ String providerCapabilityKey(String providerId) =>
 /// AI 类 provider 标识的前缀。
 const String aiProviderIdPrefix = 'ai:';
 
+/// 请求里用来指名「AI 类 provider」的选择标识。
+///
+/// AI 的运行时标识形如 `ai:<provider>:<model>`，随模型配置变化，
+/// 不能存进任务；但请求方需要一个稳定的选择符，
+/// 由 `selectProviders` 把它解析到任意一个 AI provider 上。
+const String aiProviderSelectorId = 'ai';
+
 /// 该标识是否是 AI 类 provider。
 bool isAiProviderId(String providerId) =>
     providerId.startsWith(aiProviderIdPrefix);

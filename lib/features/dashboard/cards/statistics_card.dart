@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
@@ -13,7 +14,7 @@ import 'package:lexiloop/ui/widgets/status_badges.dart';
 /// 总词数的 Key，供测试定位。
 const Key totalWordsKey = Key('dashboard-total-words');
 
-/// 统计卡片：总词数、各掌握等级分布、今日已答、连续天数。
+/// 统计卡片：总词数、各掌握等级分布、今日已答（含今日正确率）、连续天数。
 ///
 /// 分布用横向条形手绘，不引图表库：`fl_chart` 虽然已在依赖里，
 /// 但五个等级的横向条形用 `FractionallySizedBox` 十几行就能表达，
@@ -83,7 +84,7 @@ class _StatisticsBody extends StatelessWidget {
         DashboardStatRow(
           label: '今日已答',
           value: '${overview.reviewedToday}',
-          note: ' 题',
+          note: _reviewedNote(overview),
           valueKey: const Key('dashboard-reviewed-today'),
         ),
         DashboardStatRow(
@@ -95,6 +96,18 @@ class _StatisticsBody extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 「今日已答」一行右侧的补充说明。
+///
+/// **今天没作答时不说正确率**：[DashboardOverview.todayAccuracy] 在没有
+/// 作答时是 `0` 而不是 `null`，直接渲染成「正确率 0%」会被读成
+/// 「今天全错了」——事实是今天还没开始。这一分支改说「今日尚无作答」，
+/// 与卡片上其余的 0 值（今日已答 0 题）读法一致。
+String _reviewedNote(DashboardOverview overview) {
+  if (overview.reviewedToday == 0) return ' 题 · 今日尚无作答';
+  final percent = (overview.todayAccuracy * percentScale).round();
+  return ' 题 · 正确率 $percent%';
 }
 
 class _MasteryBar extends StatelessWidget {

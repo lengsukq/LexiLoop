@@ -10,9 +10,11 @@ import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/merge_content.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
+import 'package:lexiloop/data/dictionary/providers/merriam_webster.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/dictionary/merge.dart';
+import 'package:lexiloop/services/llm/llm_config.dart';
 
 /// 默认的数据源调用顺序。
 ///
@@ -26,12 +28,42 @@ const List<String> defaultTranslationProviderOrder = <String>[
   'mymemory',
 ];
 
+/// 初始化可请求的全部字段。
+///
+/// **来源**：[providerCapabilities] 五个能力键的并集（16 项），与旧版
+/// `INITIALIZATION_FIELDS` 逐字对应。
+///
+/// **为什么不是 [contentFields]**：`pronunciations.phonetic` 与
+/// `pronunciations.audio` 是音标与音频两个可独立请求的子字段，
+/// 而 `pronunciations` 只是它们在 `word_contents` 里的合列。
+/// 管线的四处判定（[projectDictionaryContent]、[mergeRequestedFields]、
+/// [hasInitializationField]、[supportsRequestedFields]）都按这两个名字
+/// 分支，规范化时把它们挡在门外会让「仅补音标」静默退化成「补全全部字段」。
+const List<String> initializationFields = <String>[
+  definitionsField,
+  phoneticField,
+  audioField,
+  'examples',
+  'phrases',
+  'forms',
+  'synonyms',
+  'antonyms',
+  'wordFamily',
+  'confusedWords',
+  'roots',
+  'affixes',
+  'tags',
+  summaryField,
+  'learning',
+  'sentenceAnalysis',
+];
+
 /// 过滤并去重请求字段，剔除未知字段名。
 List<String> normalizeRequestedFields(Iterable<String>? fields) {
   if (fields == null) return const <String>[];
   final result = <String>[];
   for (final field in fields) {
-    if (!contentFields.contains(field)) continue;
+    if (!initializationFields.contains(field)) continue;
     if (result.contains(field)) continue;
     result.add(field);
   }
@@ -347,7 +379,9 @@ DictionaryProvider? _resolveProvider(
 ) {
   for (final provider in candidates) {
     if (provider.id == id) return provider;
-    if (id == 'ai' && isAiProviderId(provider.id)) return provider;
+    if (id == aiProviderSelectorId && isAiProviderId(provider.id)) {
+      return provider;
+    }
   }
   return null;
 }
@@ -362,3 +396,99 @@ bool _hasPronunciation(DictionaryContent content, {required bool audio}) {
 }
 
 bool _nonEmpty(Object? value) => value is String && value.trim().isNotEmpty;
+
+/// 一个数据源当前能否被调用，以及不能调用时的原因。
+///
+/// **为什么不直接暴露 [selectProviders] 的过滤结果**：
+/// `selectProviders` 收的是一整批来源并丢掉不合格的，界面要展示的恰恰是
+/// 被丢掉的那部分（以及为什么），否则用户只会看到一个少了几项的来源列表，
+/// 无从判断是「去设置里开」还是「换几个字段」。
+class ProviderAvailability {
+  /// 以可用性与不可用原因构造。
+  const new({required this.available, this.reason});
+
+  /// 是否可被本次调用选中。
+  final bool available;
+
+  /// 不可用原因；可用时为 `null`。
+  final String? reason;
+}
+
+/// 数据源在「这次请求」下的可用性。
+///
+/// 判据与 [selectProviders] 的三层过滤**逐条同源**：未启用
+/// （[DictionaryProvider.isEnabled]）、不支持该请求（`supports`）、
+/// 能力与请求字段无交集（[supportsRequestedFields]）。这里只补一件事——
+/// 把「不可用」翻译成用户能照着做的中文原因。
+ProviderAvailability providerAvailability({
+  required DictionaryProvider provider,
+  required AppSettings settings,
+  required ProviderRequest request,
+}) {
+  if (!provider.isEnabled(settings)) {
+    final reason = _configurationReason(settings, provider.id);
+    return ProviderAvailability(
+      available: false,
+      reason: reason ?? providerDisabledReason,
+    );
+  }
+  if (!provider.supports(request)) {
+    return const ProviderAvailability(
+      available: false,
+      reason: providerRequestUnsupportedReason,
+    );
+  }
+  if (!supportsRequestedFields(provider, request)) {
+    return const ProviderAvailability(
+      available: false,
+      reason: providerFieldMismatchReason,
+    );
+  }
+  return const ProviderAvailability(available: true);
+}
+
+/// 数据源已启用但缺少必要凭据时的原因；配置完整时返回 `null`。
+///
+/// 这里读的是与各 provider 的 `isEnabled` 同一批设置键，
+/// 因此「界面上说可用、运行时被跳过」不会发生——`isEnabled` 仍是
+/// 最终判据，本函数只负责让原因可读。
+String? _configurationReason(AppSettings settings, String providerId) {
+  if (providerId == merriamWebsterProviderId) {
+    final configured =
+        _rawText(settings, merriamWebsterDictionaryKeyName) +
+        _rawText(settings, merriamWebsterThesaurusKeyName);
+    return configured.isEmpty ? providerKeyMissingReason : null;
+  }
+  if (!isAiProviderId(providerId)) return null;
+  final config = llmConfigFromSettings(settings.raw);
+  if (config.isUsable) return null;
+  if (!config.ai.enabled) return aiDisabledReason;
+  if (config.primaryProvider == null) return aiProviderMissingReason;
+  return aiIncompleteReason;
+}
+
+String _rawText(AppSettings settings, String key) {
+  final value = settings.raw[key];
+  return value is String ? value.trim() : '';
+}
+
+/// 数据源在设置里被关掉时的原因。
+const String providerDisabledReason = '请先在设置中启用该数据源';
+
+/// 需要 API Key 的数据源缺少凭据时的原因。
+const String providerKeyMissingReason = '尚未配置 API Key';
+
+/// 数据源不支持本次语言或词条类型时的原因。
+const String providerRequestUnsupportedReason = '不支持当前语言或词条类型';
+
+/// 数据源能力与所选字段没有交集时的原因。
+const String providerFieldMismatchReason = '与所选字段没有交集';
+
+/// AI 词条初始化用途未启用时的原因。
+const String aiDisabledReason = 'AI 词条初始化未启用';
+
+/// AI 主提供方不存在时的原因。
+const String aiProviderMissingReason = 'AI Provider 不存在';
+
+/// AI 配置缺项时的原因。
+const String aiIncompleteReason = 'AI 配置不完整（缺少 API Key、Base URL 或模型名）';

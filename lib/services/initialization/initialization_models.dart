@@ -43,6 +43,134 @@ class EnqueueRequest {
   final int priority;
 }
 
+/// 单条入队的结果。
+///
+/// 入队有三种落点，必须区分：新建一个任务、合并进已有活跃任务、
+/// 或者根本没入队（词条不存在或已暂停）。旧版在 `queueSelectedInitialization`
+/// 里先查一次「有没有活跃任务」再入队来区分，本类把这次判定固化下来，
+/// 界面才能报出「新建 N 个 / 合并 M 个」。
+class EnqueueOutcome {
+  /// 以任务 ID 与是否新建构造。
+  const new({required this.jobId, required this.created});
+
+  /// 未入队（词条不存在或已暂停）。
+  static const EnqueueOutcome skipped = EnqueueOutcome(
+    jobId: null,
+    created: false,
+  );
+
+  /// 任务 ID；未入队时为 `null`。
+  final int? jobId;
+
+  /// 是否新建了任务；`false` 表示合并进已有的活跃任务。
+  final bool created;
+
+  /// 是否真的入了队。
+  bool get enqueued => jobId != null;
+}
+
+/// 批量入队的回执。
+class EnqueueBulkReport {
+  /// 以新建、合并与跳过数构造。
+  const new({
+    required this.created,
+    required this.merged,
+    required this.skipped,
+  });
+
+  /// 新建的任务 ID。
+  final List<int> created;
+
+  /// 合并进已有活跃任务的任务 ID。
+  final List<int> merged;
+
+  /// 未入队的词条数（词条不存在或已暂停）。
+  final int skipped;
+
+  /// 实际入队的任务总数。
+  int get jobCount => created.length + merged.length;
+
+  /// 入队的任务 ID（新建在前，与旧版 `enqueueBulk` 的返回一致）。
+  List<int> get jobIds => <int>[...created, ...merged];
+}
+
+/// 预览里点名的词条。
+class InitializationPreviewWord {
+  /// 以词条 ID 与文本构造。
+  const new({required this.wordId, required this.term});
+
+  /// 词条 ID。
+  final int wordId;
+
+  /// 词条文本。
+  final String term;
+}
+
+/// 预览里「这个词条会被跳过」的一条记录。
+///
+/// **为什么必须带原因**：跳过有两类完全不同的原因——暂停的词条本来就不该
+/// 补全，已经满足所选字段的词条则是本次配置选得太保守。只给一个数字，
+/// 用户会以为配置出了问题。
+class InitializationSkip {
+  /// 以词条 ID、文本与原因构造。
+  const new({required this.wordId, required this.term, required this.reason});
+
+  /// 词条 ID。
+  final int wordId;
+
+  /// 词条文本。
+  final String term;
+
+  /// 面向用户的中文原因。
+  final String reason;
+}
+
+/// 一次批量初始化的预览结果。
+///
+/// 口径与旧版 `/api/initialization/preview` 逐条对应：
+/// 「范围内」是存在的词条数，「处理」是真正会入队的词条数，
+/// 两者之差即跳过。**入队只发生在「处理」这一集合上**，
+/// 所以预览的选集与实际入队的选集必然一致。
+class InitializationPreview {
+  /// 以各项计数构造。
+  const new({
+    required this.existingWords,
+    required this.selectedWordIds,
+    required this.samples,
+    required this.mergedWords,
+    required this.satisfiedWords,
+    required this.suspendedWords,
+    required this.skips,
+  });
+
+  /// 范围内的词条数。
+  final int existingWords;
+
+  /// 本次会入队的词条 ID。
+  final List<int> selectedWordIds;
+
+  /// 会入队的词条示例。
+  final List<InitializationPreviewWord> samples;
+
+  /// 其中会合并进已有活跃任务的词条数。
+  final int mergedWords;
+
+  /// 其中内容已满足所选字段、worker 会直接判为完成的词条数。
+  final int satisfiedWords;
+
+  /// 其中已暂停、不入队的词条数。
+  final int suspendedWords;
+
+  /// 跳过的词条与原因（最多若干条，供界面展示）。
+  final List<InitializationSkip> skips;
+
+  /// 会入队的词条数。
+  int get selectedWords => selectedWordIds.length;
+
+  /// 跳过的词条总数。
+  int get skippedWords => satisfiedWords + suspendedWords;
+}
+
 /// 已被认领（或正在执行）的任务。
 class ClaimedJob {
   /// 以各字段构造。

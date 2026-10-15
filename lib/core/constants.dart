@@ -636,6 +636,18 @@ const int jobPriorityManualBulk = 90;
 /// 初始化任务优先级：默认（单条手动触发）。
 const int jobPriorityDefault = 100;
 
+/// 初始化预览展示的示例词条条数。
+///
+/// 沿用旧版 `/api/initialization/preview` 的 8 条：够认出「这是我要补的那
+/// 一批」，再多只会把侧栏撑成一堵墙。
+const int initializationPreviewSampleLimit = 8;
+
+/// 初始化预览展示的跳过明细条数。
+///
+/// 跳过原因只有两类（已满足 / 已暂停），逐条列出来最多也就十几行；
+/// 上限是为了让「暂停了 800 个词条」这种情况不至于刷屏。
+const int initializationPreviewSkipLimit = 12;
+
 /// 单次 SQL 的绑定参数上限保护——批量操作按此分批。
 ///
 /// SQLite 默认变量上限为 999（旧版）或 32766（新版），

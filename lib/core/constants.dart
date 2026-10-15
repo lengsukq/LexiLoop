@@ -668,6 +668,22 @@ const int ttsCacheMaxEntries = 200;
 const int ttsTimeoutMs = 15 * secondMs;
 
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 统计页（对应旧版 app/(main)/statistics/page.tsx）
+// ═══════════════════════════════════════════════════════════════
+
+/// 趋势图默认展示的天数。
+const int defaultTrendDays = 30;
+
+/// 趋势图可选的天数档位。
+const List<int> trendDayOptions = <int>[7, 14, 30, 90];
+
+/// 迷你趋势条展示的最近作答次数。
+const int recentResultsLimit = 20;
+
+/// 统计页「学习时长」的分钟换算基数。
+const int statsMinutesPerHour = 60;
+
 // 界面交互（对应旧版 lib/config.ts 与各组件内联值）
 // ═══════════════════════════════════════════════════════════════
 

@@ -15,6 +15,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/settings_service.dart';
 import 'package:lexiloop/services/study_service.dart';
+import 'package:lexiloop/services/tts_service.dart';
 
 /// 词条查询。
 final Provider<WordDao> wordDaoProvider = Provider<WordDao>(
@@ -56,6 +57,14 @@ final Provider<ReviewDao> reviewDaoProvider = Provider<ReviewDao>(
 /// 学习会话读写（供只读查询使用）。
 final Provider<StudyDao> studyDaoProvider = Provider<StudyDao>(
   (ref) => StudyDao(ref.watch(databaseProvider)),
+);
+
+/// 语音朗读。
+///
+/// 界面层通过这个 provider 取服务，测试里用 `overrideWithValue` 换成假引擎，
+/// 避免在测试进程里初始化平台通道。
+final Provider<TtsService> ttsServiceProvider = Provider<TtsService>(
+  (ref) => TtsService(FlutterTtsEngine()),
 );
 
 /// 当前应用设置。

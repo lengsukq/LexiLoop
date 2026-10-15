@@ -64,7 +64,8 @@ void main() {
         isEmpty,
         reason:
             '字号必须取自 LexiType（`lib/ui/theme/lexi_type.dart`）。\n'
-            '收敛前这里有 25 种字号，其中 6 个是半点值——半点值不是设计决定，\n'
+            '收敛前这里有 24 种字号（399 处），其中 6 个是半点值\n'
+            '（10.5/11.5/12.5/13.5/14.5/15.5）——半点值不是设计决定，\n'
             '是「这次想大一点点」的临时产物。\n'
             '手搓 TextStyle 再借 `LexiType.X.fontSize` 也不行：那样会丢掉 token\n'
             '的**行高**，多行文本就没有行距。请用 `LexiType.X.copyWith(...)`。\n'
@@ -112,7 +113,7 @@ void main() {
         isEmpty,
         reason:
             '圆角必须取自 LexiRadius（`lib/ui/theme/lexi_colors.dart`）。\n'
-            '收敛前这里有 9 种临时圆角（3/4/6/8/10/12/13/14/16/999）：\n'
+            '收敛前这里有 10 种取值（3/4/6/8/10/12/13/14/16/999，26 处）：\n'
             '同一个应用里同时出现 13 与 14 两种「差不多」的圆角，是纯噪声。\n'
             '违规项：\n${violations.join('\n')}',
       );

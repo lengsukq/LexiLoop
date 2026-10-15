@@ -185,6 +185,41 @@ void main() {
       expect(await dao.rankOf(mode: GameMode.match, score: 150), 2);
       expect(await dao.rankOf(mode: GameMode.match, score: 50), 3);
     });
+
+    test('新模式的高分按 wire 字符串逐字归类，互不串档', () async {
+      await dao.saveHighScore(
+        mode: GameMode.listeningPick,
+        score: 400,
+        maxCombo: 3,
+        accuracy: 70,
+        elapsedMs: 40000,
+        now: now,
+      );
+      await dao.saveHighScore(
+        mode: GameMode.meaningBlitz,
+        score: 900,
+        maxCombo: 8,
+        accuracy: 95,
+        elapsedMs: 30000,
+        now: now + 1,
+      );
+      expect(await dao.bestScore(GameMode.listeningPick), 400);
+      expect(await dao.bestScore(GameMode.meaningBlitz), 900);
+      expect(await dao.bestScore(GameMode.whackAMole), 0);
+
+      // 落库的字符串必须与旧版 `GAME_MODES` 逐字一致，旧备份导入后
+      // 历史高分才能被同一个模式读到。
+      final rows = await db.select(db.gameHighScores).get();
+      expect(rows.map((row) => row.gameMode).toSet(), <String>{
+        'LISTENING_PICK',
+        'MEANING_BLITZ',
+      });
+      final top = await dao.topScores(
+        mode: GameMode.meaningBlitz,
+        limit: leaderboardLimit,
+      );
+      expect(top.map((entry) => entry.score), <int>[900]);
+    });
   });
 
   group('候选查询', () {

@@ -17,6 +17,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「开始学习」按钮的 Key，供测试定位。
 const Key startStudyButtonKey = Key('dashboard-start-study');
@@ -39,7 +40,7 @@ class TodayPlanCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final plan = ref.watch(dailyPlanProvider);
     final overview = ref.watch(dashboardOverviewProvider);
-    return DashboardCard(
+    return SectionCard(
       title: '今日计划',
       icon: Icons.today_rounded,
       child: plan.when(

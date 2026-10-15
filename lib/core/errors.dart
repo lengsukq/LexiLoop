@@ -215,6 +215,15 @@ enum AppErrorCode {
   /// 设备无网络连接。
   networkUnavailable('NETWORK_UNAVAILABLE', '网络不可用。'),
 
+  /// 浏览器端被同源策略挡下：请求本身没问题，是运行环境不允许跨域。
+  ///
+  /// 与 [networkUnavailable] 分开是有意的：用户看到「网络不可用」会去查
+  /// Wi-Fi，而真正的原因（换成桌面/移动端就能用）必须写进文案里。
+  browserCorsBlocked(
+    'BROWSER_CORS_BLOCKED',
+    '浏览器不允许网页直接访问该数据源。请改用桌面端或移动端，或换一个数据源。',
+  ),
+
   // ── 语音 ──
 
   /// 系统 TTS 引擎不可用或缺少所需语音包。

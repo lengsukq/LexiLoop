@@ -7,7 +7,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/phonetics/phonetics_play_view.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/features/phonetics/phonetics_setup_view.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/settling_indicator.dart';
 
 /// 音标训练页面。
 class PhoneticsPage extends ConsumerWidget {
@@ -31,7 +31,7 @@ class PhoneticsPage extends ConsumerWidget {
           onAction: controller.dispatch,
           onExit: controller.exit,
         ),
-        PhoneticSaving() => const _SavingView(),
+        PhoneticSaving() => const SettlingIndicator(),
         PhoneticFinished() => PhoneticsResultView(
           result: state.result,
           onReplay: controller.start,
@@ -42,30 +42,6 @@ class PhoneticsPage extends ConsumerWidget {
           onRetry: controller.retrySave,
         ),
       },
-    );
-  }
-}
-
-class _SavingView extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const CircularProgressIndicator(),
-          const SizedBox(height: 14),
-          Text(
-            '正在结算…',
-            style: TextStyle(
-              color: context.lexiColors.secondaryLabel,
-              fontSize: 13.5,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

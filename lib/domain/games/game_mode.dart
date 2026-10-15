@@ -9,9 +9,9 @@
 /// [GameModeRules] 一个值对象，界面与服务都只读它。
 library;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
 
 /// 小游戏、配对与音标训练的模式。
 ///
@@ -20,6 +20,12 @@ import 'package:lexiloop/domain/games/game_constants.dart';
 enum GameMode {
   /// 单词拼图：按释义从字母池拼出单词。
   wordBuilder('WORD_BUILDER'),
+
+  /// 听音辨词：听发音，从四个词里选出正确的英文词条。
+  listeningPick('LISTENING_PICK'),
+
+  /// 词义冲刺：看英文词条，快速选出正确的中文释义。
+  meaningBlitz('MEANING_BLITZ'),
 
   /// 词汇地鼠：按释义锤中冒头的正确单词。
   whackAMole('WHACK_A_MOLE'),
@@ -41,7 +47,7 @@ enum GameMode {
   /// 数据库与备份 JSON 中的稳定标识。
   final String wire;
 
-  /// 该模式是否属于「四个小游戏」（配对与音标有各自的会话与结算规则）。
+  /// 该模式是否属于「六个小游戏」（配对与音标有各自的会话与结算规则）。
   bool get isMiniGame => this != GameMode.match && this != GameMode.phonetics;
 
   /// 会话来源标识：小游戏带 `GAME_` 前缀。
@@ -104,7 +110,7 @@ class GameSpeedRules {
 /// 一局的计分权重。
 ///
 /// 旧版 `games/completion.ts` 与 `matching/service.ts` 各有一套；
-/// 收敛后四个小游戏共用 [gameBasePoints] 一组，配对与音标各用自己的一组，
+/// 收敛后六个小游戏共用 [gameBasePoints] 一组，配对与音标各用自己的一组，
 /// 但**只有一套计算函数**（见 `scoring.dart`）。
 class GameScoreRules {
   /// 以各权重构造。
@@ -214,7 +220,7 @@ const GameTimeBonusRules _noTimeBonus = GameTimeBonusRules(
 
 /// 各模式的规则表。
 ///
-/// 数值全部来自 `game_constants.dart`（迁入 `core/constants.dart` 后即同一出处），
+/// 数值全部来自 `lib/core/constants.dart` 的 `game*` / `match*` / `phonetic*` 一族，
 /// 与旧版 `GAME_CONFIGS` 逐条对应；`match` 的对数与时限边界由
 /// `matching_service.dart` 用 `matching*` 常量夹取。
 const Map<GameMode, GameModeRules> gameModeRules = <GameMode, GameModeRules>{
@@ -232,6 +238,40 @@ const Map<GameMode, GameModeRules> gameModeRules = <GameMode, GameModeRules>{
       taskType: StudyTaskType.spelling,
       itemCount: wordBuilderItemCount,
       durationSeconds: wordBuilderDurationSeconds,
+    ),
+    timeBonus: _noTimeBonus,
+  ),
+  GameMode.listeningPick: GameModeRules(
+    score: GameScoreRules(
+      basePoints: gameBasePoints,
+      comboStep: gameComboStep,
+      comboCap: gameComboCap,
+      mistakePenalty: gameMistakePenalty,
+      speed: _speedRules,
+    ),
+    session: GameSessionRules(
+      sessionType: StudyMode.listening,
+      questionType: QuestionType.listeningSpelling,
+      taskType: StudyTaskType.listening,
+      itemCount: listeningPickItemCount,
+      durationSeconds: listeningPickDurationSeconds,
+    ),
+    timeBonus: _noTimeBonus,
+  ),
+  GameMode.meaningBlitz: GameModeRules(
+    score: GameScoreRules(
+      basePoints: gameBasePoints,
+      comboStep: gameComboStep,
+      comboCap: gameComboCap,
+      mistakePenalty: gameMistakePenalty,
+      speed: _speedRules,
+    ),
+    session: GameSessionRules(
+      sessionType: StudyMode.daily,
+      questionType: QuestionType.enToZhChoice,
+      taskType: StudyTaskType.review,
+      itemCount: meaningBlitzItemCount,
+      durationSeconds: meaningBlitzDurationSeconds,
     ),
     timeBonus: _noTimeBonus,
   ),

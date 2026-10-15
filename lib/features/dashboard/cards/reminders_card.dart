@@ -8,6 +8,7 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 错词与到期提醒卡片：到期数、错词数，各带一个跳转按钮。
 ///
@@ -21,7 +22,7 @@ class RemindersCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(dashboardOverviewProvider);
-    return DashboardCard(
+    return SectionCard(
       title: '提醒',
       icon: Icons.notifications_none_rounded,
       child: overview.when(

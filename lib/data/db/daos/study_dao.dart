@@ -199,6 +199,32 @@ WHERE s.completed_at IS NULL
 ORDER BY s.started_at DESC
 LIMIT 1''';
 
+/// 跨模式找最近一条可恢复会话，附带剩余题数。
+///
+/// 逐字对应旧版 `modules/statistics/service.ts:16-24` 的 `getDashboard` 查询：
+/// 只看 [sessionResumeTtlMs] 内开始且未完成的会话，内连接 `PENDING` 题目
+/// （因此没有待答题目的会话天然被排除），按开始时间倒序取第一条。
+///
+/// **为什么要排除小游戏**：`MATCH_GAME` / `GAME_*` 的会话不占用今日复习
+/// 队列，若出现在首页「继续上次学习」里，用户会以为还剩一批复习任务。
+///
+/// **与旧版有意不同的一处**：末尾补了 `s.id DESC` 作为同毫秒的确定性兜底。
+/// 旧版只按 `started_at` 排序，同一毫秒开始的两个会话返回哪一条由扫描顺序
+/// 决定；首页卡片会因此在两次刷新之间跳变，测试也无法断言。
+const String _latestResumableSql = '''
+SELECT s.id, s.session_type, s.source_type, s.started_at, s.planned_count,
+       count(i.id) AS remaining_count
+FROM study_sessions s
+JOIN study_session_items i
+  ON i.study_session_id = s.id AND i.status = 'PENDING'
+WHERE s.completed_at IS NULL
+  AND s.started_at >= ?
+  AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
+  AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+GROUP BY s.id
+ORDER BY s.started_at DESC, s.id DESC
+LIMIT 1''';
+
 // ═══════════════════════════════════════════════════════════════
 // 内部类型
 // ═══════════════════════════════════════════════════════════════
@@ -324,6 +350,38 @@ class SessionHead {
 
   /// 落库的会话类型（`StudyMode` 的 wire 值）。
   final String sessionType;
+
+  /// 开始时间（epoch 毫秒）。
+  final int startedAt;
+}
+
+/// 跨模式找到的一条可恢复会话（首页「继续上次学习」用）。
+///
+/// [mode] 是**展示用**的会话类型，不是落库的 `session_type`：
+/// `AI_RECOMMENDED` / `SENTENCE_REVIEW` 的 `session_type` 会被落成
+/// `WRONG_WORDS` / `DUE_REVIEW`，只有 `source_type` 能还原用户实际在做什么
+/// （对应旧版 `statistics/service.ts` 里 `resumeSession.sessionType` 的三元选择）。
+class ResumableSession {
+  /// 以各字段构造。
+  const new({
+    required this.id,
+    required this.mode,
+    required this.remainingCount,
+    required this.plannedCount,
+    required this.startedAt,
+  });
+
+  /// 会话 ID。
+  final int id;
+
+  /// 展示用的会话类型。
+  final StudyMode mode;
+
+  /// 还剩多少道待作答题目（`status = 'PENDING'` 的条数）。
+  final int remainingCount;
+
+  /// 会话计划题数。
+  final int plannedCount;
 
   /// 开始时间（epoch 毫秒）。
   final int startedAt;
@@ -779,6 +837,36 @@ WHERE i.status = 'PENDING'
       Variable<int>(ttl),
       Variable<String>(taskType.wire),
     ]);
+  }
+
+  /// 跨模式找最近一条可恢复会话；没有则返回 `null`。
+  ///
+  /// 与 [findResumableSession] 的区别是**不指定模式**：后者回答「我点『错词
+  /// 强化』时能不能接着上次那条」，本方法回答「用户最近有没有一条做了一半的
+  /// 会话」——首页的「继续上次学习」要的是后者，所以不复用也不改前者的语义。
+  ///
+  /// 只认 [sessionResumeTtlMs] 内开始的会话，与 [expireStaleSessions] 的边界
+  /// 一致：更早的会话应当被收尾，把它们摆到首页等于让用户接着做过期题目。
+  Future<ResumableSession?> findLatestResumableSession(int now) async {
+    final row = await _db
+        .customSelect(
+          _latestResumableSql,
+          variables: <Variable<Object>>[
+            Variable<int>(now - sessionResumeTtlMs),
+          ],
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    return ResumableSession(
+      id: row.read<int>('id'),
+      mode: _modeOf(
+        row.read<String>('session_type'),
+        row.readNullable<String>('source_type'),
+      ),
+      remainingCount: row.read<int>('remaining_count'),
+      plannedCount: row.read<int>('planned_count'),
+      startedAt: row.read<int>('started_at'),
+    );
   }
 
   /// 把超过 [sessionResumeTtlMs] 未完成的会话标记过期并收尾，

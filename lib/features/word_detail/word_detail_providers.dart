@@ -13,9 +13,15 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/data/dictionary/content.dart';
+import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/services/dictionary/lookup_service.dart';
+import 'package:lexiloop/services/related_word_service.dart';
+import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
 /// 词条详情查询。
@@ -83,11 +89,34 @@ wordProviderAttemptsProvider =
           ref.watch(wordDetailDaoProvider).providerAttempts(wordId),
     );
 
+/// 有道内容的预览与应用服务。
+///
+/// 词典查询服务在这里单独构造：它是**有状态**的（持有 HTTP 客户端），
+/// 复用 `dao_providers` 里的实例会让详情页与初始化队列共用同一份连接池，
+/// 而详情页的预览是用户手点触发的、与后台任务无关的一次性调用。
+final Provider<WordContentRefreshService> wordContentRefreshServiceProvider =
+    Provider<WordContentRefreshService>(
+      (ref) => WordContentRefreshService(
+        ref.watch(databaseProvider),
+        ref.watch(settingsServiceProvider),
+        DictionaryLookupAdapter(
+          DictionaryLookupService(ref.watch(httpFetcherProvider)),
+        ),
+        WordEditService(ref.watch(databaseProvider)),
+      ),
+    );
+
+/// 关联词预览与加入服务。
+final Provider<RelatedWordService> relatedWordServiceProvider =
+    Provider<RelatedWordService>(
+      (ref) => RelatedWordService(ref.watch(databaseProvider)),
+    );
+
 /// 词条详情的写操作入口。
 final Provider<WordDetailActions> wordDetailActionsProvider =
     Provider<WordDetailActions>(WordDetailActions.new);
 
-/// 词条详情的写操作（暂停、笔记、删除）。
+/// 词条详情的写操作（暂停、笔记、删除、有道刷新、初始化、关联词）。
 ///
 /// 只有「容器引用」一个依赖，不接收回调参数——行为对象而非回调集合，
 /// 是旧版详情页参数膨胀（11 + 6 + 7 个 props）的直接对策。
@@ -106,7 +135,7 @@ class WordDetailActions {
     await (db.update(db.words)..where((row) => row.id.equals(wordId))).write(
       WordsCompanion(
         isSuspended: Value<bool>(suspended),
-        updatedAt: Value<int>(DateTime.now().millisecondsSinceEpoch),
+        updatedAt: Value<int>(_now()),
       ),
     );
     _invalidateWord(wordId);
@@ -119,7 +148,7 @@ class WordDetailActions {
     await (db.update(db.words)..where((row) => row.id.equals(wordId))).write(
       WordsCompanion(
         userNote: Value<String?>(text.isEmpty ? null : text),
-        updatedAt: Value<int>(DateTime.now().millisecondsSinceEpoch),
+        updatedAt: Value<int>(_now()),
       ),
     );
     _invalidateWord(wordId);
@@ -184,11 +213,93 @@ class WordDetailActions {
     );
   }
 
+  /// 排一个初始化任务。
+  ///
+  /// 「补全缺失内容」传 [InitializationMode.fillMissingFields]，
+  /// 「重新生成」传 [InitializationMode.forceOverwrite]；已有活跃任务时
+  /// [WordEditService.enqueueInitialization] 会按「更强的模式胜出」升级它，
+  /// 因此重复点击不会丢掉用户最后表达的那次意图。
+  Future<void> requestInitialization(
+    int wordId,
+    InitializationMode mode,
+  ) async {
+    await _edit.enqueueInitialization(wordId: wordId, now: _now(), mode: mode);
+    _invalidateAfterQueueChange(wordId);
+  }
+
+  /// 排一个「翻译补全」任务。
+  ///
+  /// 一个任务同时补齐缺失的释义译文、摘要译文与例句译文
+  /// （见 `LlmSupplementalTaskRunner`）：三者是同一件事的三个部分，
+  /// 拆成三个任务只会让用户在一个词条上看到三条排队记录。
+  Future<void> requestTranslation(int wordId) async {
+    await _edit.enqueueInitialization(
+      wordId: wordId,
+      now: _now(),
+      taskType: JobTaskType.exampleTranslations,
+    );
+    _invalidateAfterQueueChange(wordId);
+  }
+
+  /// 抓取有道内容预览（**不写库**）。
+  Future<YoudaoPreviewResult> previewYoudao(
+    int wordId, {
+    String? termOverride,
+  }) => _refresh.preview(wordId: wordId, termOverride: termOverride);
+
+  /// 应用有道预览内容；[newTerm] 非空时同时改词条文本。
+  Future<void> applyYoudao({
+    required int wordId,
+    required DictionaryContent content,
+    required InitializationMode mode,
+    required List<ProviderAttemptRecord> attempts,
+    String? newTerm,
+  }) async {
+    await _refresh.apply(
+      wordId: wordId,
+      fetched: content,
+      mode: mode,
+      attempts: attempts,
+      now: _now(),
+      newTerm: newTerm,
+    );
+    _invalidateAfterQueueChange(wordId);
+  }
+
+  /// 预览一个关联词在父词条里的关系信息与词库状态。
+  Future<RelatedWordPreview> previewRelatedWord(
+    int parentWordId,
+    String term,
+  ) => _related.preview(parentWordId: parentWordId, rawTerm: term);
+
+  /// 把关联词加入词库（必要时同时排初始化任务）。
+  Future<RelatedAddResult> addRelatedWord({
+    required int parentWordId,
+    required String term,
+    required RelationType relation,
+  }) async {
+    final result = await _related.add(
+      parentWordId: parentWordId,
+      rawTerm: term,
+      relation: relation,
+      now: _now(),
+    );
+    _invalidateList();
+    return result;
+  }
+
   /// 本次写入用的服务实例。
   ///
   /// 刻意不引用 `features/add` 里的 provider：详情页与「添加词条」弹窗
   /// 是两条独立的入口，共享一个 provider 会让任一侧重构都要看另一侧。
   WordEditService get _edit => WordEditService(_ref.read(databaseProvider));
+
+  /// 有道刷新服务。
+  WordContentRefreshService get _refresh =>
+      _ref.read(wordContentRefreshServiceProvider);
+
+  /// 关联词服务。
+  RelatedWordService get _related => _ref.read(relatedWordServiceProvider);
 
   int _now() => DateTime.now().millisecondsSinceEpoch;
 
@@ -203,5 +314,22 @@ class WordDetailActions {
       ..invalidate(recentReviewLogsProvider(wordId))
       ..invalidate(wordProviderAttemptsProvider(wordId))
       ..invalidate(dashboardOverviewProvider);
+  }
+
+  /// 入队或应用内容之后失效词条与列表两侧的缓存。
+  ///
+  /// 列表侧必须一起失效：词条文本、初始化状态与掌握分都在卡片上，
+  /// 只刷新详情页会让用户返回列表时看到一个「还没改」的旧词条。
+  void _invalidateAfterQueueChange(int wordId) {
+    _invalidateWord(wordId);
+    _invalidateList();
+  }
+
+  /// 失效词库列表相关的缓存。
+  void _invalidateList() {
+    _ref
+      ..invalidate(wordListProvider)
+      ..invalidate(wordCountProvider)
+      ..invalidate(masterySummaryProvider);
   }
 }

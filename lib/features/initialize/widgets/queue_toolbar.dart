@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 词根词缀卡片：词根、前缀、后缀分区展示。
 ///
@@ -24,7 +25,7 @@ class MorphologyCard extends StatelessWidget {
     final prefixes = _affixesOf(AffixKind.prefix);
     final suffixes = _affixesOf(AffixKind.suffix);
 
-    return DetailSectionCard(
+    return SectionCard(
       title: '词根词缀',
       icon: Icons.account_tree_rounded,
       child: Column(

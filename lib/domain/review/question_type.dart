@@ -187,21 +187,13 @@ QuestionType resolveAdaptiveQuestionType({
       isQuestionTypeEligible(preferred, context)) {
     return preferred;
   }
+  // 池子用具名常量而不是内联字面量：同一组题型在别处也要引用，
+  // 内联一份就多一处「改了这里忘了那里」的机会。
   final pool =
       preferred == QuestionType.listeningSpelling ||
           preferred == QuestionType.listeningChoice
-      ? const <QuestionType>[
-          QuestionType.listeningSpelling,
-          QuestionType.listeningChoice,
-        ]
-      : const <QuestionType>[
-          QuestionType.zhToEnSpelling,
-          QuestionType.enToZhChoice,
-          QuestionType.zhToEnChoice,
-          QuestionType.letterBank,
-          QuestionType.clozeSentence,
-          QuestionType.enToZh,
-        ];
+      ? adaptiveListeningPool
+      : adaptiveSpellingPool;
   return weightedPickFromPool(pool, context, config, source) ??
       QuestionType.zhToEnSpelling;
 }

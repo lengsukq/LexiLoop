@@ -26,7 +26,6 @@ void main() {
         'package:drift/',
         'package:dio/',
         'package:path_provider/',
-        'package:flutter_secure_storage/',
         'package:window_manager/',
         'package:just_audio/',
         'package:flutter_tts/',
@@ -224,6 +223,38 @@ void main() {
       expect(hourMs, 60 * minuteMs);
       expect(dayMs, 24 * hourMs);
       expect(weekMs, 7 * dayMs);
+    });
+  });
+
+  group('平台可移植性', () {
+    test('dart:io 只能出现在 *_native.dart 里', () {
+      // Web 构建的依赖图里不允许出现 `dart:io`（浏览器没有文件系统，
+      // 且它根本无法编译）。平台差异必须经由条件导入隔离：调用方 import
+      // 不带后缀的文件，由它 `export ... if (dart.library.js_interop) ...`
+      // 选中实现。把这条钉成守卫，是因为「顺手 import 一下 dart:io」是
+      // 最容易发生、也最难在评审里看出来的 Web 破坏方式。
+      final violations = <String>[];
+
+      for (final file in collectDartFiles('lib')) {
+        if (file.path.endsWith('_native.dart')) continue;
+        for (var i = 0; i < file.lines.length; i += 1) {
+          final line = file.lines[i].trim();
+          // 注释里出现的 `dart:io`（例如解释为什么不引入它）不算违规。
+          if (!line.startsWith('import ') && !line.startsWith('export ')) {
+            continue;
+          }
+          if (!line.contains("'dart:io'")) continue;
+          violations.add(file.locate(i + 1));
+        }
+      }
+
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            '平台相关实现请放进 `*_native.dart`，再由不带后缀的同名文件条件导出。\n'
+            '违规项：\n${violations.join('\n')}',
+      );
     });
   });
 }

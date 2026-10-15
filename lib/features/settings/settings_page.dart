@@ -22,6 +22,7 @@ import 'package:lexiloop/features/settings/question_type_section.dart';
 import 'package:lexiloop/features/settings/study_plan_section.dart';
 import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 
 /// 设置页。
 class SettingsPage extends ConsumerWidget {
@@ -37,7 +38,7 @@ class SettingsPage extends ConsumerWidget {
       body: SafeArea(
         child: settings.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => _SettingsError(
+          error: (error, _) => ErrorRetryView(
             message: error is AppError ? error.message : '读取设置失败：$error',
             onRetry: () => ref.invalidate(appSettingsProvider),
           ),
@@ -117,37 +118,6 @@ class _SettingsHeader extends StatelessWidget {
             style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SettingsError extends StatelessWidget {
-  const new({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(Icons.error_outline_rounded, size: 40, color: colors.danger),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
-          ],
-        ),
       ),
     );
   }

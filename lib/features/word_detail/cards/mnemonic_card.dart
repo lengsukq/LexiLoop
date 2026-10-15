@@ -10,6 +10,7 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 助记与句子分析卡片：助记法、发音提示、常见错误与句子分析。
 ///
@@ -34,7 +35,7 @@ class MnemonicCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '助记与句子分析',
       icon: Icons.lightbulb_outline_rounded,
       child: Column(

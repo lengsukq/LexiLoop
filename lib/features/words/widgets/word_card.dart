@@ -1,11 +1,18 @@
 /// 词库列表里的一张词条卡片。
 ///
 /// 卡片上只放「一眼能判断要不要点进去」的信息：词形、两条状态徽标、
-/// 释义摘要、语向与到期日。编辑、复习记录这些留给详情页。
+/// 释义摘要、语向与到期日，外加两个就地操作（朗读、编辑）——
+/// 旧版 `words/page.tsx` 也是把这两个入口挂在卡片上，
+/// 用户不必为了改一个错字先进详情页。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
+import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
+import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -152,7 +159,7 @@ class _CardMeta extends StatelessWidget {
   }
 }
 
-/// 卡片右侧：朗读入口与掌握分。
+/// 卡片右侧：朗读 / 编辑入口与掌握分。
 class _CardAside extends StatelessWidget {
   const new({required this.entry});
 
@@ -165,7 +172,13 @@ class _CardAside extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const _SpeakerButton(),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _SpeakerButton(entry: entry),
+            _EditButton(entry: entry),
+          ],
+        ),
         const SizedBox(height: 2),
         Text(
           '${entry.masteryScore}',
@@ -186,20 +199,21 @@ class _CardAside extends StatelessWidget {
 
 /// 朗读发音按钮。
 ///
-/// **当前是空实现**：音频服务层正在并行开发，接上之后只要把 [_speak]
-/// 换成真正的播放器调用，按钮的位置与命中区都不用再动。
-/// 在此之前保持「可点」，是为了先把入口立住——用户点下去不会有异常，
-/// 也不会因为按钮被禁用而误以为这个词条不能朗读。
-class _SpeakerButton extends StatelessWidget {
-  const new();
+/// 走 [speakWithWordSpeaker]（真人录音优先、系统朗读兜底）：卡片上带着
+/// `pronunciations` 就是为了这里——没有音频地址时它会静默回落到系统朗读，
+/// 有地址时先播放词典的 mp3。
+class _SpeakerButton extends ConsumerWidget {
+  const new({required this.entry});
+
+  final WordListEntry entry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return IconButton(
       tooltip: '朗读发音',
       iconSize: 18,
       visualDensity: VisualDensity.compact,
-      onPressed: _speak,
+      onPressed: () => unawaited(_speak(context, ref)),
       icon: Icon(
         Icons.volume_up_rounded,
         size: 16,
@@ -208,8 +222,51 @@ class _SpeakerButton extends StatelessWidget {
     );
   }
 
-  /// 音频层接线前的占位实现。
-  void _speak() {}
+  Future<void> _speak(BuildContext context, WidgetRef ref) =>
+      speakWithWordSpeaker(
+        context: context,
+        ref: ref,
+        term: entry.term,
+        contentType: entry.contentType,
+        pronunciations: entry.pronunciations,
+      );
+}
+
+/// 编辑词条按钮。
+///
+/// 与详情页头部用的是同一个弹窗：列表页改完文本后由
+/// `WordDetailActions.applyYoudao` 统一失效 `wordListProvider`，
+/// 卡片会自己刷新成新词形。
+class _EditButton extends StatelessWidget {
+  const new({required this.entry});
+
+  final WordListEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: '编辑词条',
+      iconSize: 18,
+      visualDensity: VisualDensity.compact,
+      onPressed: () => unawaited(
+        EditWordDialog.show(
+          context,
+          target: EditWordTarget(
+            wordId: entry.id,
+            term: entry.term,
+            sourceLanguage: entry.sourceLanguage,
+            targetLanguage: entry.targetLanguage,
+            contentType: entry.contentType,
+          ),
+        ),
+      ),
+      icon: Icon(
+        Icons.edit_rounded,
+        size: 15,
+        color: context.lexiColors.tertiaryLabel,
+      ),
+    );
+  }
 }
 
 /// 徽标色位。

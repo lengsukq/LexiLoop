@@ -4,7 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
-import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 笔记输入框的定位键。
 ///
@@ -60,7 +60,7 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   @override
   Widget build(BuildContext context) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '我的笔记',
       icon: Icons.edit_note_rounded,
       child: Column(

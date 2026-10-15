@@ -8,7 +8,7 @@
 /// 不需要任何状态；旧版首页把 6 个 hook 的结果在页面里粘合再逐层下传，
 /// 这里改为「卡片自取」。
 ///
-/// **空库时整页换成导入引导**：一个还没有任何词条的用户，六张卡片
+/// **空库时整页换成导入引导**：一个还没有任何词条的用户，整页卡片
 /// 全部显示 0，对「下一步做什么」零信息量。旧版 `page.tsx:72-87`
 /// 在 `totalWords === 0` 时直接返回空状态，本版沿用同一个判据。
 library;
@@ -20,10 +20,12 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/dashboard/cards/platform_card.dart';
 import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/dashboard/cards/reminders_card.dart';
+import 'package:lexiloop/features/dashboard/cards/resume_session_card.dart';
 import 'package:lexiloop/features/dashboard/cards/statistics_card.dart';
 import 'package:lexiloop/features/dashboard/cards/suggestion_card.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 空库引导的标题 Key，供测试定位。
@@ -64,7 +66,9 @@ class _DashboardBody extends StatelessWidget {
   };
 }
 
-/// 正常的六张卡片。
+/// 正常的卡片流。
+///
+/// 其中 [ResumeSessionCard] 只在存在可恢复会话时出现，其余六张常驻。
 class _DashboardCards extends StatelessWidget {
   const new();
 
@@ -73,6 +77,12 @@ class _DashboardCards extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
     children: const <Widget>[
       _PageHeader(),
+      // 「继续上次学习」挂在今日队列上方（对应旧版 `page.tsx:142-148` 的
+      // 位置）：用户刚回首页时最想接上的就是那条做了一半的会话，
+      // 排在今日计划之前才不会被 30 题的配额盖住。没有可恢复会话时
+      // 它自己渲染成空，不占位置。
+      ResumeSessionCard(),
+      SizedBox(height: 10),
       TodayPlanCard(),
       SizedBox(height: 10),
       SuggestionCard(),
@@ -204,12 +214,6 @@ class _EmptyIcon extends StatelessWidget {
 
 /// CSV 导入页的路由。
 ///
-/// 这里是本地副本而不是 `lib/app/router.dart` 里的 `importPath`：
-/// `router.dart` 引入了全部顶层页面（含本文件），feature 反向 import
-/// 会形成环；而 `/import` 是一条顶层路由，并不在 `appDestinations`
-/// 导航表里，也就没法走 `dashboard_navigation.dart` 的目的地解析。
-/// 路由改名时会有测试直接断言这条字符串而失败。
-const String csvImportPath = '/import';
 
 /// 空库引导图标的边长。
 const double emptyIconSize = 80;

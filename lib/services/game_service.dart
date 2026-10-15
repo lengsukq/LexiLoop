@@ -1,4 +1,4 @@
-/// 四个小游戏的编排。
+/// 六个小游戏的编排。
 ///
 /// 对应旧版 `modules/games/service.ts`（开局）与
 /// `modules/games/completion.ts`（结算）。
@@ -15,11 +15,11 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/game_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
@@ -253,8 +253,8 @@ class GameService {
 
   /// 按模式造题。
   ///
-  /// 中译英选择题的选项池是「本局全部候选词条」——与旧版
-  /// `createChoicePool(candidate.term, terms, CHOICE_COUNT)` 一致。
+  /// 选项池的构造规则收敛在 `GameChoicePools.choicesFor`：词义冲刺拿释义池、
+  /// 其余选择题拿词形池（与旧版 `createGameItems` 的三元链一致）。
   /// 单词拼图额外构造字母块，并保证打乱后不恰好等于原词。
   List<GameQuestion> _buildQuestions({
     required GameMode mode,
@@ -262,7 +262,16 @@ class GameService {
     required Map<int, int> itemIds,
     required double Function() random,
   }) {
-    final terms = <String>[for (final candidate in candidates) candidate.term];
+    final pools = GameChoicePools(
+      terms: <String>[for (final candidate in candidates) candidate.term],
+      definitions: <String>[
+        for (final candidate in candidates) candidate.definition,
+      ],
+      termDefinitions: <String, String>{
+        for (final candidate in candidates)
+          candidate.term: candidate.definition,
+      },
+    );
     final result = <GameQuestion>[];
     for (final candidate in candidates) {
       final itemId = itemIds[candidate.id];
@@ -278,15 +287,11 @@ class GameService {
                 ? buildLetterTiles(candidate.term, random: random)
                 : const <LetterTile>[],
           ),
-          choices: GameChoices(
-            options: mode == GameMode.wordBuilder
-                ? const <String>[]
-                : createChoicePool(
-                    correct: candidate.term,
-                    pool: terms,
-                    size: gameChoiceCount,
-                    random: random,
-                  ),
+          choices: pools.choicesFor(
+            mode: mode,
+            term: candidate.term,
+            definition: candidate.definition,
+            random: random,
           ),
           priority: candidate.priority,
         ),

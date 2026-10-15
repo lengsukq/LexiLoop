@@ -17,6 +17,7 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
@@ -140,6 +141,9 @@ void main() {
   test('清单覆盖了所有会读库的顶层 provider', () {
     // 这条不是行为断言而是「清单不许悄悄变短」：几个关键页面必须在列，
     // 否则恢复备份后它们会继续显示导入前的快照。
+    //
+    // 新增会读库的顶层 provider 时，除了加进 `dataBackedProviders`，
+    // 也要把它加到这里——否则清单可以在「测试仍然全绿」的情况下被漏掉。
     expect(
       dataBackedProviders,
       containsAll(<Object>[
@@ -148,8 +152,14 @@ void main() {
         dashboardOverviewProvider,
         dailySuggestionProvider,
         statisticsOverviewProvider,
+        dailyTrendProvider,
+        recentResultsProvider,
+        // 首页「继续上次学习」卡片：漏掉它会让恢复备份后仍显示已被替换的会话。
+        resumableSessionProvider,
         queuePageProvider,
         queueProgressProvider,
+        // 文章导入：漏掉它会让恢复备份后仍能提交按旧词库判定的预览。
+        articleImportServiceProvider,
       ]),
     );
   });

@@ -8,7 +8,7 @@
 /// 交给调用方传入，服务层负责把池子填满，领域层只负责去重、打乱与截断。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/question_payload.dart';
@@ -38,6 +38,7 @@ class GameChoices {
   const new({
     required this.options,
     this.definitions = const <String, String>{},
+    this.correct,
   });
 
   /// 选项文本（已打乱，含正确项）。
@@ -46,8 +47,89 @@ class GameChoices {
   /// 选项文本 → 中文释义（仅听音选词类题目需要）。
   final Map<String, String> definitions;
 
+  /// 正确选项的文本；`null` 表示正确项就是词形。
+  ///
+  /// **为什么正确项由出题方写死**：旧版在 `games/page.tsx:217` 现场判题
+  /// （`session.mode === "MEANING_BLITZ" ? current.definition : current.term`），
+  /// 「哪个模式的正确项是释义」这条规则因此散在界面层，判题代码离不开模式。
+  /// 出题时把正确项写进题目后，判题只看 [GameQuestion.answer]，
+  /// 听音辨词与词义冲刺因此可以共用同一个状态机。
+  final String? correct;
+
   /// 该题是否可用于作答（选项不足时判为不可用，界面据此提示）。
   bool get isUsable => options.length >= gameMinimumChoiceCount;
+}
+
+/// 一局候选池派生出的干扰项来源。
+///
+/// **为什么要有它**：旧版 `createGameItems`（`games/service.ts`）在函数体里
+/// 现算 `terms` 与 `definitions` 两个数组，再用一个三元链决定拿哪个当池子；
+/// 这里把「池子怎么来」与「按模式选哪个池子」拆成两步，
+/// 加模式时只需要改 [choicesFor] 一处。
+class GameChoicePools {
+  /// 以各字段构造。
+  const new({
+    required this.terms,
+    required this.definitions,
+    required this.termDefinitions,
+  });
+
+  /// 本局全部候选的词形。
+  final List<String> terms;
+
+  /// 本局全部候选的释义。
+  final List<String> definitions;
+
+  /// 词形 → 释义（听音辨词的选项副标题用）。
+  final Map<String, String> termDefinitions;
+
+  /// 按模式造一道题的选项集合。
+  ///
+  /// 与旧版 `createGameItems` 逐条对应：词义冲刺的选项池是**释义**
+  /// （正确项也是释义），听音辨词与其余选择题模式的选项池是**词形**；
+  /// 单词拼图不用选项，改用字母块。配对与音标各有自己的出题路径
+  /// （`matching_service.dart` / `domain/phonetics/selection.dart`），
+  /// 不会走到这里，这里给空选项而不是抛错。
+  GameChoices choicesFor({
+    required GameMode mode,
+    required String term,
+    required String definition,
+    required double Function() random,
+  }) {
+    return switch (mode) {
+      GameMode.wordBuilder ||
+      GameMode.match ||
+      GameMode.phonetics => const GameChoices(options: <String>[]),
+      GameMode.meaningBlitz => GameChoices(
+        options: createChoicePool(
+          correct: definition,
+          pool: definitions,
+          size: gameChoiceCount,
+          random: random,
+        ),
+        correct: definition,
+      ),
+      GameMode.listeningPick => GameChoices(
+        options: createChoicePool(
+          correct: term,
+          pool: terms,
+          size: gameChoiceCount,
+          random: random,
+        ),
+        definitions: termDefinitions,
+      ),
+      GameMode.whackAMole ||
+      GameMode.wordStack ||
+      GameMode.wordTetris => GameChoices(
+        options: createChoicePool(
+          correct: term,
+          pool: terms,
+          size: gameChoiceCount,
+          random: random,
+        ),
+      ),
+    };
+  }
 }
 
 /// 一道完整的游戏题目。
@@ -78,9 +160,9 @@ class GameQuestion {
 
   /// 该题的正确选项文本。
   ///
-  /// 中译英类题目选英文词条，英译中类题目选中文释义——由 [choices] 的
-  /// 构造方式决定，因此这里只需知道「正确项是否在选项里」。
-  String get answer => word.term;
+  /// 中译英类题目选英文词条，英译中类题目选中文释义——由
+  /// [GameChoices.correct] 决定（出题时写入），缺省即词形。
+  String get answer => choices.correct ?? word.term;
 }
 
 /// 从候选池里造一个含正确项、且去重后长度为 [size] 的选项列表。

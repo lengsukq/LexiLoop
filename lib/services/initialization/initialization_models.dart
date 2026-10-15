@@ -5,7 +5,7 @@
 /// 才发现；这里全部具名。
 library;
 
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 
 /// 一次入队请求。

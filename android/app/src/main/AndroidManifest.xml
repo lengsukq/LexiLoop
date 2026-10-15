@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 词典初始化（有道 / 爱词霸 / dictionaryapi.dev / LLM 网关）需要联网。
+         debug manifest 里那条 INTERNET 只服务于 Flutter 工具的热重载，
+         不会进入 release 包；缺了这条，release 包会以「网络不可用」静默失败。 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="lexiloop"
         android:name="${applicationName}"

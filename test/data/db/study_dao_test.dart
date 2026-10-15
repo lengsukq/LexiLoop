@@ -130,6 +130,7 @@ void main() {
     String? sourceType,
     int? startedAt,
     int? completedAt,
+    int plannedCount = 0,
   }) => db
       .into(db.studySessions)
       .insert(
@@ -138,6 +139,7 @@ void main() {
           sourceType: Value<String?>(sourceType),
           startedAt: startedAt ?? now,
           completedAt: Value<int?>(completedAt),
+          plannedCount: Value<int>(plannedCount),
           createdAt: now,
         ),
       );
@@ -814,6 +816,129 @@ void main() {
       );
 
       expect(await dao.findResumableSession(StudyMode.dueReview, now), isNull);
+    });
+  });
+
+  group('跨模式可恢复会话', () {
+    test('取最近一天内 started_at 最新的一条，忽略已完成与超时', () async {
+      final word = await insertWord(term: 'apple');
+      // 已完成：即使有 PENDING 题目也不算可恢复。
+      final completed = await insertSession(startedAt: now, completedAt: now);
+      await insertItem(completed, word);
+      // 超时：超过 sessionResumeTtlMs 的会话应由 expireStaleSessions 收尾。
+      final stale = await insertSession(
+        startedAt: now - sessionResumeTtlMs - 1,
+      );
+      await insertItem(stale, word);
+      final older = await insertSession(startedAt: now - 2 * hourMs);
+      await insertItem(older, word);
+      final newer = await insertSession(startedAt: now - hourMs);
+      await insertItem(newer, word);
+
+      final found = await dao.findLatestResumableSession(now);
+
+      expect(found, isNotNull);
+      expect(found!.id, newer);
+      expect(found.startedAt, now - hourMs);
+    });
+
+    test('排除小游戏会话（MATCH_GAME 与 GAME_ 前缀）', () async {
+      final word = await insertWord(term: 'apple');
+      final matchGame = await insertSession(sourceType: 'MATCH_GAME');
+      await insertItem(matchGame, word);
+      final prefixed = await insertSession(sourceType: 'GAME_SPELLING');
+      await insertItem(prefixed, word);
+      final review = await insertSession(
+        mode: StudyMode.dueReview,
+        startedAt: now - 2 * hourMs,
+      );
+      await insertItem(review, word);
+
+      final found = await dao.findLatestResumableSession(now);
+
+      expect(found?.id, review, reason: '小游戏不占用今日复习队列，不该出现在「继续上次学习」里');
+      expect(found?.mode, StudyMode.dueReview);
+    });
+
+    test('只统计 PENDING 题目，剩余题数与计划题数分别取值', () async {
+      final word = await insertWord(term: 'apple');
+      final sessionId = await insertSession(plannedCount: 4);
+      await insertItem(sessionId, word);
+      await insertItem(sessionId, word, position: 1);
+      await insertItem(
+        sessionId,
+        word,
+        position: 2,
+        status: StudyItemStatus.answered,
+        answeredAt: now,
+      );
+      await insertItem(
+        sessionId,
+        word,
+        position: 3,
+        status: StudyItemStatus.skipped,
+        answeredAt: now,
+        skipReason: 'LATER',
+      );
+
+      final found = await dao.findLatestResumableSession(now);
+
+      expect(found!.remainingCount, 2, reason: '只数 PENDING');
+      expect(found.plannedCount, 4);
+    });
+
+    test('待答题目为 0 的会话不算可恢复', () async {
+      final word = await insertWord(term: 'apple');
+      final sessionId = await insertSession();
+      await insertItem(
+        sessionId,
+        word,
+        status: StudyItemStatus.answered,
+        answeredAt: now,
+      );
+
+      expect(await dao.findLatestResumableSession(now), isNull);
+    });
+
+    test('展示用模式按 source_type 优先，其余取 session_type', () async {
+      final word = await insertWord(term: 'apple');
+      // 旧版把这两种模式的 session_type 落成 WRONG_WORDS / DUE_REVIEW，
+      // 只有 source_type 能还原用户实际在做什么。
+      final ai = await insertSession(
+        mode: StudyMode.wrongWords,
+        sourceType: StudyMode.aiRecommended.wire,
+        startedAt: now - 3 * hourMs,
+      );
+      await insertItem(ai, word);
+      expect(
+        (await dao.findLatestResumableSession(now))?.mode,
+        StudyMode.aiRecommended,
+      );
+
+      final sentences = await insertSession(
+        mode: StudyMode.dueReview,
+        sourceType: StudyMode.sentenceReview.wire,
+        startedAt: now - 2 * hourMs,
+      );
+      await insertItem(sentences, word);
+      expect(
+        (await dao.findLatestResumableSession(now))?.mode,
+        StudyMode.sentenceReview,
+      );
+
+      final spelling = await insertSession(
+        mode: StudyMode.spelling,
+        startedAt: now - hourMs,
+      );
+      await insertItem(spelling, word);
+      expect(
+        (await dao.findLatestResumableSession(now))?.mode,
+        StudyMode.spelling,
+      );
+    });
+
+    test('空库返回 null', () async {
+      expect(await dao.findLatestResumableSession(now), isNull);
     });
   });
 

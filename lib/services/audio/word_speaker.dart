@@ -13,10 +13,10 @@ library;
 
 import 'dart:math' show min;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
-import 'package:lexiloop/services/audio/audio_constants.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
 import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/audio/speech_request.dart';

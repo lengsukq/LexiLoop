@@ -18,13 +18,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/add_page.dart';
+import 'package:lexiloop/features/add/article_page.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/features/games/games_page.dart';
 import 'package:lexiloop/features/import/import_page.dart';
 import 'package:lexiloop/features/initialize/initialize_page.dart';
 import 'package:lexiloop/features/match/match_page.dart';
 import 'package:lexiloop/features/phonetics/phonetics_page.dart';
-import 'package:lexiloop/features/placeholder/placeholder_page.dart';
 import 'package:lexiloop/features/settings/settings_page.dart';
 import 'package:lexiloop/features/statistics/statistics_page.dart';
 import 'package:lexiloop/features/study/study_page.dart';
@@ -32,9 +32,7 @@ import 'package:lexiloop/features/word_detail/word_detail_page.dart';
 import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/ui/adaptive_shell.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
-
-/// CSV 导入页的路径（顶层路由，不套外壳）。
-const String importPath = '/import';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 
 /// 全局路由实例。
 final GoRouter appRouter = createAppRouter();
@@ -51,17 +49,21 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
     initialLocation: initialLocation,
     routes: <RouteBase>[
       GoRoute(
-        path: importPath,
+        path: csvImportPath,
         builder: (context, state) => const ImportPage(),
+      ),
+      GoRoute(
+        path: articlePath,
+        builder: (context, state) => const ArticlePage(),
       ),
       // 小游戏与配对不在主导航里（它们是「独立模式，不占用今日复习队列」），
       // 从首页的「趣味训练」进入，因此是顶层路由、不套外壳。
       GoRoute(
-        path: '/games',
+        path: gamesPath,
         builder: (context, state) =>
             GamesPage(initialMode: state.uri.queryParameters['mode']),
       ),
-      GoRoute(path: '/match', builder: (context, state) => const MatchPage()),
+      GoRoute(path: matchPath, builder: (context, state) => const MatchPage()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AdaptiveShell(navigationShell: navigationShell),
@@ -71,7 +73,10 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
               routes: <RouteBase>[
                 GoRoute(
                   path: destination.path,
-                  builder: (context, state) => _pageFor(destination, state),
+                  builder: (context, state) => pageForDestination(
+                    destination,
+                    studyModeWire: state.uri.queryParameters['mode'],
+                  ),
                   routes: _subRoutesFor(destination),
                 ),
               ],
@@ -82,7 +87,17 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
   );
 }
 
-Widget _pageFor(AppDestination destination, GoRouterState state) {
+/// 导航目的地 → 页面。
+///
+/// 导出成公开函数而不是私有分支，是为了让
+/// `test/app/destination_pages_test.dart` 能遍历 [appDestinations]
+/// 逐个断言「每个目的地都真的有页面」——这是本文件唯一无法靠类型系统
+/// 保证的事情（`path` 是字符串）。
+///
+/// **未知路径抛 [StateError] 而不是渲染一个兜底页**：兜底页会让「新加了
+/// 目的地却忘了接线」表现为一个能正常打开的空页面，而抛错会在测试里
+/// 立刻暴露。旧版没有这层保护，占位组件被当成已完成页面用了很久。
+Widget pageForDestination(AppDestination destination, {String? studyModeWire}) {
   return switch (destination.path) {
     '/' => const DashboardPage(),
     '/add' => const AddPage(),
@@ -93,8 +108,11 @@ Widget _pageFor(AppDestination destination, GoRouterState state) {
     '/words' => const WordsPage(),
     '/settings' => const SettingsPage(),
     '/statistics' => const StatisticsPage(),
-    '/study' => StudyPage(mode: studyModeOf(state.uri.queryParameters['mode'])),
-    _ => PlaceholderPage(destination: destination),
+    '/study' => StudyPage(mode: studyModeOf(studyModeWire)),
+    _ => throw StateError(
+      '导航目的地 ${destination.path} 没有对应页面：'
+      ' 请在 pageForDestination 里补一个分支。',
+    ),
   };
 }
 

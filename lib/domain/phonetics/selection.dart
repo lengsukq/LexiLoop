@@ -14,8 +14,8 @@
 /// 这样「易混音标组」这套教学资产才真正参与出题，而不是只躺在目录里。
 library;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/domain/phonetics/catalog.dart';

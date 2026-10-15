@@ -23,6 +23,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「昨日质量」徽章文字的 Key，供测试定位（文字同时携带分数与语气色）。
 const Key suggestionQualityTextKey = Key('suggestion-quality');
@@ -45,7 +46,7 @@ class _SuggestionCardState extends ConsumerState<SuggestionCard> {
   @override
   Widget build(BuildContext context) {
     final suggestion = ref.watch(dailySuggestionProvider);
-    return DashboardCard(
+    return SectionCard(
       title: '今日建议',
       icon: Icons.lightbulb_outline,
       child: suggestion.when(

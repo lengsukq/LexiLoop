@@ -10,13 +10,14 @@ library;
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/game_dao.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/domain/games/choice_pick.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_runtime.dart';
 import 'package:lexiloop/domain/games/scoring.dart';
@@ -178,6 +179,122 @@ void main() {
         db.studySessions,
       )..where((row) => row.id.equals(second.sessionId))).getSingle();
       expect(fresh.completedAt, isNull);
+    });
+  });
+
+  group('听音辨词与词义冲刺', () {
+    test('词义冲刺的选项与判题答案都是释义', () async {
+      await insertWords(6);
+      final session = await service.start(
+        mode: GameMode.meaningBlitz,
+        now: now,
+        random: constantRandom(),
+      );
+      expect(session.questions.length, 6);
+      for (final question in session.questions) {
+        expect(question.choices.options.length, gameChoiceCount);
+        expect(question.choices.options, contains(question.word.definition));
+        expect(question.answer, question.word.definition);
+        expect(
+          question.choices.options,
+          isNot(contains(question.word.term)),
+          reason: '选项里不能出现词形',
+        );
+      }
+      final row = await (db.select(
+        db.studySessions,
+      )..where((item) => item.id.equals(session.sessionId))).getSingle();
+      expect(row.sessionType, StudyMode.daily);
+      expect(row.sourceType, 'GAME_MEANING_BLITZ');
+    });
+
+    test('听音辨词的选项是词形，并带上释义映射与会话题型', () async {
+      await insertWords(6);
+      final session = await service.start(
+        mode: GameMode.listeningPick,
+        now: now,
+        random: constantRandom(),
+      );
+      for (final question in session.questions) {
+        expect(question.choices.options, contains(question.word.term));
+        expect(question.answer, question.word.term);
+        expect(
+          question.choices.definitions[question.word.term],
+          question.word.definition,
+        );
+      }
+      final row = await (db.select(
+        db.studySessions,
+      )..where((item) => item.id.equals(session.sessionId))).getSingle();
+      expect(row.sessionType, StudyMode.listening);
+      expect(row.sourceType, 'GAME_LISTENING_PICK');
+      final items = await (db.select(
+        db.studySessionItems,
+      )..where((item) => item.studySessionId.equals(session.sessionId))).get();
+      expect(
+        items.every(
+          (item) => item.questionType == QuestionType.listeningSpelling,
+        ),
+        isTrue,
+      );
+      expect(
+        items.every((item) => item.taskType == StudyTaskType.listening),
+        isTrue,
+      );
+    });
+
+    test('题量与时限取自旧版 GAME_CONFIGS', () async {
+      await insertWords(12);
+      final listening = await service.start(
+        mode: GameMode.listeningPick,
+        now: now,
+        random: constantRandom(),
+      );
+      expect(listening.questions.length, listeningPickItemCount);
+      expect(listening.plan.durationMs, listeningPickDurationSeconds * 1000);
+      final blitz = await service.start(
+        mode: GameMode.meaningBlitz,
+        now: now + 1000,
+        random: constantRandom(),
+      );
+      expect(blitz.questions.length, meaningBlitzItemCount);
+      expect(blitz.plan.durationMs, meaningBlitzDurationSeconds * 1000);
+    });
+
+    test('结算走复习日志：词义冲刺答对写词形、答错写失败标记', () async {
+      await insertWords(5);
+      final session = await service.start(
+        mode: GameMode.meaningBlitz,
+        now: now,
+        random: constantRandom(),
+      );
+      var runtime = startGameRuntime(
+        mode: session.mode,
+        plan: session.plan,
+        questions: session.questions,
+        random: constantRandom(),
+      );
+      runtime = runtime.dispatch(PickChoice(session.questions[0].answer))!;
+      runtime = runtime.dispatch(const AdvanceChoicePick())!;
+      final result = await service.complete(
+        session: session,
+        summary: runtime.core.summary,
+        answers: runtime.core.answerRecords(session.questions),
+        now: now + 5000,
+      );
+      expect(result.summary.firstTryCorrect, 1);
+      final logs = await reviewLogs();
+      final answered = logs.firstWhere(
+        (log) => log.read<int>('word_id') == session.questions[0].wordId,
+      );
+      expect(
+        answered.read<String>('user_answer'),
+        session.questions[0].word.term,
+      );
+      final missed = logs.firstWhere(
+        (log) => log.read<int>('word_id') == session.questions[1].wordId,
+      );
+      expect(missed.read<String>('user_answer'), gameMistakeAnswer);
     });
   });
 

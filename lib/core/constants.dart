@@ -259,8 +259,9 @@ const double questionTypeRandomCeiling = 0.999999;
 
 /// 权重占比换算成百分数的基数。
 ///
-/// 命名带 `questionType` 前缀：`data/dictionary/dictionary_constants.dart` 已有一个
-/// 同值的 `percentScale`，而同时 import 两个文件的 `services/` 会在重名上报错。
+/// 命名带 `questionType` 前缀：`percentScale` 这个名字已经被「百分数换算
+/// 基数」占用，而两者语义不同——前者是题型权重占比，后者是通用百分比。
+/// 分开命名比共用一个更容易在改动时看清影响面。
 const int questionTypePercentScale = 100;
 
 // 题型权重预设：对应旧版
@@ -527,6 +528,13 @@ const int rollbackBlockedTermLimit = 30;
 /// 导入历史一次展示的批次数。
 const int recentImportBatchLimit = 20;
 
+/// 一次翻译任务最多送出多少条缺失内容。
+///
+/// 与旧版 `modules/translations/service.ts` 的 `translateMissingDefinitions`
+/// 一致（`source.slice(0, 20)`）：一个词条可能有十几条源语言释义，
+/// 一次全送会把单次请求撑到超时上限，而分批推进对用户是可见的进度。
+const int translationBatchLimit = 20;
+
 /// 导入批次行明细的分页大小。
 const int importRowPageSize = 50;
 
@@ -640,12 +648,6 @@ const int maintenanceIntervalMs = 10 * minuteMs;
 /// 按 3s 节奏排期会持续占着数据通道，对耗电没有好处。
 const int maintenanceBusyIntervalMs = 30 * secondMs;
 
-/// 每日 AI 建议的生成时刻（本地时区，24 小时制）。
-const int dailySuggestionHour = 0;
-
-/// 每日 AI 建议的生成分钟。
-const int dailySuggestionMinute = 5;
-
 /// AI 内容质量分低于此值时整份丢弃。
 ///
 /// 来源：旧版 `dictionary/providers/ai-lexical.ts`。
@@ -668,6 +670,13 @@ const int jobPrioritySupplemental = 20;
 
 /// 初始化任务优先级：手动批量初始化。
 const int jobPriorityManualBulk = 90;
+
+/// 初始化任务优先级：从关联词卡片加入词库。
+///
+/// 旧版 `modules/words/related.ts` 的 `addRelatedWord` 写死 80：比用户显式
+/// 选中的批量初始化（90）低一档、比后台补充任务（20）高得多——用户刚刚
+/// 点下「加入词库」，这个任务应当排在其他自动任务前面。
+const int jobPriorityRelatedWord = 80;
 
 /// 初始化任务优先级：默认（单条手动触发）。
 const int jobPriorityDefault = 100;
@@ -731,10 +740,9 @@ const int transientServerErrorFloor = 500;
 /// 来源：旧版 `modules/settings/service.ts:77` 的 `.min(0)`。
 /// 0 与 1 在当前实现下等价——`LlmConfig` 会把候选链遍数夹到至少 1 遍。
 ///
-/// **为什么叫 Floor/Ceiling/Default 而不是 `minAiRetryCount` /
-/// `defaultAiRetryCount`**：`lib/data/dictionary/dictionary_constants.dart`
-/// 已经占了后两个名字，而 `lib/services/llm/llm_config.dart` 同时 import
-/// 这两个文件，同名会让引用产生歧义。两组常量取值必须一致，
+/// **为什么叫 Floor/Ceiling 而不是 `minAiRetryCount`**：后者这个名字已经被
+/// 「AI 参数」分节里的边界常量占用，而两处语义不同——这里是**设置项的取值
+/// 范围**，那里是**LLM 请求参数的边界**。两组常量取值必须一致，
 /// 由 `test/domain/models/app_settings_test.dart` 断言。
 const int aiRetryCountFloor = 0;
 
@@ -772,9 +780,6 @@ const int youdaoRetryJitterMaxMs = 400;
 /// 旧版服务端内存 LRU 为 200 条；本版落盘缓存，此处保留作为软上限。
 const int ttsCacheMaxEntries = 200;
 
-/// TTS 合成超时（毫秒）。
-const int ttsTimeoutMs = 15 * secondMs;
-
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
 // 统计页（对应旧版 app/(main)/statistics/page.tsx）
@@ -784,7 +789,17 @@ const int ttsTimeoutMs = 15 * secondMs;
 const int defaultTrendDays = 30;
 
 /// 趋势图可选的天数档位。
-const List<int> trendDayOptions = <int>[7, 14, 30, 90];
+///
+/// 与旧版 `statistics/page.tsx` 的 `Segmented` 逐档对齐（7 天 / 30 天 / 90 天 /
+/// 一年）。**必须与 [statisticsDailyDetailLimit] 一起看**：明细表只列最近
+/// 若干天，档位再大也不会把明细撑成无底洞。
+const List<int> trendDayOptions = <int>[7, 30, 90, 365];
+
+/// 统计页「最近学习明细」最多列出多少天。
+///
+/// 旧版明细表固定 `slice(0, 30)`，与趋势档位无关——它是「最近发生了什么」，
+/// 不是「这一档的全部」。
+const int statisticsDailyDetailLimit = 30;
 
 /// 迷你趋势条展示的最近作答次数。
 const int recentResultsLimit = 20;
@@ -831,9 +846,6 @@ const double sidebarBreakpoint = 1024;
 /// 侧边栏宽度。
 const double sidebarWidth = 256;
 
-/// 侧边栏占据的主内容左边距（含间隙）。
-const double sidebarContentInset = 264;
-
 /// 桌面窗口默认宽度。
 const double defaultWindowWidth = 1280;
 
@@ -877,3 +889,926 @@ const int manualDefinitionPartOfSpeechMaxLength = 50;
 /// 一个词条在多次重试下可能积累上百条调用记录，卡片是排查工具而不是流水账；
 /// 默认按时间倒序取最近这些条，够定位「是哪一次调用出的问题」。
 const int providerAttemptCardLimit = 50;
+
+/// 手动添加页一次最多接受的行数。
+///
+/// 与旧版 `components/add/manual-tab.tsx` 的 `MAX_ROWS` 一致：每行要单独
+/// 打一次词典，100 行已经是一次「批量导入」的量级，再多就该走 CSV。
+const int manualBatchMaxRows = 100;
+
+/// 手动添加页单行的字符上限。
+const int manualBatchMaxCharsPerLine = 1200;
+
+/// 手动添加页整段文本的字符上限。
+const int manualBatchMaxTotalChars = 24000;
+
+/// 手动添加页单行超限报错里截取的输入片段长度。
+///
+/// 与旧版 `components/add/manual-tab.tsx` 的 `overlong.slice(0, 24)` 一致：
+/// 报错要让人认出是哪一行，又不该把一整段 1200 字符的内容贴进提示里。
+const int manualBatchErrorSnippetLength = 24;
+
+/// 手动添加页生成预览时的并发数。
+///
+/// 与旧版 `PREVIEW_CONCURRENCY` 一致：词典站点对并发敏感，串行又太慢。
+const int manualBatchPreviewConcurrency = 5;
+
+/// 答题计时在多久没有交互后暂停（毫秒）。
+///
+/// 与旧版 `lib/use-active-stopwatch.ts` 的 `ACTIVE_IDLE_TIMEOUT_MS` 一致
+/// （45 秒）：统计的是「真正在答题的时间」，挂机、切窗口、锁屏都不该算进去。
+/// 短于这个间隔的停顿视为思考的一部分。
+const int activeIdleTimeoutMs = 45 * secondMs;
+
+// ═══════════════════════════════════════════════════════════════
+// 小游戏 / 配对 / 音标训练
+//
+// 数值来源逐条标注旧版出处。旧版把权重分散在 `games/completion.ts`、
+// `matching/service.ts`、`games/service.ts` 三处（见 CLEAN_CODE_BASELINE），
+// 这里收敛成唯一出处。
+// ═══════════════════════════════════════════════════════════════
+
+/// 开局所需的最少题数（旧版 `MINIMUM_GAME_ITEMS`）。
+const int gameMinimumItemCount = 4;
+
+/// 选择题的选项数量（旧版 `CHOICE_COUNT`）。
+const int gameChoiceCount = 4;
+
+/// 一道题至少要有几个选项才算可用。
+///
+/// 只有 1 个选项的题没有判别意义（选不选都是它），界面据此提示题库不足。
+const int gameMinimumChoiceCount = 2;
+
+/// 候选池一次取用的行数上限（旧版 `CANDIDATE_QUERY_LIMIT`）。
+///
+/// 旧版每次开局都跑一次全表排序再截断；这里是同一策略的显式上限，
+/// 避免题库上万条时把整张表读进内存。
+const int gameCandidateQueryLimit = 160;
+
+/// 连击加成最多累计的级数，防止长连击把单题分值放大到失控。
+const int gameComboCap = 5;
+
+/// 快答阈值：低于此耗时的作答获得速度奖励。
+const int gameFastAnswerMs = 3000;
+
+/// 快答奖励分值。
+const int gameFastAnswerBonus = 20;
+
+/// 慢答阈值：达到此耗时的作答扣除速度分。
+const int gameSlowAnswerMs = 12000;
+
+/// 慢答扣分分值。
+const int gameSlowAnswerPenalty = 10;
+
+/// 评级 S 的得分占理论上限的百分比下限。
+const int gameRankSPercent = 85;
+
+/// 评级 A 的得分占理论上限的百分比下限。
+const int gameRankAPercent = 70;
+
+/// 评级 B 的得分占理论上限的百分比下限。
+const int gameRankBPercent = 45;
+
+/// 高分榜展示的条数（旧版 `LEADERBOARD_LIMIT`）。
+const int leaderboardLimit = 10;
+
+// ═══════════════════════════════════════════════════════════════
+// 计分权重——旧版两套权重的唯一收敛点
+//
+// 旧版 `modules/games/completion.ts` 与 `modules/matching/service.ts`
+// 各写了一套权重（`docs/CLEAN_CODE_BASELINE.md` 点名的重复）：
+//   小游戏：firstTry*100 + recovered*55 + maxCombo*12 − mistake*20
+//   配对：  firstTry*120 + recovered*70 + min(600, 剩余ms/100) + maxCombo*15 − mistake*25
+//   音标：  firstTry*120 + recovered*60 + maxCombo*15 − mistake*20
+// 收敛后只保留「基础分 / 连击步长 / 失误罚分 / 剩余时间换算」四类，
+// 上表里 `recovered` 的低权重由「答错清零连击」自然实现。
+// ═══════════════════════════════════════════════════════════════
+
+/// 六个小游戏的基础分（旧版 `firstTryCorrect * 100`）。
+const int gameBasePoints = 100;
+
+/// 六个小游戏的连击步长（旧版 `maxCombo * 12`）。
+const int gameComboStep = 12;
+
+/// 六个小游戏的失误罚分（旧版 `mistakeCount * 20`）。
+const int gameMistakePenalty = 20;
+
+/// 配对游戏的基础分（旧版 `firstTryCorrect * 120`）。
+const int matchBasePoints = 120;
+
+/// 配对游戏的连击步长（旧版 `maxCombo * 15`）。
+const int matchComboStep = 15;
+
+/// 配对游戏的失误罚分（旧版 `mistakeCount * 25`）。
+const int matchMistakePenalty = 25;
+
+/// 配对游戏「剩余时间换分」的换算分母（旧版 `remainingMs / 100`）。
+const int matchRemainingTimeDivisorMs = 100;
+
+/// 配对游戏「剩余时间换分」的上限（旧版 `Math.min(600, …)`）。
+const int matchRemainingTimeBonusCap = 600;
+
+/// 音标训练的基础分（旧版 `firstTryCorrect * 120`）。
+const int phoneticBasePoints = 120;
+
+/// 音标训练的连击步长（旧版 `maxCombo * 15`）。
+const int phoneticComboStep = 15;
+
+/// 音标训练的失误罚分（旧版 `mistakeCount * 20`）。
+const int phoneticMistakePenalty = 20;
+
+// ═══════════════════════════════════════════════════════════════
+// 各模式的题量与时限（旧版 `GAME_CONFIGS`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 单词拼图的题量。
+const int wordBuilderItemCount = 8;
+
+/// 单词拼图的时限（秒）。
+const int wordBuilderDurationSeconds = 90;
+
+/// 听音辨词的题量。
+const int listeningPickItemCount = 8;
+
+/// 听音辨词的时限（秒）。
+const int listeningPickDurationSeconds = 60;
+
+/// 词义冲刺的题量。
+const int meaningBlitzItemCount = 10;
+
+/// 词义冲刺的时限（秒）。
+const int meaningBlitzDurationSeconds = 45;
+
+/// 词汇地鼠的题量。
+const int whackAMoleItemCount = 10;
+
+/// 词汇地鼠的时限（秒）。
+const int whackAMoleDurationSeconds = 60;
+
+/// 单词堆堆乐的题量。
+const int wordStackItemCount = 8;
+
+/// 单词堆堆乐的时限（秒）。
+const int wordStackDurationSeconds = 75;
+
+/// 词汇俄罗斯方块的题量。
+const int wordTetrisItemCount = 10;
+
+/// 词汇俄罗斯方块的时限（秒）。
+const int wordTetrisDurationSeconds = 75;
+
+/// 配对的默认对数。
+const int matchingDefaultPairCount = 6;
+
+/// 配对的最少对数（旧版 `MINIMUM_PAIR_COUNT`）。
+const int matchingMinimumPairCount = 4;
+
+/// 配对的最多对数（旧版 `MAXIMUM_PAIR_COUNT`）。
+const int matchingMaximumPairCount = 8;
+
+/// 配对的默认时限（秒）。
+///
+/// 与旧版默认预设「标准挑战」（6 组 / 60 秒）一致；`matchPresets` 里的
+/// 三档预设会覆盖它。
+const int matchingDefaultDurationSeconds = 60;
+
+/// 配对的最短时限（秒，旧版 `MINIMUM_DURATION_SECONDS`）。
+const int matchingMinimumDurationSeconds = 30;
+
+/// 配对的最长时限（秒，旧版 `MAXIMUM_DURATION_SECONDS`）。
+const int matchingMaximumDurationSeconds = 180;
+
+/// 音标训练的题量（旧版 `GAME_ITEM_COUNT`）。
+const int phoneticItemCount = 10;
+
+/// 音标训练的时限（秒，旧版 `GAME_DURATION_SECONDS`）。
+const int phoneticDurationSeconds = 75;
+
+/// 音标训练所需的最少题数（旧版 `MINIMUM_ITEMS`）。
+const int phoneticMinimumItemCount = 4;
+
+/// 音标训练的选项数量（旧版 `OPTION_COUNT`）。
+const int phoneticChoiceCount = 4;
+
+/// 音标训练一次取用的候选池上限（旧版 `CANDIDATE_POOL_SIZE`）。
+///
+/// 取值 48 与音标目录规模一致：候选池要足够大，才能凑出
+/// 「同类音标」的干扰项。
+const int phoneticCandidatePoolSize = 48;
+
+/// 音标训练的会话来源标识。
+///
+/// **与旧版的差异**：旧版复用 `GAME_PHONETICS`，会被
+/// `ReviewService._isExcludedSource` 的 `GAME_` 前缀规则一起排除；
+/// 本版改用独立标识，让「音标训练不写复习日志」这条规则在会话表里自解释。
+const String phoneticTrainingSourceType = 'PHONETIC_TRAINING';
+
+// ═══════════════════════════════════════════════════════════════
+// 词汇地鼠（旧版 `whack-a-mole.tsx`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 地鼠洞的数量（旧版 `HOLE_COUNT`）。
+const int whackAMoleHoleCount = 6;
+
+/// 地鼠停留时长（毫秒，旧版 `MOLE_STAY_MS`）。
+const int whackAMoleStayMs = 2800;
+
+/// 相邻地鼠冒头的间隔（毫秒，旧版 `STAGGER_MS`）。
+const int whackAMoleStaggerMs = 130;
+
+/// 第一只地鼠冒头前的延迟（毫秒，旧版硬编码 150）。
+const int whackAMolePopDelayMs = 150;
+
+// ═══════════════════════════════════════════════════════════════
+// 单词堆堆乐（旧版 `word-stack.tsx`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 点错的词块回落冷却（毫秒，旧版硬编码 620）。
+const int wordStackBlockCooldownMs = 620;
+
+/// 塔上可见的层数（旧版 `solvedTerms.slice(-4)`）。
+const int wordStackTowerVisibleCount = 4;
+
+// ═══════════════════════════════════════════════════════════════
+// 词汇俄罗斯方块（旧版 `word-tetris.tsx`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 堆叠上限（旧版 `TETRIS_DANGER_CAP`）：堆满即结束本局。
+const int wordTetrisDangerCap = 5;
+
+/// 方块下落的最短时长（毫秒，旧版 `FALL_MIN_MS`）。
+const int wordTetrisFallMinMs = 4200;
+
+/// 方块下落时长的随机跨度（毫秒，旧版 `FALL_SPREAD_MS`）。
+const int wordTetrisFallSpreadMs = 1800;
+
+/// 下落轨道数（旧版把 4 列写死在 `shuffle([0,1,2,3])` 里）。
+const int wordTetrisColumnCount = 4;
+
+// ═══════════════════════════════════════════════════════════════
+// 音标目录与出题
+// ═══════════════════════════════════════════════════════════════
+
+/// 48 音标框架的音标总数——目录完整性由测试断言。
+const int phonemeCatalogSize = 48;
+
+/// 音标目录里元音（含双元音）的数量。
+const int phonemeVowelCount = 20;
+
+/// 音标目录里辅音的数量。
+const int phonemeConsonantCount = 28;
+
+// ═══════════════════════════════════════════════════════════════
+// 选择题的作答节奏（旧版 `app/(main)/games/page.tsx`）
+//
+// 这两个值不在旧版 `GAME_CONFIGS` 里，而是硬编码在页面组件的
+// `setTimeout` 里；集中到常量后，状态机可以按「毫秒」推进并单测。
+// ═══════════════════════════════════════════════════════════════
+
+/// 进入听音辨词 / 词义冲刺的每一题后，自动朗读该词条前的延迟（毫秒）。
+///
+/// 旧版 `games/page.tsx:114` 的 `window.setTimeout(..., 180)`：立刻朗读会与
+/// 上一题的播放叠在一起，等一帧多一点再播才像「本题开始」。
+const int gameAutoSpeakDelayMs = 180;
+
+/// 选择题答错后红框反馈的停留时长（毫秒）。
+///
+/// 旧版 `games/page.tsx:217` 的 `setTimeout(() => setWrongChoice(null), 420)`：
+/// 反馈期内忽略点击，避免用户连点把同一个错误选项刷成一串失误。
+const int gameWrongChoiceFeedbackMs = 420;
+
+// ═══════════════════════════════════════════════════════════════
+// 文章导入（AI 选词的输入上限与输出结构）
+//
+// 数值来源逐条标注旧版出处：`modules/article-import/extract.ts`（词形与分段）、
+// `service.ts`（候选与 AI 输入上限）、`schema.ts`（AI 输出结构，逐条对应 zod）。
+// ═══════════════════════════════════════════════════════════════
+// ── 词形提取（旧版 modules/article-import/extract.ts） ──
+
+/// 词形的最短字符数。
+///
+/// 旧版 `extract.ts` 的 `stripped.length < 2` 与 `normalized.length < 2`。
+const int articleTokenMinChars = 2;
+
+/// 词形的最长字符数。
+///
+/// 旧版 `extract.ts` 的 `stripped.length > 30` 与 `normalized.length > 30`。
+const int articleTokenMaxChars = 30;
+
+/// 「单换行也算分段」所需的最少非空行数。
+///
+/// 旧版 `extract.ts` 的 `splitIntoParagraphs`：只有一整块、却含换行时，
+/// 至少两行才按行拆段。
+const int articleParagraphMinLines = 2;
+
+// ── 预览与候选（旧版 service.ts / candidates.ts） ──
+
+/// 送进 AI 提示词的「已掌握词」样本上限。
+///
+/// 旧版 `service.ts` 的 `existingRows.slice(0, 30)` 与
+/// `prompt.ts` 的 `knownSample.slice(0, 30)`。
+const int articleKnownSampleLimit = 30;
+
+/// 本地切句的候选上限（用于给候选词找出处句、以及拼进 AI 的文章片段）。
+///
+/// 旧版 `service.ts` 的 `extractSentences(cleaned)...slice(0, 40)`。
+const int articleSentenceCandidateLimit = 40;
+
+/// 拼进 AI 文章片段的句子条数上限。
+///
+/// 旧版 `service.ts` 的 `sentencesRaw.slice(0, 15)`。
+const int articleAiSnippetSentenceLimit = 15;
+
+/// 合并预览时，「全文词数」缺失时的估算倍数。
+///
+/// 旧版 `candidates.ts` 的 `wordCount: totalWordCount || uniqueCount * 2`。
+const int articleWordCountEstimateFactor = 2;
+
+/// 预览令牌的字符数。
+///
+/// 本版新增：旧版用 `crypto.randomUUID()` 生成服务端预览令牌，
+/// Dart 侧用等长随机十六进制串代替（见 `ArticleImportService`）。
+const int articlePreviewTokenLength = 32;
+
+/// 报错文案里回显的令牌前缀长度。
+///
+/// 本版新增：旧版 `mergeArticlePreviews` 的报错用 `token.slice(0, 8)`，
+/// 那是 UUID 前 8 位；本版令牌长度不同，取前一半（16 位）同样够定位。
+const int articleShortTokenChars = 16;
+
+// ── AI 输出结构上限（旧版 modules/article-import/schema.ts） ──
+
+/// AI 返回的单词条数上限（旧版 `max(100)`）。
+const int articleAiWordsMaxItems = 100;
+
+/// 宽容解析接受的短语条数上限（旧版 `max(20)`；真正的上限由
+/// `articlePhraseLimit` 在合并阶段施加）。
+const int articleAiPhrasesMaxItems = 20;
+
+/// 宽容解析接受的句子条数上限（旧版 `max(20)`；真正的上限由
+/// `articleSentenceLimit` 在合并阶段施加）。
+const int articleAiSentencesMaxItems = 20;
+
+/// 短语卡片的重点词汇条数上限（旧版 `max(8)`）。
+const int articleAiPhraseKeyVocabMaxItems = 8;
+
+/// 句子卡片的重点词汇条数上限（旧版 `max(10)`）。
+const int articleAiSentenceKeyVocabMaxItems = 10;
+
+/// 语法要点条数上限（旧版 `max(4)`）。
+const int articleAiGrammarNotesMaxItems = 4;
+
+/// 词条文本的字符数上限（旧版 `term: max(60)`）。
+const int articleAiTermMaxChars = 60;
+
+/// 推荐理由的字符数上限（旧版 `reason: max(40)`）。
+const int articleAiReasonMaxChars = 40;
+
+/// 重点词汇词形的字符数上限（旧版 `max(40)`）。
+const int articleAiKeyVocabTermMaxChars = 40;
+
+/// 重点词汇词性的字符数上限（旧版 `max(20)`）。
+const int articleAiKeyVocabPosMaxChars = 20;
+
+/// 重点词汇释义的字符数上限（旧版 `max(80)`）。
+const int articleAiKeyVocabMeaningMaxChars = 80;
+
+/// 语法句型的字符数上限（旧版 `max(120)`）。
+const int articleAiGrammarPatternMaxChars = 120;
+
+/// 单条语法说明的字符数上限（旧版 `max(200)`）。
+const int articleAiGrammarNoteMaxChars = 200;
+
+/// 短语直译 / 意译的字符数上限（旧版 `max(200)`）。
+const int articleAiPhraseTranslationMaxChars = 200;
+
+/// 短语辨析的字符数上限（旧版 `max(120)`）。
+const int articleAiPhraseNuanceMaxChars = 120;
+
+/// 句子原文的字符数上限（旧版 `sentence: max(600)`）。
+const int articleAiSentenceTextMaxChars = 600;
+
+/// 句子直译 / 意译的字符数上限（旧版 `max(400)`）。
+const int articleAiSentenceTranslationMaxChars = 400;
+
+/// 句子注释的字符数上限（旧版 `max(200)`）。
+const int articleAiSentenceNuanceMaxChars = 200;
+
+/// 难度取值上限（旧版 `difficulty: min(1).max(5)`；下限 1 无需具名）。
+const int articleAiDifficultyMax = 5;
+
+/// 难度无法解析时的兜底值（旧版 `lenientDifficulty` 的 `return 3`）。
+const int articleAiDifficultyFallback = 3;
+
+// ── 本模块的字符串常量（无数字，无需豁免） ──
+
+/// 默认源语言。
+///
+/// 与旧版 `/api/article-import/preview` 的 `sourceLanguage ?? "en"` 一致。
+const String articleDefaultSourceLanguage = 'en';
+
+/// 默认目标语言。
+///
+/// 与旧版一致（**不是** CSV 导入页的 `zh`）：`zh-CN` 才是真实词库里的取值。
+const String articleDefaultTargetLanguage = 'zh-CN';
+
+/// 段落拼接分隔符（旧版用 `"\n\n"` 拼回被合并的段落）。
+const String articleParagraphSeparator = '\n\n';
+
+/// 分段 ID 前缀（旧版 `seg-1`、`seg-2`…）。
+const String articleSegmentIdPrefix = 'seg-';
+
+/// AI 未给出理由时的兜底理由（旧版 `schema.ts` 的 `?? "值得学习"`）。
+const String articleDefaultReason = '值得学习';
+
+// ═══════════════════════════════════════════════════════════════
+// 词典管线 / LLM 降级 / 每日建议
+//
+// 数值来源逐条标注旧版出处：`dictionary/pipeline.ts`（提前终止质量分）、
+// `modules/llm/client.ts`（超时与 token 边界）、`modules/suggestions/*`（权重与阈值）。
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 词典合并管线：PRIORITY_FALLBACK 的提前终止质量分
+// （对应旧版 `dictionary/pipeline.ts` 的 fallbackQualityScore）
+// ═══════════════════════════════════════════════════════════════
+
+/// 质量分中「目标语言释义」的权重。
+///
+/// 释义是判题的唯一依据：没有释义的选择题没有选项，权重必须最高。
+const double fallbackQualityTargetDefinitionWeight = 0.5;
+
+/// 质量分中「例句数量」的权重。
+const double fallbackQualityExamplesWeight = 0.3;
+
+/// 质量分中「音标」的权重。
+const double fallbackQualityPhoneticsWeight = 0.2;
+
+/// 只有部分满足某分项时乘以的折扣系数（对应旧版 1 / 0.5 / 0）。
+const double fallbackQualityPartialFactor = 0.5;
+
+/// 完全满足某分项时乘以的系数。
+const double fallbackQualityFullFactor = 1;
+
+/// 例句「充足」所需的条数。
+const int fallbackQualityExamplesFullCount = 2;
+
+/// 例句「勉强够用」所需的条数。
+const int fallbackQualityExamplesPartialCount = 1;
+
+/// 句子类词条缺少译文时的质量分上限。
+///
+/// 句子没有中文译文就无法判分，即使字段齐全也不能算高质量，
+/// 否则 PRIORITY_FALLBACK 会在第一个 provider 就停下。
+const double fallbackQualitySentenceTranslationCap = 0.6;
+
+// ═══════════════════════════════════════════════════════════════
+// 字段完备性判定（对应旧版 `dictionary/selection.ts`）
+// ═══════════════════════════════════════════════════════════════
+
+/// `sentenceAnalysis` 视为完备所需的同结构例句数。
+///
+/// 旧版要求 ≥3：少于 3 条无法让学习者归纳出句型。
+const int sentenceAnalysisMinSimilarExamples = 3;
+
+// ═══════════════════════════════════════════════════════════════
+// 初始化任务查询（对应旧版 `initialization/queries.ts`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 初始化任务列表的默认分页大小。
+const int initializationJobPageSize = 50;
+
+// ═══════════════════════════════════════════════════════════════
+// 每日建议：候选排序权重
+// （对应旧版 `suggestions/constants.ts` 的 SUGGESTION_SCORE_WEIGHTS）
+// ═══════════════════════════════════════════════════════════════
+
+/// 每日建议候选的排序权重。
+///
+/// 旧版把这些值写成 `score()` 里的 13 个裸权重，被
+/// `docs/CLEAN_CODE_BASELINE.md` 点名；这里逐个具名，
+/// 并保留旧版数值以便与线上表现对齐。
+class SuggestionScoreWeights {
+  /// 以各权重构造。
+  const new({
+    required this.incorrect,
+    required this.again,
+    required this.hard,
+    required this.wrongActive,
+    required this.wrongCount,
+    required this.hardCount,
+    required this.dueToday,
+    required this.difficulty,
+    required this.lapses,
+    required this.fallback,
+    required this.durationBaselineMs,
+    required this.durationStepMs,
+    required this.durationMaxBonus,
+    required this.overdueMaxBonus,
+    required this.overduePerDay,
+  });
+
+  /// 昨日答错一次的分值。
+  final int incorrect;
+
+  /// 昨日选择「忘记」一次的分值。
+  final int again;
+
+  /// 昨日选择「模糊」一次的分值。
+  final int hard;
+
+  /// 仍处于活跃错词状态的分值。
+  final int wrongActive;
+
+  /// 累计答错次数的每单位分值。
+  final int wrongCount;
+
+  /// 累计模糊次数的每单位分值。
+  final int hardCount;
+
+  /// 今天到期的分值。
+  final int dueToday;
+
+  /// FSRS 难度的每单位分值。
+  final int difficulty;
+
+  /// FSRS 遗忘次数的每单位分值。
+  final int lapses;
+
+  /// 「无风险候选时兜底补位」的分值。
+  final int fallback;
+
+  /// 平均作答时长基线（毫秒）：低于此值不计入分值。
+  final int durationBaselineMs;
+
+  /// 超过基线后每多少毫秒加 1 分。
+  final int durationStepMs;
+
+  /// 作答时长分项的分值上限。
+  final int durationMaxBonus;
+
+  /// 逾期分项的分值上限。
+  final int overdueMaxBonus;
+
+  /// 逾期每一天的分值。
+  final int overduePerDay;
+}
+
+/// 每日建议候选排序权重的唯一实例。
+const SuggestionScoreWeights suggestionScoreWeights = SuggestionScoreWeights(
+  incorrect: 120,
+  again: 75,
+  hard: 38,
+  wrongActive: 55,
+  wrongCount: 7,
+  hardCount: 4,
+  dueToday: 22,
+  difficulty: 2,
+  lapses: 5,
+  fallback: 1,
+  durationBaselineMs: 7 * secondMs,
+  durationStepMs: 300,
+  durationMaxBonus: 45,
+  overdueMaxBonus: 35,
+  overduePerDay: 4,
+);
+
+// ═══════════════════════════════════════════════════════════════
+// 每日建议：质量分（对应旧版 `suggestions/metrics.ts`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 每日建议质量分的合成权重。
+class SuggestionQualityWeights {
+  /// 以各权重构造。
+  const new({
+    required this.againPenalty,
+    required this.hardPenalty,
+    required this.stabilityScale,
+    required this.speedBaselineMs,
+    required this.speedDivisor,
+    required this.speedDefault,
+    required this.speedFloor,
+    required this.completionDefault,
+    required this.accuracyWeight,
+    required this.stabilityWeight,
+    required this.speedWeight,
+    required this.completionWeight,
+  });
+
+  /// 每题「忘记」的挑战度罚分。
+  final double againPenalty;
+
+  /// 每题「模糊」的挑战度罚分。
+  final double hardPenalty;
+
+  /// 挑战度换算为稳定性得分的放大系数。
+  final double stabilityScale;
+
+  /// 速度得分基线（毫秒）：低于此值速度满分。
+  final int speedBaselineMs;
+
+  /// 超过基线后每多少毫秒扣 1 分。
+  final double speedDivisor;
+
+  /// 没有时长数据时的速度得分。
+  final double speedDefault;
+
+  /// 速度得分下限。
+  final double speedFloor;
+
+  /// 没有完成率数据时的默认完成率。
+  final double completionDefault;
+
+  /// 正确率权重。
+  final double accuracyWeight;
+
+  /// 稳定性权重。
+  final double stabilityWeight;
+
+  /// 速度权重。
+  final double speedWeight;
+
+  /// 完成率权重。
+  final double completionWeight;
+}
+
+/// 每日建议质量分权重的唯一实例。
+const SuggestionQualityWeights suggestionQualityWeights =
+    SuggestionQualityWeights(
+      againPenalty: 1.5,
+      hardPenalty: 0.7,
+      stabilityScale: 55,
+      speedBaselineMs: 5 * secondMs,
+      speedDivisor: 180,
+      speedDefault: 70,
+      speedFloor: 35,
+      completionDefault: 70,
+      accuracyWeight: 0.58,
+      stabilityWeight: 0.2,
+      speedWeight: 0.08,
+      completionWeight: 0.14,
+    );
+
+// ═══════════════════════════════════════════════════════════════
+// 每日建议：规则式文案阈值（对应旧版 `suggestions/content.ts`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 规则式建议文案使用的判定阈值。
+class SuggestionTextThresholds {
+  /// 以各阈值构造。
+  const new({
+    required this.lowAccuracyPercent,
+    required this.strengthAccuracyPercent,
+    required this.strengthCompletionPercent,
+    required this.strengthStudyMinutes,
+    required this.headlineWeakAccuracyPercent,
+    required this.headlineStrongAccuracyPercent,
+    required this.slowAverageDurationMs,
+    required this.weakQuestionAccuracyPercent,
+    required this.overloadMinSkipped,
+    required this.overloadSkipRatio,
+    required this.strengthReviewCount,
+    required this.riskLimit,
+  });
+
+  /// 低于此正确率视为「需要修复错误」。
+  final int lowAccuracyPercent;
+
+  /// 达到此正确率可作为亮点。
+  final int strengthAccuracyPercent;
+
+  /// 达到此完成率可作为亮点。
+  final int strengthCompletionPercent;
+
+  /// 达到此学习分钟数可作为亮点。
+  final int strengthStudyMinutes;
+
+  /// 标题分档：低于此正确率时标题为「先修复错误」。
+  final int headlineWeakAccuracyPercent;
+
+  /// 标题分档：达到此正确率且完成率高时为「保持状态」。
+  final int headlineStrongAccuracyPercent;
+
+  /// 平均作答时长超过此值视为「偏慢」。
+  final int slowAverageDurationMs;
+
+  /// 题型正确率低于此值才提示该题型薄弱。
+  final int weakQuestionAccuracyPercent;
+
+  /// 跳过题数的绝对下限。
+  final int overloadMinSkipped;
+
+  /// 跳过题数占作答数的比例下限。
+  final double overloadSkipRatio;
+
+  /// 作答量达到此值且零跳过才算「完整完成」。
+  final int strengthReviewCount;
+
+  /// 风险条目最多展示几条。
+  final int riskLimit;
+}
+
+/// 规则式建议文案阈值的唯一实例。
+const SuggestionTextThresholds suggestionTextThresholds =
+    SuggestionTextThresholds(
+      lowAccuracyPercent: 75,
+      strengthAccuracyPercent: 80,
+      strengthCompletionPercent: 90,
+      strengthStudyMinutes: 15,
+      headlineWeakAccuracyPercent: 60,
+      headlineStrongAccuracyPercent: 85,
+      slowAverageDurationMs: 15 * secondMs,
+      weakQuestionAccuracyPercent: 75,
+      overloadMinSkipped: 3,
+      overloadSkipRatio: 0.25,
+      strengthReviewCount: 10,
+      riskLimit: 4,
+    );
+
+// ═══════════════════════════════════════════════════════════════
+// 每日建议：候选池规模与时间窗
+// ═══════════════════════════════════════════════════════════════
+
+/// 打分后保留的候选数量上限。
+const int suggestionCandidateLimit = 30;
+
+/// 没有任何风险候选时，兜底补位的词条数量。
+const int suggestionFallbackCandidateLimit = 12;
+
+/// 活跃错词的扫描上限。
+const int suggestionWrongWordScanLimit = 200;
+
+/// 到期卡片的扫描上限。
+const int suggestionDueCardScanLimit = 200;
+
+/// 最终推荐条目数量上限（对应旧版 `RECOMMENDATION_LIMIT`）。
+const int suggestionRecommendationLimit = 8;
+
+/// 统计指标的回看窗口。
+///
+/// 按自然日筛选，因此至少要覆盖「昨天」；取 3 天以容忍时区与夏令时边界。
+const int suggestionMetricsLookbackMs = 3 * dayMs;
+
+// ═══════════════════════════════════════════════════════════════
+// LLM 配置的取值边界（对应旧版 `settings/service.ts` 的 zod schema）
+// ═══════════════════════════════════════════════════════════════
+
+/// 温度下限。
+const double minLlmTemperature = 0;
+
+/// 温度上限。
+const double maxLlmTemperature = 1;
+
+/// 开启思考时强制使用的温度。
+///
+/// Anthropic 的 extended thinking 只接受 `temperature = 1`。
+const double llmThinkingTemperature = 1;
+
+/// 最大输出 token 下限。
+const int minLlmMaxOutputTokens = 500;
+
+/// 最大输出 token 上限。
+const int maxLlmMaxOutputTokens = 200000;
+
+/// `aiRetryCount` 的默认值。
+const int defaultAiRetryCount = 1;
+
+/// `aiRetryCount` 的上限。
+const int maxAiRetryCount = 5;
+
+/// Anthropic 开启思考时，输出上限额外预留的 token。
+///
+/// 思考 token 与正文 token 共用 `max_tokens` 预算，不留余量会被截断。
+const int anthropicThinkingOutputHeadroomTokens = 1024;
+
+/// Anthropic API 版本头。
+const String anthropicVersionHeader = '2023-06-01';
+
+/// 判定「请求本身有误」的状态码。
+const int httpBadRequestStatus = 400;
+
+/// 错误摘要截断长度（写进错误详情，避免整页 HTML 进日志）。
+const int llmErrorSnippetChars = 120;
+
+/// 推理模型标识前缀：这些模型用 `reasoning_effort` 而不是 `temperature`。
+const List<String> llmReasoningModelPrefixes = <String>['o1', 'o3', 'gpt-5'];
+
+/// 默认推理强度。
+const String llmDefaultReasoningEffort = 'low';
+
+/// Anthropic 思考参数不合法时的状态码提示关键词。
+const List<String> llmThinkingRejectionKeywords = <String>[
+  'thinking',
+  'reasoning',
+  'reasoning_effort',
+  'budget_tokens',
+];
+
+// ═══════════════════════════════════════════════════════════════
+// AI 词条内容的质量门（对应旧版 `ai-lexical-content.ts`）
+// ═══════════════════════════════════════════════════════════════
+
+/// 助记词被视为「中文」所需的最少汉字数。
+///
+/// 少于 8 个汉字通常是模型把英文解释直接塞进了助记字段。
+const int aiMnemonicMinChineseChars = 8;
+
+/// AI 建议质量分的分项权重（对应 `aiSuggestionQualityScore`）。
+const int aiSuggestionHeadlineWeight = 30;
+
+/// AI 建议质量分：总结权重。
+const int aiSuggestionSummaryWeight = 20;
+
+/// AI 建议质量分：行动建议充分时的权重。
+const int aiSuggestionActionsWeight = 20;
+
+/// AI 建议质量分：只有一条行动建议时的权重。
+const int aiSuggestionSingleActionWeight = 10;
+
+/// AI 建议质量分：有风险提示时的权重。
+const int aiSuggestionRisksWeight = 10;
+
+/// AI 建议质量分：推荐条目落在候选池内时的权重。
+const int aiSuggestionRecommendedWeight = 20;
+
+/// AI 建议质量分：行动建议「充分」所需条数。
+const int aiSuggestionMinActions = 2;
+
+/// AI 建议提示词里声明的亮点条数上限。
+const int suggestionAiMaxStrengths = 3;
+
+/// AI 建议提示词里声明的风险条数上限。
+const int suggestionAiMaxRisks = 4;
+
+/// AI 建议提示词里声明的行动建议条数下限。
+const int suggestionAiMinActions = 2;
+
+/// AI 建议提示词里声明的行动建议条数上限。
+const int suggestionAiMaxActions = 3;
+
+/// 推荐理由最多拼接的分句数。
+const int suggestionReasonPartLimit = 2;
+
+/// 双精度零值。
+///
+/// 架构守卫只豁免整数 `0`，浮点字面量 `0.0` 会被判为裸数字，
+/// 因此需要 `double` 上下文的零值必须具名。
+const double zeroDouble = 0;
+
+/// 百分数换算基数。
+///
+/// `lib/services` 禁止裸数字字面量，而正确率 / 完成率到处要 `* 100`。
+const int percentScale = 100;
+
+/// 结构化输出中 JSON Schema 的名字。
+const String llmJsonSchemaName = 'lexiloop_lexical_content';
+
+// ═══════════════════════════════════════════════════════════════
+// 音频播放层（真人发音下载与预取）
+//
+// 数值与协议常量来源：旧版 `src/modules/tts/service.ts` 的 `fetchYoudaoAudio`、
+// `src/lib/tts-client.ts` 的 `preloadTtsBatch`。
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 有道真人发音（对应旧版 src/modules/tts/service.ts 的 fetchYoudaoAudio）
+// ═══════════════════════════════════════════════════════════════
+
+/// 有道发音端点。
+///
+/// 来源：旧版 `src/modules/tts/service.ts` 的 `fetchYoudaoAudio` 模板串。
+const String youdaoAudioEndpoint = 'https://dict.youdao.com/dictvoice';
+
+/// 词条在 URL 中的查询参数名。
+const String youdaoAudioQueryKey = 'audio';
+
+/// 口音在 URL 中的查询参数名。
+const String youdaoAudioTypeQueryKey = 'type';
+
+/// 有道词典的来源标识，与 `pronunciations[].source` 的取值逐字对应。
+///
+/// 取自 `lib/data/dictionary/providers/youdao_fields.dart` 写库时的
+/// `'source': 'youdao'`。之所以在这里重述而不直接 import provider 常量：
+/// 音频层不该为了一个字符串标识依赖整个词典 provider 实现。
+const String youdaoAudioSource = 'youdao';
+
+// ═══════════════════════════════════════════════════════════════
+// 下载与预取
+// ═══════════════════════════════════════════════════════════════
+
+/// 批量预取真人录音时的并发下载数。
+///
+/// 对应旧版 `src/lib/tts-client.ts` 的 `preloadTtsBatch(items, maxConcurrent = 2)`。
+/// 取 2 而不是更高：预取发生在学习界面刚挂载、网络正被主流程占用的时刻，
+/// 并发拉高只会让首屏更慢、也更容易触发词典站点限流。
+const int audioPreloadConcurrency = 2;
+
+/// 下载音频时使用的 User-Agent。
+///
+/// 与旧版 `fetchYoudaoAudio` 的请求头逐字一致。部分词典站点会拒绝没有
+/// UA 的请求，缺了这一行会表现为「音频地址存在但永远放不出来」。
+const String audioUserAgent = 'Mozilla/5.0 LexiLoop';
+
+/// 下载音频时声明可接受的类型。
+const String audioAcceptHeader = 'audio/mpeg,*/*';
+
+/// 缓存中音频字节的内容类型，供播放器构造数据源时使用。
+const String audioContentType = 'audio/mpeg';

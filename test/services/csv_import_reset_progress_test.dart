@@ -15,6 +15,7 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/csv_import_service.dart';
+import 'package:lexiloop/services/learning_progress_reset.dart';
 import 'package:lexiloop/services/settings_service.dart';
 
 void main() {

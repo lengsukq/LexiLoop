@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
@@ -122,6 +123,51 @@ void main() {
           csvImportServiceProvider.overrideWithValue(service),
         ],
         child: MaterialApp(theme: LexiTheme.light, home: const ImportPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  /// 把导入页挂到真实路由上，用于断言三个出口的跳转目标。
+  ///
+  /// `/initialize` 与 `/words` 在本项目里没有具名常量（路径字面量待统一），
+  /// 因此这里也按字面量搭两条占位路由。
+  Future<void> pumpRoutedPage(
+    WidgetTester tester,
+    CsvImportService service,
+  ) async {
+    tester.view.physicalSize = const Size(900, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final router = GoRouter(
+      initialLocation: '/import',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/import',
+          builder: (context, state) => const ImportPage(),
+        ),
+        GoRoute(
+          path: '/initialize',
+          builder: (context, state) =>
+              const Scaffold(body: Center(child: Text('初始化页占位'))),
+        ),
+        GoRoute(
+          path: '/words',
+          builder: (context, state) =>
+              const Scaffold(body: Center(child: Text('单词本占位'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          databaseProvider.overrideWithValue(db),
+          csvImportServiceProvider.overrideWithValue(service),
+        ],
+        child: MaterialApp.router(theme: LexiTheme.light, routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -305,6 +351,98 @@ void main() {
       expect(find.text('重置已有词条的学习进度'), findsOneWidget);
       expect(find.textContaining('复习卡、复习日志、错词状态'), findsOneWidget);
       expect(find.textContaining('词典内容不删除'), findsOneWidget);
+    });
+  });
+
+  group('导入完成后的三个出口', () {
+    ImportCommitResult commitResult() => const ImportCommitResult(
+      batchId: 7,
+      created: 2,
+      existing: 0,
+      duplicate: 0,
+      invalid: 0,
+      failed: 0,
+      queuedInitializations: 2,
+    );
+
+    Future<void> pumpWithResult(
+      WidgetTester tester,
+      CsvImportService service,
+    ) async {
+      await pumpRoutedPage(tester, service);
+      await tester.tap(find.byKey(const Key('importPickFile')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('importSubmit')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('importResultCard')), findsOneWidget);
+    }
+
+    _FakeImportService serviceWithResult() => _FakeImportService(
+      deps(),
+      previewResult: buildPreview('单词,释义\napple,苹果\npear,梨\n'),
+      commitResult: commitResult(),
+    );
+
+    testWidgets('结果卡片给出三个出口', (tester) async {
+      await pumpWithResult(tester, serviceWithResult());
+
+      expect(find.byKey(const Key('importGoInitialize')), findsOneWidget);
+      expect(find.byKey(const Key('importGoWords')), findsOneWidget);
+      expect(find.byKey(const Key('importRestart')), findsOneWidget);
+      expect(find.text('查看初始化'), findsOneWidget);
+      expect(find.text('打开单词本'), findsOneWidget);
+      expect(find.text('继续导入'), findsOneWidget);
+    });
+
+    testWidgets('「查看初始化」跳到初始化页', (tester) async {
+      await pumpWithResult(tester, serviceWithResult());
+
+      await tester.tap(find.byKey(const Key('importGoInitialize')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('初始化页占位'), findsOneWidget);
+      expect(find.byKey(const Key('importResultCard')), findsNothing);
+    });
+
+    testWidgets('「打开单词本」跳到词库页', (tester) async {
+      await pumpWithResult(tester, serviceWithResult());
+
+      await tester.tap(find.byKey(const Key('importGoWords')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('单词本占位'), findsOneWidget);
+    });
+
+    testWidgets('「继续导入」真的把向导重置回第一步', (tester) async {
+      final service = serviceWithResult();
+      await pumpRoutedPage(tester, service);
+      await tester.tap(find.byKey(const Key('importPickFile')));
+      await tester.pumpAndSettle();
+      // 先把向导改成非默认状态，重置才有的可验。
+      await tester.tap(find.text('新增并补全缺失字段（FILL_MISSING）'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('importSubmit')));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(ImportPage)),
+      );
+      expect(container.read(importWizardProvider).mode, ImportMode.fillMissing);
+
+      await tester.tap(find.byKey(const Key('importRestart')));
+      await tester.pumpAndSettle();
+
+      final state = container.read(importWizardProvider);
+      expect(state.result, isNull);
+      expect(state.preview, isNull);
+      expect(state.mode, ImportMode.skipExisting);
+      expect(state.onlyProblems, isFalse);
+      expect(state.resetLearningProgress, isFalse);
+      expect(state.errorMessage, isNull);
+      // 语言方向保留：同一批人通常连着导同一个语种。
+      expect(state.sourceLanguage, 'en');
+      expect(find.byKey(const Key('importResultCard')), findsNothing);
+      expect(find.text('选择文件后，这里会显示逐行预览与问题行。'), findsOneWidget);
     });
   });
 }

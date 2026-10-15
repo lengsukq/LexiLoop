@@ -3,62 +3,13 @@
 /// 这些是纯展示件（玻璃底板、字段行、小标签），不含任何取数逻辑；
 /// 取数全在 `word_detail_providers.dart`，页面组件只接收数据。
 ///
-/// 注：与仪表盘的 `DashboardCard` 是同类底板。两者刻意各自保留一份，
-/// 以免 feature 之间互相依赖；待 `lib/ui/widgets/` 开放编辑后应合并过去。
+/// 注：卡片底板是共享的 [SectionCard]；这里只留详情页特有的字段行、
+/// 要点行、小标签与异步占位。
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
-
-/// 详情页的分区卡片：玻璃底板 + 标题行 + 内容。
-class DetailSectionCard extends StatelessWidget {
-  /// 以标题与内容构造。
-  const new({required this.title, required this.child, this.icon, super.key});
-
-  /// 卡片标题。
-  final String title;
-
-  /// 标题左侧图标。
-  final IconData? icon;
-
-  /// 卡片内容。
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      showSpecular: true,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              if (icon != null) ...<Widget>[
-                Icon(icon, size: 16, color: colors.accent),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                title,
-                style: TextStyle(
-                  color: colors.label,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「标签 + 值」的一行。
 ///
@@ -213,7 +164,7 @@ class DetailLoadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return DetailSectionCard(
+    return SectionCard(
       title: title,
       child: Row(
         children: <Widget>[
@@ -255,7 +206,7 @@ class DetailErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return DetailSectionCard(
+    return SectionCard(
       title: title,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

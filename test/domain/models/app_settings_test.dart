@@ -6,7 +6,6 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
@@ -395,7 +394,7 @@ void main() {
       expect(llmConfigFromSettings(storage).ai.retryCount, 3);
     });
 
-    test('与 dictionary_constants 中的同名常量取值一致', () {
+    test('与 core/constants.dart 中的同名常量取值一致', () {
       // 两个文件里各有一份（后者按其文件头注释应在后续提交整体上移到 core）。
       // 一旦有人只改一处，这里会红。
       expect(aiRetryCountCeiling, maxAiRetryCount);

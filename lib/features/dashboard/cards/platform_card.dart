@@ -4,8 +4,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
-import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 平台能力卡片：把 `PlatformCaps` 的判定结果直接摆出来。
 ///
@@ -18,9 +18,20 @@ class PlatformCapabilityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final platformName = PlatformCaps.isDesktop ? 'macOS' : 'Android';
+    final platformName = switch ((
+      PlatformCaps.isWeb,
+      PlatformCaps.isDesktop,
+      PlatformCaps.isMobile,
+    )) {
+      // 三态而不是「是桌面就 macOS、否则 Android」：Web 上两个都是 false，
+      // 二元判断会把浏览器里的自检卡片写成「运行平台：Android」。
+      (true, _, _) => 'Web（浏览器）',
+      (_, true, _) => 'macOS',
+      (_, _, true) => 'Android',
+      _ => '未知平台',
+    };
 
-    return DashboardCard(
+    return SectionCard(
       title: '平台能力',
       icon: Icons.devices_rounded,
       child: Column(

@@ -18,6 +18,33 @@ import 'package:lexiloop/domain/models/study_models.dart';
 /// 展示换算，单位不同，硬套毫秒常量反而更难读。
 const int _secondsPerMinute = 60;
 
+/// 一个月按多少天估算（用于「N 月」档）。
+const int _daysPerMonth = 30;
+
+/// 一年按多少天估算（用于「X.X 年」档）。
+const int _daysPerYear = 365;
+
+/// 使用提示后的说明文案（尚未揭示答案时）。
+const String studyHintPendingText = '已使用提示，本题将按「模糊」记录';
+
+/// 使用提示后的说明文案（已揭示答案时）。
+const String studyHintRevealedText = '已使用提示，建议选择「模糊」';
+
+/// 把 FSRS 间隔天数格式化为评级按钮下方的短文案。
+///
+/// 与旧版 `study-client.tsx` 的 `formatInterval` 一致：不足一天「今天」、
+/// 不足一月按天、不足一年按月、再往上按年。按钮只有一行位置，写成
+/// 「3 天后」会挤掉等级本身。
+String studyIntervalText(int scheduledDays) {
+  if (scheduledDays < 1) return '今天';
+  if (scheduledDays == 1) return '1 天';
+  if (scheduledDays < _daysPerMonth) return '$scheduledDays 天';
+  if (scheduledDays < _daysPerYear) {
+    return '${(scheduledDays / _daysPerMonth).round()} 月';
+  }
+  return '${(scheduledDays / _daysPerYear).toStringAsFixed(1)} 年';
+}
+
 /// 四档自评的中文文案。
 String studyRatingLabel(ReviewRating rating) => switch (rating) {
   ReviewRating.again => '忘了',

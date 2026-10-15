@@ -79,6 +79,29 @@ void main() {
         );
   }
 
+  /// 插一条学习会话。
+  ///
+  /// [completedCount] 默认 5，即「一个正常做完的会话」；传 0 表示一条题都没做的
+  /// 空会话，[skippedCount] 默认 0 表示没跳过任何题。
+  Future<void> insertSession({
+    required int startedAt,
+    int completedCount = 5,
+    int skippedCount = 0,
+    StudyMode sessionType = StudyMode.daily,
+  }) async {
+    await db
+        .into(db.studySessions)
+        .insert(
+          StudySessionsCompanion.insert(
+            sessionType: sessionType,
+            startedAt: startedAt,
+            completedCount: Value<int>(completedCount),
+            skippedCount: Value<int>(skippedCount),
+            createdAt: startedAt,
+          ),
+        );
+  }
+
   group('dailyTrend', () {
     test('没有记录时返回补齐的零值序列', () async {
       final trend = await dao.dailyTrend(now: today, days: 7);
@@ -146,6 +169,109 @@ void main() {
       final trend = await dao.dailyTrend(now: today, days: 3);
       expect(trend.last.durationMs, 0);
       expect(trend.last.reviewed, 1);
+    });
+
+    test('补齐的零值序列里会话类字段都是 0', () async {
+      final trend = await dao.dailyTrend(now: today, days: 4);
+
+      expect(
+        trend.every((item) => item.again == 0 && item.skipped == 0),
+        isTrue,
+      );
+      expect(trend.every((item) => item.sessions == 0), isTrue);
+    });
+
+    test('again 只数评级为 AGAIN 的作答', () async {
+      final wordId = await insertWord();
+      await insertLog(
+        wordId: wordId,
+        reviewedAt: today,
+        isCorrect: false,
+        rating: ReviewRating.again,
+      );
+      await insertLog(
+        wordId: wordId,
+        reviewedAt: today,
+        isCorrect: false,
+        rating: ReviewRating.hard,
+      );
+      await insertLog(
+        wordId: wordId,
+        reviewedAt: today,
+        rating: ReviewRating.easy,
+      );
+
+      final trend = await dao.dailyTrend(now: today, days: 3);
+      expect(trend.last.reviewed, 3);
+      expect(trend.last.again, 1);
+      expect(trend.last.correct, 1);
+    });
+
+    test('sessions 跳过一条题都没做的空会话', () async {
+      await insertSession(startedAt: today);
+      await insertSession(startedAt: today, completedCount: 0);
+
+      final trend = await dao.dailyTrend(now: today, days: 3);
+      expect(trend.last.sessions, 1);
+    });
+
+    test('skipped 取会话的 skipped_count 之和，按会话开始日的自然日归并', () async {
+      await insertSession(startedAt: today, completedCount: 4, skippedCount: 2);
+      await insertSession(
+        startedAt: today + hourMs,
+        completedCount: 1,
+        skippedCount: 3,
+      );
+      await insertSession(
+        startedAt: today - 2 * dayMs,
+        completedCount: 2,
+        skippedCount: 7,
+      );
+
+      final trend = await dao.dailyTrend(now: today, days: 5);
+      expect(trend.last.sessions, 2, reason: '同一天的两个会话都算');
+      expect(trend.last.skipped, 5, reason: '2 + 3');
+      expect(trend[trend.length - 3].skipped, 7, reason: '两天前那个会话');
+    });
+
+    test('skipped 与会话无关：review_logs 不参与', () async {
+      final wordId = await insertWord();
+      await insertLog(wordId: wordId, reviewedAt: today, isCorrect: false);
+
+      final trend = await dao.dailyTrend(now: today, days: 3);
+      expect(trend.last.reviewed, 1);
+      expect(trend.last.skipped, 0, reason: 'skipped 只来自 study_sessions');
+      expect(trend.last.sessions, 0);
+    });
+
+    test('只有会话没有复习记录的那天也要产出', () async {
+      await insertSession(
+        startedAt: today - dayMs,
+        completedCount: 3,
+        skippedCount: 1,
+      );
+
+      final trend = await dao.dailyTrend(now: today, days: 3);
+      expect(trend.last.reviewed, 0);
+      expect(trend.last.sessions, 0);
+      expect(trend[trend.length - 2].sessions, 1);
+      expect(trend[trend.length - 2].skipped, 1);
+    });
+
+    test('窗口外的会话不计入', () async {
+      await insertSession(startedAt: today - 30 * dayMs, skippedCount: 4);
+
+      final trend = await dao.dailyTrend(now: today, days: 7);
+      expect(trend.every((item) => item.sessions == 0), isTrue);
+      expect(trend.every((item) => item.skipped == 0), isTrue);
+    });
+
+    test('空会话的 skipped_count 也不计入', () async {
+      await insertSession(startedAt: today, completedCount: 0, skippedCount: 9);
+
+      final trend = await dao.dailyTrend(now: today, days: 3);
+      expect(trend.last.sessions, 0);
+      expect(trend.last.skipped, 0);
     });
   });
 

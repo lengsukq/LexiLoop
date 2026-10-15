@@ -8,7 +8,6 @@ library;
 
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/services/llm/llm_client.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';

@@ -6,7 +6,9 @@ library;
 import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/study_models.dart';
 
 /// 列表查询的 SQL。
 ///
@@ -22,6 +24,7 @@ SELECT
   w.initialization_status, w.mastery_level, w.mastery_score,
   w.is_suspended, w.created_at, w.source_created_at,
   rc.due_at, COALESCE(ws.active, 0) AS wrong_active,
+  wc.pronunciations_json,
   (
     SELECT json_extract(value, '$.text')
     FROM json_each(wc.definitions_json)
@@ -129,6 +132,7 @@ class WordListEntry {
     required this.dueAt,
     required this.wrongWordActive,
     required this.meaning,
+    required this.pronunciations,
   });
 
   /// 词条 ID。
@@ -172,6 +176,13 @@ class WordListEntry {
 
   /// 目标语言的第一条释义文本，用于列表摘要；无内容时为 `null`。
   final String? meaning;
+
+  /// 发音列表（`pronunciations_json`）。
+  ///
+  /// 列表页的朗读按钮要用它取真人录音地址：`WordSpeaker` 优先播放词典
+  /// 提供的 mp3，拿不到才回落到系统朗读。逐条再查一次 `word_contents`
+  /// 会让一页 40 张卡片多 40 次往返，因此随列表一次取回。
+  final List<PronunciationView> pronunciations;
 }
 
 /// 列表查询条件。
@@ -391,6 +402,9 @@ class WordDao {
       dueAt: row.read<int?>('due_at'),
       wrongWordActive: row.read<int>('wrong_active') != 0,
       meaning: row.read<String?>('meaning'),
+      pronunciations: parsePronunciations(
+        row.read<String?>('pronunciations_json'),
+      ),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_runtime.dart';
 import 'package:lexiloop/features/games/games_providers.dart';
+import 'package:lexiloop/features/games/widgets/choice_pick_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/games/widgets/whack_a_mole_view.dart';
 import 'package:lexiloop/features/games/widgets/word_builder_view.dart';
@@ -75,6 +76,10 @@ class _GameArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (runtime) {
+      ChoicePickRuntime(:final state) => ChoicePickView(
+        state: state,
+        onAction: onAction,
+      ),
       WhackAMoleRuntime(:final state) => WhackAMoleView(
         state: state,
         onAction: onAction,

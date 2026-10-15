@@ -5,11 +5,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lexiloop/core/errors.dart';
-import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
+import 'package:lexiloop/features/word_detail/dialogs/youdao_preview_dialog.dart';
+import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
@@ -17,7 +17,7 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
-/// 词条头部：文本、状态徽章、口音切换与操作按钮。
+/// 词条头部：操作栏 + 文本、状态徽章、口音切换与学习开关。
 ///
 /// 只接收数据，写操作通过 [wordDetailActionsProvider] 发起——
 /// 旧版这一块收了 11 个 props 与 6 个回调，这里一个参数都不用传。
@@ -30,57 +30,219 @@ class WordDetailHeaderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      showSpecular: true,
-      padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _TermBlock(detail: detail),
-          const SizedBox(height: 10),
-          _PronunciationBar(detail: detail),
-          const SizedBox(height: 10),
-          _SourceMeta(detail: detail),
-          const SizedBox(height: 6),
-          _HeaderActions(detail: detail),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _HeaderActionBar(detail: detail),
+        const SizedBox(height: 10),
+        LiquidGlass(
+          level: GlassLevel.elevated,
+          borderRadius: BorderRadius.circular(LexiRadius.lg),
+          showSpecular: true,
+          padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _TermBlock(detail: detail),
+              _TranslationHint(detail: detail),
+              const SizedBox(height: 10),
+              _PronunciationBar(detail: detail),
+              const SizedBox(height: 10),
+              _SourceMeta(detail: detail),
+              const SizedBox(height: 6),
+              _HeaderActions(detail: detail),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-/// 朗读词条，失败时提示原因。
+/// 顶部操作栏：补全内容、有道词典、编辑、重新生成、删除。
 ///
+/// **为什么独立于卡片之外**：这些是「对这个词条做什么」，而卡片展示的是
+/// 「这个词条是什么」。混在一张玻璃卡片里会让用户以为按钮只作用于卡片
+/// 内部的某个分区。
+class _HeaderActionBar extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        OutlinedButton.icon(
+          onPressed: () => unawaited(
+            _initialize(context, ref, InitializationMode.fillMissingFields),
+          ),
+          icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+          label: const Text('补全缺失内容'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () =>
+              unawaited(YoudaoPreviewDialog.show(context, wordId: detail.id)),
+          icon: const Icon(Icons.menu_book_rounded, size: 16),
+          label: const Text('有道词典'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => unawaited(
+            EditWordDialog.show(
+              context,
+              target: EditWordTarget(
+                wordId: detail.id,
+                term: detail.term,
+                sourceLanguage: detail.sourceLanguage,
+                targetLanguage: detail.targetLanguage,
+                contentType: detail.contentType,
+              ),
+            ),
+          ),
+          icon: const Icon(Icons.edit_rounded, size: 16),
+          label: const Text('编辑'),
+        ),
+        TextButton.icon(
+          onPressed: () => unawaited(_confirmRegenerate(context, ref)),
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('重新生成'),
+        ),
+        TextButton.icon(
+          onPressed: () => unawaited(_confirmDelete(context, ref)),
+          icon: Icon(
+            Icons.delete_outline_rounded,
+            size: 16,
+            color: colors.danger,
+          ),
+          label: Text('删除', style: TextStyle(color: colors.danger)),
+        ),
+      ],
+    );
+  }
+
+  /// 排一个初始化任务并提示。
+  Future<void> _initialize(
+    BuildContext context,
+    WidgetRef ref,
+    InitializationMode mode,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref
+        .read(wordDetailActionsProvider)
+        .requestInitialization(detail.id, mode);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          mode == InitializationMode.forceOverwrite ? '已排入重新生成队列' : '已排入补全队列',
+        ),
+      ),
+    );
+  }
+
+  /// 「重新生成」的二次确认。
+  ///
+  /// 必须确认：它会覆盖现有内容（虽然保留手动编辑的释义与例句），
+  /// 误点一次就要等一次完整的重新抓取。
+  Future<void> _confirmRegenerate(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('重新生成'),
+        content: const Text('重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await _initialize(context, ref, InitializationMode.forceOverwrite);
+  }
+
+  /// 二次确认后删除词条，并退出详情页。
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除词条'),
+        content: Text(
+          '确定删除「${detail.term}」吗？'
+          '该词条的释义、例句、复习记录与错词状态都会一并删除，且无法恢复。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(wordDetailActionsProvider).delete(detail.id);
+    if (context.mounted) await Navigator.of(context).maybePop();
+  }
+}
+
+/// 朗读词条，失败或降级时提示原因。
+///
+/// 统一走 [speakWithWordSpeaker]（真人录音优先、系统朗读兜底）：
 /// Android 缺语音包时系统 TTS 会静默无声，不提示的话用户只会觉得
-/// 「按钮坏了」。抽成顶层函数是因为发音栏上每个口音都要一个播放按钮，
-/// 与头部那一个共用同一段失败处理。
-///
-/// **暂不按口音切换音色**：`TtsService` 目前只按 `sourceLanguage` 选音色，
-/// 播放按钮先按口音拆开是为了让界面结构一步到位；口音真正生效要等新的
-/// 音频层落地，届时只需改这一处。
+/// 「按钮坏了」。
 Future<void> _speakWord(
   BuildContext context,
   WidgetRef ref,
+  WordDetail detail, {
+  Accent? accent,
+}) {
+  final fromSelection = ref.read(selectedAccentProvider)[detail.id];
+  return _speakWith(
+    context,
+    ref,
+    detail,
+    _resolveAccent(ref, fromSelection, accent),
+  );
+}
+
+/// 决定这次朗读用哪个口音。
+///
+/// 优先级：显式指定的口音（点了某个口音的喇叭）> 该词条上次选中的口音 >
+/// 设置里的默认口音。写成显式分支而不是 `??` 链：`??` 链在
+/// `ref.read` 的泛型推断下会把整体类型推成可空，编译器无法替我们确认
+/// 「一定拿得到一个口音」。
+Accent _resolveAccent(WidgetRef ref, Accent? selected, Accent? override) {
+  if (override != null) return override;
+  if (selected != null) return selected;
+  return ref.read(preferredAccentProvider);
+}
+
+/// 用指定口音朗读。
+Future<void> _speakWith(
+  BuildContext context,
+  WidgetRef ref,
   WordDetail detail,
-) async {
-  final messenger = ScaffoldMessenger.of(context);
-  final playback =
-      ref.read(appSettingsProvider).value?.playback ??
-      PlaybackSettings.defaults;
-  try {
-    await ref
-        .read(ttsServiceProvider)
-        .speakTerm(
-          term: detail.term,
-          sourceLanguage: detail.sourceLanguage,
-          contentType: detail.contentType,
-          playback: playback,
-        );
-  } on AppError catch (error) {
-    messenger.showSnackBar(SnackBar(content: Text(error.message)));
-  }
+  Accent accent,
+) {
+  return speakWithWordSpeaker(
+    context: context,
+    ref: ref,
+    term: detail.term,
+    accent: accent,
+    contentType: detail.contentType,
+    pronunciations: detail.pronunciations,
+  );
 }
 
 class _TermBlock extends StatelessWidget {
@@ -126,6 +288,53 @@ class _TermBlock extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// 「暂无中文释义 → AI 翻译释义」提示。
+///
+/// 只在**有英文释义而缺中文译文**时出现：什么内容都没有的词条该走
+/// 「补全缺失内容」，那是另一条路径。
+///
+/// **与旧版的差异**：旧版把 busy 与结果文案放在页面上（`translationBusy` /
+/// `translationMessage`）；这里改成入队后弹一条 SnackBar——翻译由后台
+/// worker 执行，页面上留一个永远停在「翻译中」的状态没有意义。
+class _TranslationHint extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final short = detail.summary.shortDefinition?.trim() ?? '';
+    final translation = detail.summary.translation?.trim() ?? '';
+    if (short.isEmpty || translation.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+    final colors = context.lexiColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: <Widget>[
+          Text(
+            '暂无中文释义',
+            style: TextStyle(color: colors.secondaryLabel, fontSize: 12.5),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: () => unawaited(_request(context, ref)),
+            icon: const Icon(Icons.translate_rounded, size: 15),
+            label: const Text('AI 翻译释义'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _request(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(wordDetailActionsProvider).requestTranslation(detail.id);
+    messenger.showSnackBar(const SnackBar(content: Text('已加入翻译队列')));
   }
 }
 
@@ -227,7 +436,8 @@ class _AccentToggle extends ConsumerWidget {
         IconButton(
           tooltip: '朗读$label式发音',
           visualDensity: VisualDensity.compact,
-          onPressed: () => unawaited(_speakWord(context, ref, detail)),
+          onPressed: () =>
+              unawaited(_speakWord(context, ref, detail, accent: accent)),
           icon: Icon(Icons.volume_up_rounded, size: 18, color: colors.accent),
         ),
       ],
@@ -291,6 +501,7 @@ class _SourceMeta extends StatelessWidget {
   );
 }
 
+/// 卡片底部：朗读、学习状态与暂停开关。
 class _HeaderActions extends ConsumerWidget {
   const new({required this.detail});
 
@@ -317,39 +528,7 @@ class _HeaderActions extends ConsumerWidget {
               .read(wordDetailActionsProvider)
               .setSuspended(detail.id, suspended: value),
         ),
-        IconButton(
-          tooltip: '删除词条',
-          onPressed: () => _confirmDelete(context, ref),
-          icon: Icon(Icons.delete_outline_rounded, color: colors.danger),
-        ),
       ],
     );
-  }
-
-  /// 二次确认后删除词条，并退出详情页。
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('删除词条'),
-        content: Text(
-          '确定删除「${detail.term}」吗？'
-          '该词条的释义、例句、复习记录与错词状态都会一并删除，且无法恢复。',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await ref.read(wordDetailActionsProvider).delete(detail.id);
-    if (context.mounted) await Navigator.of(context).maybePop();
   }
 }

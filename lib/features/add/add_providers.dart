@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
 /// 词条写入服务。
@@ -196,11 +197,11 @@ manualEntryProvider = NotifierProvider<ManualEntryController, ManualEntryState>(
 );
 
 /// 按行切分并去掉空行。
-List<String> splitLines(String value) => value
-    .split('\n')
-    .map((line) => line.trim())
-    .where((line) => line.isNotEmpty)
-    .toList(growable: false);
+///
+/// 与批量预览共用同一实现（`services/manual_preview_service.dart` 的
+/// `manualBatchLines`）：两处各写一遍会在「什么算一行」上漂移，而批量预览的
+/// 行数上限正是按同一个切分结果算的。
+List<String> splitLines(String value) => manualBatchLines(value);
 
 /// 按逗号、顿号或空白切分标签。
 List<String> splitTags(String value) => value

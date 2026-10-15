@@ -19,6 +19,7 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/data/dictionary/content_normalize.dart';
+import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
@@ -65,6 +66,7 @@ class WordDraft {
     this.examples = const <WordExampleDraft>[],
     this.tags = const <String>[],
     this.note,
+    this.content,
   });
 
   /// 词条文本（用户输入的原始形态）。
@@ -93,6 +95,17 @@ class WordDraft {
 
   /// 用户笔记。
   final String? note;
+
+  /// 已构建好的完整词典内容。
+  ///
+  /// 非空时整份落库，[definitions]/[examples]/[phonetic]/[tags] 不再参与；
+  /// 为空时按那些扁平字段构造内容（手动录入路径）。
+  ///
+  /// **为什么需要它**：词典刷新（有道预览应用）必须原样保留释义的
+  /// `partOfSpeech`/`senseId`、例句的 `isUserAdded` 等结构字段——
+  /// 「覆盖时保留手动编辑的释义与手动添加的例句」正是靠 `isUserEdited` /
+  /// `isUserAdded` 判定的，压平成字符串就再也分不出哪些是用户资产。
+  final DictionaryContent? content;
 
   /// 归一化后的词条文本。
   String get normalizedTerm => normalizeTerm(term, sourceLanguage);
@@ -173,26 +186,251 @@ LIMIT 1''',
     });
   }
 
-  /// 覆盖词条内容（不改词条文本与语种）。
+  /// 覆盖词条内容，并在词条文本变化时一并改名。
+  ///
+  /// 对应旧版 `modules/words/youdao-refresh.ts` 的 `applyYoudaoContent`：
+  /// 「改词条文本 + 覆盖内容 + 重算状态 + 写数据源审计」在**同一个事务**里
+  /// 完成。半套的写入（词条文本已改而内容还是旧的）会让词条名实不符，
+  /// 比整次失败更糟。
+  ///
+  /// [draft] 的 [WordDraft.content] 非空时按词典内容的完整结构落库
+  /// （有道刷新路径），否则按扁平字段落库（手动编辑路径）。
+  /// [attempts] 是本次抓取的数据源调用记录：既写进
+  /// `word_contents.provider_metadata_json`，也逐条插入 `provider_attempts`
+  /// （`initialization_job_id` 为 `NULL`——这不是队列任务，是用户手动触发的
+  /// 一次刷新，挂到某个任务上会让初始化质量卡把它算进任务重试次数）。
+  ///
+  /// **与旧版的差异**：旧版在事务外先查重、再进事务写入，查重与写入之间
+  /// 理论上存在竞态；这里把查重也放进同一个事务的入口步骤，纯本地单进程
+  /// 下两者等价，但语义更干净。
   Future<void> updateContent({
     required int wordId,
     required WordDraft draft,
     required int now,
+    List<ProviderAttemptRecord> attempts = const <ProviderAttemptRecord>[],
   }) async {
+    final change = await _resolveTermChange(wordId, draft);
+    final body = draft.content;
+    final status = body == null
+        ? _statusFor(draft)
+        : contentStatus(body, change.contentType);
     await _db.transaction(() async {
-      await _upsertContent(wordId, draft, now);
-      await (_db.update(
-        _db.words,
-      )..where((row) => row.id.equals(wordId))).write(
-        WordsCompanion(
-          contentType: Value<LexicalContentType>(draft.contentType),
-          entryType: Value<EntryType>(legacyEntryType(draft.contentType)),
-          initializationStatus: Value<InitializationStatus>(_statusFor(draft)),
-          userNote: Value<String?>(_blankToNull(draft.note)),
-          updatedAt: Value<int>(now),
-        ),
-      );
+      if (change.changed) {
+        await _writeTerm(wordId, change.term, change.normalizedTerm, now);
+      }
+      if (body == null) {
+        await _upsertContent(wordId, draft, now);
+      } else {
+        await _writeDictionaryContent(wordId, body, attempts, now);
+      }
+      await _writeWordMeta(wordId, draft, status, now);
     });
+  }
+
+  /// 解析这次写入是否需要改词条文本，并完成校验与查重。
+  ///
+  /// 校验顺序与旧版 `applyYoudaoContent` 一致：先按语言与内容类型规整
+  /// 展示文本，空则 [AppErrorCode.termRequired]、超过 [termMaxLength] 则
+  /// [AppErrorCode.termTooLong]，最后按
+  /// `normalized_term + source_language + target_language` 查重
+  /// （排除自身）→ [AppErrorCode.termAlreadyExists]。
+  ///
+  /// 文本未变化时**不校验也不查重**：手动编辑内容每次都会把同一个词条
+  /// 文本传进来，每次都查一遍既多两次查询，又会让历史遗留的超长词条
+  /// 永远改不了内容。
+  Future<_TermChange> _resolveTermChange(int wordId, WordDraft draft) async {
+    final row = await _wordRow(wordId);
+    final raw = draft.term.trim();
+    if (raw == row.term) {
+      return _TermChange(
+        term: row.term,
+        normalizedTerm: row.normalizedTerm,
+        contentType: row.contentType,
+        changed: false,
+      );
+    }
+    final term = displayTerm(raw, row.sourceLanguage, row.contentType);
+    _assertValidTerm(term);
+    final normalized = normalizeTerm(term, row.sourceLanguage);
+    if (await _hasOtherWord(
+      normalizedTerm: normalized,
+      sourceLanguage: row.sourceLanguage,
+      targetLanguage: row.targetLanguage,
+      excludeId: wordId,
+    )) {
+      throw const ConflictError(AppErrorCode.termAlreadyExists);
+    }
+    return _TermChange(
+      term: term,
+      normalizedTerm: normalized,
+      contentType: row.contentType,
+      changed: true,
+    );
+  }
+
+  /// 读取改名与状态重算需要的词条行；不存在时抛 [AppErrorCode.wordNotFound]。
+  Future<_EditWordRow> _wordRow(int wordId) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT term, normalized_term, source_language, target_language, '
+          'content_type FROM words WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .get();
+    if (rows.isEmpty) throw const NotFoundError(AppErrorCode.wordNotFound);
+    final row = rows.first;
+    return _EditWordRow(
+      term: row.read<String>('term'),
+      normalizedTerm: row.read<String>('normalized_term'),
+      sourceLanguage: row.read<String>('source_language'),
+      targetLanguage: row.read<String>('target_language'),
+      contentType:
+          wireLookup(
+            LexicalContentType.values,
+            row.read<String>('content_type'),
+          ) ??
+          LexicalContentType.word,
+    );
+  }
+
+  /// 同一语言对下是否已有别的词条占用该归一化文本。
+  Future<bool> _hasOtherWord({
+    required String normalizedTerm,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required int excludeId,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT id FROM words WHERE normalized_term = ? '
+          'AND source_language = ? AND target_language = ? AND id != ? LIMIT 1',
+          variables: <Variable<Object>>[
+            Variable<String>(normalizedTerm),
+            Variable<String>(sourceLanguage),
+            Variable<String>(targetLanguage),
+            Variable<int>(excludeId),
+          ],
+        )
+        .get();
+    return rows.isNotEmpty;
+  }
+
+  /// 写入改名后的词条文本与归一化文本。
+  Future<void> _writeTerm(
+    int wordId,
+    String term,
+    String normalizedTerm,
+    int now,
+  ) => _db.customUpdate(
+    'UPDATE words SET term = ?, normalized_term = ?, updated_at = ? '
+    'WHERE id = ?',
+    variables: <Variable<Object>>[
+      Variable<String>(term),
+      Variable<String>(normalizedTerm),
+      Variable<int>(now),
+      Variable<int>(wordId),
+    ],
+    updates: <ResultSetImplementation<dynamic, dynamic>>{_db.words},
+    updateKind: UpdateKind.update,
+  );
+
+  /// 整份写入词典内容（15 个 JSON 列 + 来源 + 审计元数据）。
+  ///
+  /// **必须写满全部内容列**：`FORCE_OVERWRITE` 的语义是「用抓取结果替换
+  /// 现有内容」，漏写某列会让上一轮的旧值留在库里，界面上就是「覆盖了
+  /// 但音标还是老的」。
+  ///
+  /// `content_version` 自增而不是置 1：它是并发冲突提示的依据，
+  /// 用 `excluded` 覆盖会永远停在 1。
+  Future<void> _writeDictionaryContent(
+    int wordId,
+    DictionaryContent content,
+    List<ProviderAttemptRecord> attempts,
+    int now,
+  ) async {
+    final columns = content.toJsonColumns();
+    final names = <String>[
+      'word_id',
+      ...columns.keys,
+      'provider_metadata_json',
+      'content_source',
+      'content_version',
+      'initialized_at',
+      'updated_at',
+    ];
+    final assignments = <String>[
+      for (final name in names)
+        if (name != 'word_id' && name != 'content_version')
+          '$name = excluded.$name',
+      'content_version = word_contents.content_version + 1',
+    ];
+    await _db.customUpdate(
+      'INSERT INTO word_contents (${names.join(', ')}) '
+      'VALUES (${List<String>.filled(names.length, '?').join(', ')}) '
+      'ON CONFLICT(word_id) DO UPDATE SET ${assignments.join(', ')}',
+      variables: <Variable<Object>>[
+        Variable<int>(wordId),
+        for (final column in columns.keys) Variable<String>(columns[column]),
+        Variable<String>(jsonEncode(_attemptsJson(attempts))),
+        Variable<String>(ContentSource.dictionaryOnly.wire),
+        const Variable<int>(contentVersionWithContent),
+        Variable<int>(now),
+        Variable<int>(now),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{_db.wordContents},
+      updateKind: UpdateKind.update,
+    );
+    await _writeAttempts(wordId, attempts, now);
+  }
+
+  /// 把本次抓取的数据源调用记录写入审计表。
+  ///
+  /// `initialization_job_id` 显式写 `NULL`：这些记录来自用户手动触发的
+  /// 刷新，不属于任何队列任务。
+  Future<void> _writeAttempts(
+    int wordId,
+    List<ProviderAttemptRecord> attempts,
+    int now,
+  ) async {
+    for (final attempt in attempts) {
+      await _db.customInsert(
+        'INSERT INTO provider_attempts (initialization_job_id, word_id, '
+        'provider_id, status, duration_ms, fields_returned_json, error_code, '
+        'error_message, metadata_json, created_at) '
+        'VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        variables: <Variable<Object>>[
+          Variable<int>(wordId),
+          Variable<String>(attempt.providerId),
+          Variable<String>(attempt.status.wire),
+          Variable<int>(attempt.durationMs),
+          Variable<String>(jsonEncode(attempt.fieldsReturned)),
+          Variable<String>(attempt.errorCode),
+          Variable<String>(attempt.errorMessage),
+          Variable<String>(
+            attempt.metadata == null ? null : jsonEncode(attempt.metadata),
+          ),
+          Variable<int>(now),
+        ],
+      );
+    }
+  }
+
+  /// 写入内容类型、初始化状态与用户笔记。
+  Future<void> _writeWordMeta(
+    int wordId,
+    WordDraft draft,
+    InitializationStatus status,
+    int now,
+  ) async {
+    await (_db.update(_db.words)..where((row) => row.id.equals(wordId))).write(
+      WordsCompanion(
+        contentType: Value<LexicalContentType>(draft.contentType),
+        entryType: Value<EntryType>(legacyEntryType(draft.contentType)),
+        initializationStatus: Value<InitializationStatus>(status),
+        userNote: Value<String?>(_blankToNull(draft.note)),
+        updatedAt: Value<int>(now),
+      ),
+    );
   }
 
   /// 切换「暂停学习」。
@@ -587,6 +825,12 @@ WHERE word_id = ? AND status = ?''',
   ///
   /// [mode] 默认「补全缺失字段」：手动录入的词条通常已有部分内容，
   /// 初始化只该补空，不该覆盖用户刚填的东西。
+  ///
+  /// **已有活跃任务时升级它而不是丢弃本次请求**（对应旧版
+  /// `queueAiTask` 的 `strongerInitializationMode` + `GREATEST`）：
+  /// 详情页的「重新生成」要在已有「补全缺失内容」任务上要求
+  /// `FORCE_OVERWRITE`，用 `DO NOTHING` 挡下就等于按钮点了没反应；
+  /// 优先级同理只升不降，避免把用户显式触发的高优先级任务降下来。
   Future<void> enqueueInitialization({
     required int wordId,
     required int now,
@@ -594,6 +838,108 @@ WHERE word_id = ? AND status = ?''',
     InitializationMode mode = InitializationMode.fillMissingFields,
     int priority = jobPriorityDefault,
   }) async {
+    final active = await _activeJob(wordId, taskType);
+    if (active == null) {
+      await _insertJob(wordId, taskType, mode, priority, now);
+      return;
+    }
+    await _db.customUpdate(
+      'UPDATE initialization_jobs SET mode = ?, priority = max(priority, ?), '
+      'max_attempts = max(max_attempts, ?), available_at = ?, updated_at = ? '
+      'WHERE id = ?',
+      variables: <Variable<Object>>[
+        Variable<String>(strongerInitializationMode(active.mode, mode).wire),
+        Variable<int>(priority),
+        const Variable<int>(importJobMaxAttempts),
+        Variable<int>(now),
+        Variable<int>(now),
+        Variable<int>(active.id),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{
+        _db.initializationJobs,
+      },
+      updateKind: UpdateKind.update,
+    );
+  }
+
+  /// 入队之后，把「还没有释义」的词条标成已排队。
+  ///
+  /// 对应旧版 `modules/imports/commit.ts:31-36` 的 `markWordInitializationQueued`：
+  /// 导入路径给新词条算出来的初始状态是 `PENDING`（尚未排队），入队成功后
+  /// 必须改成 `QUEUED`，否则词库页按状态筛选时，一批「其实已经在队列里」
+  /// 的词条会一直显示成「待初始化」。
+  ///
+  /// **只在没有释义时才改**：已经有释义的词条，它的状态是「内容完整度」的
+  /// 表达（`READY` / `PARTIAL`），把它压回 `QUEUED` 会让详情页显示成
+  /// 「还没初始化」，而它明明已经能用来出题了。
+  Future<void> markInitializationQueuedIfNoDefinition({
+    required int wordId,
+    required int now,
+  }) async {
+    if (await _hasDefinition(wordId)) return;
+    await (_db.update(_db.words)..where((row) => row.id.equals(wordId))).write(
+      WordsCompanion(
+        initializationStatus: const Value<InitializationStatus>(
+          InitializationStatus.queued,
+        ),
+        updatedAt: Value<int>(now),
+      ),
+    );
+  }
+
+  /// 该词条是否已有至少一条释义。
+  ///
+  /// 解析失败按「没有释义」处理——与旧版 `try { … } catch { hasDefinition = false }`
+  /// 一致：一份坏掉的 JSON 不该让词条永远停在「已就绪」。
+  Future<bool> _hasDefinition(int wordId) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT definitions_json FROM word_contents WHERE word_id = ?',
+          variables: <Variable<Object>>[Variable<int>(wordId)],
+        )
+        .get();
+    if (rows.isEmpty) return false;
+    // 与旧版同口径：只看 `definitions_json` 的**数组长度**，
+    // 坏掉的 JSON 由 `decodeJsonList` 归一成空列表。
+    return decodeJsonList(rows.first.readNullable<String>('definitions_json'))
+        .isNotEmpty;
+  }
+
+  /// 该词条该任务类型当前的活跃任务。
+  Future<({int id, InitializationMode mode})?> _activeJob(
+    int wordId,
+    JobTaskType taskType,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT id, mode FROM initialization_jobs WHERE word_id = ? '
+          "AND task_type = ? AND status IN ('QUEUED', 'RUNNING') LIMIT 1",
+          variables: <Variable<Object>>[
+            Variable<int>(wordId),
+            Variable<String>(taskType.wire),
+          ],
+        )
+        .get();
+    if (rows.isEmpty) return null;
+    return (
+      id: rows.first.read<int>('id'),
+      mode:
+          wireLookup(
+            InitializationMode.values,
+            rows.first.read<String>('mode'),
+          ) ??
+          InitializationMode.fillMissingFields,
+    );
+  }
+
+  /// 新建一条初始化任务；唯一索引冲突时静默放弃（另一处已建过）。
+  Future<void> _insertJob(
+    int wordId,
+    JobTaskType taskType,
+    InitializationMode mode,
+    int priority,
+    int now,
+  ) async {
     await _db.customInsert(
       '''
 INSERT INTO initialization_jobs
@@ -694,6 +1040,86 @@ ON CONFLICT DO NOTHING''',
 
 /// 手工录入内容的来源标识。
 const String manualContentSource = 'manual';
+
+/// 取两个初始化模式里更强的那一个。
+///
+/// 强弱与旧版 `queue.ts` 的 `strongerInitializationMode` 一致：
+/// 覆盖 > 补空 > 跳过。同一词条的活跃任务被复用时要保证「用户最后
+/// 表达的意图」胜出，而不是先到先得。
+///
+/// 用显式分支而不是给模式打数字权重：权重表要在两处维护（映射与比较），
+/// 而这里只需要回答「谁更强」，枚举本身已经说清了顺序。
+InitializationMode strongerInitializationMode(
+  InitializationMode current,
+  InitializationMode requested,
+) {
+  if (current == requested) return current;
+  if (requested == InitializationMode.forceOverwrite) return requested;
+  if (current == InitializationMode.forceOverwrite) return current;
+  if (requested == InitializationMode.fillMissingFields) return requested;
+  if (current == InitializationMode.fillMissingFields) return current;
+  return requested;
+}
+
+/// 一次改名的解析结果。
+///
+/// 把「要不要改」「改成什么」「按哪个内容类型重算状态」三件事打包返回，
+/// 避免调用方在事务里再查一次词条行。
+class _TermChange {
+  const new({
+    required this.term,
+    required this.normalizedTerm,
+    required this.contentType,
+    required this.changed,
+  });
+
+  /// 应写入 `words.term` 的展示文本。
+  final String term;
+
+  /// 应写入 `words.normalized_term` 的归一化文本。
+  final String normalizedTerm;
+
+  /// 词条的内容类型（来自数据库行，用于状态重算）。
+  final LexicalContentType contentType;
+
+  /// 词条文本是否真的变了。
+  final bool changed;
+}
+
+/// 改名与状态重算需要的词条行。
+class _EditWordRow {
+  const new({
+    required this.term,
+    required this.normalizedTerm,
+    required this.sourceLanguage,
+    required this.targetLanguage,
+    required this.contentType,
+  });
+
+  final String term;
+  final String normalizedTerm;
+  final String sourceLanguage;
+  final String targetLanguage;
+  final LexicalContentType contentType;
+}
+
+/// 数据源调用记录的 JSON 形态（与 `initialization_worker` 的同名构造一致）。
+Map<String, Object?> _attemptJson(ProviderAttemptRecord attempt) =>
+    <String, Object?>{
+      'providerId': attempt.providerId,
+      'status': attempt.status.wire,
+      'durationMs': attempt.durationMs,
+      'fieldsReturned': attempt.fieldsReturned,
+      if (attempt.errorCode != null) 'errorCode': attempt.errorCode,
+      if (attempt.errorMessage != null) 'errorMessage': attempt.errorMessage,
+      if (attempt.metadata != null) 'metadata': attempt.metadata,
+    };
+
+List<Map<String, Object?>> _attemptsJson(
+  List<ProviderAttemptRecord> attempts,
+) => <Map<String, Object?>>[
+  for (final attempt in attempts) _attemptJson(attempt),
+];
 
 /// 有内容时的内容版本号。
 const int contentVersionWithContent = 1;

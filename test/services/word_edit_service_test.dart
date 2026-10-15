@@ -4,11 +4,14 @@
 /// **重复词条被静默合并**——用户以为新建了一个词，实际改的是旧的。
 library;
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/data/dictionary/content.dart';
+import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
@@ -362,6 +365,304 @@ void main() {
         taskType: JobTaskType.mnemonic,
       );
       expect(await db.select(db.initializationJobs).get(), hasLength(2));
+    });
+
+    test('已有活跃任务时升级模式：补空 → 覆盖', () async {
+      final id = await service.create(draft: draft(), now: now);
+      await service.enqueueInitialization(wordId: id, now: now);
+
+      await service.enqueueInitialization(
+        wordId: id,
+        now: now + 1000,
+        mode: InitializationMode.forceOverwrite,
+      );
+
+      final jobs = await db.select(db.initializationJobs).get();
+      expect(jobs, hasLength(1));
+      expect(jobs.single.mode, InitializationMode.forceOverwrite);
+      expect(jobs.single.updatedAt, now + 1000);
+    });
+
+    test('已有活跃任务时模式不被削弱', () async {
+      final id = await service.create(draft: draft(), now: now);
+      await service.enqueueInitialization(
+        wordId: id,
+        now: now,
+        mode: InitializationMode.forceOverwrite,
+      );
+
+      await service.enqueueInitialization(
+        wordId: id,
+        now: now + 1000,
+        mode: InitializationMode.skipInitialized,
+      );
+
+      final jobs = await db.select(db.initializationJobs).get();
+      expect(jobs.single.mode, InitializationMode.forceOverwrite);
+    });
+
+    test('已有活跃任务时优先级只升不降', () async {
+      final id = await service.create(draft: draft(), now: now);
+      await service.enqueueInitialization(
+        wordId: id,
+        now: now,
+        priority: jobPriorityManualBulk,
+      );
+
+      await service.enqueueInitialization(
+        wordId: id,
+        now: now + 1000,
+        priority: jobPrioritySupplemental,
+      );
+
+      final jobs = await db.select(db.initializationJobs).get();
+      expect(jobs.single.priority, jobPriorityManualBulk);
+    });
+  });
+
+  group('strongerInitializationMode', () {
+    test('覆盖强于补空强于跳过', () {
+      expect(
+        strongerInitializationMode(
+          InitializationMode.fillMissingFields,
+          InitializationMode.forceOverwrite,
+        ),
+        InitializationMode.forceOverwrite,
+      );
+      expect(
+        strongerInitializationMode(
+          InitializationMode.skipInitialized,
+          InitializationMode.fillMissingFields,
+        ),
+        InitializationMode.fillMissingFields,
+      );
+      expect(
+        strongerInitializationMode(
+          InitializationMode.forceOverwrite,
+          InitializationMode.skipInitialized,
+        ),
+        InitializationMode.forceOverwrite,
+      );
+      expect(
+        strongerInitializationMode(
+          InitializationMode.skipInitialized,
+          InitializationMode.skipInitialized,
+        ),
+        InitializationMode.skipInitialized,
+      );
+    });
+  });
+
+  group('updateContent 改词条文本', () {
+    test('文本变化时写入 term 与 normalized_term', () async {
+      final id = await service.create(draft: draft(), now: now);
+
+      await service.updateContent(
+        wordId: id,
+        draft: draft(term: 'Apples'),
+        now: now + 1000,
+      );
+
+      final word = await wordOf(id);
+      expect(word.term, 'apples');
+      expect(word.normalizedTerm, 'apples');
+      expect(word.updatedAt, now + 1000);
+    });
+
+    test('空文本抛「词条文本不能为空」', () async {
+      final id = await service.create(draft: draft(), now: now);
+      await expectLater(
+        service.updateContent(
+          wordId: id,
+          draft: draft(term: '   '),
+          now: now,
+        ),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            AppErrorCode.termRequired,
+          ),
+        ),
+      );
+    });
+
+    test('超长文本抛「词条文本过长」', () async {
+      final id = await service.create(draft: draft(), now: now);
+      await expectLater(
+        service.updateContent(
+          wordId: id,
+          draft: draft(term: 'a' * (termMaxLength + 1)),
+          now: now,
+        ),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            AppErrorCode.termTooLong,
+          ),
+        ),
+      );
+    });
+
+    test('与别的词条重复抛「已存在相同词条」', () async {
+      await service.create(
+        draft: draft(term: 'banana'),
+        now: now,
+      );
+      final id = await service.create(draft: draft(), now: now);
+
+      await expectLater(
+        service.updateContent(
+          wordId: id,
+          draft: draft(term: 'Banana'),
+          now: now,
+        ),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            AppErrorCode.termAlreadyExists,
+          ),
+        ),
+      );
+      expect((await wordOf(id)).term, 'apple');
+    });
+
+    test('文本未变化时不触发查重（历史遗留的超长词条仍可改内容）', () async {
+      final id = await service.create(draft: draft(), now: now);
+      // 直接改库造一个超长历史词条：更新内容不该因为它而失败。
+      await (db.update(db.words)..where((row) => row.id.equals(id))).write(
+        WordsCompanion(term: Value<String>('a' * (termMaxLength + 10))),
+      );
+
+      await service.updateContent(
+        wordId: id,
+        draft: draft(term: 'a' * (termMaxLength + 10)),
+        now: now,
+      );
+
+      expect((await wordOf(id)).term, 'a' * (termMaxLength + 10));
+    });
+
+    test('词条不存在抛「词条不存在」', () async {
+      await expectLater(
+        service.updateContent(wordId: 999, draft: draft(), now: now),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            AppErrorCode.wordNotFound,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('updateContent 落库词典内容', () {
+    /// 一份带结构字段的词典内容。
+    DictionaryContent structuredContent() =>
+        const DictionaryContent(<String, Object?>{
+          'definitions': <Object?>[
+            <String, Object?>{
+              'language': 'zh',
+              'text': '苹果',
+              'partOfSpeech': 'n.',
+              'isUserEdited': true,
+              'senseId': 'apple_n_fruit',
+            },
+          ],
+          'examples': <Object?>[
+            <String, Object?>{
+              'sentence': 'I ate an apple.',
+              'translation': '我吃了一个苹果。',
+              'isUserAdded': true,
+            },
+          ],
+          'pronunciations': <Object?>[
+            <String, Object?>{'accent': 'US', 'phonetic': 'ˈæpl'},
+          ],
+          'summary': <String, Object?>{'translation': '苹果'},
+        });
+
+    test('整份写入并保留结构字段', () async {
+      final id = await service.create(draft: draft(), now: now);
+
+      await service.updateContent(
+        wordId: id,
+        draft: WordDraft(
+          term: 'apple',
+          contentType: LexicalContentType.word,
+          sourceLanguage: 'en',
+          targetLanguage: 'zh',
+          content: structuredContent(),
+        ),
+        now: now + 1000,
+      );
+
+      final content = await contentOf(id);
+      expect(content.definitionsJson, contains('senseId'));
+      expect(content.definitionsJson, contains('isUserEdited'));
+      expect(content.examplesJson, contains('isUserAdded'));
+      expect(content.pronunciationsJson, contains('ˈæpl'));
+      expect(content.summaryJson, contains('苹果'));
+      expect(content.contentSource, ContentSource.dictionaryOnly);
+      expect(content.initializedAt, now + 1000);
+      expect(
+        content.contentVersion,
+        contentVersionWithContent + 1,
+        reason: '词典内容走自增语义：创建时已写 1，这次应用后应为 2',
+      );
+    });
+
+    test('数据源调用记录写入 provider_attempts 且不挂任务', () async {
+      final id = await service.create(draft: draft(), now: now);
+
+      await service.updateContent(
+        wordId: id,
+        draft: WordDraft(
+          term: 'apple',
+          contentType: LexicalContentType.word,
+          sourceLanguage: 'en',
+          targetLanguage: 'zh',
+          content: structuredContent(),
+        ),
+        now: now,
+        attempts: const <ProviderAttemptRecord>[
+          ProviderAttemptRecord(
+            providerId: 'youdao',
+            status: ProviderAttemptStatus.success,
+            durationMs: 30,
+            fieldsReturned: <String>['definitions'],
+          ),
+        ],
+      );
+
+      final attempts = await db.select(db.providerAttempts).get();
+      expect(attempts, hasLength(1));
+      expect(attempts.single.initializationJobId, isNull);
+      expect((await contentOf(id)).providerMetadataJson, contains('youdao'));
+    });
+
+    test('同一事务里改名与写内容一起生效', () async {
+      final id = await service.create(draft: draft(), now: now);
+
+      await service.updateContent(
+        wordId: id,
+        draft: WordDraft(
+          term: 'pear',
+          contentType: LexicalContentType.word,
+          sourceLanguage: 'en',
+          targetLanguage: 'zh',
+          content: structuredContent(),
+        ),
+        now: now,
+      );
+
+      final word = await wordOf(id);
+      expect(word.term, 'pear');
+      expect(word.normalizedTerm, 'pear');
+      expect((await contentOf(id)).definitionsJson, contains('苹果'));
     });
   });
 }

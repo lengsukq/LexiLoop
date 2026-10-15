@@ -11,13 +11,20 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
+/// 拿不到间隔预览时的占位符。
+///
+/// 与旧版一致显示 `—` 而不是留白：留白看起来像界面坏了，
+/// 破折号说明「这一刻确实没有这个信息」。
+const String _missingInterval = '—';
+
 /// 四档自评按钮组。
 class StudyRatingBar extends StatelessWidget {
-  /// 以提示语、可用性、当前等级与回调构造。
+  /// 以提示语、可用性、当前等级、间隔预览与回调构造。
   const new({
     required this.hint,
     required this.enabled,
     required this.selected,
+    required this.intervals,
     required this.onSelect,
     super.key,
   });
@@ -30,6 +37,12 @@ class StudyRatingBar extends StatelessWidget {
 
   /// 当前（将要或已经）生效的等级。
   final ReviewRating? selected;
+
+  /// 各等级对应的间隔文案；取不到时为空表，按钮显示占位符。
+  ///
+  /// 传文案而不是 `FsrsIntervalPreview`：评级条不必认识 FSRS 的模型，
+  /// 换算（「今天 / N 天 / N 月 / X.X 年」四档）集中在 `study_texts.dart`。
+  final Map<ReviewRating, String> intervals;
 
   /// 选择回调。
   final ValueChanged<ReviewRating> onSelect;
@@ -53,6 +66,7 @@ class StudyRatingBar extends StatelessWidget {
                   rating: rating,
                   selected: rating == selected,
                   enabled: enabled,
+                  interval: intervals[rating] ?? _missingInterval,
                   onTap: () => onSelect(rating),
                 ),
               ),
@@ -71,12 +85,14 @@ class _RatingButton extends StatelessWidget {
     required this.rating,
     required this.selected,
     required this.enabled,
+    required this.interval,
     required this.onTap,
   });
 
   final ReviewRating rating;
   final bool selected;
   final bool enabled;
+  final String interval;
   final VoidCallback onTap;
 
   @override
@@ -104,19 +120,36 @@ class _RatingButton extends StatelessWidget {
         child: Container(
           constraints: const BoxConstraints(minHeight: 48),
           alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LexiRadius.sm),
             border: Border.all(
               color: foreground.withValues(alpha: selected ? 0.6 : 0.25),
             ),
           ),
-          child: Text(
-            studyRatingLabel(rating),
-            style: TextStyle(
-              color: foreground,
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                studyRatingLabel(rating),
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // 间隔预览是「这一档会排到什么时候」的唯一线索，也是旧版
+              // 揭示答案时唯一会变的东西——按钮上必须给它留一行。
+              Text(
+                interval,
+                key: Key('study.rating.interval.${rating.wire}'),
+                style: TextStyle(
+                  color: foreground.withValues(alpha: 0.75),
+                  fontSize: 10.5,
+                ),
+              ),
+            ],
           ),
         ),
       ),

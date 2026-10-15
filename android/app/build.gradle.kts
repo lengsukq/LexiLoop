@@ -15,11 +15,11 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.lexiloop.lexiloop"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 钉成 26 而不是 flutter.minSdkVersion：后者由 Flutter SDK 决定，
+        // 会随 SDK 升级悄悄抬高，构建产物就不再可复现。26（Android 8.0）
+        // 是当前插件集合（drift / just_audio / flutter_tts）实际要求的下限。
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)

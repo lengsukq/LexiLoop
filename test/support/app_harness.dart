@@ -3,7 +3,7 @@
 /// **为什么需要它**：本项目的颜色、圆角等视觉 token 由 `LexiTheme` 通过
 /// `Theme` 扩展（`context.lexiColors`）注入，而不是全局单例。任何直接
 /// `pumpWidget(Widget)` 而没挂主题的用例，都会在第一次读 `lexiColors`
-/// 时抛空断言——而报错信息指向 `AmbientBackground` / `DashboardCard`
+/// 时抛空断言——而报错信息指向 `AmbientBackground` / `SectionCard`
 /// 的内部实现，与「忘了挂主题」之间没有任何线索，很容易被误判成组件 bug。
 ///
 /// 所以：**所有**渲染本项目 widget 的用例都必须经过这里，不要自己拼

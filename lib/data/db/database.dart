@@ -8,11 +8,9 @@
 /// 逐条对照审计，且 `IF NOT EXISTS` 保证重复打开幂等。
 library;
 
-import 'dart:io';
-
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:lexiloop/data/db/converters.dart';
+import 'package:lexiloop/data/db/database_connection.dart';
 import 'package:lexiloop/data/db/tables/import_tables.dart';
 import 'package:lexiloop/data/db/tables/initialization_tables.dart';
 import 'package:lexiloop/data/db/tables/misc_tables.dart';
@@ -21,12 +19,13 @@ import 'package:lexiloop/data/db/tables/study_tables.dart';
 import 'package:lexiloop/data/db/tables/word_tables.dart';
 // 生成的 part 文件会引用这些枚举类型，必须在此导入。
 import 'package:lexiloop/domain/enums.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-/// 数据库文件名。
+/// 原生端数据库文件名。
+///
+/// Web 端不用它：浏览器存储（IndexedDB / OPFS）的条目名见
+/// `database_connection_web.dart` 的 `webDatabaseName`。
 const String databaseFileName = 'lexiloop.sqlite';
 
 /// 索引与约束的 DDL。
@@ -99,20 +98,12 @@ class AppDatabase extends _$AppDatabase {
   /// 以给定的查询执行器打开数据库。
   new(super.e);
 
-  /// 打开默认路径下的数据库文件。
+  /// 打开默认位置的数据库。
   ///
-  /// 用 `LazyDatabase` 是因为应用支持目录的解析是异步的，
-  /// 而 Drift 的连接构造是同步的。
-  factory open() {
-    return AppDatabase(
-      LazyDatabase(() async {
-        final directory = await getApplicationSupportDirectory();
-        final file = File(p.join(directory.path, databaseFileName));
-        await file.parent.create(recursive: true);
-        return NativeDatabase.createInBackground(file);
-      }),
-    );
-  }
+  /// 连接本身由 `database_connection.dart` 按平台条件导入：原生端是应用支持
+  /// 目录下的 SQLite 文件（`LazyDatabase`），Web 端是 drift 的 WASM 实现
+  /// （`DatabaseConnection.delayed`）。两者都是延迟打开，因此本工厂保持同步。
+  factory open() => AppDatabase(openAppDatabaseExecutor());
 
   @override
   int get schemaVersion => 1;

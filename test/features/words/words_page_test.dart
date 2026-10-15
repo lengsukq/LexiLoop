@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
@@ -26,7 +27,10 @@ import 'package:lexiloop/features/words/widgets/word_paginator.dart';
 import 'package:lexiloop/features/words/widgets/words_header.dart';
 import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+
+import '../word_detail/word_write_test_support.dart';
 
 void main() {
   late AppDatabase db;
@@ -112,14 +116,21 @@ void main() {
     }
   }
 
-  Future<void> pumpPage(WidgetTester tester, {double width = 1400}) async {
+  Future<void> pumpPage(
+    WidgetTester tester, {
+    double width = 1400,
+    List<Override> overrides = const <Override>[],
+  }) async {
     tester.view.physicalSize = Size(width, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[databaseProvider.overrideWithValue(db)],
+        overrides: <Override>[
+          databaseProvider.overrideWithValue(db),
+          ...overrides,
+        ],
         child: MaterialApp.router(
           theme: LexiTheme.light,
           routerConfig: _testRouter(),
@@ -473,9 +484,13 @@ void main() {
       );
     });
 
-    testWidgets('朗读按钮存在且可点（音频层尚未接线）', (tester) async {
+    testWidgets('朗读按钮把请求交给 WordSpeaker', (tester) async {
       await insertWord(term: 'speakable');
-      await pumpPage(tester);
+      final speaker = RecordingSpeaker();
+      await pumpPage(
+        tester,
+        overrides: <Override>[wordSpeakerProvider.overrideWithValue(speaker)],
+      );
 
       final button = find.descendant(
         of: find.byType(WordCard),
@@ -486,8 +501,8 @@ void main() {
       await tester.tap(button);
       await tester.pumpAndSettle();
 
-      // 占位实现：不崩、不跳转，卡片仍在原处。
-      expect(find.text('speakable'), findsOneWidget);
+      expect(speaker.requests, hasLength(1));
+      expect(speaker.requests.single.term, 'speakable');
       expect(tester.takeException(), isNull);
     });
   });

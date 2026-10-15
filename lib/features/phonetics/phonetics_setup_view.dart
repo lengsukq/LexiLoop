@@ -7,8 +7,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/phonetics/catalog.dart';
 import 'package:lexiloop/features/games/widgets/game_result_panel.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';

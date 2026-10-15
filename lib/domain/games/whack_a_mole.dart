@@ -12,7 +12,7 @@
 /// [WhackAMoleState.isMoleUp] 暴露「第几只已冒头」，由界面决定怎么画。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/domain/review/question_payload.dart';

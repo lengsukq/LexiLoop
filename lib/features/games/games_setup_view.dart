@@ -2,7 +2,7 @@
 ///
 /// 对应旧版 `games/games-setup.tsx`。旧版把「配对」与「音标」也做成入口卡片
 /// 放在同一页；本版这两个功能有独立路由（`/match`、`/phonetics`），
-/// 因此这里只列 4 个游戏，并在页脚给出跳转提示（由路由层接线）。
+/// 因此这里只列 6 个游戏，并在页脚给出跳转提示（由路由层接线）。
 library;
 
 import 'package:flutter/material.dart';
@@ -13,21 +13,43 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 可开局的小游戏（配对与音标不在本页）。
+///
+/// 顺序与旧版 `GAME_MODES` 一致，方便与旧界面逐格对照。
 const List<GameMode> miniGameModes = <GameMode>[
-  GameMode.whackAMole,
   GameMode.wordBuilder,
+  GameMode.listeningPick,
+  GameMode.meaningBlitz,
+  GameMode.whackAMole,
   GameMode.wordStack,
   GameMode.wordTetris,
 ];
 
-/// 每个模式的说明文案。
+/// 每个模式的副标题（旧版 `GAME_CONFIG[mode].subtitle`）。
 String gameModeSubtitle(GameMode mode) => switch (mode) {
-  GameMode.wordBuilder => '按释义组合字母',
+  GameMode.wordBuilder => '根据释义组合字母',
+  GameMode.listeningPick => '听发音快速选词',
+  GameMode.meaningBlitz => '限时选择正确释义',
   GameMode.whackAMole => '锤出正确单词',
   GameMode.wordStack => '点词块搭高塔',
   GameMode.wordTetris => '点中下落单词',
   GameMode.match => '英文与释义配对',
   GameMode.phonetics => '听音辨音训练',
+};
+
+/// 每个模式的规则（旧版 `GAME_CONFIG[mode].rule`）。
+///
+/// 旧版把这条文案印在游戏页头的渐变卡片里；本版页头只有模式标题与进度，
+/// 因此把它放到准备页的模式卡片上，玩家选之前就能看清怎么玩。
+/// 配对与音标不在旧版 `GAME_CONFIG` 里，取旧版入口卡片的说明文案。
+String gameModeRule(GameMode mode) => switch (mode) {
+  GameMode.wordBuilder => '点击打乱的字母拼出英文词条',
+  GameMode.listeningPick => '听到发音后，从四个词中选出正确答案',
+  GameMode.meaningBlitz => '看到英文后，快速选择对应的中文释义',
+  GameMode.whackAMole => '看释义，在地鼠缩回前锤中正确单词',
+  GameMode.wordStack => '看释义，点选滚动词块堆高塔',
+  GameMode.wordTetris => '看释义，点中下落的正确单词',
+  GameMode.match => '英文与释义组队配对，连击计分',
+  GameMode.phonetics => '听音、音标与单词三向匹配',
 };
 
 /// 游戏准备页。
@@ -145,28 +167,7 @@ class _ModeCard extends StatelessWidget {
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        gameModeTitle(mode),
-                        style: TextStyle(
-                          color: colors.label,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        gameModeSubtitle(mode),
-                        style: TextStyle(
-                          color: colors.quaternaryLabel,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Expanded(child: _ModeCardText(mode: mode)),
                 if (loading)
                   const SizedBox(
                     width: 16,
@@ -178,6 +179,39 @@ class _ModeCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ModeCardText extends StatelessWidget {
+  const new({required this.mode});
+
+  final GameMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          gameModeTitle(mode),
+          style: TextStyle(
+            color: colors.label,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          gameModeSubtitle(mode),
+          style: TextStyle(color: colors.quaternaryLabel, fontSize: 12),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          gameModeRule(mode),
+          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11.5),
+        ),
+      ],
     );
   }
 }

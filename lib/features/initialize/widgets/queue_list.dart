@@ -8,9 +8,9 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_progress_card.dart';
-import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/glass.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 队列列表。

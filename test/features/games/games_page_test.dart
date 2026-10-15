@@ -49,11 +49,17 @@ void main() {
   });
 
   group('准备页', () {
-    testWidgets('渲染 4 个游戏与「开始」按钮', (tester) async {
+    testWidgets('渲染 6 个游戏（含听音辨词与词义冲刺）与「开始」按钮', (tester) async {
+      // 6 张卡片在默认的 800×600 测试窗口里放不下，列表会把靠后的卡片
+      // 留在视口外不挂载；测试需要一块够高的画布才能断言全部卡片。
+      tester.view.physicalSize = const Size(520, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await pumpGamesPage(tester);
       expect(find.text('趣味训练'), findsOneWidget);
       for (final mode in miniGameModes) {
         expect(find.text(gameModeTitle(mode)), findsOneWidget);
+        expect(find.text(gameModeRule(mode)), findsOneWidget);
       }
       expect(find.text('开始'), findsOneWidget);
       expect(find.byType(FilledButton), findsOneWidget);

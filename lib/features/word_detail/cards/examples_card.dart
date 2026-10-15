@@ -6,49 +6,36 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
-import 'package:lexiloop/data/db/dao_providers.dart';
-import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
-import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 例句卡片：句子 + 翻译 + 逐条操作（朗读 / 翻译 / 删除）。
 ///
 /// 调用方保证 [examples] 非空，否则整卡不显示。
 class ExamplesCard extends ConsumerWidget {
-  /// 以词条 ID、源语言与例句列表构造。
-  const new({
-    required this.wordId,
-    required this.sourceLanguage,
-    required this.examples,
-    super.key,
-  });
+  /// 以词条 ID 与例句列表构造。
+  const new({required this.wordId, required this.examples, super.key});
 
   /// 词条 ID；三个操作都要靠它落库或入队。
   final int wordId;
-
-  /// 词条的源语言代码；朗读时用它选音色。
-  final String sourceLanguage;
 
   /// 例句列表。
   final List<ExampleView> examples;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '例句',
       icon: Icons.format_quote_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           for (var index = 0; index < examples.length; index += 1)
-            _ExampleRow(
-              wordId: wordId,
-              index: index,
-              item: examples[index],
-              sourceLanguage: sourceLanguage,
-            ),
+            _ExampleRow(wordId: wordId, index: index, item: examples[index]),
         ],
       ),
     );
@@ -61,17 +48,11 @@ class ExamplesCard extends ConsumerWidget {
 /// `detailExamplePositions` 把它换算回 `examples_json` 的真实下标，
 /// 因此这里不需要、也不应该自己去数原始 JSON 的位置。
 class _ExampleRow extends ConsumerWidget {
-  const new({
-    required this.wordId,
-    required this.index,
-    required this.item,
-    required this.sourceLanguage,
-  });
+  const new({required this.wordId, required this.index, required this.item});
 
   final int wordId;
   final int index;
   final ExampleView item;
-  final String sourceLanguage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -135,23 +116,22 @@ class _ExampleRow extends ConsumerWidget {
   }
 
   /// 朗读例句原文。
-  Future<void> _speak(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final playback =
-        ref.read(appSettingsProvider).value?.playback ??
-        PlaybackSettings.defaults;
-    try {
-      await ref
-          .read(ttsServiceProvider)
-          .speak(
-            item.sentence,
-            languageCode: sourceLanguage,
-            rate: playback.speedFor(null),
-          );
-    } on AppError catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
-    }
-  }
+  ///
+  /// 走与词条相同的 [speakWithWordSpeaker]：例句没有音标与音频地址，
+  /// `WordSpeaker` 因此必然回落到系统朗读，但它统一了语速档位（句子档）
+  /// 与失败提示，不必在这里再抄一遍。
+  ///
+  /// **与旧版的差异**：旧版按词条的 `sourceLanguage` 选语言（`en` →
+  /// `en-US`），而 `SpeechRequest` 只按口音选语言，因此例句固定读作英语
+  /// 口音。例句本来就都是英文，实际听感与旧版一致。
+  Future<void> _speak(BuildContext context, WidgetRef ref) =>
+      speakWithWordSpeaker(
+        context: context,
+        ref: ref,
+        term: item.sentence,
+        accent: ref.read(preferredAccentProvider),
+        contentType: LexicalContentType.sentence,
+      );
 
   /// 排一个 AI 翻译任务。
   ///

@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 词形变化卡片：复数、过去式、比较级等。
 ///
@@ -17,7 +18,7 @@ class FormsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '词形变化',
       icon: Icons.swap_horiz_rounded,
       child: Column(

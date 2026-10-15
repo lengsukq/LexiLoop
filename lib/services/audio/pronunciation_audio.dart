@@ -7,9 +7,22 @@
 /// 「哪个口音该放哪一个地址」可以被单测直接钉住，界面层不再重复这套判断。
 library;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
-import 'package:lexiloop/services/audio/audio_constants.dart';
+
+/// 口音到有道 `type` 参数值的映射。
+///
+/// 与旧版 `YOUDAO_ACCENT_TYPE` 逐条对应：**英音为 1、美音为 2**，
+/// 与有道自己的口径一致（`1` 是英式发音），写反了会得到另一种口音。
+/// 存成字符串是因为它只作为查询参数出现，中间不必经过数值类型。
+///
+/// 放在这里而不是 `lib/core/constants.dart`：它以领域枚举 [Accent] 为键，
+/// 而 `lib/core` 不依赖业务层（见 `docs/ARCHITECTURE_BASELINE.md` 的分层约定）。
+const Map<Accent, String> youdaoAccentParam = <Accent, String>{
+  Accent.uk: '1',
+  Accent.us: '2',
+};
 
 /// 取出该口音下应当播放的真人录音地址；没有可用地址时返回 `null`。
 ///

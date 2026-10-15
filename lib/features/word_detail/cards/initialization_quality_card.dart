@@ -14,6 +14,7 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 初始化质量卡片（默认折叠）。
 class InitializationQualityCard extends ConsumerWidget {
@@ -66,7 +67,7 @@ class _CollapsibleState extends State<_Collapsible> {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return DetailSectionCard(
+    return SectionCard(
       title: widget.title,
       icon: widget.icon,
       child: Column(

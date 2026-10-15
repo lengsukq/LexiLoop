@@ -6,12 +6,44 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/domain/review/duration.dart';
+import 'package:lexiloop/features/study/study_clock.dart';
+import 'package:lexiloop/services/fsrs_scheduler.dart';
 import 'package:lexiloop/services/study_service.dart';
+
+/// 活跃计时器的构造工厂。
+///
+/// 用 provider 暴露工厂而不是让页面直接 `StudyClock()`：widget 测试必须注入
+/// 与 `tester.pump` 同步的假时钟（`binding.clock`），否则 `Timer` 走假时间、
+/// `DateTime.now()` 走真实时间，「45 秒空闲」这条规则根本构造不出来。
+typedef StudyClockFactory = StudyClock Function();
+
+/// 活跃计时器的构造工厂。
+final Provider<StudyClockFactory> studyClockFactoryProvider =
+    Provider<StudyClockFactory>((ref) => StudyClock.new);
+
+/// 读取某词条四档评级的间隔预览。
+typedef IntervalPreviewLoader = Future<List<FsrsIntervalPreview>> Function(
+  int wordId,
+);
+
+/// 间隔预览的读取入口。
+///
+/// 抽成 provider 是为了给「预览失败」留一个稳定的注入点：界面必须在预览
+/// 抛错时照常作答，而真实的 `ReviewService` 几乎不会在只读查询上失败。
+/// 闭包捕获服务实例而不是 `ref`，provider 被回收后它仍然可用。
+final Provider<IntervalPreviewLoader> intervalPreviewLoaderProvider =
+    Provider<IntervalPreviewLoader>((ref) {
+      final service = ref.watch(reviewServiceProvider);
+      return (wordId) => service.previewIntervals(
+        wordId,
+        now: DateTime.now().millisecondsSinceEpoch,
+      );
+    });
 
 /// 学习会话控制器。
 class StudySessionController extends AsyncNotifier<StudySessionView?> {
@@ -39,11 +71,15 @@ class StudySessionController extends AsyncNotifier<StudySessionView?> {
 
   /// 提交当前题目的作答；没有待答题目时返回 `null`。
   ///
+  /// [durationMs] 由界面层的活跃计时器给出（已经扣掉暂停与空闲）；
+  /// 为空时退回「题目展示时刻到现在」的墙钟估算。
+  ///
   /// 提交后重新读取会话（而不是本地改计数）：`resumeIndex`、正确/错误计数、
   /// 自适应追问插入的新题都由数据库决定，本地推算一定会和服务层不一致。
   Future<ReviewOutcome?> submit({
     required ReviewRating rating,
     String? userAnswer,
+    int? durationMs,
   }) async {
     final session = state.value;
     final item = session?.currentItem;
@@ -61,7 +97,9 @@ class StudySessionController extends AsyncNotifier<StudySessionView?> {
             studySessionId: session.id,
             studySessionItemId: item.itemId,
             userAnswer: userAnswer,
-            durationMs: _elapsedMs(now),
+            durationMs: boundedActiveDurationMs(
+              durationMs ?? _wallClockMs(now),
+            ),
           ),
           now: now,
         );
@@ -104,15 +142,15 @@ class StudySessionController extends AsyncNotifier<StudySessionView?> {
 
   int _now() => DateTime.now().millisecondsSinceEpoch;
 
-  /// 本题已耗费的毫秒数。
+  /// 界面层没有给出活跃时长时的墙钟兜底。
   ///
-  /// 上限复用 [maxActiveAnswerDurationMs]：应用挂起后恢复时，
-  /// 「现在 - 题目展示时刻」会变成几小时，直接入库会把平均耗时与
-  /// 掌握度一起算歪。
-  int? _elapsedMs(int now) {
+  /// 这里**只**算「现在 - 题目展示时刻」，不夹上界：夹取统一由
+  /// [boundedActiveDurationMs] 负责，两处都夹会让「到底是谁改了我的时长」
+  /// 无从追查。崩溃恢复与时钟回拨这两条路径会走到这里。
+  int? _wallClockMs(int now) {
     final shownAt = _itemShownAt;
     if (shownAt == null) return null;
-    return (now - shownAt).clamp(0, maxActiveAnswerDurationMs);
+    return now - shownAt;
   }
 
   /// 生成一次性的幂等键。

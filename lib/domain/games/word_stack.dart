@@ -14,7 +14,7 @@
 /// 因此可以用 `TickWordStack` 直接单测。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
 

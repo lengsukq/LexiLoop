@@ -12,11 +12,11 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/game_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_question.dart';

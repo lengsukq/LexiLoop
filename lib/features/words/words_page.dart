@@ -17,7 +17,8 @@ import 'package:lexiloop/features/words/widgets/word_filter_bar.dart';
 import 'package:lexiloop/features/words/widgets/word_paginator.dart';
 import 'package:lexiloop/features/words/widgets/words_header.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
+import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 
 /// 单词本页面。
 class WordsPage extends ConsumerWidget {
@@ -51,11 +52,6 @@ class WordsPage extends ConsumerWidget {
   }
 }
 
-/// 词条详情页的路径前缀。
-///
-/// 集中一处：路由表与本页都引用它，改名时不会只改一边。
-const String wordDetailPathPrefix = '/words/';
-
 /// 结果区：加载中 / 出错 / 空 / 列表。
 class _WordResults extends ConsumerWidget {
   const new({required this.words, required this.onRetry});
@@ -68,7 +64,7 @@ class _WordResults extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return words.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _ErrorView(
+      error: (error, _) => ErrorRetryView(
         message: error is AppError ? error.message : '加载词条失败：$error',
         onRetry: onRetry,
       ),
@@ -105,37 +101,6 @@ class _WordList extends StatelessWidget {
           onTap: () => context.go('$wordDetailPathPrefix${entry.id}'),
         );
       },
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  const new({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(Icons.error_outline_rounded, size: 40, color: colors.danger),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
-          ],
-        ),
-      ),
     );
   }
 }

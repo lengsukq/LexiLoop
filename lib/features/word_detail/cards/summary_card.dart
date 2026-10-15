@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 摘要卡片：简释、整句翻译、CEFR 等级、词频，以及词条标签。
 ///
@@ -20,7 +21,7 @@ class SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '摘要',
       icon: Icons.auto_awesome_rounded,
       child: Column(

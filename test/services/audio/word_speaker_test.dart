@@ -6,10 +6,10 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
-import 'package:lexiloop/services/audio/audio_constants.dart';
 import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/audio/speech_request.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';

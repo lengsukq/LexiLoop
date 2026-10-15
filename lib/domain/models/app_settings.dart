@@ -331,6 +331,7 @@ class PlaybackSettings {
     required this.phraseSpeed,
     required this.sentenceSpeed,
     required this.autoPlayPronunciation,
+    this.humanAudioEnabled = true,
   });
 
   /// 选择题揭示答案前的延迟（秒）。
@@ -350,6 +351,13 @@ class PlaybackSettings {
 
   /// 是否自动朗读发音。
   final bool autoPlayPronunciation;
+
+  /// 是否优先播放词典的真人录音（mp3）。
+  ///
+  /// 关掉它即「只用系统朗读」：真人录音依赖联网与第三方站点，站点不可用
+  /// 或用户不愿为一次点按付一次请求时，需要有一个不必改代码的开关。
+  /// 默认开启——真人录音相对系统朗读是明确的音质提升。
+  final bool humanAudioEnabled;
 
   /// 默认值。
   static const PlaybackSettings defaults = PlaybackSettings(
@@ -376,6 +384,7 @@ class PlaybackSettings {
     'phraseSpeed': phraseSpeed,
     'sentenceSpeed': sentenceSpeed,
     'autoPlayPronunciation': autoPlayPronunciation,
+    'humanAudioEnabled': humanAudioEnabled,
   };
 }
 
@@ -553,6 +562,10 @@ PlaybackSettings _parsePlayback(_SettingsReader reader) {
     autoPlayPronunciation: reader.boolValue(
       'autoPlayPronunciation',
       fallback: fallback.autoPlayPronunciation,
+    ),
+    humanAudioEnabled: reader.boolValue(
+      'humanAudioEnabled',
+      fallback: fallback.humanAudioEnabled,
     ),
   );
 }

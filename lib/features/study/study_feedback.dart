@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/features/study/study_answer_diff.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -17,11 +18,26 @@ const double _buttonHeight = 50;
 
 /// 提交后的判定反馈。
 class StudyFeedbackPanel extends StatelessWidget {
-  /// 以判定结果构造。
-  const new({required this.outcome, super.key});
+  /// 以判定结果、当前题目、用户作答与「是否用过提示」构造。
+  const new({
+    required this.outcome,
+    required this.item,
+    required this.answer,
+    required this.usedHint,
+    super.key,
+  });
 
   /// 本次作答的完整结果。
   final ReviewOutcome outcome;
+
+  /// 当前题目；答错时要拿它的词条与题型决定差异对比的形态。
+  final StudyItemView item;
+
+  /// 用户提交的答案文本。
+  final String answer;
+
+  /// 本题是否用过提示；用过就提示用户「建议选模糊」。
+  final bool usedHint;
 
   @override
   Widget build(BuildContext context) {
@@ -62,9 +78,13 @@ class StudyFeedbackPanel extends StatelessWidget {
           ),
           if (!outcome.isCorrect) ...<Widget>[
             const SizedBox(height: 10),
+            _WrongAnswerDetail(item: item, outcome: outcome, answer: answer),
+          ],
+          if (usedHint) ...<Widget>[
+            const SizedBox(height: 8),
             Text(
-              '期望答案：${outcome.expectedAnswer}',
-              style: TextStyle(color: colors.danger, fontSize: 14),
+              studyHintRevealedText,
+              style: TextStyle(color: colors.warning, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
@@ -98,6 +118,34 @@ class StudyFeedbackPanel extends StatelessWidget {
 
   String _nextReviewText(ReviewOutcome outcome) =>
       outcome.scheduledDays <= 0 ? '今天内' : '${outcome.scheduledDays} 天后';
+}
+
+/// 答错时的详情：期望答案 + 逐字/逐词差异。
+///
+/// 期望答案那行始终保留（旧版也保留）：差异对比在「完全没写」或「答对但有
+/// 容错」时不会渲染，用户至少要知道正确答案是什么。
+class _WrongAnswerDetail extends StatelessWidget {
+  const new({required this.item, required this.outcome, required this.answer});
+
+  final StudyItemView item;
+  final ReviewOutcome outcome;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '期望答案：${outcome.expectedAnswer}',
+          style: TextStyle(color: colors.danger, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        StudyAnswerDiff(item: item, outcome: outcome, answer: answer),
+      ],
+    );
+  }
 }
 
 /// 会话总结。

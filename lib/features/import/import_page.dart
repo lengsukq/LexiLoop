@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_history_section.dart';
@@ -17,6 +18,7 @@ import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 
 /// CSV 导入页。
 class ImportPage extends ConsumerWidget {
@@ -336,7 +338,7 @@ class _PreviewStep extends ConsumerWidget {
             onTap: () => notifier.setMode(mode),
           ),
         const SizedBox(height: 12),
-        _ResetProgressOption(
+        ResetProgressOption(
           value: state.resetLearningProgress,
           onChanged: (next) => notifier.setResetLearningProgress(value: next),
         ),
@@ -347,64 +349,6 @@ class _PreviewStep extends ConsumerWidget {
           onSubmit: () => _submit(context, ref),
         ),
       ],
-    );
-  }
-}
-
-/// 「重置已有词条的学习进度」勾选项。
-///
-/// 缺省关闭（见 [ImportWizardState.resetLearningProgress]），并且用危险色
-/// 描边：它是本页唯一一个会删除既有数据的开关，必须和上面的模式选择
-/// 在视觉上分开。
-class _ResetProgressOption extends StatelessWidget {
-  const new({required this.value, required this.onChanged});
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-        border: Border.all(color: colors.danger.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Checkbox(
-            key: const Key('resetLearningProgress'),
-            value: value,
-            onChanged: (next) => onChanged(next ?? false),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '重置已有词条的学习进度',
-                  style: TextStyle(
-                    color: colors.danger,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '删除复习卡、复习日志、错词状态与掌握度，并撤下正在进行的'
-                  '复习题目。词典内容不删除，但这些学习历史无法恢复。'
-                  '本次新增的词条不受影响。',
-                  style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -577,8 +521,56 @@ class _ResultCard extends StatelessWidget {
             '失败 ${result.failed}；已入队初始化 ${result.queuedInitializations} 个',
             style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
           ),
+          const SizedBox(height: 12),
+          const _ResultActions(),
         ],
       ),
+    );
+  }
+}
+
+/// 导入完成后的三个出口。
+///
+/// 对应旧版 `components/add/csv-tab.tsx` 成功卡片上的三个动作：
+/// 「查看初始化」跳 `/initialize`、「打开单词本」跳 `/words`、
+/// 「继续导入」清空向导回到第一步。没有出口时，用户导入 200 个词条后
+/// 只能自己找路。
+///
+/// **路径字面量待统一**：`/initialize` 与 `/words` 目前没有具名常量，
+/// 而 `/import` 在项目里被抄了三份（`words_providers.dart` 与
+/// `dashboard_page.dart` 各有一个 `csvImportPath`，
+/// `data_management_section.dart` 是裸字面量）。本次**不做**这项去重——
+/// 它会同时改动另外几个工作流正在改的文件；统一时应当把四条路径一起收进
+/// `app/router.dart` 的常量。
+class _ResultActions extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(importWizardProvider.notifier);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        FilledButton.icon(
+          key: const Key('importGoInitialize'),
+          onPressed: () => context.go('/initialize'),
+          icon: const Icon(Icons.playlist_play_rounded, size: 16),
+          label: const Text('查看初始化'),
+        ),
+        OutlinedButton.icon(
+          key: const Key('importGoWords'),
+          onPressed: () => context.go('/words'),
+          icon: const Icon(Icons.menu_book_rounded, size: 16),
+          label: const Text('打开单词本'),
+        ),
+        TextButton(
+          key: const Key('importRestart'),
+          onPressed: notifier.reset,
+          child: const Text('继续导入'),
+        ),
+      ],
     );
   }
 }

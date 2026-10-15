@@ -14,9 +14,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 趣味训练入口。
 class PracticeCard extends StatelessWidget {
@@ -26,7 +26,7 @@ class PracticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return DashboardCard(
+    return SectionCard(
       title: '趣味训练',
       icon: Icons.sports_esports_outlined,
       child: Column(

@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/word_detail/cards/definitions_card.dart';
 import 'package:lexiloop/features/word_detail/cards/examples_card.dart';
 import 'package:lexiloop/features/word_detail/cards/forms_card.dart';
@@ -20,6 +21,8 @@ import 'package:lexiloop/features/word_detail/cards/word_detail_header_card.dart
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/error_retry_view.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 词条详情页。
 ///
@@ -41,7 +44,7 @@ class WordDetailPage extends ConsumerWidget {
       body: SafeArea(
         child: detail.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => _LoadErrorView(
+          error: (error, _) => ErrorRetryView(
             message: '词条加载失败：$error',
             onRetry: () => ref.invalidate(wordDetailProvider(wordId)),
           ),
@@ -79,35 +82,31 @@ class _WordDetailBody extends StatelessWidget {
     if (detail.definitions.isNotEmpty)
       DefinitionsCard(wordId: detail.id, definitions: detail.definitions),
     if (detail.examples.isNotEmpty)
-      ExamplesCard(
-        wordId: detail.id,
-        sourceLanguage: detail.sourceLanguage,
-        examples: detail.examples,
-      ),
+      ExamplesCard(wordId: detail.id, examples: detail.examples),
     if (detail.phrases.isNotEmpty) PhrasesCard(phrases: detail.phrases),
     if (detail.forms.isNotEmpty) FormsCard(forms: detail.forms),
     if (detail.synonyms.isNotEmpty)
       RelatedWordsCard(
-        title: '同义词',
-        icon: Icons.sync_alt_rounded,
+        wordId: detail.id,
+        relation: RelationType.synonym,
         items: detail.synonyms,
       ),
     if (detail.antonyms.isNotEmpty)
       RelatedWordsCard(
-        title: '反义词',
-        icon: Icons.compare_arrows_rounded,
+        wordId: detail.id,
+        relation: RelationType.antonym,
         items: detail.antonyms,
       ),
     if (detail.wordFamily.isNotEmpty)
       RelatedWordsCard(
-        title: '词族',
-        icon: Icons.hub_rounded,
+        wordId: detail.id,
+        relation: RelationType.wordFamily,
         items: detail.wordFamily,
       ),
     if (detail.confusedWords.isNotEmpty)
       RelatedWordsCard(
-        title: '易混词',
-        icon: Icons.help_outline_rounded,
+        wordId: detail.id,
+        relation: RelationType.confusedWith,
         items: detail.confusedWords,
       ),
     if (detail.roots.isNotEmpty || detail.affixes.isNotEmpty)
@@ -150,7 +149,7 @@ class _NoContentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DetailSectionCard(
+    return const SectionCard(
       title: '内容',
       icon: Icons.hourglass_empty_rounded,
       child: DetailEmptyHint(text: '该词条还没有内容。它可能正在等待初始化，或数据源没有返回结果。'),
@@ -196,38 +195,6 @@ class _MissingView extends StatelessWidget {
               onPressed: () => Navigator.of(context).maybePop(),
               child: const Text('返回'),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 详情加载失败时的提示与重试。
-class _LoadErrorView extends StatelessWidget {
-  const new({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(Icons.error_outline_rounded, size: 40, color: colors.danger),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ),
       ),

@@ -9,7 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/word_stack.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 

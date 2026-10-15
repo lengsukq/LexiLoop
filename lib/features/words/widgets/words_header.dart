@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 
 /// 词库页头部。

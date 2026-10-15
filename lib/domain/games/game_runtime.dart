@@ -8,6 +8,7 @@
 /// 派发上一个游戏的动作，这类竞态不该让游戏崩掉。
 library;
 
+import 'package:lexiloop/domain/games/choice_pick.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
@@ -34,6 +35,32 @@ sealed class GameRuntime {
   ///
   /// 单词拼图的「不认识」流程**不**算在这里：它要等用户点「继续」。
   bool get awaitingAdvance;
+}
+
+/// 听音辨词与词义冲刺的运行态。
+///
+/// 两个模式共用一个运行态：它们的规则完全一致（见 `choice_pick.dart`），
+/// 题面差异由视图按 `core.plan.mode` 决定。
+final class ChoicePickRuntime extends GameRuntime {
+  /// 以状态机状态构造。
+  const new(this.state);
+
+  /// 状态机状态。
+  final ChoicePickState state;
+
+  @override
+  GameCoreState get core => state.core;
+
+  @override
+  GameQuestion? get current => state.current;
+
+  @override
+  GameRuntime? dispatch(Object action) => action is ChoicePickAction
+      ? ChoicePickRuntime(choicePickNext(state, action))
+      : null;
+
+  @override
+  bool get awaitingAdvance => state.solved;
 }
 
 /// 词汇地鼠的运行态。
@@ -135,27 +162,41 @@ final class WordTetrisRuntime extends GameRuntime {
 }
 
 /// 该模式对应的「开始」动作。
+///
+/// 分支全部显式列出（不用 `_` 兜底）：新增模式时这几处必须一起改，
+/// 编译器会指出漏掉的分支。配对与音标有各自的运行态
+/// （`matching.dart` / `domain/phonetics/quiz.dart`），不会走到这里，
+/// 这里给单词拼图作为类型上安全的兜底。
 Object startActionFor(GameMode mode) => switch (mode) {
+  GameMode.listeningPick || GameMode.meaningBlitz => const StartChoicePick(),
   GameMode.whackAMole => const StartWhackAMole(),
   GameMode.wordStack => const StartWordStack(),
   GameMode.wordTetris => const StartWordTetris(),
-  _ => const StartWordBuilder(),
+  GameMode.wordBuilder ||
+  GameMode.match ||
+  GameMode.phonetics => const StartWordBuilder(),
 };
 
 /// 该模式对应的「时间前进」动作。
 Object tickActionFor(GameMode mode, int deltaMs) => switch (mode) {
+  GameMode.listeningPick || GameMode.meaningBlitz => TickChoicePick(deltaMs),
   GameMode.whackAMole => TickWhackAMole(deltaMs),
   GameMode.wordStack => TickWordStack(deltaMs),
   GameMode.wordTetris => TickWordTetris(deltaMs),
-  _ => TickWordBuilder(deltaMs),
+  GameMode.wordBuilder ||
+  GameMode.match ||
+  GameMode.phonetics => TickWordBuilder(deltaMs),
 };
 
 /// 该模式对应的「进入下一题」动作。
 Object advanceActionFor(GameMode mode) => switch (mode) {
+  GameMode.listeningPick || GameMode.meaningBlitz => const AdvanceChoicePick(),
   GameMode.whackAMole => const AdvanceWhackAMole(),
   GameMode.wordStack => const AdvanceWordStack(),
   GameMode.wordTetris => const AdvanceWordTetris(),
-  _ => const AdvanceWordBuilder(),
+  GameMode.wordBuilder ||
+  GameMode.match ||
+  GameMode.phonetics => const AdvanceWordBuilder(),
 };
 
 /// 按模式建一局运行态并立即开始计时。
@@ -183,6 +224,9 @@ GameRuntime _createRuntime({
   required double Function() random,
 }) {
   return switch (mode) {
+    GameMode.listeningPick || GameMode.meaningBlitz => ChoicePickRuntime(
+      startChoicePick(plan: plan, questions: questions),
+    ),
     GameMode.whackAMole => WhackAMoleRuntime(
       startWhackAMole(plan: plan, questions: questions, random: random),
     ),
@@ -192,6 +236,7 @@ GameRuntime _createRuntime({
     GameMode.wordTetris => WordTetrisRuntime(
       startWordTetris(plan: plan, questions: questions, random: random),
     ),
-    _ => WordBuilderRuntime(startWordBuilder(plan: plan, questions: questions)),
+    GameMode.wordBuilder || GameMode.match || GameMode.phonetics =>
+      WordBuilderRuntime(startWordBuilder(plan: plan, questions: questions)),
   };
 }

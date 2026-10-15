@@ -6,8 +6,8 @@
 /// 「新内容该覆盖还是只补空缺」，以及「哪些数据源值得调用」。
 library;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/merge_content.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/data/dictionary/providers/merriam_webster.dart';

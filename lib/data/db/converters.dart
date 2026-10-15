@@ -34,22 +34,3 @@ class WireEnumConverter<T extends WireEnum> extends TypeConverter<T, String> {
   @override
   String toSql(T value) => value.wire;
 }
-
-/// 可空版本的 [WireEnumConverter]。
-class NullableWireEnumConverter<T extends WireEnum>
-    extends TypeConverter<T?, String?> {
-  /// 以该枚举的全部取值构造。
-  const new(this.values);
-
-  /// 该枚举的全部取值，用于反查。
-  final List<T> values;
-
-  @override
-  T? fromSql(String? fromDb) {
-    if (fromDb == null) return null;
-    return wireLookup(values, fromDb);
-  }
-
-  @override
-  String? toSql(T? value) => value?.wire;
-}

@@ -3,12 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 
 /// 总词数的 Key，供测试定位。
@@ -26,7 +27,7 @@ class StatisticsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(dashboardOverviewProvider);
-    return DashboardCard(
+    return SectionCard(
       title: '学习统计',
       icon: Icons.bar_chart_rounded,
       child: overview.when(

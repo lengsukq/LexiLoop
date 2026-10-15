@@ -1,22 +1,24 @@
 /// 应用入口。
 ///
 /// 桌面端（macOS）需要先初始化 `window_manager` 设定窗口尺寸，
-/// 因为侧边栏布局依赖足够的窗口宽度；Android 跳过这一步。
+/// 因为侧边栏布局依赖足够的窗口宽度；Android 与 Web 跳过这一步。
+///
+/// **窗口配置为什么走 `app/desktop_window.dart`**：`window_manager` 在 Web 上
+/// 编译不过，必须由条件导入隔离，调用点因此不能再直接 import 它。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/app.dart';
+import 'package:lexiloop/app/desktop_window.dart';
 import 'package:lexiloop/app/maintenance_bootstrap.dart';
-import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
-import 'package:window_manager/window_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (PlatformCaps.isDesktop) {
-    await _configureDesktopWindow();
+    await configureDesktopWindow();
   }
 
   // ProviderScope 必须包在根部：数据库实例等依赖由它持有与释放。
@@ -25,24 +27,4 @@ Future<void> main() async {
   runApp(
     const ProviderScope(child: MaintenanceBootstrap(child: LexiLoopApp())),
   );
-}
-
-/// 设定 macOS 窗口的初始尺寸与最小尺寸。
-///
-/// 最小宽度设得比侧边栏断点小，让用户仍可把窗口缩到「底部 Tab」形态；
-/// 但默认打开时给足宽度，呈现旧版那套侧边栏设计。
-Future<void> _configureDesktopWindow() async {
-  await windowManager.ensureInitialized();
-
-  const options = WindowOptions(
-    size: Size(defaultWindowWidth, defaultWindowHeight),
-    minimumSize: Size(minWindowWidth, minWindowHeight),
-    center: true,
-    title: 'LexiLoop 词环',
-  );
-
-  await windowManager.waitUntilReadyToShow(options, () async {
-    await windowManager.show();
-    await windowManager.focus();
-  });
 }

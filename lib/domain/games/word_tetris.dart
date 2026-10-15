@@ -15,7 +15,7 @@
 /// 堆叠层用静态条块表示，不做 `tetris-stack-in` 的入场动画。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/domain/review/question_payload.dart';

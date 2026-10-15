@@ -10,7 +10,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/features/settings/ai/bounded_number_field.dart';
 import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';

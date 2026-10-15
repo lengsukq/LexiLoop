@@ -16,12 +16,20 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
 
 /// 一天的复习统计。
+///
+/// 字段口径逐条对应旧版 `modules/statistics/service.ts` 的 `getStatistics(days)`
+/// 里那条 `daily` 记录。**注意 `skipped` 与 `reviewed` 来自两张不同的表**：
+/// 前者是学习会话自身的 `skipped_count` 字段，后者是 `review_logs` 的条数——
+/// 旧版就是这么算的，不要改成「逐条数 `study_session_items`」。
 class DailyReviewStat {
   /// 以各字段构造。
   const new({
     required this.dateKey,
     required this.reviewed,
     required this.correct,
+    required this.again,
+    required this.skipped,
+    required this.sessions,
     required this.durationMs,
     required this.newWords,
   });
@@ -35,6 +43,18 @@ class DailyReviewStat {
   /// 当天答对次数。
   final int correct;
 
+  /// 当天评级为 `AGAIN`（完全忘记）的作答次数。
+  final int again;
+
+  /// 当天「已完成会话」的 `skipped_count` 之和。
+  ///
+  /// 只统计 `completed_count > 0` 的会话——旧版把一条题都没做的空会话整条跳过，
+  /// 它的 `skipped_count` 也就不该出现。
+  final int skipped;
+
+  /// 当天 `completed_count > 0` 的学习会话条数。
+  final int sessions;
+
   /// 当天有效学习时长（毫秒）。
   final int durationMs;
 
@@ -42,6 +62,11 @@ class DailyReviewStat {
   final int newWords;
 
   /// 当天正确率（0–1）；无作答时为 0。
+  ///
+  /// **旧版的 `accuracy` 在无作答时是 `null`，这里压成了 0**：界面上要区分
+  /// 「没作答」与「全错」时必须再判一次 [reviewed]（见
+  /// `features/statistics/widgets/recent_daily_detail_card.dart` 的 `accuracyText`），
+  /// 不能直接显示 0%。
   double get accuracy => reviewed == 0 ? 0 : correct / reviewed;
 }
 
@@ -105,6 +130,21 @@ class QuestionTypeAccuracy {
   double get accuracy => attempts == 0 ? 0 : correct / attempts;
 }
 
+/// 一天里「已完成会话」的聚合。
+///
+/// 单独一个类型而不是两个平行的 `Map<String, int>`：条数与跳过数来自同一条
+/// SQL 的同一行，拆成两张表迟早会有一处忘了同步。
+class _DailySessionStat {
+  /// 以各字段构造。
+  const new({required this.sessions, required this.skipped});
+
+  /// 当天 `completed_count > 0` 的会话条数。
+  final int sessions;
+
+  /// 当天这些会话的 `skipped_count` 之和。
+  final int skipped;
+}
+
 /// 统计查询入口。
 class StatisticsDao {
   /// 以数据库构造。
@@ -113,57 +153,30 @@ class StatisticsDao {
   final AppDatabase _db;
 
   /// 最近 [days] 天的逐日复习统计（按日期升序，缺失的日子补 0）。
+  ///
+  /// 口径与旧版 `modules/statistics/service.ts` 的 `getStatistics(days)` 一致：
+  /// - 复习类字段来自 `review_logs`：`reviewed` / `correct` / `again` /
+  ///   `durationMs`（单题时长按 [maxActiveAnswerDurationMs] 夹取）；
+  /// - 会话类字段来自 `study_sessions`：`sessions` 只数 `completed_count > 0`
+  ///   的会话，`skipped` 取这些会话的 `skipped_count` 之和；
+  /// - `newWords` 是当天「首次接触」的词条数。
   Future<List<DailyReviewStat>> dailyTrend({
     required int now,
     int days = defaultTrendDays,
   }) async {
     final from = startOfLocalDay(now - (days - 1) * dayMs);
-    final rows = await _db
-        .customSelect(
-          '''
-SELECT date(reviewed_at / 1000, 'unixepoch', 'localtime') AS day,
-       count(*) AS reviewed,
-       COALESCE(SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END), 0) AS correct,
-       COALESCE(SUM(
-         CASE WHEN duration_ms IS NULL OR duration_ms <= 0 THEN 0
-              WHEN duration_ms > ? THEN ?
-              ELSE duration_ms END
-       ), 0) AS duration_ms
-FROM review_logs
-WHERE reviewed_at >= ?
-GROUP BY day
-ORDER BY day ASC''',
-          variables: <Variable<Object>>[
-            const Variable<int>(maxActiveAnswerDurationMs),
-            const Variable<int>(maxActiveAnswerDurationMs),
-            Variable<int>(from),
-          ],
-        )
-        .get();
-
-    final byDay = <String, DailyReviewStat>{};
-    for (final row in rows) {
-      final key = row.read<String>('day');
-      byDay[key] = DailyReviewStat(
-        dateKey: key,
-        reviewed: row.read<int>('reviewed'),
-        correct: row.read<int>('correct'),
-        durationMs: row.read<int>('duration_ms'),
-        newWords: 0,
-      );
-    }
-
+    final byDay = await _reviewStatsByDay(from);
+    final sessionsByDay = await _sessionStatsByDay(from);
     final newWordsByDay = await _newWordsByDay(from);
+
     final result = <DailyReviewStat>[];
     for (var offset = days - 1; offset >= 0; offset -= 1) {
       final key = dateKey(now - offset * dayMs);
-      final stat = byDay[key];
       result.add(
-        DailyReviewStat(
-          dateKey: key,
-          reviewed: stat?.reviewed ?? 0,
-          correct: stat?.correct ?? 0,
-          durationMs: stat?.durationMs ?? 0,
+        _mergeDay(
+          key: key,
+          review: byDay[key],
+          session: sessionsByDay[key],
           newWords: newWordsByDay[key] ?? 0,
         ),
       );
@@ -286,6 +299,101 @@ ORDER BY attempts DESC''').get();
     }
     return result;
   }
+
+  /// 每个日期键上的复习聚合。
+  ///
+  /// 会话相关字段（`skipped` / `sessions`）在这里恒为 0，由 [_mergeDay]
+  /// 用 [_sessionStatsByDay] 的结果补齐。
+  Future<Map<String, DailyReviewStat>> _reviewStatsByDay(int from) async {
+    final rows = await _db
+        .customSelect(
+          '''
+SELECT date(reviewed_at / 1000, 'unixepoch', 'localtime') AS day,
+       count(*) AS reviewed,
+       COALESCE(SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END), 0) AS correct,
+       COALESCE(SUM(CASE WHEN rating = ? THEN 1 ELSE 0 END), 0) AS again,
+       COALESCE(SUM(
+         CASE WHEN duration_ms IS NULL OR duration_ms <= 0 THEN 0
+              WHEN duration_ms > ? THEN ?
+              ELSE duration_ms END
+       ), 0) AS duration_ms
+FROM review_logs
+WHERE reviewed_at >= ?
+GROUP BY day
+ORDER BY day ASC''',
+          variables: <Variable<Object>>[
+            Variable<String>(ReviewRating.again.wire),
+            const Variable<int>(maxActiveAnswerDurationMs),
+            const Variable<int>(maxActiveAnswerDurationMs),
+            Variable<int>(from),
+          ],
+        )
+        .get();
+
+    return <String, DailyReviewStat>{
+      for (final row in rows)
+        row.read<String>('day'): DailyReviewStat(
+          dateKey: row.read<String>('day'),
+          reviewed: row.read<int>('reviewed'),
+          correct: row.read<int>('correct'),
+          again: row.read<int>('again'),
+          skipped: 0,
+          sessions: 0,
+          durationMs: row.read<int>('duration_ms'),
+          newWords: 0,
+        ),
+    };
+  }
+
+  /// 每个日期键上「已完成会话」的条数与跳过数。
+  ///
+  /// **一次查完窗口内的全部会话再在 Dart 里按日期归并**，而不是逐日查一次：
+  /// 365 天档位下逐日查就是 365 条 SQL。
+  ///
+  /// `completed_count > 0` 这个条件不能省：旧版把「一条题都没做」的空会话
+  /// 整条跳过（既不计数也不计跳过），否则用户在统计页会看到一堆空会话。
+  Future<Map<String, _DailySessionStat>> _sessionStatsByDay(int from) async {
+    final rows = await _db
+        .customSelect(
+          '''
+SELECT date(started_at / 1000, 'unixepoch', 'localtime') AS day,
+       count(*) AS sessions,
+       COALESCE(SUM(skipped_count), 0) AS skipped
+FROM study_sessions
+WHERE started_at >= ? AND completed_count > 0
+GROUP BY day
+ORDER BY day ASC''',
+          variables: <Variable<Object>>[Variable<int>(from)],
+        )
+        .get();
+    return <String, _DailySessionStat>{
+      for (final row in rows)
+        row.read<String>('day'): _DailySessionStat(
+          sessions: row.read<int>('sessions'),
+          skipped: row.read<int>('skipped'),
+        ),
+    };
+  }
+
+  /// 把两次查询的结果按同一个日期键合成一条逐日统计。
+  ///
+  /// **某天只有会话、没有复习记录时也必须产出这一天**，否则「跳过 3 道题」
+  /// 会凭空消失——旧版是按补齐后的日期键去查 Map，天然有这个性质。
+  DailyReviewStat _mergeDay({
+    required String key,
+    required DailyReviewStat? review,
+    required _DailySessionStat? session,
+    required int newWords,
+  }) => DailyReviewStat(
+    dateKey: key,
+    reviewed: review?.reviewed ?? 0,
+    correct: review?.correct ?? 0,
+    again: review?.again ?? 0,
+    skipped: session?.skipped ?? 0,
+    sessions: session?.sessions ?? 0,
+    durationMs: review?.durationMs ?? 0,
+    newWords: newWords,
+  );
 
   /// 每个日期键上「首次出现」的词条数。
   Future<Map<String, int>> _newWordsByDay(int from) async {

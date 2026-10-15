@@ -3,10 +3,15 @@
 /// 对应旧版 `components/game-result.tsx`（Hero / Stats / Accuracy）、
 /// `components/leaderboard-panel.tsx`（高分榜）与各 `*-result.tsx` 的拼装。
 /// 三个业务线的结算页只差文案与按钮，因此做成一个组件 + 一份文案对象。
+///
+/// 错词列表对应旧版 `components/game-summary.tsx` 的 `SummaryRow`：
+/// 行内先给出词条与释义，点开还有「看词条详情」的入口。旧版点开的是
+/// 助记弹窗（`word-mnemonic-sheet.tsx`，含 AI 生成内容），那部分不在本次范围。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/game_dao.dart';
+import 'package:lexiloop/domain/games/game_mistake.dart';
 import 'package:lexiloop/domain/games/scoring.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/glass.dart';
@@ -43,7 +48,8 @@ class GameResultPanel extends StatelessWidget {
     required this.result,
     required this.onReplay,
     required this.onExit,
-    this.mistakes = const <String>[],
+    this.mistakes = const <GameMistake>[],
+    this.onOpenWord,
     super.key,
   });
 
@@ -59,8 +65,11 @@ class GameResultPanel extends StatelessWidget {
   /// 退出回调。
   final VoidCallback onExit;
 
-  /// 本轮失误的词条（`词条 · 释义`），为空时不展示。
-  final List<String> mistakes;
+  /// 本轮失误的词条，为空时不展示。
+  final List<GameMistake> mistakes;
+
+  /// 打开词条详情（跳到 `/words/:id`）；为空时不给入口。
+  final ValueChanged<int>? onOpenWord;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +83,7 @@ class GameResultPanel extends StatelessWidget {
         _Accuracy(accuracy: summary.accuracy),
         if (mistakes.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
-          _MistakeList(mistakes: mistakes),
+          _MistakeList(mistakes: mistakes, onOpenWord: onOpenWord),
         ],
         const SizedBox(height: 14),
         _Leaderboard(leaderboard: result.leaderboard),
@@ -263,10 +272,24 @@ class _Accuracy extends StatelessWidget {
   }
 }
 
-class _MistakeList extends StatelessWidget {
-  const new({required this.mistakes});
+/// 错词列表：每行先给出词条与释义，点开还有「看词条详情」。
+///
+/// 用 StatefulWidget 记住展开的那一行（同时只展开一行）：错词可能有十几个，
+/// 全部展开会把排行榜挤出屏幕；一次只看一个词条的完整释义更接近旧版
+/// 助记弹窗「一次一个词」的节奏。
+class _MistakeList extends StatefulWidget {
+  const new({required this.mistakes, required this.onOpenWord});
 
-  final List<String> mistakes;
+  final List<GameMistake> mistakes;
+  final ValueChanged<int>? onOpenWord;
+
+  @override
+  State<_MistakeList> createState() => _MistakeListState();
+}
+
+class _MistakeListState extends State<_MistakeList> {
+  /// 当前展开的词条 ID；为空表示全部折叠。
+  int? _expandedWordId;
 
   @override
   Widget build(BuildContext context) {
@@ -279,25 +302,98 @@ class _MistakeList extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '本轮失误 ${mistakes.length} 个 · 已记入错词，后续会优先出现',
+            '本轮失误 ${widget.mistakes.length} 个 · 已记入错词，后续会优先出现',
             style: TextStyle(
               color: colors.warningDeep,
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
-          for (final item in mistakes)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                item,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
-              ),
+          const SizedBox(height: 4),
+          for (final mistake in widget.mistakes)
+            _MistakeRow(
+              mistake: mistake,
+              expanded: _expandedWordId == mistake.wordId,
+              onToggle: () => setState(() {
+                _expandedWordId = _expandedWordId == mistake.wordId
+                    ? null
+                    : mistake.wordId;
+              }),
+              onOpenWord: widget.onOpenWord,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 一行错词。
+class _MistakeRow extends StatelessWidget {
+  const new({
+    required this.mistake,
+    required this.expanded,
+    required this.onToggle,
+    required this.onOpenWord,
+  });
+
+  final GameMistake mistake;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final ValueChanged<int>? onOpenWord;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      mistake.term,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.label,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 18,
+                    color: colors.tertiaryLabel,
+                  ),
+                ],
+              ),
+              Text(
+                mistake.definition,
+                maxLines: expanded ? null : 2,
+                overflow: expanded ? null : TextOverflow.ellipsis,
+                style: TextStyle(color: colors.secondaryLabel, fontSize: 12),
+              ),
+              if (expanded && onOpenWord != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => onOpenWord!(mistake.wordId),
+                    child: const Text('看词条详情'),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

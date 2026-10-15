@@ -16,7 +16,6 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
 import 'package:lexiloop/data/dictionary/content_normalize.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/dictionary/selection.dart';

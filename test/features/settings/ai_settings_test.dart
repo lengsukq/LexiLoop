@@ -17,7 +17,6 @@ import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/features/settings/settings_page.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';

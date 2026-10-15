@@ -20,8 +20,8 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/date_key.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/database.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
+import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
@@ -819,7 +819,7 @@ class SuggestionService {
       risks: _strings(content['risks']),
       actions: _strings(content['actions']),
       recommendedItems: <RecommendedStudyItem>[
-        for (final item in _decodeList(
+        for (final item in decodeJsonList(
           row.read<String?>('recommended_items_json'),
         ))
           ?RecommendedStudyItem.fromJson(item),
@@ -1501,15 +1501,4 @@ Map<String, Object?> _decodeMap(String? raw) {
     return <String, Object?>{};
   }
   return <String, Object?>{};
-}
-
-List<Object?> _decodeList(String? raw) {
-  if (raw == null || raw.isEmpty) return <Object?>[];
-  try {
-    final decoded = jsonDecode(raw);
-    if (decoded is List) return decoded;
-  } on FormatException {
-    return <Object?>[];
-  }
-  return <Object?>[];
 }

@@ -19,6 +19,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
 void main() {

@@ -1,61 +1,12 @@
 /// 仪表盘共用的小组件。
 ///
-/// 与详情页的 `DetailSectionCard` 是同类底板；两者各自保留一份以免
-/// feature 之间互相依赖，待 `lib/ui/widgets/` 开放编辑后应合并过去。
+/// 卡片底板本身是共享的 `SectionCard`（`lib/ui/widgets/section_card.dart`）；
+/// 这里只留仪表盘特有的加载/失败/统计行——它们的文案与结构与其他页确实
+/// 不同，强行统一只会把差异塞进参数里。
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
-
-/// 仪表盘卡片底板：玻璃面板 + 标题行 + 内容。
-class DashboardCard extends StatelessWidget {
-  /// 以标题与内容构造。
-  const new({required this.title, required this.child, this.icon, super.key});
-
-  /// 卡片标题。
-  final String title;
-
-  /// 标题左侧图标。
-  final IconData? icon;
-
-  /// 卡片内容。
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      showSpecular: true,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              if (icon != null) ...<Widget>[
-                Icon(icon, size: 16, color: colors.accent),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                title,
-                style: TextStyle(
-                  color: colors.label,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
 
 /// 卡片内的加载占位。
 class DashboardLoading extends StatelessWidget {

@@ -7,7 +7,7 @@
 /// 而且下游「字段是否完备」的判定会全部失效。
 library;
 
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 

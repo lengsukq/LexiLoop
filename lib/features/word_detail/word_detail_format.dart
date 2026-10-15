@@ -8,6 +8,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/domain/models/word_content_models.dart';
 
 /// 内容类型的中文名。
 String contentTypeLabel(LexicalContentType type) => switch (type) {
@@ -145,5 +146,17 @@ PronunciationView? preferredPronunciation(
   }
   return items.first;
 }
+
+/// 关联词关系的中文名。
+///
+/// 与旧版 `related-word-dialog.tsx` 的 `relationLabel` 逐字一致：
+/// `WORD_FAMILY` 写成「同根词 / 词族」而不是只写「词族」——详情页上
+/// 词根词缀的卡片叫「构词」，只写「词族」会让用户以为那是同一类东西。
+String relationLabel(RelationType relation) => switch (relation) {
+  RelationType.synonym => '近义词',
+  RelationType.antonym => '反义词',
+  RelationType.wordFamily => '同根词 / 词族',
+  RelationType.confusedWith => '易混词',
+};
 
 String _pad(int value) => value.toString().padLeft(2, '0');

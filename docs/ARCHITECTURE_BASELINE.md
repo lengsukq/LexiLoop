@@ -1,5 +1,15 @@
 # LexiLoop 开发与架构文档
 
+> ⚠️ **本文档描述的是旧版 Next.js 实现（`main` 分支，`src/` 目录），不是当前代码。**
+> 当前实现是纯 Flutter 客户端（`flutter` 分支，`lib/` 目录），
+> 见 [`FLUTTER_MIGRATION_STATUS.md`](FLUTTER_MIGRATION_STATUS.md) 与
+> [`FLUTTER_PARITY.md`](FLUTTER_PARITY.md)。
+> 保留本文档是因为它是迁移的**对照基准**：`lib/core/constants.dart`、
+> `lib/core/errors.dart` 与各服务的注释大量引用它的分层与模块边界来
+> 说明「为什么这样写」。文中的 PostgreSQL、Next.js、服务端 API、
+> 密码登录等都不存在于当前实现。
+
+
 ## 1. 定位
 
 LexiLoop（词环）是单用户、自托管的 Next.js 词汇学习应用。核心原则：只初始化 CSV 中实际导入的词条；PostgreSQL 是唯一业务数据源；无需账号、多用户和云端数据库。

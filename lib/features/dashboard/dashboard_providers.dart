@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
+import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
@@ -22,6 +23,18 @@ final FutureProvider<DailyStudyPlan> dailyPlanProvider =
       (ref) => ref
           .watch(studyServiceProvider)
           .dailyPlan(now: ref.watch(dashboardNowProvider)),
+    );
+
+/// 最近一条可恢复会话（跨模式），供「继续上次学习」卡片使用。
+///
+/// 与 [dailyPlanProvider] 一样只依赖提供者与 [dashboardNowProvider]：
+/// 两者共用同一个「现在」，否则跨过 `sessionResumeTtlMs` 边界的那一帧会出现
+/// 「今日计划里还留着它、卡片里已经没有」的矛盾。
+final FutureProvider<ResumableSession?> resumableSessionProvider =
+    FutureProvider<ResumableSession?>(
+      (ref) => ref
+          .watch(studyDaoProvider)
+          .findLatestResumableSession(ref.watch(dashboardNowProvider)),
     );
 
 /// 全局概览（总词数、掌握分布、到期、错词、今日已答、连续天数、新词、

@@ -18,6 +18,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 import 'package:lexiloop/data/db/dao_providers.dart';
+import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
@@ -35,6 +36,10 @@ import 'package:lexiloop/services/settings_service.dart';
 ///   「用户在筛选什么」，恢复后继续沿用反而更自然。
 final List<ProviderOrFamily> dataBackedProviders = <ProviderOrFamily>[
   appSettingsProvider,
+  // 文章导入服务：它缓存了按当前词库判定的预览（KNOWN/CANDIDATE 与出处句），
+  // 换了一份词库之后这些判定就是过期快照；失效它会连带丢掉预览令牌，
+  // 于是「提交」会明确报「预览已过期」而不是照旧数据建词条。
+  articleImportServiceProvider,
   importHistoryProvider,
   importBatchRowsProvider,
   wordListProvider,
@@ -42,6 +47,7 @@ final List<ProviderOrFamily> dataBackedProviders = <ProviderOrFamily>[
   masterySummaryProvider,
   dashboardOverviewProvider,
   dashboardNowProvider,
+  resumableSessionProvider,
   dailySuggestionProvider,
   dailyPlanProvider,
   statisticsOverviewProvider,

@@ -155,44 +155,6 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// 空态：题库不足或功能不可用时的中文提示。
-class GameEmptyView extends StatelessWidget {
-  /// 以提示与图标构造。
-  const new({
-    required this.message,
-    this.icon = Icons.inbox_rounded,
-    super.key,
-  });
-
-  /// 提示文案。
-  final String message;
-
-  /// 图标。
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, size: 40, color: colors.tertiaryLabel),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.secondaryLabel, fontSize: 13.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 错误态：带重试按钮的中文提示。
 class GameErrorView extends StatelessWidget {
   /// 以提示与重试回调构造。
@@ -229,65 +191,11 @@ class GameErrorView extends StatelessWidget {
   }
 }
 
-/// 题干卡片：中文释义（小游戏）或音标/单词（音标训练）。
-class GamePromptCard extends StatelessWidget {
-  /// 以题干与提示构造。
-  const new({
-    required this.hint,
-    required this.prompt,
-    this.promptStyle,
-    this.footer,
-    super.key,
-  });
-
-  /// 顶部提示（说明这一题要做什么）。
-  final String hint;
-
-  /// 题干主体。
-  final String prompt;
-
-  /// 题干样式（音标训练用等宽大字号）。
-  final TextStyle? promptStyle;
-
-  /// 题干下方的附加内容（朗读按钮、释义等）。
-  final Widget? footer;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Column(
-      children: <Widget>[
-        Text(
-          hint,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: colors.quaternaryLabel,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          prompt,
-          textAlign: TextAlign.center,
-          style:
-              promptStyle ??
-              TextStyle(
-                color: colors.label,
-                fontSize: 22,
-                height: 1.4,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        if (footer != null) ...<Widget>[const SizedBox(height: 12), footer!],
-      ],
-    );
-  }
-}
-
 /// 模式标题。
 String gameModeTitle(GameMode mode) => switch (mode) {
   GameMode.wordBuilder => '单词拼图',
+  GameMode.listeningPick => '听音辨词',
+  GameMode.meaningBlitz => '词义冲刺',
   GameMode.whackAMole => '词汇地鼠',
   GameMode.wordStack => '单词堆堆乐',
   GameMode.wordTetris => '词汇俄罗斯方块',

@@ -2,11 +2,11 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/backup_service.dart';
 
@@ -15,9 +15,6 @@ import 'package:lexiloop/services/backup_service.dart';
 /// 与 `appDestinations` 里的 `/add` 对应；集中具名是为了让「入口按钮」
 /// 与「路由断言」写的是同一个字符串。
 const String addWordPath = '/add';
-
-/// CSV 导入页的路径（与 `app/router.dart` 的顶层路由同名）。
-const String csvImportPath = '/import';
 
 /// 统计页的路径。
 const String statisticsPath = '/statistics';

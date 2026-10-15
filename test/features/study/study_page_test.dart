@@ -13,17 +13,24 @@ library;
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
+import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/tts_service.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+
+import '../../services/audio/audio_fakes.dart';
 
 /// 记录朗读文本的假引擎。
 class RecordingSpeechEngine implements SpeechEngine {
@@ -46,11 +53,28 @@ class RecordingSpeechEngine implements SpeechEngine {
   Future<bool> isLanguageAvailable(String language) async => true;
 }
 
+/// 读取富文本某一行的纯文本。
+String _plainText(WidgetTester tester, Key key) =>
+    tester.widget<Text>(find.byKey(key)).textSpan!.toPlainText();
+
+/// 读取富文本某一行里被标为差异（带下划线）的片段。
+List<String> _diffParts(WidgetTester tester, Key key) {
+  final span = tester.widget<Text>(find.byKey(key)).textSpan! as TextSpan;
+  return <String>[
+    for (final child in span.children!.whereType<TextSpan>())
+      if (child.style?.decoration == TextDecoration.underline) child.text!,
+  ];
+}
+
 void main() {
   late AppDatabase db;
+  late FakeAudioPlayer audioPlayer;
+  late FakeAudioDownloader audioDownloader;
 
   setUp(() {
     db = AppDatabase(NativeDatabase.memory());
+    audioPlayer = FakeAudioPlayer();
+    audioDownloader = FakeAudioDownloader()..openGate();
   });
 
   tearDown(() => db.close());
@@ -62,6 +86,7 @@ void main() {
     required String term,
     required String meaning,
     String examplesJson = '[]',
+    String? pronunciationsJson,
   }) async {
     final stamp = nowMs();
     final id = await db
@@ -89,10 +114,38 @@ void main() {
               '[{"language":"zh","text":"$meaning"}]',
             ),
             examplesJson: Value<String>(examplesJson),
+            pronunciationsJson: Value<String>(pronunciationsJson ?? '[]'),
             updatedAt: stamp,
           ),
         );
     return id;
+  }
+
+  /// 一条带美音真人录音的发音 JSON。
+  String pronunciationJson(String audioUrl) =>
+      '[{"accent":"US","phonetic":"test",'
+      '"audioUrl":"$audioUrl","source":"youdao"}]';
+
+  /// 往会话里追加一道题。
+  Future<void> addSessionItem({
+    required int sessionId,
+    required double position,
+    required int wordId,
+    required QuestionType questionType,
+  }) async {
+    final stamp = nowMs();
+    await db
+        .into(db.studySessionItems)
+        .insert(
+          StudySessionItemsCompanion.insert(
+            studySessionId: sessionId,
+            position: position,
+            wordId: wordId,
+            taskType: StudyTaskType.review,
+            questionType: questionType,
+            createdAt: stamp,
+          ),
+        );
   }
 
   /// 建一条含单道题目的「今日」会话，返回会话 ID。
@@ -114,18 +167,12 @@ void main() {
             createdAt: stamp,
           ),
         );
-    await db
-        .into(db.studySessionItems)
-        .insert(
-          StudySessionItemsCompanion.insert(
-            studySessionId: sessionId,
-            position: 0,
-            wordId: wordId,
-            taskType: StudyTaskType.review,
-            questionType: questionType,
-            createdAt: stamp,
-          ),
-        );
+    await addSessionItem(
+      sessionId: sessionId,
+      position: 0,
+      wordId: wordId,
+      questionType: questionType,
+    );
     return sessionId;
   }
 
@@ -133,20 +180,38 @@ void main() {
   ///
   /// 画布刻意设得又窄又高：默认 800×600 装不下「题干 + 作答 + 自评 +
   /// 反馈」，而 `ListView` 不会挂载视口外的子组件，finder 会找不到它们。
+  ///
+  /// 三个覆盖是硬要求：
+  /// - `audioPlayerPortProvider`：`just_audio` 是平台通道插件，测试进程里不可用；
+  /// - `audioDownloaderProvider`：假下载器，**不发真实网络请求**；
+  /// - `studyClockFactoryProvider`：活跃计时器的 `Timer` 走假时间，
+  ///   不注入 `binding.clock` 就会与 `DateTime.now()` 各走一套时间。
   Future<ProviderContainer> pumpStudy(
     WidgetTester tester, {
     StudyMode mode = StudyMode.daily,
     SpeechEngine? speechEngine,
+    IntervalPreviewLoader? intervalPreviewLoader,
   }) async {
-    tester.view.physicalSize = const Size(520, 1500);
+    tester.view.physicalSize = const Size(520, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final container = ProviderContainer(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        audioPlayerPortProvider.overrideWithValue(audioPlayer),
+        audioDownloaderProvider.overrideWithValue(audioDownloader),
+        studyClockFactoryProvider.overrideWithValue(
+          () => StudyClock(
+            now: () => tester.binding.clock.now().millisecondsSinceEpoch,
+          ),
+        ),
         if (speechEngine != null)
           ttsServiceProvider.overrideWithValue(TtsService(speechEngine)),
+        if (intervalPreviewLoader != null)
+          intervalPreviewLoaderProvider.overrideWithValue(
+            intervalPreviewLoader,
+          ),
       ],
     );
     addTearDown(container.dispose);
@@ -439,5 +504,369 @@ void main() {
 
     expect(sessionOf(container).skippedCount, 1);
     expect(find.text('这一轮完成了'), findsOneWidget);
+  });
+
+  group('间隔预览', () {
+    testWidgets('四档按钮上显示各自的排期间隔', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final container = await pumpStudy(tester);
+      await tester.pumpAndSettle();
+
+      final previews = await container
+          .read(reviewServiceProvider)
+          .previewIntervals(wordId, now: nowMs());
+      expect(previews, hasLength(4));
+      for (final preview in previews) {
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(Key('study.rating.interval.${preview.rating.wire}')),
+              )
+              .data,
+          studyIntervalText(preview.scheduledDays),
+        );
+      }
+    });
+
+    testWidgets('预览失败时不显示间隔，且不阻断答题', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      final container = await pumpStudy(
+        tester,
+        intervalPreviewLoader: (wordId) async => throw StateError('预览失败'),
+      );
+      await tester.pumpAndSettle();
+
+      for (final rating in ReviewRating.values) {
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(Key('study.rating.interval.${rating.wire}')),
+              )
+              .data,
+          '—',
+          reason: '取不到预览就显示占位符，不能假装有间隔',
+        );
+      }
+
+      // 预览只是提示：拿不到也必须能照常作答。
+      await tester.tap(find.text('苹果'));
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 1);
+    });
+  });
+
+  group('拼写提示', () {
+    testWidgets('逐层揭开字母，并把「记得」降级为「模糊」', (tester) async {
+      // 用长词：服务层对长词的单个手误仍然判对，降级规则才有发挥空间。
+      final wordId = await insertWord(term: 'beautiful', meaning: '美丽的');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      final container = await pumpStudy(tester);
+      expect(find.text('b _ _ _ _ _ _ _ l'), findsOneWidget);
+
+      await tester.tap(find.text('提示'));
+      await tester.pump();
+      expect(find.text('b e a _ _ _ _ _ l'), findsOneWidget);
+      expect(find.text('已使用提示，本题将按「模糊」记录'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'beautifull');
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('回答正确'), findsOneWidget, reason: '单字母手误仍判对');
+      expect(find.text('自评：模糊'), findsOneWidget, reason: '用了提示就降一档');
+      expect(find.text('已使用提示，建议选择「模糊」'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 1);
+    });
+
+    testWidgets('没用提示时同样的答案按「记得」记录', (tester) async {
+      final wordId = await insertWord(term: 'beautiful', meaning: '美丽的');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'beautifull');
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('自评：记得'), findsOneWidget);
+    });
+
+    testWidgets('换题后提示等级清零', (tester) async {
+      final first = await insertWord(term: 'beautiful', meaning: '美丽的');
+      final second = await insertWord(term: 'wonderful', meaning: '精彩的');
+      final sessionId = await insertSession(
+        wordId: first,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+      await addSessionItem(
+        sessionId: sessionId,
+        position: 1,
+        wordId: second,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.tap(find.text('提示'));
+      await tester.pump();
+      expect(find.text('提示 (1)'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'beautiful');
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('下一题'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('提示'), findsOneWidget, reason: '新题回到基础提示');
+      expect(find.text('提示 (1)'), findsNothing);
+      expect(find.text('w _ _ _ _ _ _ _ l'), findsOneWidget);
+    });
+  });
+
+  group('答案差异', () {
+    testWidgets('答错时展示字符级差异', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'aple');
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('回答错误'), findsOneWidget);
+      expect(find.text('期望答案：apple'), findsOneWidget);
+      expect(_plainText(tester, const Key('study.diff.actual')), '你的输入：aple');
+      expect(
+        _plainText(tester, const Key('study.diff.expected')),
+        '正确答案：apple',
+      );
+      expect(_diffParts(tester, const Key('study.diff.expected')), <String>[
+        'p',
+      ], reason: '漏掉的那个字母才是差异段');
+      expect(_diffParts(tester, const Key('study.diff.actual')), isEmpty);
+    });
+
+    testWidgets('答对时不展示差异', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(find.byKey(const Key('study.diff.expected')), findsNothing);
+    });
+  });
+
+  group('键盘快捷键', () {
+    testWidgets('数字键 1-4 提交对应评级', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final container = await pumpStudy(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).completedCount, 1);
+      expect(find.text('自评：记得'), findsOneWidget);
+    });
+
+    testWidgets('未作答时数字键无效（与按钮同一可用性）', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      final container = await pumpStudy(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).completedCount, 0);
+      expect(find.text('先作答，再选择记得程度'), findsOneWidget);
+    });
+
+    testWidgets('空格提交，S 跳过，R 重播发音', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final engine = RecordingSpeechEngine();
+      final container = await pumpStudy(tester, speechEngine: engine);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+      await tester.pumpAndSettle();
+      expect(engine.spoken, <String>['apple']);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
+      expect(find.text('自评：记得'), findsOneWidget);
+    });
+
+    testWidgets('S 稍后再学', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final container = await pumpStudy(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).skippedCount, 1);
+      expect(find.text('这一轮完成了'), findsOneWidget);
+    });
+
+    testWidgets('输入框聚焦时空格、字母键让位给输入法，数字键仍可用', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      final engine = RecordingSpeechEngine();
+      final container = await pumpStudy(tester, speechEngine: engine);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).completedCount, 0, reason: '空格不得提交');
+      expect(sessionOf(container).skippedCount, 0, reason: 'S 不得跳过');
+      expect(engine.spoken, isEmpty, reason: 'R 不得触发朗读');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
+      expect(find.text('自评：记得'), findsOneWidget);
+    });
+  });
+
+  group('活跃计时', () {
+    testWidgets('挂机超过 45 秒后作答只记录活跃上限', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      await pumpStudy(tester);
+      await tester.pump(const Duration(seconds: 100));
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(
+        log.durationMs,
+        activeIdleTimeoutMs,
+        reason: '空闲定时器在 45 秒时关掉了活跃段，挂机时间不计入',
+      );
+    });
+
+    testWidgets('挂机后再交互只累加真实活跃段', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      await pumpStudy(tester);
+      await tester.pump(const Duration(seconds: 30));
+      // 点选项本身也是一次交互：它把活跃段续到这一刻。
+      await tester.tap(find.text('苹果'));
+      // 之后 60 秒没有任何交互：只有前 45 秒算活跃。
+      await tester.pump(const Duration(seconds: 60));
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      final log = await db.select(db.reviewLogs).getSingle();
+      const expected = 30 * secondMs + activeIdleTimeoutMs;
+      expect(
+        log.durationMs,
+        inInclusiveRange(expected, expected + 500),
+        reason: '墙钟走了 90 秒，只该记录 30 秒活跃 + 45 秒空闲容忍（余量留给 pumpAndSettle 帧步）',
+      );
+    });
+  });
+
+  group('发音预取', () {
+    testWidgets('挂载时预取当前题及其后各题的真人录音', (tester) async {
+      final first = await insertWord(
+        term: 'apple',
+        meaning: '苹果',
+        pronunciationsJson: pronunciationJson('https://example.com/apple.mp3'),
+      );
+      final second = await insertWord(
+        term: 'banana',
+        meaning: '香蕉',
+        pronunciationsJson: pronunciationJson('https://example.com/banana.mp3'),
+      );
+      final sessionId = await insertSession(
+        wordId: first,
+        questionType: QuestionType.enToZh,
+      );
+      await addSessionItem(
+        sessionId: sessionId,
+        position: 1,
+        wordId: second,
+        questionType: QuestionType.enToZh,
+      );
+
+      await pumpStudy(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        audioDownloader.downloaded.map((uri) => uri.toString()).toList(),
+        <String>[
+          'https://example.com/apple.mp3',
+          'https://example.com/banana.mp3',
+        ],
+      );
+      expect(audioPlayer.playCount, 0, reason: '预取只下载，不播放');
+    });
+
+    testWidgets('降级到系统朗读时界面给出提示', (tester) async {
+      // 词条没有真人录音地址：必然回落到系统朗读。
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final engine = RecordingSpeechEngine();
+      await pumpStudy(tester, speechEngine: engine);
+
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+
+      expect(engine.spoken, <String>['apple']);
+      expect(find.text('暂无真人录音，已改用系统朗读'), findsOneWidget);
+    });
   });
 }

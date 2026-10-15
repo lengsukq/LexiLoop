@@ -8,7 +8,7 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_board_view.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/features/match/match_setup_view.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/settling_indicator.dart';
 
 /// 配对页面。
 class MatchPage extends ConsumerWidget {
@@ -32,7 +32,7 @@ class MatchPage extends ConsumerWidget {
           onAction: controller.dispatch,
           onExit: controller.exit,
         ),
-        MatchSaving() => const _SavingView(),
+        MatchSaving() => const SettlingIndicator(),
         MatchFinished() => GameResultPanel(
           labels: const GameResultLabels(
             title: '本轮得分',
@@ -49,30 +49,6 @@ class MatchPage extends ConsumerWidget {
           onRetry: controller.retrySave,
         ),
       },
-    );
-  }
-}
-
-class _SavingView extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const CircularProgressIndicator(),
-          const SizedBox(height: 14),
-          Text(
-            '正在结算…',
-            style: TextStyle(
-              color: context.lexiColors.secondaryLabel,
-              fontSize: 13.5,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -22,7 +22,7 @@
 ///    与 `test/domain/phonetics/catalog_test.dart` 持续看守。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 
 /// 音标分类（对应旧版 `PhonemeCategory` 的 10 个取值）。
 enum PhonemeCategory {

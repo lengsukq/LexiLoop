@@ -12,7 +12,6 @@ library;
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/dictionary/content.dart';
-import 'package:lexiloop/data/dictionary/dictionary_constants.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/dictionary/merge.dart';

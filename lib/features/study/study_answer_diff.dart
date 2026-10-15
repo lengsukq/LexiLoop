@@ -1,0 +1,227 @@
+/// 答案差异的展示。
+///
+/// 对应旧版 `src/components/answer-diff.tsx`。算法在
+/// `domain/review/answer_diff.dart`，这里只负责上色：红色是「你写的多出来的
+/// 部分」，绿色是「正确答案里你漏掉的部分」。
+library;
+
+import 'package:flutter/material.dart';
+import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/review_models.dart';
+import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/domain/review/answer_diff.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+
+/// 会做答案差异对比的题型。
+///
+/// 只有「要把答案拼出来」的题目才有「差在哪」可言；选择题的错因是选错了项，
+/// 界面上已经用颜色标出来了。
+const Set<QuestionType> _diffQuestionTypes = <QuestionType>{
+  QuestionType.zhToEnSpelling,
+  QuestionType.listeningSpelling,
+  QuestionType.clozeSentence,
+  QuestionType.letterBank,
+};
+
+/// 答案差异：词条走字符级，句子走词级。
+class StudyAnswerDiff extends StatelessWidget {
+  /// 以题目、判定结果与用户作答构造。
+  const new({
+    required this.item,
+    required this.outcome,
+    required this.answer,
+    super.key,
+  });
+
+  /// 当前题目。
+  final StudyItemView item;
+
+  /// 本次作答的判定结果。
+  final ReviewOutcome outcome;
+
+  /// 用户实际提交的答案文本（字母拼词是拼出的字母串）。
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) => _diffView() ?? const SizedBox.shrink();
+
+  /// 构造差异视图；无需展示时返回 `null`。
+  ///
+  /// 判对就不展示：差异是「你错在哪」的说明，答对了还列一堆红字只会让人
+  /// 以为自己错了。
+  Widget? _diffView() {
+    if (outcome.isCorrect) return null;
+    if (!_diffQuestionTypes.contains(item.questionType)) return null;
+    final expected = outcome.expectedAnswer;
+    if (item.word.contentType == LexicalContentType.sentence) {
+      final diff = sentenceDiff(expected: expected, actual: answer);
+      return diff == null ? null : _SentenceDiffView(diff: diff);
+    }
+    final diff = termDiff(expected: expected, actual: answer);
+    return diff == null ? null : _TermDiffView(diff: diff);
+  }
+}
+
+/// 词条的两行字符级差异。
+class _TermDiffView extends StatelessWidget {
+  const new({required this.diff});
+
+  final ({List<DiffSegment> expected, List<DiffSegment> actual}) diff;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _DiffLine(
+          lineKey: const Key('study.diff.actual'),
+          label: '你的输入：',
+          segments: diff.actual,
+          color: colors.danger,
+        ),
+        const SizedBox(height: 4),
+        _DiffLine(
+          lineKey: const Key('study.diff.expected'),
+          label: '正确答案：',
+          segments: diff.expected,
+          color: colors.success,
+        ),
+      ],
+    );
+  }
+}
+
+/// 一行带标签的差异文本。
+class _DiffLine extends StatelessWidget {
+  const new({
+    required this.lineKey,
+    required this.label,
+    required this.segments,
+    required this.color,
+  });
+
+  final Key lineKey;
+  final String label;
+  final List<DiffSegment> segments;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final base = TextStyle(color: colors.label, fontSize: 13);
+    return Text.rich(
+      key: lineKey,
+      TextSpan(
+        children: <InlineSpan>[
+          TextSpan(
+            text: label,
+            style: TextStyle(
+              color: colors.tertiaryLabel,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          for (final segment in segments)
+            TextSpan(
+              text: segment.text,
+              style: segment.isDiff
+                  ? base.copyWith(
+                      color: color,
+                      backgroundColor: color.withValues(alpha: 0.15),
+                      decoration: TextDecoration.underline,
+                      decorationColor: color.withValues(alpha: 0.4),
+                    )
+                  : base,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 句子的词级差异。
+class _SentenceDiffView extends StatelessWidget {
+  const new({required this.diff});
+
+  final ({List<SentenceDiffWord> words, int editDistance, String expectedText})
+  diff;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '逐词对比（红=多写，绿=漏词）',
+          style: TextStyle(
+            color: colors.tertiaryLabel,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          key: const Key('study.diff.words'),
+          spacing: 4,
+          runSpacing: 4,
+          children: <Widget>[
+            for (final word in diff.words) _WordChip(word: word),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '编辑距离 ${diff.editDistance} · 参考：${diff.expectedText}',
+          key: const Key('study.diff.meta'),
+          style: TextStyle(color: colors.tertiaryLabel, fontSize: 11),
+        ),
+      ],
+    );
+  }
+}
+
+/// 词级差异里的一个词。
+class _WordChip extends StatelessWidget {
+  const new({required this.word});
+
+  final SentenceDiffWord word;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final (
+      Color foreground,
+      Color? background,
+      TextDecoration? decoration,
+    ) = switch (word.kind) {
+      SentenceDiffKind.equal => (colors.secondaryLabel, null, null),
+      SentenceDiffKind.extra => (
+        colors.danger,
+        colors.danger.withValues(alpha: 0.15),
+        null,
+      ),
+      SentenceDiffKind.missing => (
+        colors.success,
+        colors.success.withValues(alpha: 0.15),
+        TextDecoration.lineThrough,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        word.word,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 12.5,
+          decoration: decoration,
+          decorationColor: colors.success.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+}

@@ -11,14 +11,14 @@
 /// 时间与随机都由调用方作为参数传入，因此可以完整单测。
 library;
 
-import 'package:lexiloop/domain/games/game_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 
 /// 一局结束后的评级。
 ///
 /// **与旧版的差异**：旧版只有排行榜名次（第 N 名），没有 S/A/B/C 评级。
 /// 这里按「得分 / 该模式理论上限」的比例给出评级，让玩家在没进前十时
-/// 也能看到自己的相对水平；阈值集中在 `game_constants.dart`。
+/// 也能看到自己的相对水平；阈值集中在 `lib/core/constants.dart` 的 `gameRank*`。
 enum GameRank {
   /// 得分达到理论上限的 [gameRankSPercent]%。
   s('S'),
@@ -144,7 +144,7 @@ int finalScore({required GameRoundSummary summary, required GameMode mode}) {
 int accuracyPercent({required int correct, required int total}) {
   if (total <= 0) return 0;
   final bounded = correct < 0 ? 0 : (correct > total ? total : correct);
-  return (bounded * gamePercentScale / total).round();
+  return (bounded * percentScale / total).round();
 }
 
 /// 最长连续正确次数；空列表返回 0。
@@ -174,7 +174,7 @@ int maxScoreFor(GameMode mode) {
 GameRank rankFor({required int score, required GameMode mode}) {
   final max = maxScoreFor(mode);
   if (max <= 0) return GameRank.c;
-  final percent = score * gamePercentScale ~/ max;
+  final percent = score * percentScale ~/ max;
   if (percent >= gameRankSPercent) return GameRank.s;
   if (percent >= gameRankAPercent) return GameRank.a;
   if (percent >= gameRankBPercent) return GameRank.b;

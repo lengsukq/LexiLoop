@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 短语卡片：短语 + 翻译。
 ///
@@ -17,7 +18,7 @@ class PhrasesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DetailSectionCard(
+    return SectionCard(
       title: '短语',
       icon: Icons.link_rounded,
       child: Column(

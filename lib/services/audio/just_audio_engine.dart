@@ -16,7 +16,7 @@ library;
 import 'dart:typed_data';
 
 import 'package:just_audio/just_audio.dart';
-import 'package:lexiloop/services/audio/audio_constants.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
 
 /// 基于 `just_audio` 的 `AudioPlayerPort` 实现。

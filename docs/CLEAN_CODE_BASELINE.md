@@ -1,5 +1,11 @@
 # LexiLoop Clean Code 代码审查报告
 
+> ⚠️ **本文档是对旧版 Next.js 实现（`main` 分支，`src/` 目录）的审查记录。**
+> 它不是当前代码的问题清单——清单上的问题类型已经被
+> `test/architecture/architecture_test.dart` 变成了自动化守卫，在写出来的
+> 当下就会被拦下。保留本文档是为了让那些守卫有可追溯的由来。
+
+
 > 审查范围：业务逻辑层（src/modules、src/lib、src/db）、UI 与 API 层（src/components、src/app）、测试与工程配置（tests/、配置文件）。
 > 审查日期：2026-08-16。以下发现按严重度（🔴 高 / 🟡 中 / 🟢 低）分类，每条含位置、问题与修复方向。
 

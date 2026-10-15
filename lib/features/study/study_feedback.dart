@@ -10,9 +10,10 @@ import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_answer_diff.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 主按钮高度下限（逻辑像素）。
 const double _buttonHeight = 50;
@@ -44,11 +45,8 @@ class StudyFeedbackPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     final accent = outcome.isCorrect ? colors.success : colors.danger;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      showSpecular: true,
-      padding: const EdgeInsets.all(16),
+    return Surface(
+      padding: const EdgeInsets.all(LexiSpace.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -191,11 +189,8 @@ class StudySummaryView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        LiquidGlass(
-          level: GlassLevel.elevated,
-          borderRadius: BorderRadius.circular(LexiRadius.lg),
-          showSpecular: true,
-          padding: const EdgeInsets.all(18),
+        Surface(
+          padding: const EdgeInsets.all(LexiSpace.s20),
           child: Column(
             children: <Widget>[
               _StatRow(label: '计划题数', value: '${session.plannedCount}'),

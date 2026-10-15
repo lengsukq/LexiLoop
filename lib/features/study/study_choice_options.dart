@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 选项在提交前后的四种外观。
@@ -55,11 +56,16 @@ class _ChoiceOptionsState extends State<ChoiceOptions> {
   Widget build(BuildContext context) {
     if (widget.item.choices.isEmpty) return const _MissingChoices();
     final outcome = widget.outcome;
+    // `crossAxisAlignment` 必须是 stretch：`Column` 默认是 center，而选项
+    // 没有固定宽度，于是每个选项会按自身文字宽度收缩、再被居中，呈现为
+    // 一列长短不一的胶囊。选项是一组同构的选择，必须等宽、左对齐，眼睛才
+    // 能沿一条竖线扫下来（HIG `layout.md`：对齐让内容更易扫读）。
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         for (final choice in widget.item.choices)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: LexiSpace.s8),
             child: _ChoiceTile(
               label: choice,
               definition: widget.item.choiceDefinitions[choice],
@@ -93,6 +99,10 @@ class _ChoiceOptionsState extends State<ChoiceOptions> {
 }
 
 /// 单个选项。
+///
+/// **为什么不用 `Surface`**：`Surface` 的底与描边是固定的，而选项有
+/// idle / selected / correct / wrong 四种状态色。这里保留自绘容器，但取值
+/// 全部来自 token（圆角 `md`、间距 `LexiSpace`、文字 `LexiType`）。
 class _ChoiceTile extends StatelessWidget {
   const new({
     required this.label,
@@ -106,61 +116,102 @@ class _ChoiceTile extends StatelessWidget {
   final _OptionState state;
   final VoidCallback? onTap;
 
+  /// 选项行的最小高度。
+  ///
+  /// 高于 macOS 的 28：选项是这一页的主要点击目标，且移动端要满足 44 的
+  /// 触控下限——两行文字（词条 + 释义）本来也需要这么高。
+  static const double minHeight = 56;
+
+  /// 选中态的描边宽度；其余状态一律 1px。
+  static const double selectedBorderWidth = 1.5;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final foreground = switch (state) {
-      _OptionState.idle => colors.label,
-      _OptionState.selected => colors.accent,
-      _OptionState.correct => colors.success,
-      _OptionState.wrong => colors.danger,
-    };
-    final background = switch (state) {
-      _OptionState.idle => colors.fill,
-      _OptionState.selected => colors.accent.withValues(alpha: 0.14),
-      _OptionState.correct => colors.success.withValues(alpha: 0.16),
-      _OptionState.wrong => colors.danger.withValues(alpha: 0.16),
+    // 文字色用 `*Text` 系列：饱和色当文字压在淡底上只有 1.8–3.3:1。
+    final (foreground, background, border) = switch (state) {
+      _OptionState.idle => (colors.label, colors.fill, colors.borderDefault),
+      _OptionState.selected => (
+        colors.accentText,
+        colors.accent.withValues(alpha: 0.06),
+        colors.accent,
+      ),
+      _OptionState.correct => (
+        colors.successText,
+        colors.success.withValues(alpha: 0.10),
+        colors.success,
+      ),
+      _OptionState.wrong => (
+        colors.dangerText,
+        colors.danger.withValues(alpha: 0.10),
+        colors.danger,
+      ),
     };
 
     return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(LexiRadius.md),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 52),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(LexiRadius.md),
-            border: Border.all(color: foreground.withValues(alpha: 0.35)),
+          constraints: const BoxConstraints(minHeight: minHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s16,
+            vertical: LexiSpace.s12,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(LexiRadius.md),
+            border: Border.all(
+              color: border,
+              width: state == _OptionState.selected ? selectedBorderWidth : 1,
+            ),
+          ),
+          child: Row(
             children: <Widget>[
-              Text(
-                label,
-                style: LexiType.title.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
+              // 判定结果额外给一个图标：颜色不能是唯一的信号
+              // （HIG `accessibility.md`：不要只靠颜色传达信息）。
+              if (_resultIcon case final icon?) ...<Widget>[
+                Icon(icon, size: 18, color: foreground),
+                const SizedBox(width: LexiSpace.s8),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      label,
+                      style: LexiType.callout.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (definition case final text?) ...<Widget>[
+                      const SizedBox(height: LexiSpace.s2),
+                      Text(
+                        text,
+                        style: LexiType.footnote.copyWith(
+                          color: colors.secondaryLabel,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (definition case final text?) ...<Widget>[
-                const SizedBox(height: 3),
-                Text(
-                  text,
-                  style: LexiType.footnote.copyWith(
-                    color: colors.secondaryLabel,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  /// 判定结果对应的图标；未判定时为 `null`。
+  IconData? get _resultIcon => switch (state) {
+    _OptionState.correct => Icons.check_circle_rounded,
+    _OptionState.wrong => Icons.cancel_rounded,
+    _ => null,
+  };
 }
 
 /// 选项缺失时的兜底提示。

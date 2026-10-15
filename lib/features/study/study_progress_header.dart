@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 顶部进度与计数。
@@ -95,27 +96,52 @@ class _CountsRow extends StatelessWidget {
 }
 
 /// 单个计数胶囊。
+///
+/// **为什么不把状态色当文字**：饱和的系统色压在它自己 10% 的淡底上只有
+/// 1.82–3.11:1（`success` 最差），而这里的文字是要读的。改成「中性底 +
+/// 彩色圆点 + 常规文字色」——文字永远 ≥4.5:1，颜色仍然一眼可辨，而且不再
+/// 只靠颜色传达信息（HIG `accessibility.md`）。
 class _CountChip extends StatelessWidget {
   const new({required this.label, required this.value, required this.color});
 
   final String label;
   final int value;
+
+  /// 圆点颜色（饱和色，用于区分，不承载文字）。
   final Color color;
+
+  /// 圆点直径。
+  static const double dotSize = 7;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.lexiColors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: LexiSpace.s8,
+        vertical: LexiSpace.s2,
       ),
-      child: Text(
-        '$label $value',
-        style: LexiType.caption.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+      decoration: BoxDecoration(
+        color: colors.fill,
+        borderRadius: BorderRadius.circular(LexiRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: dotSize,
+            height: dotSize,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: LexiSpace.s6),
+          Text(
+            '$label $value',
+            style: LexiType.caption.copyWith(
+              color: colors.secondaryLabel,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -163,7 +189,7 @@ class _HeaderAction extends StatelessWidget {
         child: Text(
           label,
           style: LexiType.body.copyWith(
-            color: enabled ? colors.accent : colors.tertiaryLabel,
+            color: enabled ? colors.accentText : colors.quaternaryLabel,
             fontWeight: FontWeight.w600,
           ),
         ),

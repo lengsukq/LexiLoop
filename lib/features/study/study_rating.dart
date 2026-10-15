@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 拿不到间隔预览时的占位符。
@@ -106,8 +107,12 @@ class _RatingButton extends StatelessWidget {
       ReviewRating.easy => colors.success,
     };
     // 已提交时只保留被记录的那一档的颜色，其余压暗：一眼能看出「刚才算的是哪档」。
+    //
+    // 压暗用 `quaternaryLabel`（4.5:1 档）而不是 `tertiaryLabel`：未作答时
+    // 四档标签是页面上**唯一**的操作指引，而 tertiary 压在 `fill` 上只有
+    // 1.74:1，间隔行再乘 0.75 透明度后只剩 1.50:1——最该读清的字反而最浅。
     final dimmed = !enabled && !selected;
-    final foreground = dimmed ? colors.tertiaryLabel : tint;
+    final foreground = dimmed ? colors.quaternaryLabel : tint;
     final background = dimmed
         ? colors.fill
         : tint.withValues(alpha: selected ? 0.18 : 0.08);
@@ -138,15 +143,16 @@ class _RatingButton extends StatelessWidget {
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: LexiSpace.s2),
               // 间隔预览是「这一档会排到什么时候」的唯一线索，也是旧版
               // 揭示答案时唯一会变的东西——按钮上必须给它留一行。
+              //
+              // 不再乘透明度：它叠在已经压暗的前景色上会掉到 1.5:1 左右，
+              // 而这一行正是用户决定「选哪档」时要看的信息。
               Text(
                 interval,
                 key: Key('study.rating.interval.${rating.wire}'),
-                style: LexiType.caption.copyWith(
-                  color: foreground.withValues(alpha: 0.75),
-                ),
+                style: LexiType.caption.copyWith(color: foreground),
               ),
             ],
           ),

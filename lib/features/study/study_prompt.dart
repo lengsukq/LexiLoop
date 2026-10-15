@@ -15,9 +15,10 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 朗读按钮的边长（逻辑像素），同时满足触控热区下限。
 const double _speakButtonSize = 44;
@@ -35,11 +36,10 @@ class StudyPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlass(
-      level: GlassLevel.elevated,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      showSpecular: true,
-      padding: const EdgeInsets.all(18),
+    // 内容层用 `Surface` 而不是液态玻璃：卡片是承载内容的地方，
+    // 玻璃只属于功能层（侧边栏 / HUD / 弹窗）。见 `ui/widgets/surface.dart`。
+    return Surface(
+      padding: const EdgeInsets.all(LexiSpace.s20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

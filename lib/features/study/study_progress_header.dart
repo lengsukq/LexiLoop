@@ -1,13 +1,24 @@
 /// 学习会话的顶部进度与计数。
 ///
 /// 学习页在沉浸模式下运行，外壳不提供导航，因此「跳过 / 结束」必须由这里
-/// 自带；进度条也在这里，让用户随时知道还剩多少。
+/// 自带；进度也在这里，让用户随时知道还剩多少。
+///
+/// **为什么是环而不是条**：进度条只能表达「比例」，剩下的题数还得另外写一行
+/// 文字；而学习页最需要的恰好是那个数字。改成环之后，环内放已完成数、环的
+/// 弧长表达比例、旁边一行说还剩多少——一个构件同时说清三件事，也成了学习页
+/// 的识别符号。
+///
+/// 环的布局用 `Wrap`：360 宽下「环 + 文案」与「计数 + 动作」会自然折成两行，
+/// 宽屏上则并成一行、左右分列。硬塞成一行会在窄屏溢出（实测）。
 library;
+
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
@@ -39,34 +50,21 @@ class StudyProgressHeader extends StatelessWidget {
         LexiSpace.s20,
         LexiSpace.s8,
       ),
-      child: Column(
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        runSpacing: LexiSpace.s8,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              _CountsRow(session: session),
-              const Spacer(),
-              _HeaderAction(
-                label: '跳过',
-                enabled: onSkip != null,
-                onTap: onSkip,
-              ),
-              _HeaderAction(label: '结束', enabled: true, onTap: onExit),
-            ],
-          ),
-          const SizedBox(height: LexiSpace.s10),
-          _ProgressTrack(
-            value: session.plannedCount <= 0
-                ? 0
-                : session.completedCount / session.plannedCount,
-          ),
+          _SessionProgress(session: session),
+          _CountsAndActions(session: session, onSkip: onSkip, onExit: onExit),
         ],
       ),
     );
   }
 }
 
-/// 已完成 / 计划 与正确 / 错误计数。
-class _CountsRow extends StatelessWidget {
+/// 进度环 + 「已完成 / 计划」+「还剩」。
+class _SessionProgress extends StatelessWidget {
   const new({required this.session});
 
   final StudySessionView session;
@@ -74,27 +72,182 @@ class _CountsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    final remaining = (session.plannedCount - session.completedCount).clamp(
+      0,
+      session.plannedCount,
+    );
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Text(
-          '${session.completedCount} / ${session.plannedCount}',
-          style: LexiType.callout.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
+        _ProgressRing(
+          completed: session.completedCount,
+          planned: session.plannedCount,
+        ),
+        const SizedBox(width: LexiSpace.s12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              '${session.completedCount} / ${session.plannedCount}',
+              style: LexiType.callout.copyWith(
+                color: colors.label,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              '还剩 $remaining 词',
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 进度环。
+class _ProgressRing extends StatelessWidget {
+  const new({required this.completed, required this.planned});
+
+  final int completed;
+  final int planned;
+
+  /// 直径——与可点区域下限同值，视觉重量与旁边的按钮一致。
+  static const double diameter = studyMinTapTarget;
+
+  /// 环的线宽。
+  static const double strokeWidth = 4;
+
+  /// 进度推进的时长。
+  static const Duration transition = Duration(milliseconds: 200);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final value = planned <= 0 ? 0.0 : (completed / planned).clamp(0.0, 1.0);
+
+    return Semantics(
+      label: '本轮进度',
+      value: '$completed / $planned',
+      child: SizedBox(
+        width: diameter,
+        height: diameter,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: value),
+          duration: LexiMotion.of(context, transition),
+          builder: (context, animated, child) => CustomPaint(
+            painter: _ProgressRingPainter(
+              value: animated,
+              track: colors.fill,
+              arc: colors.accent,
+              strokeWidth: strokeWidth,
+            ),
+            child: child,
+          ),
+          // 环内的数字是**已完成数**：它是随作答增长的那个，也是用户扫一眼
+          // 想确认的那个。比例由弧长表达，不再重复写成百分比。
+          child: Center(
+            child: Text(
+              '$completed',
+              style: LexiType.caption.copyWith(
+                color: colors.label,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ),
-        const SizedBox(width: LexiSpace.s10),
+      ),
+    );
+  }
+}
+
+/// 画一个从 12 点开始、顺时针生长的环。
+class _ProgressRingPainter extends CustomPainter {
+  const new({
+    required this.value,
+    required this.track,
+    required this.arc,
+    required this.strokeWidth,
+  });
+
+  final double value;
+  final Color track;
+  final Color arc;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    // 线宽画在半径两侧，所以半径要减掉半个线宽，环才不会超出画布。
+    final radius = (size.shortestSide - strokeWidth) / 2;
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..color = track,
+    );
+
+    if (value <= 0) return;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      2 * math.pi * value,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..color = arc,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ProgressRingPainter old) =>
+      old.value != value ||
+      old.track != track ||
+      old.arc != arc ||
+      old.strokeWidth != strokeWidth;
+}
+
+/// 正确 / 错误计数与「跳过 / 结束」。
+class _CountsAndActions extends StatelessWidget {
+  const new({
+    required this.session,
+    required this.onSkip,
+    required this.onExit,
+  });
+
+  final StudySessionView session;
+  final VoidCallback? onSkip;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Wrap(
+      spacing: LexiSpace.s6,
+      runSpacing: LexiSpace.s8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
         _CountChip(
           label: '正确',
           value: session.correctCount,
           color: colors.success,
         ),
-        const SizedBox(width: LexiSpace.s6),
         _CountChip(
           label: '错误',
           value: session.wrongCount,
           color: colors.danger,
         ),
+        const SizedBox(width: LexiSpace.s6),
+        _HeaderAction(label: '跳过', enabled: onSkip != null, onTap: onSkip),
+        _HeaderAction(label: '结束', enabled: true, onTap: onExit),
       ],
     );
   }
@@ -121,53 +274,40 @@ class _CountChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LexiSpace.s8,
-        vertical: LexiSpace.s2,
-      ),
-      decoration: BoxDecoration(
-        color: colors.fill,
-        borderRadius: BorderRadius.circular(LexiRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            width: dotSize,
-            height: dotSize,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: LexiSpace.s6),
-          Text(
-            '$label $value',
-            style: LexiType.caption.copyWith(
-              color: colors.secondaryLabel,
-              fontWeight: FontWeight.w600,
+    return Semantics(
+      label: label,
+      value: '$value',
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s8,
+          vertical: LexiSpace.s4,
+        ),
+        decoration: BoxDecoration(
+          color: colors.fill,
+          borderRadius: BorderRadius.circular(LexiRadius.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ExcludeSemantics(
+              child: Container(
+                width: dotSize,
+                height: dotSize,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 进度条。
-class _ProgressTrack extends StatelessWidget {
-  const new({required this.value});
-
-  final double value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(LexiRadius.sm),
-      child: LinearProgressIndicator(
-        value: value.clamp(0, 1),
-        minHeight: 6,
-        backgroundColor: colors.fill,
-        valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+            const SizedBox(width: LexiSpace.s6),
+            ExcludeSemantics(
+              child: Text(
+                '$label $value',
+                style: LexiType.caption.copyWith(
+                  color: colors.secondaryLabel,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -145,19 +145,25 @@ class _ListeningPrompt extends StatelessWidget {
           style: LexiType.body.copyWith(color: colors.quaternaryLabel),
         ),
         const SizedBox(height: LexiSpace.s14),
-        Material(
-          color: colors.accent.withValues(alpha: LexiTint.tint),
-          shape: const CircleBorder(),
-          child: InkWell(
-            onTap: onSpeak,
-            customBorder: const CircleBorder(),
-            child: SizedBox(
-              width: _speakButtonSize,
-              height: _speakButtonSize,
-              child: Icon(
-                Icons.volume_up_rounded,
-                size: 44,
-                color: colors.accent,
+        // 纯图标控件必须自带标签：读屏软件否则只会念「按钮」，
+        // 桌面端用户悬停也看不到它做什么。`Tooltip` 同时提供悬停提示
+        // 与语义标签，一处覆盖两端。
+        Tooltip(
+          message: '播放发音',
+          child: Material(
+            color: colors.accent.withValues(alpha: LexiTint.tint),
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: onSpeak,
+              customBorder: const CircleBorder(),
+              child: SizedBox(
+                width: _speakButtonSize,
+                height: _speakButtonSize,
+                child: Icon(
+                  Icons.volume_up_rounded,
+                  size: 44,
+                  color: colors.accent,
+                ),
               ),
             ),
           ),

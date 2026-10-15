@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/games/whack_a_mole.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -119,7 +120,7 @@ class _Hole extends StatelessWidget {
           child: visible
               ? AnimatedScale(
                   scale: 1,
-                  duration: const Duration(milliseconds: 160),
+                  duration: LexiMotion.of(context, LexiMotion.feedback),
                   child: Material(
                     color: wrong
                         ? colors.danger.withValues(alpha: LexiTint.strong)

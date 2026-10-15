@@ -82,6 +82,8 @@ class _RelatedRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    // a11y-ok: 行内由 _RelatedBody 渲染可见文字，读屏会念出词条内容；
+    // 点击语义由 InkWell 自己提供，不需要额外标签。
     return InkWell(
       onTap: () => RelatedWordDialog.show(
         context,

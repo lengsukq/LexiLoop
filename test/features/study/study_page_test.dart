@@ -234,11 +234,18 @@ void main() {
   StudySessionView sessionOf(ProviderContainer container) =>
       container.read(studySessionProvider).value!;
 
-  testWidgets('没有候选词条时显示空态', (tester) async {
+  testWidgets('没有候选词条时走结算视图，标题与做完一轮不同', (tester) async {
+    // 「今天没词可学」与「刚做完一轮」共用结算视图，只有标题不同——
+    // 照旧版 `study-client.tsx:548`。曾经这里是一个独立的空态页，
+    // 整页只剩一个 `maybePop` 的返回按钮，而学习页是分支根路由，
+    // 那个按钮点了没反应，用户被困在沉浸式页面里（见下一条用例）。
     await pumpStudy(tester);
 
-    expect(find.text('今天没有需要复习的词了'), findsOneWidget);
-    expect(find.text('返回'), findsOneWidget);
+    expect(find.text('暂时没有更多可学习词条'), findsOneWidget);
+    expect(find.text('这一轮完成了'), findsNothing);
+    // 空态也必须给得出「再来一轮」，否则导入词条后只能退出重进。
+    expect(find.text('再来一轮'), findsOneWidget);
+    expect(find.text('返回首页'), findsOneWidget);
   });
 
   testWidgets('会话启动失败时显示错误态与重试', (tester) async {

@@ -193,14 +193,16 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   Widget build(BuildContext context) {
     final session = widget.session;
     if (session == null) return const StudyLoadingView();
-    if (session.items.isEmpty) return StudyEmptyView(onExit: _exit);
 
+    // 没有题目时 `currentItem` 也是 `null`（`resumeIndex >= items.length`），
+    // 因此「今天没词可学」与「这一轮做完了」共用结算视图——旧版
+    // `study-client.tsx:548` 正是这么做的，只是标题不同。
     final item = _answered ?? session.currentItem;
     if (item == null) {
       return StudySummaryView(
         session: session,
         onRestart: _restart,
-        onHome: _home,
+        onHome: _leaveToHome,
       );
     }
     // 答题区包一层输入监听：指针、滚轮、滚动都算「用户在场」，
@@ -219,7 +221,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
             StudyProgressHeader(
               session: session,
               onSkip: _canSkip ? _skip : null,
-              onExit: _exit,
+              onExit: _leaveToHome,
             ),
             Expanded(child: _content(item)),
           ],
@@ -591,13 +593,20 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     return focusContext.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
-  void _exit() => Navigator.maybePop(context);
-
-  /// 返回首页。
+  /// 离开学习页，回到今日。
   ///
-  /// 学习页是分支根路由，`maybePop` 在根路由上什么也不会发生；路由器在场时
-  /// 直接跳 `/`，测试等无路由器的场景再退回出栈。
-  void _home() {
+  /// **不能只 `Navigator.maybePop`**：学习页是 `StatefulShellRoute` 的
+  /// **分支根路由**，栈里没有上一页，`maybePop` 什么都不会发生；而沉浸模式
+  /// 又不渲染外壳导航（`destinations.dart` 的 `immersivePaths`），于是用户
+  /// 会被困在这一页——没有题目可做时尤其明显，整页只剩一个点了没反应的按钮。
+  ///
+  /// 旧版这里是 `<Link href="/">退出</Link>`（`study-client.tsx:554`），
+  /// 结算页的「返回今日」同样是 `href="/"`。本方法照旧版做：**明确回首页**，
+  /// 而不是指望返回栈。
+  ///
+  /// 无路由器时（部分 widget 测试直接 `home: StudyPage(...)`）退回出栈，
+  /// 保持这些测试的可运行性。
+  void _leaveToHome() {
     final router = GoRouter.maybeOf(context);
     if (router == null) {
       Navigator.maybePop(context);

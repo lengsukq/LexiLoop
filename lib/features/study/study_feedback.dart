@@ -170,6 +170,11 @@ class StudySummaryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    // 标题按「有没有题目」区分，照旧版 `study-client.tsx:548`：
+    // `data.items.length === 0` 时是「暂时没有更多可学习词条」，否则
+    // 「本轮学习完成」。两者共用同一个结算视图——对用户来说「今天没词可学」
+    // 与「刚做完一轮」是同一件事：现在没得学了，只能再来一轮或回首页。
+    final title = session.items.isEmpty ? '暂时没有更多可学习词条' : '这一轮完成了';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       children: <Widget>[
@@ -177,7 +182,8 @@ class StudySummaryView extends StatelessWidget {
         const SizedBox(height: 12),
         Center(
           child: Text(
-            '这一轮完成了',
+            title,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: colors.label,
               fontSize: 22,

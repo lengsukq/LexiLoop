@@ -24,17 +24,23 @@ class AdaptiveShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-
-    if (isImmersivePath(location)) {
-      return navigationShell;
-    }
+    final immersive = isImmersivePath(location);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final useSidebar = constraints.maxWidth >= sidebarBreakpoint;
-        return AmbientBackground(
-          child: useSidebar ? _buildWide(context) : _buildCompact(context),
-        );
+        // 沉浸模式**只隐藏窄屏的底部 Tab Bar**，宽屏侧边栏保留。
+        //
+        // 旧版 `components/app-shell.tsx` 就是这么做的：`isStudyScreen` 只影响
+        // `!isStudyScreen && <nav class="... lg:hidden">`（移动端底栏）与底部
+        // 内边距，桌面侧边栏 `<aside class="... lg:flex">` 从不隐藏。
+        //
+        // 早先的实现把两者一起隐藏了，于是在沉浸页上：栈里没有上一页、
+        // 侧边栏又不在，用户只能靠页面自己的退出按钮——那个按钮一旦写错
+        // （见 `study_page.dart` 的 `_leaveToHome`），整页就没有出路。
+        if (useSidebar) return AmbientBackground(child: _buildWide(context));
+        if (immersive) return navigationShell;
+        return AmbientBackground(child: _buildCompact(context));
       },
     );
   }

@@ -13,10 +13,10 @@ import 'package:lexiloop/domain/phonetics/catalog.dart';
 import 'package:lexiloop/features/games/widgets/game_result_panel.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/services/game_service.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 音标训练准备页。
 class PhoneticsSetupView extends StatelessWidget {
@@ -159,8 +159,7 @@ class _CatalogSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

@@ -5,7 +5,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -101,59 +100,55 @@ class _PresetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Material(
+      color: selected
+          ? Color.alphaBlend(colors.accent.withValues(alpha: 0.1), colors.card)
+          : colors.card,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      child: Material(
-        color: selected
-            ? colors.accent.withValues(alpha: 0.1)
-            : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.lg),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(LexiRadius.lg),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(LexiRadius.lg),
-              border: Border.all(
-                color: selected ? colors.accent : colors.borderSubtle,
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(LexiRadius.lg),
+            border: Border.all(
+              color: selected ? colors.accent : colors.borderSubtle,
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: LexiSpace.s14,
-              vertical: LexiSpace.s12,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        preset.name,
-                        style: LexiType.callout.copyWith(
-                          color: colors.label,
-                          fontWeight: FontWeight.w600,
-                        ),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s14,
+            vertical: LexiSpace.s12,
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      preset.name,
+                      style: LexiType.callout.copyWith(
+                        color: colors.label,
+                        fontWeight: FontWeight.w600,
                       ),
-                      Text(
-                        '${preset.pairs} 组 · ${preset.seconds} 秒 · '
-                        '${preset.description}',
-                        style: LexiType.footnote.copyWith(
-                          color: colors.quaternaryLabel,
-                        ),
+                    ),
+                    Text(
+                      '${preset.pairs} 组 · ${preset.seconds} 秒 · '
+                      '${preset.description}',
+                      style: LexiType.footnote.copyWith(
+                        color: colors.quaternaryLabel,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                if (selected)
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 18,
-                    color: colors.accent,
-                  ),
-              ],
-            ),
+              ),
+              if (selected)
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 18,
+                  color: colors.accent,
+                ),
+            ],
           ),
         ),
       ),

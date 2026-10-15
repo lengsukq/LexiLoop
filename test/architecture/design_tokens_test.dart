@@ -58,6 +58,18 @@ const Color _darkSurface = Color(0xFF000000);
 /// 卡片底色（深色）。
 const Color _darkCard = Color(0xFF1C1C1E);
 
+/// 允许使用 `LiquidGlass` 的**功能层**文件。
+///
+/// 每一个都是「浮在内容之上的界面构件」：桌面侧边栏、底部 Tab Bar、
+/// 「更多」底部 Sheet、筛选 Sheet、初始化配置对话框、批量操作浮条。
+/// 内容层的卡片一律走 `Surface`。
+const Set<String> functionalLayerFiles = <String>{
+  'lib/ui/adaptive_shell.dart',
+  'lib/features/words/widgets/word_filter_sheet.dart',
+  'lib/features/initialize/configurator/initialization_configurator.dart',
+  'lib/features/initialize/widgets/queue_bulk_bar.dart',
+};
+
 void main() {
   group('字号', () {
     test('lib 里不得出现 fontSize 字面量（token 文件除外）', () {
@@ -181,6 +193,32 @@ void main() {
       for (final step in steps) {
         expect(step % 2, 0, reason: '$step 不在 2pt 节奏上');
       }
+    });
+  });
+
+  group('材质', () {
+    test('LiquidGlass 只能出现在功能层', () {
+      final violations = <String>[];
+      for (final file in collectDartFiles('lib')) {
+        if (functionalLayerFiles.contains(file.path)) continue;
+        for (var i = 0; i < file.lines.length; i += 1) {
+          if (file.lines[i].contains('LiquidGlass(')) {
+            violations.add(file.locate(i + 1));
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'Liquid Glass 只属于**功能层**（侧边栏、底部栏、弹窗、浮层操作条）。\n'
+            "Apple `materials.md` 的原话是「Don't use Liquid Glass in the "
+            'content layer… use standard materials for elements in the content '
+            'layer」。玻璃压在玻璃上会让所有卡片落在同一层材质上，层级只能\n'
+            '靠间距硬撑——这正是界面「看起来不统一」的根源。\n'
+            '内容层请用 Surface（`lib/ui/widgets/surface.dart`）。\n'
+            '违规项：\n${violations.join('\n')}',
+      );
     });
   });
 

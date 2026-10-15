@@ -14,11 +14,11 @@ import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 词条卡片。
 class WordCard extends StatelessWidget {
@@ -45,10 +45,8 @@ class WordCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: LiquidGlass(
-        level: GlassLevel.elevated,
+      child: Surface(
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        showSpecular: true,
         padding: const EdgeInsets.symmetric(
           horizontal: LexiSpace.s14,
           vertical: LexiSpace.s12,

@@ -5,7 +5,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -104,54 +103,58 @@ class _ChoiceTile extends StatelessWidget {
       ChoiceState.correct => colors.success,
       ChoiceState.idle => colors.borderDefault,
     };
+    // 底色必须不透明：这些方块是内容层的卡片，不再是玻璃背板。
+    // 选中态直接与卡片底合成，否则半透明色会漏出页面底，看起来像变脏。
     final background = switch (state) {
-      ChoiceState.wrong => colors.danger.withValues(alpha: 0.1),
-      ChoiceState.correct => colors.success.withValues(alpha: 0.12),
-      ChoiceState.idle => Colors.transparent,
+      ChoiceState.wrong => Color.alphaBlend(
+        colors.danger.withValues(alpha: 0.1),
+        colors.card,
+      ),
+      ChoiceState.correct => Color.alphaBlend(
+        colors.success.withValues(alpha: 0.12),
+        colors.card,
+      ),
+      ChoiceState.idle => colors.card,
     };
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Material(
+      color: background,
       borderRadius: BorderRadius.circular(LexiRadius.md),
-      child: Material(
-        color: background,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(LexiRadius.md),
-              border: Border.all(color: border),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: LexiSpace.s14,
-              vertical: LexiSpace.s10,
-            ),
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style:
-                      labelStyle ??
-                      LexiType.title.copyWith(
-                        color: colors.label,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                if (subtitle != null && subtitle!.isNotEmpty)
-                  Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: LexiType.caption.copyWith(
-                      color: colors.quaternaryLabel,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(LexiRadius.md),
+            border: Border.all(color: border),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s14,
+            vertical: LexiSpace.s10,
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style:
+                    labelStyle ??
+                    LexiType.title.copyWith(
+                      color: colors.label,
+                      fontWeight: FontWeight.w600,
                     ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty)
+                Text(
+                  subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: LexiType.caption.copyWith(
+                    color: colors.quaternaryLabel,
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

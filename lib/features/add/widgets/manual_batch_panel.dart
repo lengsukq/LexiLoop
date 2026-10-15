@@ -15,10 +15,10 @@ import 'package:lexiloop/features/add/manual_batch_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/features/add/widgets/manual_batch_row_card.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 词典批量预览面板。
 class ManualBatchPanel extends ConsumerStatefulWidget {
@@ -108,8 +108,7 @@ class _BatchInputCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(inputCardPadding),
       child: Column(
@@ -405,8 +404,7 @@ class _ConfirmAllCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(inputCardPadding),
       child: Column(
@@ -449,8 +447,7 @@ class _AllConfirmedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(inputCardPadding),
       child: Column(

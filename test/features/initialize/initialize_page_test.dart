@@ -20,8 +20,8 @@ import 'package:lexiloop/features/initialize/widgets/queue_list.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart';
 import 'package:lexiloop/services/initialization/initialization_queries.dart';
 import 'package:lexiloop/services/initialization/job_runner.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 记录调用次数的假执行器。
 class _RecordingRunner implements InitializationJobRunner {
@@ -388,7 +388,7 @@ void main() {
 
       final alphaTile = find.ancestor(
         of: find.text('alpha'),
-        matching: find.byType(LiquidGlass),
+        matching: find.byType(Surface),
       );
       await tester.tap(
         find.descendant(of: alphaTile, matching: find.text('重试')),

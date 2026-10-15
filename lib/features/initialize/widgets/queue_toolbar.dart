@@ -12,8 +12,8 @@ import 'package:lexiloop/features/initialize/configurator/configurator_state.dar
 import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 队列工具栏。
 class QueueToolbar extends ConsumerStatefulWidget {
@@ -308,8 +308,7 @@ class _StatusChip extends StatelessWidget {
     final colors = context.lexiColors;
     return GestureDetector(
       onTap: onTap,
-      child: LiquidGlass(
-        level: GlassLevel.subtle,
+      child: Surface(
         borderRadius: BorderRadius.circular(LexiRadius.sm),
         padding: const EdgeInsets.symmetric(
           horizontal: chipPaddingH,

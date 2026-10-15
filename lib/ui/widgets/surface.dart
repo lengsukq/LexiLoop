@@ -33,11 +33,11 @@ enum SurfaceVariant {
 /// 卡片内的默认内边距。
 const double surfaceCardPadding = LexiSpace.s20;
 
-/// 卡片投影的模糊半径。
-const double _cardShadowBlur = 2;
-
-/// 卡片投影的垂直偏移。
-const double _cardShadowOffsetY = 1;
+/// 卡片投影的高度。
+///
+/// 用 `Material` 的 elevation 而不是手写 `BoxShadow`：`Material` 同时负责
+/// 投影、描边与**承载涟漪**，三者必须来自同一个节点（见 [Surface.build]）。
+const double _cardElevation = 1;
 
 /// 内容层的一张表面。
 class Surface extends StatelessWidget {
@@ -81,32 +81,32 @@ class Surface extends StatelessWidget {
     }
 
     final isInset = variant == SurfaceVariant.inset;
-    final decoration = BoxDecoration(
-      color: isInset
-          ? colors.fill
-          : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
-      borderRadius: resolvedRadius,
-      border: isInset
-          ? null
-          : Border.all(
-              color: highContrast ? colors.borderStrong : colors.borderSubtle,
-            ),
-      boxShadow: isInset
-          ? null
-          : <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-                blurRadius: _cardShadowBlur,
-                offset: const Offset(0, _cardShadowOffsetY),
-              ),
-            ],
-    );
-
     final resolvedPadding =
         padding ?? EdgeInsets.all(isInset ? LexiSpace.s12 : surfaceCardPadding);
 
-    return DecoratedBox(
-      decoration: decoration,
+    // **必须是 Material，不能是 DecoratedBox。**
+    //
+    // `ListTile` 与 `InkWell` 把背景与涟漪画在「最近的 Material 祖先」上。
+    // 中间夹一层带底色的 `DecoratedBox`，涟漪就会被卡片底色整个盖住；
+    // `ListTile` 在 debug 下还会直接抛断言（`_findIntermediateWidget` 沿祖先
+    // 链找 Material，途中撞见带不透明底色的 DecoratedBox 就报错）。
+    //
+    // 把底色、描边、投影都交给 `Material`，三个职责就落在同一个节点上。
+    return Material(
+      color: isInset ? colors.fill : colors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: resolvedRadius,
+        side: isInset
+            ? BorderSide.none
+            : BorderSide(
+                color: highContrast ? colors.borderStrong : colors.borderSubtle,
+              ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      elevation: isInset ? 0 : _cardElevation,
+      shadowColor: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
+      // 不关掉的话 Material 3 会按 elevation 给底色叠一层主色调。
+      surfaceTintColor: Colors.transparent,
       child: Padding(padding: resolvedPadding, child: child),
     );
   }

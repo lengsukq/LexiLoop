@@ -5,10 +5,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 一个设置分组卡片。
 class SettingsSectionCard extends StatelessWidget {
@@ -33,8 +33,7 @@ class SettingsSectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     final subtitle = this.subtitle;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

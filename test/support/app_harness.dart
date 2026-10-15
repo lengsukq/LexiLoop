@@ -17,7 +17,7 @@ import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
 /// 给 [child] 套上应用主题与最小方向性环境。
 ///
-/// 只需要 `MaterialApp` 就够：本项目的卡片大多自带 `LiquidGlass` 底板，
+/// 只需要 `MaterialApp` 就够：本项目的卡片大多自带 `Surface` 底板，
 /// 不依赖 `Scaffold` 提供的 safe area。
 Widget wrapWithAppTheme(Widget child) =>
     MaterialApp(theme: LexiTheme.light, home: child);

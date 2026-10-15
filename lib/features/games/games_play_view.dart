@@ -15,10 +15,10 @@ import 'package:lexiloop/features/games/widgets/whack_a_mole_view.dart';
 import 'package:lexiloop/features/games/widgets/word_builder_view.dart';
 import 'package:lexiloop/features/games/widgets/word_stack_view.dart';
 import 'package:lexiloop/features/games/widgets/word_tetris_view.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 小游戏进行中页面。
 class GamesPlayView extends StatelessWidget {
@@ -47,10 +47,9 @@ class GamesPlayView extends StatelessWidget {
         GameHud(title: gameModeTitle(mode), core: playing.core, onExit: onExit),
         const SizedBox(height: LexiSpace.s12),
         Expanded(
-          child: LiquidGlass(
-            level: GlassLevel.elevated,
+          child: Surface(
+            padding: EdgeInsets.zero,
             borderRadius: BorderRadius.circular(LexiRadius.xl),
-            showSpecular: true,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(LexiSpace.s16),
               child: Column(

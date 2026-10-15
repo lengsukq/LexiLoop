@@ -9,10 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 掌握概览进度带。
 class MasteryOverviewStrip extends ConsumerWidget {
@@ -49,8 +49,7 @@ class _OverviewBody extends StatelessWidget {
         LexiSpace.s20,
         LexiSpace.s8,
       ),
-      child: LiquidGlass(
-        level: GlassLevel.elevated,
+      child: Surface(
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         padding: const EdgeInsets.symmetric(
           horizontal: LexiSpace.s16,

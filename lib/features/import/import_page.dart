@@ -16,11 +16,11 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_history_section.dart';
 import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// CSV 导入页。
 class ImportPage extends ConsumerWidget {
@@ -113,8 +113,7 @@ class _StepCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
@@ -495,8 +494,7 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

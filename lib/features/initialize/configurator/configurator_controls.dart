@@ -5,8 +5,8 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 一段式选择器的一个选项。
 ///
@@ -135,8 +135,7 @@ class ConfiguratorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.md),
       padding: const EdgeInsets.all(cardPadding),
       child: Column(

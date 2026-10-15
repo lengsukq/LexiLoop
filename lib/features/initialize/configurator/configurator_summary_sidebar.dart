@@ -11,8 +11,8 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_fields.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 任务摘要。
 class ConfiguratorSummarySidebar extends ConsumerWidget {
@@ -39,8 +39,7 @@ class ConfiguratorSummarySidebar extends ConsumerWidget {
       ('来源', _sourceSummary(draft)),
       ('策略', strategyLabel(draft)),
     ];
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(sidebarPadding),
       child: Column(

@@ -10,10 +10,10 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/import/csv_parser.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 预览表格。
 class ImportPreviewTable extends StatelessWidget {
@@ -36,8 +36,7 @@ class ImportPreviewTable extends StatelessWidget {
       ..write('新增 ${preview.newRows} / 已存在 ${preview.existingRows} / ')
       ..write('重复 ${preview.duplicateRows} / 无效 ${preview.invalidRows}）');
 
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

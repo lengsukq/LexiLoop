@@ -12,7 +12,6 @@ import 'package:lexiloop/domain/games/game_question.dart';
 import 'package:lexiloop/domain/games/matching.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -143,45 +142,45 @@ class _Card extends StatelessWidget {
         : (selected ? colors.accent : colors.borderSubtle);
     return Opacity(
       opacity: matched ? 0.28 : 1,
-      child: LiquidGlass(
-        level: GlassLevel.subtle,
+      child: Material(
+        color: wrong
+            ? Color.alphaBlend(
+                colors.danger.withValues(alpha: 0.1),
+                colors.card,
+              )
+            : (selected
+                  ? Color.alphaBlend(
+                      colors.accent.withValues(alpha: 0.1),
+                      colors.card,
+                    )
+                  : colors.card),
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        child: Material(
-          color: wrong
-              ? colors.danger.withValues(alpha: 0.1)
-              : (selected
-                    ? colors.accent.withValues(alpha: 0.1)
-                    : Colors.transparent),
+        child: InkWell(
+          onTap: matched || locked ? null : onTap,
           borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: InkWell(
-            onTap: matched || locked ? null : onTap,
-            borderRadius: BorderRadius.circular(LexiRadius.md),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 54),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(LexiRadius.md),
-                border: Border.all(color: border),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: LexiSpace.s10,
-                vertical: LexiSpace.s8,
-              ),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                side == MatchSide.word ? pair.word.term : pair.word.definition,
-                style: TextStyle(
-                  color: side == MatchSide.word
-                      ? colors.label
-                      : colors.secondaryLabel,
-                  fontSize:
-                      (side == MatchSide.word
-                              ? LexiType.callout
-                              : LexiType.body)
-                          .fontSize,
-                  fontWeight: side == MatchSide.word
-                      ? FontWeight.w600
-                      : FontWeight.w400,
-                ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 54),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(LexiRadius.md),
+              border: Border.all(color: border),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s10,
+              vertical: LexiSpace.s8,
+            ),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              side == MatchSide.word ? pair.word.term : pair.word.definition,
+              style: TextStyle(
+                color: side == MatchSide.word
+                    ? colors.label
+                    : colors.secondaryLabel,
+                fontSize:
+                    (side == MatchSide.word ? LexiType.callout : LexiType.body)
+                        .fontSize,
+                fontWeight: side == MatchSide.word
+                    ? FontWeight.w600
+                    : FontWeight.w400,
               ),
             ),
           ),

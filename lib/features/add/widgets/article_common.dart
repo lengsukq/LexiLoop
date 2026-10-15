@@ -7,10 +7,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
 const String articleSampleArticle =
@@ -75,8 +75,7 @@ class ArticleSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(articleCardPadding),
       child: Column(

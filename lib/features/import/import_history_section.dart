@@ -14,10 +14,10 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
 import 'package:lexiloop/features/import/rollback_blocked_message.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 撤销失败的提示停留时长。
 ///
@@ -35,8 +35,7 @@ class ImportHistorySection extends ConsumerWidget {
     final colors = context.lexiColors;
     final history = ref.watch(importHistoryProvider);
 
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

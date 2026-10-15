@@ -14,10 +14,10 @@ import 'package:lexiloop/data/db/daos/game_dao.dart';
 import 'package:lexiloop/domain/games/game_mistake.dart';
 import 'package:lexiloop/domain/games/scoring.dart';
 import 'package:lexiloop/services/game_service.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 结算页的文案。
 class GameResultLabels {
@@ -122,10 +122,8 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.xl),
-      showSpecular: true,
       padding: const EdgeInsets.symmetric(
         vertical: LexiSpace.s24,
         horizontal: LexiSpace.s20,
@@ -296,8 +294,7 @@ class _MistakeListState extends State<_MistakeList> {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.md),
       padding: const EdgeInsets.all(LexiSpace.s12),
       child: Column(

@@ -23,6 +23,7 @@ import 'package:lexiloop/features/statistics/widgets/recent_results_card.dart';
 import 'package:lexiloop/features/statistics/widgets/trend_chart_card.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 统计页。
 class StatisticsPage extends ConsumerWidget {
@@ -148,8 +149,7 @@ class _RangeSelector extends StatelessWidget {
             child: GestureDetector(
               key: Key('statistics-range-$days'),
               onTap: () => onSelect(days),
-              child: LiquidGlass(
-                level: GlassLevel.subtle,
+              child: Surface(
                 borderRadius: BorderRadius.circular(LexiRadius.sm),
                 padding: const EdgeInsets.symmetric(
                   horizontal: chipPaddingH,

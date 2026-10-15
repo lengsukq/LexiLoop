@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/features/statistics/statistics_providers.dart';
 import 'package:lexiloop/features/statistics/widgets/stat_card.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 概览指标：词条数、累计作答、正确率、连续天数、累计时长。
 class OverviewCards extends ConsumerWidget {
@@ -17,8 +17,7 @@ class OverviewCards extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(statisticsOverviewProvider);
     return overview.when(
-      data: (data) => LiquidGlass(
-        level: GlassLevel.elevated,
+      data: (data) => Surface(
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         padding: const EdgeInsets.all(cardPadding),
         child: Wrap(

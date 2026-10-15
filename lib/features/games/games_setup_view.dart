@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -139,47 +138,43 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Material(
+      color: selected
+          ? Color.alphaBlend(colors.accent.withValues(alpha: 0.1), colors.card)
+          : colors.card,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      child: Material(
-        color: selected
-            ? colors.accent.withValues(alpha: 0.1)
-            : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.lg),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(LexiRadius.lg),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(LexiRadius.lg),
-              border: Border.all(
-                color: selected ? colors.accent : colors.borderSubtle,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(LexiRadius.lg),
+            border: Border.all(
+              color: selected ? colors.accent : colors.borderSubtle,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s14,
+            vertical: LexiSpace.s12,
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.sports_esports_rounded,
+                size: 20,
+                color: selected ? colors.accent : colors.tertiaryLabel,
               ),
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: LexiSpace.s14,
-              vertical: LexiSpace.s12,
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  selected
-                      ? Icons.check_circle_rounded
-                      : Icons.sports_esports_rounded,
-                  size: 20,
-                  color: selected ? colors.accent : colors.tertiaryLabel,
+              const SizedBox(width: LexiSpace.s10),
+              Expanded(child: _ModeCardText(mode: mode)),
+              if (loading)
+                const SizedBox(
+                  width: LexiSpace.s16,
+                  height: LexiSpace.s16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                const SizedBox(width: LexiSpace.s10),
-                Expanded(child: _ModeCardText(mode: mode)),
-                if (loading)
-                  const SizedBox(
-                    width: LexiSpace.s16,
-                    height: LexiSpace.s16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

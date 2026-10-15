@@ -16,10 +16,10 @@ import 'package:lexiloop/domain/phonetics/selection.dart';
 import 'package:lexiloop/features/games/widgets/game_choice_grid.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 音标训练进行中页面。
 class PhoneticPlayView extends StatelessWidget {
@@ -134,10 +134,8 @@ class _Prompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.xl),
-      showSpecular: true,
       padding: const EdgeInsets.symmetric(
         vertical: LexiSpace.s20,
         horizontal: LexiSpace.s16,
@@ -281,8 +279,7 @@ class _Analysis extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     final confusables = confusablePhonemes(entry.symbol);
-    return LiquidGlass(
-      level: GlassLevel.subtle,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

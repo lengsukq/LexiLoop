@@ -13,11 +13,11 @@ import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 词条头部：操作栏 + 文本、状态徽章、口音切换与学习开关。
 ///
@@ -37,10 +37,8 @@ class WordDetailHeaderCard extends ConsumerWidget {
       children: <Widget>[
         _HeaderActionBar(detail: detail),
         const SizedBox(height: LexiSpace.s10),
-        LiquidGlass(
-          level: GlassLevel.elevated,
+        Surface(
           borderRadius: BorderRadius.circular(LexiRadius.lg),
-          showSpecular: true,
           padding: const EdgeInsets.fromLTRB(
             LexiSpace.s20,
             LexiSpace.s16,

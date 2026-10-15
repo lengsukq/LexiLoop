@@ -7,8 +7,8 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 各状态任务计数。
 class QueueProgressCard extends ConsumerWidget {
@@ -18,8 +18,7 @@ class QueueProgressCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(queueProgressProvider);
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(cardPadding),
       child: progress.when(

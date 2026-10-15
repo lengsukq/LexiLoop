@@ -9,11 +9,11 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_progress_card.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 队列列表。
 class QueueList extends ConsumerWidget {
@@ -127,8 +127,7 @@ class _WordTileState extends ConsumerState<_WordTile> {
   @override
   Widget build(BuildContext context) {
     final word = widget.word;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.md),
       padding: const EdgeInsets.symmetric(
         horizontal: LexiSpace.s14,

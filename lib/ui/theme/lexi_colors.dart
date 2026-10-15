@@ -14,6 +14,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 创建一份色板。
   const new({
     required this.surface,
+    required this.card,
     required this.label,
     required this.secondaryLabel,
     required this.tertiaryLabel,
@@ -42,6 +43,12 @@ class LexiColors extends ThemeExtension<LexiColors> {
 
   /// 页面底色（`--ll-surface`）。
   final Color surface;
+
+  /// 卡片底色——内容层表面（`Surface`）的不透明底。
+  ///
+  /// 浅色用纯白、深色用 `#1C1C1E`：卡片必须与页面底拉开一档，否则发丝
+  /// 描边就成了唯一的层级线索。
+  final Color card;
 
   /// 主文本色（`--ll-label`）。
   final Color label;
@@ -125,6 +132,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 浅色模式色板。
   static const LexiColors light = LexiColors(
     surface: Color(0xFFF2F2F7),
+    card: Color(0xFFFFFFFF),
     label: Color(0xFF1C1C1E),
     // 四级标签按「对比度单调递减」取值，且**每一级都 ≥4.5:1**。
     // 原先 tertiary(#AEAEB2, 1.98:1) 比 quaternary(#8E8E93, 2.92:1) 更弱，
@@ -158,6 +166,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 深色模式色板。
   static const LexiColors dark = LexiColors(
     surface: Color(0xFF000000),
+    card: Color(0xFF1C1C1E),
     label: Color(0xFFF5F5F7),
     secondaryLabel: Color(0xFFC7C7CC),
     tertiaryLabel: Color(0xFFAEAEB2),
@@ -208,6 +217,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
     Color? successText,
     Color? warningText,
     Color? purpleText,
+    Color? card,
     Color? separator,
     Color? fill,
     Color? borderSubtle,
@@ -216,6 +226,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
   }) {
     return LexiColors(
       surface: surface ?? this.surface,
+      card: card ?? this.card,
       label: label ?? this.label,
       secondaryLabel: secondaryLabel ?? this.secondaryLabel,
       tertiaryLabel: tertiaryLabel ?? this.tertiaryLabel,
@@ -248,6 +259,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
     if (other is! LexiColors) return this;
     return LexiColors(
       surface: Color.lerp(surface, other.surface, t)!,
+      card: Color.lerp(card, other.card, t)!,
       label: Color.lerp(label, other.label, t)!,
       secondaryLabel: Color.lerp(secondaryLabel, other.secondaryLabel, t)!,
       tertiaryLabel: Color.lerp(tertiaryLabel, other.tertiaryLabel, t)!,

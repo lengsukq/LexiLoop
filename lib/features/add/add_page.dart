@@ -24,6 +24,7 @@ import 'package:lexiloop/features/add/widgets/manual_entry_form.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 添加词条页。
 class AddPage extends StatelessWidget {
@@ -142,8 +143,7 @@ class _ArticleImportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(cardPadding),
       child: Column(
@@ -192,8 +192,7 @@ class _CreatedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return LiquidGlass(
-      level: GlassLevel.elevated,
+    return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(cardPadding),
       child: Column(

@@ -48,14 +48,15 @@ const Set<String> functionalLayerFiles = <String>{
 
 void main() {
   group('字号', () {
-    test('lib 里不得出现 fontSize 字面量（token 文件除外）', () {
+    test('lib 里不得出现 fontSize（token 文件除外）', () {
       final violations = <String>[];
+      final pattern = RegExp('fontSize:');
       for (final file in collectDartFiles('lib')) {
         if (file.path.endsWith('ui/theme/lexi_type.dart')) continue;
         for (var i = 0; i < file.lines.length; i += 1) {
-          if (RegExp(r'fontSize:\s*[0-9]').hasMatch(file.lines[i])) {
-            violations.add(file.locate(i + 1));
-          }
+          final line = file.lines[i];
+          if (line.trimLeft().startsWith('//')) continue;
+          if (pattern.hasMatch(line)) violations.add(file.locate(i + 1));
         }
       }
       expect(
@@ -64,7 +65,9 @@ void main() {
         reason:
             '字号必须取自 LexiType（`lib/ui/theme/lexi_type.dart`）。\n'
             '收敛前这里有 25 种字号，其中 6 个是半点值——半点值不是设计决定，\n'
-            ' 是「这次想大一点点」的临时产物。\n'
+            '是「这次想大一点点」的临时产物。\n'
+            '手搓 TextStyle 再借 `LexiType.X.fontSize` 也不行：那样会丢掉 token\n'
+            '的**行高**，多行文本就没有行距。请用 `LexiType.X.copyWith(...)`。\n'
             '违规项：\n${violations.join('\n')}',
       );
     });

@@ -54,10 +54,7 @@ class ErrorRetryView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.secondaryLabel,
-                fontSize: LexiType.body.fontSize,
-              ),
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: _errorButtonGap),
             FilledButton(onPressed: onRetry, child: const Text(retryLabel)),

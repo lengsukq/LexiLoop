@@ -118,10 +118,9 @@ class StudyHintBar extends ConsumerWidget {
         Text(
           pattern,
           key: const Key('study.hint.pattern'),
-          style: TextStyle(
+          style: LexiType.title.copyWith(
             color: context.lexiColors.accent,
             fontFamily: 'monospace',
-            fontSize: LexiType.title.fontSize,
             letterSpacing: 2,
           ),
         ),

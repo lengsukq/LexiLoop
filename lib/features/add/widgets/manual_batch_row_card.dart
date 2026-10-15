@@ -115,9 +115,8 @@ class _RowHeader extends StatelessWidget {
           ),
           child: Text(
             '${entry.index + 1}',
-            style: TextStyle(
+            style: LexiType.caption.copyWith(
               color: colors.accent,
-              fontSize: LexiType.caption.fontSize,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -59,9 +59,8 @@ class SectionCard extends StatelessWidget {
               ],
               Text(
                 title,
-                style: TextStyle(
+                style: LexiType.callout.copyWith(
                   color: colors.label,
-                  fontSize: LexiType.callout.fontSize,
                   fontWeight: FontWeight.w600,
                 ),
               ),

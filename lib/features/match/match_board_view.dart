@@ -172,17 +172,15 @@ class _Card extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               side == MatchSide.word ? pair.word.term : pair.word.definition,
-              style: TextStyle(
-                color: side == MatchSide.word
-                    ? colors.label
-                    : colors.secondaryLabel,
-                fontSize:
-                    (side == MatchSide.word ? LexiType.callout : LexiType.body)
-                        .fontSize,
-                fontWeight: side == MatchSide.word
-                    ? FontWeight.w600
-                    : FontWeight.w400,
-              ),
+              style: (side == MatchSide.word ? LexiType.callout : LexiType.body)
+                  .copyWith(
+                    color: side == MatchSide.word
+                        ? colors.label
+                        : colors.secondaryLabel,
+                    fontWeight: side == MatchSide.word
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  ),
             ),
           ),
         ),

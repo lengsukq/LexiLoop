@@ -30,9 +30,8 @@ class SettlingIndicator extends StatelessWidget {
           const SizedBox(height: _settlingGap),
           Text(
             settlingMessage,
-            style: TextStyle(
+            style: LexiType.body.copyWith(
               color: context.lexiColors.secondaryLabel,
-              fontSize: LexiType.body.fontSize,
             ),
           ),
         ],

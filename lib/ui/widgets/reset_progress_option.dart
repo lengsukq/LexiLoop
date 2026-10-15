@@ -67,18 +67,16 @@ class ResetProgressOption extends StatelessWidget {
               children: <Widget>[
                 Text(
                   resetProgressTitle,
-                  style: TextStyle(
+                  style: LexiType.body.copyWith(
                     color: colors.danger,
-                    fontSize: LexiType.body.fontSize,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: LexiSpace.s2),
                 Text(
                   resetProgressDescription,
-                  style: TextStyle(
+                  style: LexiType.footnote.copyWith(
                     color: colors.secondaryLabel,
-                    fontSize: LexiType.footnote.fontSize,
                   ),
                 ),
               ],

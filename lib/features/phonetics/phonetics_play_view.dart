@@ -114,11 +114,7 @@ class PhoneticPlayView extends StatelessWidget {
   TextStyle _optionStyle(BuildContext context, PhoneticQuestion question) {
     // 两个分支的字号原本是 19 与 16，都落在 `title` 档（17），
     // 因此条件已无意义——保留条件只会让人以为它们不一样。
-    final base = TextStyle(
-      color: context.lexiColors.label,
-      fontSize: LexiType.title.fontSize,
-      fontWeight: FontWeight.w600,
-    );
+    final base = LexiType.title.copyWith(color: context.lexiColors.label);
     return question.challenge.hasPhoneticChoices
         ? base.copyWith(fontFamily: 'monospace')
         : base;

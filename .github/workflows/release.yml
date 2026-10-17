@@ -1,6 +1,12 @@
 # 仓库默认分支是 main（旧 Next.js 版），Flutter 应用在 flutter 分支。
 # GitHub 的「Run workflow」按钮只读取默认分支上的 workflow，
 # 所以本文件放在 main；构建时 checkout 到 inputs.source_ref（默认 flutter）。
+#
+# 版本策略：
+#   - pubspec.yaml 只保留 0.x 基础版本（当前 0.1.0+1）
+#   - CI 取 major.minor（0.1），拼接上海时区时间戳：0.1.<yyyyMMddHHmmss>
+#   - Android versionCode / macOS CFBundleVersion 使用 Unix 秒
+#   - 每次成功构建创建一个 GitHub Release，tag = v<version_name>
 name: Build Release (Android / macOS)
 
 on:
@@ -20,22 +26,54 @@ on:
         required: true
         default: flutter
         type: string
-      build_number:
-        description: "构建号（Android versionCode / macOS CFBundleVersion）；留空使用 run number"
-        required: false
-        default: ""
-        type: string
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: release-${{ inputs.platform }}-${{ inputs.source_ref }}
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      tag: ${{ steps.version.outputs.tag }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+
+      - name: Resolve timestamp version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_VERSION="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | cut -d+ -f1 | cut -d. -f1-2)"
+          if ! [[ "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::无法从 pubspec.yaml 读取 0.x 基础版本：'$BASE_VERSION'"
+            exit 1
+          fi
+          STAMP="$(TZ=Asia/Shanghai date +%Y%m%d%H%M%S)"
+          VERSION_NAME="${BASE_VERSION}.${STAMP}"
+          BUILD_NUMBER="$(date -u +%s)"
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (build $BUILD_NUMBER, source $SOURCE_SHA)"
+
   android:
     name: Android APK
+    needs: prepare
     if: inputs.platform == 'all' || inputs.platform == 'android'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -44,12 +82,14 @@ jobs:
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+      VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -120,10 +160,13 @@ jobs:
         run: |
           set -euo pipefail
           if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-            echo "::error::build_number 必须是纯数字，当前为 '$BUILD_NUMBER'"
+            echo "::error::build number 必须是纯数字，当前为 '$BUILD_NUMBER'"
             exit 1
           fi
-          flutter build apk --release --build-number "$BUILD_NUMBER" --no-pub
+          flutter build apk --release \
+            --build-name "$VERSION_NAME" \
+            --build-number "$BUILD_NUMBER" \
+            --no-pub
           ls -lh build/app/outputs/flutter-apk/app-release.apk
 
       - name: Verify signing certificate
@@ -163,10 +206,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | cut -d+ -f1)"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk \
-            "dist/LexiLoop-${VERSION}-${BUILD_NUMBER}-android.apk"
+            "dist/LexiLoop-${VERSION_NAME}-${BUILD_NUMBER}-android.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -179,16 +221,19 @@ jobs:
 
   macos:
     name: macOS app
+    needs: prepare
     if: inputs.platform == 'all' || inputs.platform == 'macos'
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+      VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -210,10 +255,13 @@ jobs:
         run: |
           set -euo pipefail
           if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-            echo "::error::build_number 必须是纯数字，当前为 '$BUILD_NUMBER'"
+            echo "::error::build number 必须是纯数字，当前为 '$BUILD_NUMBER'"
             exit 1
           fi
-          flutter build macos --release --build-number "$BUILD_NUMBER" --no-pub
+          flutter build macos --release \
+            --build-name "$VERSION_NAME" \
+            --build-number "$BUILD_NUMBER" \
+            --no-pub
 
       - name: Verify ad-hoc signature
         shell: bash
@@ -227,13 +275,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | cut -d+ -f1)"
           APP="build/macos/Build/Products/Release/lexiloop.app"
           ARCHS="$(lipo -archs "$APP/Contents/MacOS/lexiloop" | tr ' ' '-')"
           echo "macOS architectures: $ARCHS"
           mkdir -p dist
           ditto -c -k --keepParent "$APP" \
-            "dist/LexiLoop-${VERSION}-${BUILD_NUMBER}-macos-${ARCHS}.zip"
+            "dist/LexiLoop-${VERSION_NAME}-${BUILD_NUMBER}-macos-${ARCHS}.zip"
 
       - name: Upload macOS zip
         uses: actions/upload-artifact@v4
@@ -243,3 +290,46 @@ jobs:
           if-no-files-found: error
           retention-days: 90
           overwrite: true
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, android, macos]
+    if: always() && needs.prepare.result == 'success' && (needs.android.result == 'success' || needs.android.result == 'skipped') && (needs.macos.result == 'success' || needs.macos.result == 'skipped') && (needs.android.result == 'success' || needs.macos.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION_NAME: ${{ needs.prepare.outputs.version_name }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+      SOURCE_REF: ${{ inputs.source_ref }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: LexiLoop-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          {
+            printf '## LexiLoop %s\n\n' "$VERSION_NAME"
+            printf -- '- Build: %s\n' "$BUILD_NUMBER"
+            printf -- '- Source: %s @ %s\n' "$SOURCE_REF" "$SOURCE_SHA"
+            printf -- '- Android APK：固定发布密钥签名。旧 debug 包首次安装需先导出备份、卸载旧包。\n'
+            printf -- '- macOS zip：ad-hoc 签名、未公证。首次打开请右键「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/lexiloop.app`。\n'
+          } > release-notes.md
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "LexiLoop ${VERSION_NAME}" \
+            --notes-file release-notes.md \
+            --latest

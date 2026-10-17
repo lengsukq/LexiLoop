@@ -11,6 +11,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/app/maintenance_bootstrap.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/services/initialization/job_runner.dart';
+import 'package:lexiloop/services/remote_backup/webdav_auto_backup.dart';
+import 'package:lexiloop/services/remote_backup/webdav_providers.dart';
+
+/// 记录是否被点火的自动备份替身。
+///
+/// 只覆盖 `start` / `dispose`：本测试要钉的是「启动时确实点了火」，
+/// 排期规则由 `test/services/remote_backup/` 单独覆盖。
+class _RecordingAutoBackup implements WebdavAutoBackup {
+  /// `start` 被调用的次数。
+  int starts = 0;
+
+  @override
+  bool get isRunning => starts > 0;
+
+  @override
+  Future<void> start() async => starts += 1;
+
+  @override
+  void dispose() {}
+}
 
 /// 记录调用序列的假执行器。
 class _RecordingRunner implements InitializationJobRunner {
@@ -50,14 +70,19 @@ class _RecordingRunner implements InitializationJobRunner {
 
 void main() {
   late _RecordingRunner runner;
+  late _RecordingAutoBackup autoBackup;
 
-  setUp(() => runner = _RecordingRunner());
+  setUp(() {
+    runner = _RecordingRunner();
+    autoBackup = _RecordingAutoBackup();
+  });
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
           initializationJobRunnerProvider.overrideWithValue(runner),
+          webdavAutoBackupProvider.overrideWithValue(autoBackup),
         ],
         child: const MaterialApp(home: MaintenanceBootstrap(child: _Marker())),
       ),
@@ -75,6 +100,12 @@ void main() {
       'expireBatches',
       'tick',
     ]);
+  });
+
+  testWidgets('启动时同时点火 WebDAV 自动备份', (tester) async {
+    await pumpApp(tester);
+
+    expect(autoBackup.starts, 1, reason: '自动备份的排期应在启动时挂上');
   });
 
   testWidgets('子组件被正常渲染', (tester) async {

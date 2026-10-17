@@ -179,6 +179,8 @@
 | 词库设置（词汇量档位 / 考试目标） | `settings/study-settings-tab.tsx` | 已对齐 | `vocabulary_section.dart` |
 | AI 设置（provider 增删改 / 模型选择 / 参数 / 连通性测试） | `settings/ai-settings-tab.tsx`、`ai-config-card.tsx`、`model-picker-dialog.tsx` | 已对齐 | `settings/ai/**` |
 | 数据管理（备份导出 / 导入 / 重置） | `settings/data-settings-tab.tsx`、`api/backups/**` | 已对齐 | `data_management_section.dart`、`lib/services/backup/**` |
+| WebDAV 远程备份（手动上传 / 远端恢复 / 自动备份） | —（旧版只有服务端本地 `BACKUP_DIR`，无远端交付） | 本版新增 | `lib/services/remote_backup/**`、`lib/data/remote_backup/**`、`features/settings/remote_backup_section.dart` |
+| 局域网同步（发现 + 配对码 + 只读共享 + 拉取时可合并或覆盖） | —（旧版为单机服务端，无设备间直连） | 本版新增 | `lib/services/lan_sync/**`、`lib/services/merge/**`、`lib/data/lan_sync/**`、`features/settings/lan_sync_section.dart` |
 | 4 个小游戏（拼图 / 地鼠 / 堆堆乐 / 俄罗斯方块） | `games/*.tsx` | 已对齐 | `lib/features/games/**`、`lib/domain/games/**` |
 | 听音辨词 / 词义冲刺 | `games/page.tsx:297-310` | 已对齐 | 同上 |
 | 游戏 HUD（倒计时 / 得分 / 连击 / 失误 / 退出） | `components/game-hud.tsx` | 已对齐 | `widgets/game_shell.dart` |

@@ -53,7 +53,9 @@ flutter build macos --debug
 
 **平台差异只允许经由条件导入**：`lib/core/platform.dart`（能力矩阵）、
 `lib/data/db/database_connection.dart`、`lib/app/desktop_window.dart`、
-`lib/services/backup/backup_file.dart`。调用方 import 不带后缀的那个文件，
+`lib/services/backup/backup_file.dart`、
+`lib/data/lan_sync/lan_sync_host.dart` 与 `lan_sync_discovery.dart`。
+调用方 import 不带后缀的那个文件，
 由它 `export ... if (dart.library.js_interop) ...` 选中实现。
 
 ## 数据
@@ -61,7 +63,13 @@ flutter build macos --debug
 - **Drift（SQLite）15 张表**，与旧版 PostgreSQL 逐列对齐
   （`test/data/db/column_names_test.dart` 强制）。原生端落在应用支持目录，
   Web 端落在浏览器存储（IndexedDB / OPFS）。
-- 备份导入/导出是 JSON，12 张表按父子序导入。
+- 备份导入/导出是 JSON，12 张表按父子序导入。另有两套交付方式：
+  - **WebDAV 远程备份**（手动上传 / 远端恢复 / 自动备份），见
+    [`docs/REMOTE_BACKUP.md`](docs/REMOTE_BACKUP.md)；
+  - **局域网同步**（一台开只读共享，另一台发现 + 配对码拉取），见
+    [`docs/LAN_SYNC.md`](docs/LAN_SYNC.md)。不依赖任何服务器；拉取时可选
+    **合并**（默认，两台设备的进度取并集、本机数据一条不删）或 **覆盖**
+    （整份替换）。两边各合并一次即双向一致。
 - **恢复备份后必须失效缓存**：新增任何会读库的顶层 provider，都要登记到
   `lib/features/settings/data_invalidation.dart` 的 `dataBackedProviders`，
   否则恢复后该页面会显示导入前的快照。
@@ -100,11 +108,17 @@ Web 端只用于**自测与验收**，不是主要交付形态：
    它自己是否发 CORS 头。
 2. `window_manager` 在 Web 上不存在，桌面窗口配置走条件导入跳过。
 3. 导出备份在 Web 上走浏览器下载（`share_plus` 的 web 实现）。
+4. **WebDAV 远程备份**能否用取决于服务器是否发 CORS 头；被挡下时给出
+   「请改用桌面端或移动端」的明确文案，而不是「网络不可用」。
+5. **局域网同步完全不可用**：浏览器里既不能监听端口也不能发 UDP 广播。
+   设置页的该分组显示「请改用桌面端或移动端」，且不发任何请求。
 
 ## 文档
 
 | 文档 | 内容 |
 |---|---|
+| [`docs/REMOTE_BACKUP.md`](docs/REMOTE_BACKUP.md) | **远程备份（WebDAV）**：配置、上传/恢复/自动备份的语义、失败模式与取舍 |
+| [`docs/LAN_SYNC.md`](docs/LAN_SYNC.md) | **局域网同步**：协议、发现、配对码、合并/覆盖两种模式、合并规则与重放语义、失败模式与真机清单 |
 | [`docs/FLUTTER_MIGRATION_STATUS.md`](docs/FLUTTER_MIGRATION_STATUS.md) | 迁移进度清单（已完成 / 进行中 / 待办） |
 | [`docs/FLUTTER_PARITY.md`](docs/FLUTTER_PARITY.md) | 与旧版逐条功能对照：已对齐 / 刻意舍弃 / 已知差异 |
 | [`docs/FLUTTER_MIGRATION_REPORT.md`](docs/FLUTTER_MIGRATION_REPORT.md) | 迁移可行性评估：外部服务清单、各层难度、双端差异 |

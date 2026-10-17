@@ -14,9 +14,7 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/games_result_view.dart';
 import 'package:lexiloop/features/games/games_setup_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/settling_indicator.dart';
 
 /// 小游戏页面。
 class GamesPage extends ConsumerStatefulWidget {
@@ -69,7 +67,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
           onAction: controller.dispatch,
           onExit: controller.exit,
         ),
-        GamesSaving() => const _SavingView(),
+        GamesSaving() => const SettlingIndicator(),
         GamesFinished() => GamesResultView(
           finished: state,
           onReplay: () => controller.start(state.result.mode),
@@ -78,30 +76,10 @@ class _GamesPageState extends ConsumerState<GamesPage> {
         GamesSaveFailed() => GameErrorView(
           message: '结算失败：${state.message}',
           onRetry: controller.retrySave,
+          secondaryLabel: resumeRoundLabel,
+          onSecondary: controller.resumeAfterSaveFailure,
         ),
       },
-    );
-  }
-}
-
-class _SavingView extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const CircularProgressIndicator(),
-          const SizedBox(height: LexiSpace.s14),
-          Text(
-            '正在结算…',
-            style: LexiType.body.copyWith(color: colors.secondaryLabel),
-          ),
-        ],
-      ),
     );
   }
 }

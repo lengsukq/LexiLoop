@@ -164,6 +164,13 @@ class MatchController extends Notifier<MatchState> {
   late final GameTicker _ticker = GameTicker(_onTick);
   Timer? _flashTimer;
 
+  /// 最近一次真正开局用的预设。
+  ///
+  /// **为什么不能从状态里读**：结算态是 [MatchFinished]，它只带结果，
+  /// 不带预设——而「再来一局」正是在结算态发生的。把预设记在控制器上，
+  /// 重开就不再依赖「当前状态恰好是准备页」这个不成立的前提。
+  MatchPreset _lastPreset = defaultMatchPreset;
+
   @override
   MatchState build() {
     ref.onDispose(_stopAll);
@@ -174,7 +181,25 @@ class MatchController extends Notifier<MatchState> {
   void selectPreset(MatchPreset preset) {
     final current = state;
     if (current is! MatchSetup) return;
+    _lastPreset = preset;
     state = MatchSetup(preset: preset);
+  }
+
+  /// 从任何状态重开一局，沿用上一次的选择。
+  ///
+  /// **这个方法是修一个「按钮什么都不做」的缺陷**：结算页的「再来一局」
+  /// 原先直接调 [start]，而 [start] 的第一行是
+  /// `if (current is! MatchSetup) return;`。结算态是 [MatchFinished]，
+  /// 于是那次调用静默返回——按钮看起来能按、按下去没有任何反应，
+  /// 用户只会怀疑自己没点中。对比 `GamesController.start(mode)` 没有这个
+  /// 守卫，所以小游戏的「再来一局」是好的，配对与音标是坏的。
+  ///
+  /// 修法不是删掉守卫（那会让进行中的一局被结算态覆盖），而是显式地
+  /// 先把状态推回准备页，再走正常开局。
+  Future<void> restart() async {
+    _stopAll();
+    state = MatchSetup(preset: _lastPreset);
+    await start();
   }
 
   /// 开始一局。
@@ -182,6 +207,7 @@ class MatchController extends Notifier<MatchState> {
     final current = state;
     if (current is! MatchSetup) return;
     final preset = current.preset;
+    _lastPreset = preset;
     _stopAll();
     state = MatchSetup(preset: preset, loading: true);
     try {

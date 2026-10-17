@@ -41,12 +41,18 @@ class MatchPage extends ConsumerWidget {
             exit: '返回',
           ),
           result: state.result,
-          onReplay: controller.start,
+          // **必须走 restart() 而不是 start()**：结算态不是准备态，
+          // start() 的守卫会让这次点击静默失效（按钮看起来能按却没反应）。
+          onReplay: controller.restart,
           onExit: controller.exit,
         ),
         MatchSaveFailed() => GameErrorView(
           message: '结算失败：${state.message}',
           onRetry: controller.retrySave,
+          // 本轮的成绩还在内存里，重试之外应当允许回去接着打完，
+          // 而不是只剩下「从头再来」或「离开」两个都丢进度的选择。
+          secondaryLabel: resumeRoundLabel,
+          onSecondary: controller.resumeAfterSaveFailure,
         ),
       },
     );

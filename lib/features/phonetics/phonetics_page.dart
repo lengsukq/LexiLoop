@@ -34,12 +34,16 @@ class PhoneticsPage extends ConsumerWidget {
         PhoneticSaving() => const SettlingIndicator(),
         PhoneticFinished() => PhoneticsResultView(
           result: state.result,
-          onReplay: controller.start,
+          // 结算态不是准备态：走 restart()，否则 start() 的守卫会让
+          // 「再来一局」静默失效。
+          onReplay: controller.restart,
           onExit: controller.exit,
         ),
         PhoneticSaveFailed() => GameErrorView(
           message: '结算失败：${state.message}',
           onRetry: controller.retrySave,
+          secondaryLabel: resumeRoundLabel,
+          onSecondary: controller.resumeAfterSaveFailure,
         ),
       },
     );

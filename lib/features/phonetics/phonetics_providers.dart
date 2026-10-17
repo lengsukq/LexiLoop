@@ -99,6 +99,15 @@ class PhoneticController extends Notifier<PhoneticState> {
   late final GameTicker _ticker = GameTicker(_onTick);
   Timer? _continueTimer;
 
+  /// 最近一次真正开局用的口音。
+  ///
+  /// 与 `MatchController` 同样的理由：结算态是 [PhoneticFinished]，
+  /// 它不带口音，而「再来一局」正发生在结算态。
+  ///
+  /// 初值与 [PhoneticSetup] 的默认口音保持一致：用户没选过时，
+  /// 重开一局应当等价于「第一次进来按开始」。
+  Accent _lastAccent = const PhoneticSetup().accent;
+
   @override
   PhoneticState build() {
     ref.onDispose(_stopAll);
@@ -109,7 +118,19 @@ class PhoneticController extends Notifier<PhoneticState> {
   void selectAccent(Accent accent) {
     final current = state;
     if (current is! PhoneticSetup) return;
+    _lastAccent = accent;
     state = PhoneticSetup(accent: accent);
+  }
+
+  /// 从任何状态重开一局，沿用上一次的口音。
+  ///
+  /// 修的是与配对页同一类缺陷：结算页的「再来一局」原先直接调 [start]，
+  /// 而 [start] 的守卫要求当前必须是 [PhoneticSetup]，结算态不满足，
+  /// 于是那次调用静默返回——按钮按下去没有任何反应。
+  Future<void> restart() async {
+    _stopAll();
+    state = PhoneticSetup(accent: _lastAccent);
+    await start();
   }
 
   /// 开始一局。
@@ -117,6 +138,7 @@ class PhoneticController extends Notifier<PhoneticState> {
     final current = state;
     if (current is! PhoneticSetup) return;
     final accent = current.accent;
+    _lastAccent = accent;
     _stopAll();
     state = PhoneticSetup(accent: accent, loading: true);
     try {

@@ -154,12 +154,17 @@ class _TowerBlock extends StatelessWidget {
   final String term;
   final int index;
 
-  /// 塔层的配色循环（对应旧版 `TOWER_COLORS`）。
-  static const List<Color> colors = <Color>[
-    Color(0xFFFF9500),
-    Color(0xFF5AC8FA),
-    Color(0xFFAF52DE),
-    Color(0xFF34C759),
+  /// 塔层配色循环。
+  ///
+  /// 收编前这里是四个写死的 iOS 系统色（`0xFFFF9500` / `0xFF5AC8FA` /
+  /// `0xFFAF52DE` / `0xFF34C759`）。游戏方块确实需要可区分的颜色，但这四个
+  /// 值绕过了 `LexiColors`：深色模式下它们不会跟着界面调整，而且与状态徽章、
+  /// 图表用的是两套「橙 / 蓝 / 紫 / 绿」。现在直接用语义色板。
+  static List<Color> colorsOf(LexiColors palette) => <Color>[
+    palette.warning,
+    palette.accent,
+    palette.purple,
+    palette.success,
   ];
 
   @override
@@ -169,7 +174,7 @@ class _TowerBlock extends StatelessWidget {
       height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: colors[index % colors.length],
+        color: colorsOf(context.lexiColors)[index % blockColorCount],
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: Text(
@@ -177,6 +182,7 @@ class _TowerBlock extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: LexiType.footnote.copyWith(
+          // 白字压在饱和填充上（见 tetris 同一处注释）。
           color: Colors.white,
           fontWeight: FontWeight.w700,
         ),
@@ -187,3 +193,6 @@ class _TowerBlock extends StatelessWidget {
 
 /// 堆塔区高度——固定高度让塔身增长时下方的操作区不位移。
 const double _stackAreaHeight = 108;
+
+/// 塔层配色的循环长度。
+const int blockColorCount = 4;

@@ -21,6 +21,14 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
+/// 「再试一次」按钮的 Key，供回归测试定位。
+///
+/// 这个 key 存在的理由是一类缺陷：**界面上有一个看起来能做的事，
+/// 但唯一能走到它的路被自己关掉了**。错答之后的状态正是如此——
+/// 文案说有重选的机会，选项格却已被禁用且领域层会忽略点击。
+/// 有了 key，测试可以直接钉住「错答后仍然存在一个能把状态推回去的动作」。
+const Key phoneticRetryKey = Key('phonetics-retry');
+
 /// 音标训练进行中页面。
 class PhoneticPlayView extends StatelessWidget {
   /// 以进行中状态与回调构造。
@@ -67,15 +75,6 @@ class PhoneticPlayView extends StatelessWidget {
                   promptStyle: _optionStyle(context, question),
                   enabled: !quiz.revealed && !quiz.hasWrongSelection,
                 ),
-                if (quiz.hasWrongSelection) ...<Widget>[
-                  const SizedBox(height: LexiSpace.s10),
-                  Text(
-                    '不对，再听一次后重新选择',
-                    style: LexiType.body.copyWith(
-                      color: context.lexiColors.danger,
-                    ),
-                  ),
-                ],
                 if (quiz.revealed) ...<Widget>[
                   const SizedBox(height: LexiSpace.s14),
                   _Analysis(entry: question.entry),
@@ -83,6 +82,38 @@ class PhoneticPlayView extends StatelessWidget {
                   FilledButton(
                     onPressed: () => onAction(const ContinuePhonetic()),
                     child: const Text('继续'),
+                  ),
+                ] else if (quiz.hasWrongSelection) ...<Widget>[
+                  // **错答之后必须给一个真的能用的出口**。
+                  //
+                  // 收敛前这里只显示一行「不对，再听一次后重新选择」，
+                  // 但 `enabled: !quiz.revealed && !quiz.hasWrongSelection`
+                  // 已经把选项格禁用，而 `_choose`（`domain/phonetics/quiz.dart`）
+                  // 在 `hasWrongSelection` 为真时直接返回原状态——**点也没有用**。
+                  // 界面因此教了一件假事：它让用户以为可以重选，实际唯一的
+                  // 出路是下面那个「跳过这题」，而跳过会把这一题记成 missed。
+                  //
+                  // 真话版本：明确说清「要重选就得先清掉这次错答」，
+                  // 并把清标记的动作做成按钮——`ContinuePhonetic` 在未揭示时
+                  // 走的正是 `clearSelected`（`quiz.dart:_continue`），
+                  // 所以它清掉标记后选项格会重新可用。
+                  const SizedBox(height: LexiSpace.s10),
+                  Text(
+                    '不对。要重新选择，请先点下面的「再试一次」。',
+                    style: LexiType.body.copyWith(
+                      color: context.lexiColors.danger,
+                    ),
+                  ),
+                  const SizedBox(height: LexiSpace.s12),
+                  FilledButton(
+                    key: phoneticRetryKey,
+                    onPressed: () => onAction(const ContinuePhonetic()),
+                    child: const Text('再试一次'),
+                  ),
+                  const SizedBox(height: LexiSpace.s8),
+                  TextButton(
+                    onPressed: () => onAction(const SkipPhonetic()),
+                    child: const Text('跳过这题'),
                   ),
                 ] else ...<Widget>[
                   const SizedBox(height: LexiSpace.s12),

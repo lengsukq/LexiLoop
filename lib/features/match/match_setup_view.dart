@@ -5,10 +5,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 
 /// 配对准备页。
 class MatchSetupView extends StatelessWidget {
@@ -34,18 +36,18 @@ class MatchSetupView extends StatelessWidget {
     final colors = context.lexiColors;
     return ListView(
       children: <Widget>[
-        Text(
-          '限时词汇配对',
-          style: LexiType.page.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
+        // **准备阶段必须能离开这一页**：`/match` 是顶层路由，没有侧边栏，
+        // 而 `exit()` 只是把状态退回 `MatchSetup`——也就是用户已经站着的
+        // 地方。此前准备页唯一的出口是浏览器/系统的返回手势，
+        // 桌面端等于没有。这里用统一的返回动作：能出栈就出栈，否则回训练页。
+        PageHeader(
+          title: '限时词汇配对',
+          subtitle: '将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。',
+          leading: backButton(
+            context,
+            preferPop: false,
+            fallbackLocation: gamesPath,
           ),
-        ),
-        const SizedBox(height: LexiSpace.s4),
-        Text(
-          '将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。',
-          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s16),
         for (final preset in matchPresets)

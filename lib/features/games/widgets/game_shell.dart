@@ -8,7 +8,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -26,22 +25,22 @@ class GameScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 背景由顶层路由的包装统一画（`app/router.dart` 的 `_capped`）：
+    // 这里再画一层会让小游戏/配对/音标比其他页光斑更浓。
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AmbientBackground(
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  LexiSpace.s16,
-                  LexiSpace.s12,
-                  LexiSpace.s16,
-                  LexiSpace.s16,
-                ),
-                child: child,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                LexiSpace.s16,
+                LexiSpace.s12,
+                LexiSpace.s16,
+                LexiSpace.s16,
               ),
+              child: child,
             ),
           ),
         ),
@@ -159,16 +158,40 @@ class _Stat extends StatelessWidget {
   }
 }
 
+/// 结算失败页上「回到刚才那一轮」的按钮文案。
+///
+/// 三个家族（小游戏 / 配对 / 音标）共用同一个说法：用户看到的应当是
+/// 「我的一轮还在」，而不是「重试」这种对自己没把握的词。
+const String resumeRoundLabel = '继续本轮';
+
 /// 错误态：带重试按钮的中文提示。
+///
+/// **为什么有第二个出口**：结算失败时这一轮的成绩还在内存里
+/// （`MatchSaveFailed.previous` / `PhoneticSaveFailed.previous`），
+/// 三个控制器也各自提供了 `resumeAfterSaveFailure()` 回到那一轮。
+/// 收敛前那个方法**零调用**，界面上只有「重试」——对用户来说
+/// 「重试」失败之后的选择只剩离开，而离开就把刚打完的一轮丢了。
 class GameErrorView extends StatelessWidget {
-  /// 以提示与重试回调构造。
-  const new({required this.message, required this.onRetry, super.key});
+  /// 以提示、重试回调与可选第二出口构造。
+  const new({
+    required this.message,
+    required this.onRetry,
+    this.secondaryLabel,
+    this.onSecondary,
+    super.key,
+  });
 
   /// 提示文案。
   final String message;
 
   /// 重试回调。
   final VoidCallback onRetry;
+
+  /// 第二出口的文案。
+  final String? secondaryLabel;
+
+  /// 第二出口的回调。
+  final VoidCallback? onSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +210,19 @@ class GameErrorView extends StatelessWidget {
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: LexiSpace.s14),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (secondaryLabel != null && onSecondary != null) ...<Widget>[
+                  OutlinedButton(
+                    onPressed: onSecondary,
+                    child: Text(secondaryLabel!),
+                  ),
+                  const SizedBox(width: LexiSpace.s12),
+                ],
+                FilledButton(onPressed: onRetry, child: const Text('重试')),
+              ],
+            ),
           ],
         ),
       ),

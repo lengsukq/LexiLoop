@@ -112,7 +112,9 @@ class _Block extends StatelessWidget {
       width: _blockWidth,
       height: WordTetrisView.blockHeight,
       child: Material(
-        color: shaking ? context.lexiColors.danger : const Color(0xFF5856D6),
+        // 方块底色取语义强调色，而不是写死的靛蓝：写死的色值在深色模式下
+        // 不会跟着调整，且与界面其它地方的强调色不是同一个蓝。
+        color: shaking ? context.lexiColors.danger : context.lexiColors.accent,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
         child: InkWell(
           onTap: onTap,
@@ -126,6 +128,9 @@ class _Block extends StatelessWidget {
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 style: LexiType.caption.copyWith(
+                  // 白字压在饱和填充上：这是「填充上的文字」而不是
+                  // 「文字色」，所以不走 `*Text` 那一组（它们是为浅色底
+                  // 上的文字准备的深色变体）。
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                 ),

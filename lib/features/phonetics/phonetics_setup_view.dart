@@ -13,10 +13,12 @@ import 'package:lexiloop/domain/phonetics/catalog.dart';
 import 'package:lexiloop/features/games/widgets/game_result_panel.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/services/game_service.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 音标训练准备页。
@@ -43,19 +45,17 @@ class PhoneticsSetupView extends StatelessWidget {
     final colors = context.lexiColors;
     return ListView(
       children: <Widget>[
-        Text(
-          '音标辨音训练',
-          style: LexiType.page.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
+        // 与配对页同一条理由：顶层路由的准备页必须能离开这一页。
+        PageHeader(
+          title: '音标辨音训练',
+          subtitle:
+              '听音、音标与单词三向匹配。每轮 $phoneticItemCount 题 / '
+              '$phoneticDurationSeconds 秒，解析里给出 48 音标目录的发音要领。',
+          leading: backButton(
+            context,
+            preferPop: false,
+            fallbackLocation: gamesPath,
           ),
-        ),
-        const SizedBox(height: LexiSpace.s4),
-        Text(
-          '听音、音标与单词三向匹配。每轮 $phoneticItemCount 题 / '
-          '$phoneticDurationSeconds 秒，解析里给出 48 音标目录的发音要领。',
-          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s16),
         Text(

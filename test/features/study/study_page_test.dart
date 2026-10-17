@@ -322,7 +322,7 @@ void main() {
     expect(sessionOf(container).completedCount, 1);
   });
 
-  testWidgets('提交后自评按钮禁用，重复点击不会重复推进', (tester) async {
+  testWidgets('提交后自评四档收起，误触不会重复推进', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     await insertWord(term: 'banana', meaning: '香蕉');
     await insertSession(
@@ -336,15 +336,16 @@ void main() {
     await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
 
-    // 再点一次「记得」不应产生第二次作答。
-    await tester.tap(find.text('记得'), warnIfMissed: false);
-    await tester.pumpAndSettle();
+    // 提交后整排自评收起：既点不动，也不可能被误触产生第二次作答。
+    // 这一排此前是「变灰但仍占位」，判定与「下一题」被推到折叠线之外，
+    // 用户按完回车只看到按钮灰掉。收起来同时解决两个问题。
+    for (final label in <String>['忘了', '模糊', '简单']) {
+      expect(find.text(label), findsNothing, reason: '$label 提交后应当收起');
+    }
     expect(sessionOf(container).completedCount, 1);
 
-    // 其余档位同样不可点。
-    await tester.tap(find.text('简单'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-    expect(sessionOf(container).completedCount, 1);
+    // 判定与「下一题」就在原地，不必滚到下面去找。
+    expect(find.text('下一题'), findsOneWidget);
   });
 
   testWidgets('答错时反馈区显示期望答案', (tester) async {
@@ -381,7 +382,7 @@ void main() {
     expect(find.text('回答正确'), findsOneWidget);
   });
 
-  testWidgets('四档自评始终可见，作答后才可点', (tester) async {
+  testWidgets('四档自评在作答期间可见，提交后交给判定面板', (tester) async {
     final wordId = await insertWord(term: 'apple', meaning: '苹果');
     await insertSession(
       wordId: wordId,
@@ -400,7 +401,12 @@ void main() {
 
     await tester.tap(find.text('记得'));
     await tester.pumpAndSettle();
-    expect(find.text('已记录的等级'), findsOneWidget);
+
+    // 提交后这一排由判定面板接替；自评分数仍在面板里写出来
+    // （「自评：记得」），所以收起并不丢信息。
+    expect(find.text('已记录的等级'), findsNothing);
+    expect(find.textContaining('回答'), findsWidgets);
+    expect(find.text('下一题'), findsOneWidget);
   });
 
   testWidgets('看词说义点自评即提交', (tester) async {

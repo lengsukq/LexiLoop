@@ -28,15 +28,33 @@ class StudyLoadingView extends StatelessWidget {
 }
 
 /// 错误态。
+///
+/// **必须有第二个出口**：学习页是沉浸路由——窄屏下外壳连底部 Tab Bar
+/// 都不渲染，全应用也没有一处 `PopScope`。于是「加载失败」曾经是一个
+/// 真正的死胡同：能点的只有「重试」，如果失败原因是持久的（词条数据损坏、
+/// 库被占用），用户只能杀掉应用。这不是理论问题，它是同一份代码里
+/// 上一个空态页被修掉的原因（见文件头注释），只是错误态漏了。
 class StudyErrorView extends StatelessWidget {
-  /// 以错误文案与重试回调构造。
-  const new({required this.message, required this.onRetry, super.key});
+  /// 以错误文案、重试回调与退出回调构造。
+  const new({
+    required this.message,
+    required this.onRetry,
+    required this.onExit,
+    this.exitLabel = '返回首页',
+    super.key,
+  });
 
   /// 面向用户的错误文案。
   final String message;
 
   /// 重试回调。
   final VoidCallback onRetry;
+
+  /// 离开本页的回调；沉浸路由上这是唯一的退路，因此必填。
+  final VoidCallback onExit;
+
+  /// 退出按钮的文案。
+  final String exitLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -55,12 +73,31 @@ class StudyErrorView extends StatelessWidget {
               style: LexiType.body.copyWith(color: colors.secondaryLabel),
             ),
             const SizedBox(height: LexiSpace.s14),
-            ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: studyButtonHeight,
-                minWidth: 120,
-              ),
-              child: FilledButton(onPressed: onRetry, child: const Text('重试')),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: studyButtonHeight,
+                    minWidth: 120,
+                  ),
+                  child: OutlinedButton(
+                    onPressed: onExit,
+                    child: Text(exitLabel),
+                  ),
+                ),
+                const SizedBox(width: LexiSpace.s12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: studyButtonHeight,
+                    minWidth: 120,
+                  ),
+                  child: FilledButton(
+                    onPressed: onRetry,
+                    child: const Text('重试'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

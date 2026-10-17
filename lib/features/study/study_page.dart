@@ -40,7 +40,6 @@ import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_states.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/fsrs_scheduler.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 四档自评快捷键 `1`–`4` 对应的数字键。
@@ -74,24 +73,44 @@ class StudyPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AmbientBackground(
-        child: SafeArea(
-          child: session.when(
-            loading: () =>
-                StudySessionBody(mode: mode, session: null, accent: accent),
-            error: (error, _) => StudyErrorView(
-              message: studyErrorMessage(error),
-              // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
-              // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
-              onRetry: () => ref.invalidate(studySessionProvider),
-            ),
-            data: (view) =>
-                StudySessionBody(mode: mode, session: view, accent: accent),
+      body: SafeArea(
+        child: session.when(
+          loading: () =>
+              StudySessionBody(mode: mode, session: null, accent: accent),
+          error: (error, _) => StudyErrorView(
+            message: studyErrorMessage(error),
+            // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
+            // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
+            onRetry: () => ref.invalidate(studySessionProvider),
+            // 沉浸路由上没有导航外壳可以依赖，这一条是唯一的退路。
+            onExit: () => leaveStudyToHome(context),
           ),
+          data: (view) =>
+              StudySessionBody(mode: mode, session: view, accent: accent),
         ),
       ),
     );
   }
+}
+
+/// 离开学习页：明确回首页，而不是指望返回栈。
+///
+/// 旧版这里是 `<Link href="/">退出</Link>`（`study-client.tsx:554`），
+/// 结算页的「返回今日」同样是 `href="/"`。本函数照旧版做。
+///
+/// 无路由器时（部分 widget 测试直接 `home: StudyPage(...)`）退回出栈，
+/// 保持这些测试的可运行性。
+///
+/// **抽成顶层函数而不是留在 State 里**：错误态与正常退出必须走同一条路。
+/// 两份实现里漏掉「无路由器」兜底的那一份，迟早正好是用户真正会撞上的
+/// 那条分支。
+void leaveStudyToHome(BuildContext context) {
+  final router = GoRouter.maybeOf(context);
+  if (router == null) {
+    Navigator.maybePop(context);
+    return;
+  }
+  router.go('/');
 }
 
 /// 会话主体：持有作答草稿与判定反馈，编排各子组件。
@@ -244,9 +263,20 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
         const SizedBox(height: LexiSpace.s16),
         ..._hintSection(item),
         _answerSection(item),
-        const SizedBox(height: LexiSpace.s20),
-        _ratingSection(item),
-        ..._feedbackSection(item),
+        // **提交之后不再留那排灰掉的自评按钮**。
+        //
+        // 收敛前这里是「自评四档 + 判定面板 + 下一题」三块依次堆着：
+        // 提交后四档整排变灰（既点不动也没信息），判定与「下一题」被推到
+        // 它们下面——在 840 高的窗口里通常已经在折叠线之外，于是用户按下
+        // 回车后看到的唯一变化是「按钮灰了」，而真正该看的东西看不到。
+        //
+        // 自评分数并没有丢：`StudyFeedbackPanel` 自己会写「自评：记得」
+        // 与下次复习间隔，那才是这一排按钮在提交后唯一还值得说的信息。
+        if (_outcome == null) ...<Widget>[
+          const SizedBox(height: LexiSpace.s20),
+          _ratingSection(item),
+        ] else
+          ..._feedbackSection(item),
       ],
     );
   }
@@ -612,12 +642,5 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   ///
   /// 无路由器时（部分 widget 测试直接 `home: StudyPage(...)`）退回出栈，
   /// 保持这些测试的可运行性。
-  void _leaveToHome() {
-    final router = GoRouter.maybeOf(context);
-    if (router == null) {
-      Navigator.maybePop(context);
-      return;
-    }
-    router.go('/');
-  }
+  void _leaveToHome() => leaveStudyToHome(context);
 }

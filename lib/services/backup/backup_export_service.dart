@@ -15,15 +15,10 @@
 library;
 
 import 'package:lexiloop/core/constants.dart';
-import 'package:lexiloop/core/date_key.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/services/backup/backup_file.dart';
-
-/// 导出文件名的固定前缀。
-///
-/// 让用户在「文件」应用里一眼认出这是备份，而不是某个临时文件。
-const String backupFilePrefix = 'lexiloop-backup-';
+import 'package:lexiloop/services/backup/backup_naming.dart';
 
 /// 一次成功导出后交给 UI 汇报的结果。
 class SharedBackupExport {
@@ -69,7 +64,7 @@ class BackupExportService {
     }
 
     // 文件名先算好再交付：交付层不必再关心时间戳的格式。
-    final filename = _fileName();
+    final filename = backupFileName(DateTime.now());
     await shareBackupBytes(bytes: result.bytes, fileName: filename);
     return SharedBackupExport(
       result: result,
@@ -77,20 +72,4 @@ class BackupExportService {
       filename: filename,
     );
   }
-
-  /// 带时间戳的备份文件名，例如 `lexiloop-backup-2026-10-14-222752.json`。
-  ///
-  /// 日期段走 `dateKey`，与旧版 `/api/backups/json` 的
-  /// `Content-Disposition` 用的是同一套 `YYYY-MM-DD`；前缀与时分秒是纯本地版
-  /// 新增的——旧版每次导出覆盖同名文件，本地版需要让多次导出能并排存放。
-  String _fileName() {
-    final now = DateTime.now();
-    return '$backupFilePrefix${dateKey(now.millisecondsSinceEpoch)}'
-        '-${_pad(now.hour)}${_pad(now.minute)}${_pad(now.second)}.json';
-  }
 }
-
-/// 两位补零，让文件名里的时间字段能按字典序排序。
-String _pad(int value) =>
-    // 宽度就是「一位数字 + 补位」里的两位，没有语义可命名。
-    value.toString().padLeft(2, '0'); // guard:allow-magic

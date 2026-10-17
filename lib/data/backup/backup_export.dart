@@ -20,6 +20,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/domain/models/webdav_settings.dart';
 
 /// 备份格式的版本号。
 ///
@@ -94,7 +95,8 @@ class BackupExporter {
   /// [BackupImporter] 的拒绝条件一致——导出器多拒的那部分只是「字节数比字符
   /// 数大」的文件，两边不会各自接受对方产不出的东西。
   Future<BackupExportResult> exportToJson() async {
-    final tables = await _readTables();
+    final tables = await readAllTables();
+    _stripSecrets(tables);
     final bytes = utf8.encode(jsonEncode(_envelope(tables)));
     if (bytes.length > maxBackupBytes) {
       throw ValidationError(
@@ -110,16 +112,52 @@ class BackupExporter {
     );
   }
 
-  /// 按 [tableOrder] 逐表读出全部行。
-  Future<Map<String, List<Map<String, Object?>>>> _readTables() async {
+  /// 按 [tableOrder] 逐表读出全部行（**原样，不剥密码**）。
+  ///
+  /// **为什么公开且不剥密码**：合并同步需要本机行的原值——它不把数据发出去，
+  /// 而是拿本机行与收到的行做合并再写回库里。若读出来的行已经被剥掉
+  /// WebDAV 密码，合并写回时那个密码就被抹掉了。
+  ///
+  /// 剥密码是**导出**这一个动作的事，因此挪到了 [exportToJson] 里、
+  /// 读表之后，而不是读表的时候。
+  Future<Map<String, List<Map<String, Object?>>>> readAllTables() async {
     final tables = <String, List<Map<String, Object?>>>{};
     for (final table in tableOrder) {
       final rows = await _db.customSelect('SELECT * FROM $table').get();
       tables[table] = rows
           .map((row) => _rowToJson(row.data))
-          .toList(growable: false);
+          // **必须是可增长列表**：合并同步会就地往这些列表里追加远端行，
+          // 再整份交给导入事务。固定的列表会让那条路径当场抛异常。
+          .toList();
     }
     return tables;
+  }
+
+  /// 从导出行里去掉不应外流的凭据。
+  ///
+  /// 只处理 `settings` 表的 `webdavBackup` 一个键：`llmConfig` 里的 API Key
+  /// 保持原样，因为「换机迁移」本来就是导出备份的主要用途之一，
+  /// 而 WebDAV 密码是唯一一个「文件本身会被送到凭据所属的那台服务器」的情况。
+  void _stripSecrets(Map<String, List<Map<String, Object?>>> tables) {
+    final rows = tables['settings'];
+    if (rows == null) return;
+    for (final row in rows) {
+      if (row['key'] != webdavSettingsKey) continue;
+      final decoded = _decodeSettingValue(row['value_json']);
+      if (decoded != null) {
+        row['value_json'] = jsonEncode(webdavValueForExport(decoded));
+      }
+    }
+  }
+
+  /// 解析 `settings.value_json` 这一列；不是合法 JSON 时返回 `null`。
+  Object? _decodeSettingValue(Object? raw) {
+    if (raw is! String || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw);
+    } on FormatException {
+      return null;
+    }
   }
 
   /// 包一层信封。

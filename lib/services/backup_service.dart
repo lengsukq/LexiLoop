@@ -4,12 +4,10 @@
 /// 这里负责平台交互（文件选择）与错误归一化。
 library;
 
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
+import 'package:lexiloop/services/backup/backup_bytes.dart';
 
 /// 备份导入服务。
 class BackupService {
@@ -35,22 +33,7 @@ class BackupService {
     // 仅在 scheme 为 file 时非空）。只有字节流是各端都可靠的读取方式，
     // 与 `csv_import_service.dart` 的取法一致。
     final bytes = await files.first.readAsBytes();
-    final result = await _importer.import(_decodeUtf8(bytes));
+    final result = await _importer.import(decodeBackupUtf8(bytes));
     return result;
-  }
-}
-
-/// 把备份字节解码成文本。
-///
-/// 非法 UTF-8 在旧实现里会从 `readAsStringSync()` 抛出裸 `FormatException`，
-/// 越过「导入失败抛 AppError」的约定；这里统一归一成备份格式错误。
-String _decodeUtf8(Uint8List bytes) {
-  try {
-    return utf8.decode(bytes);
-  } on FormatException catch (error) {
-    throw ValidationError(
-      AppErrorCode.backupInvalidFormat,
-      details: '备份文件不是合法的 UTF-8 文本：${error.message}',
-    );
   }
 }

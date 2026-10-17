@@ -113,6 +113,76 @@ class BackupImportResult {
   int get totalRows => rowCounts.values.fold(0, (sum, count) => sum + count);
 }
 
+/// 解析一份备份的原始文本，返回「表名 → 行」。
+///
+/// **为什么把解析与写入拆开**：导入（全量替换）与合并同步都需要这份解析，
+/// 而它们对「写进去什么」有完全不同的打算。解析只负责「这份文件是不是
+/// 一份合法备份」，写库由 [BackupImporter.replaceAll] 负责。
+///
+/// 表集合恒为 [BackupImporter.tableOrder]；备份里缺的表返回空列表，
+/// 备份里多的表被忽略（前进兼容）。
+Map<String, List<Map<String, Object?>>> parseBackupPayload(String raw) {
+  if (raw.length > maxBackupBytes) {
+    throw const ValidationError(AppErrorCode.backupTooLarge);
+  }
+  final decoded = _decodeBackupJson(raw);
+  _assertBackupHeader(decoded);
+
+  final result = <String, List<Map<String, Object?>>>{};
+  for (final table in BackupImporter.tableOrder) {
+    result[table] = _parseBackupTable(
+      table,
+      decoded is Map<String, Object?> ? decoded[table] : null,
+    );
+  }
+  return result;
+}
+
+Object? _decodeBackupJson(String raw) {
+  try {
+    return jsonDecode(raw);
+  } on FormatException catch (error) {
+    throw ValidationError(
+      AppErrorCode.backupInvalidJson,
+      details: error.message,
+    );
+  }
+}
+
+void _assertBackupHeader(Object? decoded) {
+  if (decoded is! Map<String, Object?>) {
+    throw const ValidationError(AppErrorCode.backupInvalidFormat);
+  }
+  if (decoded['format'] != backupFormat) {
+    throw const ValidationError(AppErrorCode.backupInvalidFormat);
+  }
+  if (decoded['version'] is! num) {
+    throw const ValidationError(AppErrorCode.backupInvalidFormat);
+  }
+}
+
+List<Map<String, Object?>> _parseBackupTable(String table, Object? value) {
+  if (value == null) return const <Map<String, Object?>>[];
+  if (value is! List) {
+    throw ValidationError(
+      AppErrorCode.backupInvalidFormat,
+      details: '表 $table 不是数组',
+    );
+  }
+
+  final rows = <Map<String, Object?>>[];
+  for (final row in value) {
+    if (row is! Map<String, Object?>) {
+      throw ValidationError(
+        AppErrorCode.backupInvalidFormat,
+        details: '表 $table 含非法行',
+      );
+    }
+    rows.add(row);
+  }
+  return rows;
+}
+
 /// 旧版备份的导入器。
 class BackupImporter {
   /// 以数据库构造导入器。
@@ -143,11 +213,25 @@ class BackupImporter {
   ///
   /// 整个过程在**单个事务**内完成：要么全部替换成功，要么原数据不变。
   /// 导入前会清空这 12 张表——旧版的语义就是「全量替换」。
-  Future<BackupImportResult> import(String raw) async {
-    if (raw.length > maxBackupBytes) {
-      throw const ValidationError(AppErrorCode.backupTooLarge);
-    }
-    final tables = _parse(raw);
+  ///
+  /// 用 `Future.sync` 而不是裸调用：解析是同步的，它的异常必须变成
+  /// **Future 的失败**而不是同步抛出——本地导入、远端恢复、局域网拉取三条
+  /// 链路都把它当 Future 处理（`on AppError catch` 挂在 await 上）。
+  Future<BackupImportResult> import(String raw) =>
+      Future<BackupImportResult>.sync(
+        () => replaceAll(parseBackupPayload(raw)),
+      );
+
+  /// 用一批**已经解析好的行**整体替换这 12 张表。
+  ///
+  /// **为什么单独暴露这一层**：合并同步先在自己的数据结构里算出「合并后的 12 张表」，
+  /// 再交给这里落库。让合并自己重新实现一遍「清表 + 按父表序插入 + 重算统计」，
+  /// 就是又一处需要与这里同步维护、且更难测的写事务。
+  ///
+  /// 传入的映射里缺少某张表时按空表处理（与「备份里没有这张表」同义）。
+  Future<BackupImportResult> replaceAll(
+    Map<String, List<Map<String, Object?>>> tables,
+  ) async {
     final rowCounts = <String, int>{};
 
     await _db.transaction(() async {
@@ -169,65 +253,6 @@ class BackupImporter {
       rowCounts: rowCounts,
       recomputedStats: stats.read<int>('c'),
     );
-  }
-
-  Map<String, List<Map<String, Object?>>> _parse(String raw) {
-    final decoded = _decode(raw);
-    _assertHeader(decoded);
-
-    final result = <String, List<Map<String, Object?>>>{};
-    for (final table in tableOrder) {
-      result[table] = _parseTable(
-        table,
-        decoded is Map<String, Object?> ? decoded[table] : null,
-      );
-    }
-    return result;
-  }
-
-  Object? _decode(String raw) {
-    try {
-      return jsonDecode(raw);
-    } on FormatException catch (error) {
-      throw ValidationError(
-        AppErrorCode.backupInvalidJson,
-        details: error.message,
-      );
-    }
-  }
-
-  void _assertHeader(Object? decoded) {
-    if (decoded is! Map<String, Object?>) {
-      throw const ValidationError(AppErrorCode.backupInvalidFormat);
-    }
-    if (decoded['format'] != backupFormat) {
-      throw const ValidationError(AppErrorCode.backupInvalidFormat);
-    }
-    if (decoded['version'] is! num) {
-      throw const ValidationError(AppErrorCode.backupInvalidFormat);
-    }
-  }
-
-  List<Map<String, Object?>> _parseTable(String table, Object? value) {
-    if (value == null) return const <Map<String, Object?>>[];
-    if (value is! List) {
-      throw ValidationError(
-        AppErrorCode.backupInvalidFormat,
-        details: '表 $table 不是数组',
-      );
-    }
-
-    final rows = <Map<String, Object?>>[];
-    for (final row in value) {
-      if (row is! Map<String, Object?>) {
-        throw ValidationError(
-          AppErrorCode.backupInvalidFormat,
-          details: '表 $table 含非法行',
-        );
-      }
-      rows.add(row);
-    }
-    return rows;
   }
 
   /// 清空待导入的表（子表在前，避免外键报错）。

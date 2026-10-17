@@ -10,10 +10,12 @@
 /// 对应旧版：服务端由常驻进程 + 定时任务驱动；本地单进程改用 Timer。
 library;
 
+// `unawaited` 来自 dart:async，定时器本身已搬到 one_shot_timer.dart。
 import 'dart:async';
 
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/services/initialization/job_runner.dart';
+import 'package:lexiloop/services/scheduling/one_shot_timer.dart';
 
 /// 后台一批跑完后回调，入参是这一批实际处理的任务数。
 ///
@@ -21,35 +23,6 @@ import 'package:lexiloop/services/initialization/job_runner.dart';
 /// 只能靠「后台跑完了」这个信号来刷新，而不是自己轮询。
 /// 传 0 表示这批无事可做，监听方应据此跳过刷新。
 typedef MaintenanceTickListener = void Function(int processed);
-
-/// 一次性的延迟定时器。
-///
-/// **为什么要抽象出这一层**：真实实现是可取消的 [Timer]，`dispose()` 靠它
-/// 收回挂起的回调；测试实现则由用例手动触发，从而不需要真的等待墙钟。
-/// 守卫要求 `dispose` 之后不留任何挂起定时器（否则 `testWidgets` 结尾会报
-/// 「A Timer is still pending」），而把 `Future.delayed` 当作延迟原语是
-/// 拿不到句柄的、取消不掉的。
-abstract interface class MaintenanceTimer {
-  /// 取消尚未到期的回调；已触发的实现应什么都不做。
-  void cancel();
-}
-
-/// 创建 [duration] 后回调 [onElapsed] 的一次性定时器。
-typedef MaintenanceTimerFactory = MaintenanceTimer Function(
-  Duration duration,
-  void Function() onElapsed,
-);
-
-/// 真实定时器：[Timer] 的薄适配层，只为满足 [MaintenanceTimer]。
-class _RealMaintenanceTimer implements MaintenanceTimer {
-  new(Duration duration, void Function() onElapsed)
-    : _timer = Timer(duration, onElapsed);
-
-  final Timer _timer;
-
-  @override
-  void cancel() => _timer.cancel();
-}
 
 /// 后台维护的配置。
 class MaintenancePolicy {
@@ -104,7 +77,7 @@ class InitializationMaintenance {
     this._runner, [
     this._policy = const MaintenancePolicy(),
     this._clock = _wallClockMs,
-    this._timerFactory = _createRealTimer,
+    this._timerFactory = createRealMaintenanceTimer,
   ]);
 
   final InitializationJobRunner _runner;
@@ -244,8 +217,3 @@ class InitializationMaintenance {
 }
 
 int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;
-
-MaintenanceTimer _createRealTimer(
-  Duration duration,
-  void Function() onElapsed,
-) => _RealMaintenanceTimer(duration, onElapsed);

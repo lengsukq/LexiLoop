@@ -13,6 +13,8 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/services/initialization/initialization_maintenance.dart';
 import 'package:lexiloop/services/initialization/job_runner.dart';
+// 定时器接缝已搬到独立文件：初始化维护与远程备份共用同一个一次性定时器。
+import 'package:lexiloop/services/scheduling/one_shot_timer.dart';
 
 /// 假执行器要抛出的异常。
 class FakeFailure implements Exception {

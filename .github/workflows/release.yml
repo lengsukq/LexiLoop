@@ -124,6 +124,7 @@ jobs:
             exit 1
           fi
           flutter build apk --release --build-number "$BUILD_NUMBER" --no-pub
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
 
       - name: Verify signing certificate
         shell: bash
@@ -131,13 +132,27 @@ jobs:
           set -euo pipefail
           APK="build/app/outputs/flutter-apk/app-release.apk"
           APKSIGNER="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::找不到 apksigner"
+            exit 1
+          fi
+          echo "apksigner: $APKSIGNER"
+          "$APKSIGNER" --version || true
           EXPECTED="$(keytool -list -v \
             -keystore android/app/lexiloop-release.jks \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -alias "$ANDROID_KEY_ALIAS" \
-            | awk -F': ' '/SHA256:/{print tolower($2); exit}')"
-          ACTUAL="$("$APKSIGNER" verify --print-certs "$APK" \
-            | awk -F': ' '/Signer #1 certificate SHA-256 digest:/{print tolower($2); exit}')"
+            | sed -n -E 's/.*SHA-?256[^:]*: *//p' \
+            | head -n 1 | tr -d ':\r' | tr '[:upper:]' '[:lower:]')"
+          APKSIGNER_OUT="$("$APKSIGNER" verify --print-certs "$APK" 2>&1)" || {
+            printf '%s\n' "$APKSIGNER_OUT"
+            echo "::error::apksigner verify 失败"
+            exit 1
+          }
+          printf '%s\n' "$APKSIGNER_OUT"
+          ACTUAL="$(printf '%s\n' "$APKSIGNER_OUT" \
+            | sed -n -E 's/.*SHA-?256 digest: *//p' \
+            | head -n 1 | tr -d ':\r' | tr '[:upper:]' '[:lower:]')"
           printf 'keystore SHA-256: %s\napk signer SHA-256: %s\n' "$EXPECTED" "$ACTUAL"
           if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::APK 签名与固定 keystore 不一致"
@@ -213,11 +228,12 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | cut -d+ -f1)"
-          ARCH="$(uname -m)"
+          APP="build/macos/Build/Products/Release/lexiloop.app"
+          ARCHS="$(lipo -archs "$APP/Contents/MacOS/lexiloop" | tr ' ' '-')"
+          echo "macOS architectures: $ARCHS"
           mkdir -p dist
-          ditto -c -k --keepParent \
-            build/macos/Build/Products/Release/lexiloop.app \
-            "dist/LexiLoop-${VERSION}-${BUILD_NUMBER}-macos-${ARCH}.zip"
+          ditto -c -k --keepParent "$APP" \
+            "dist/LexiLoop-${VERSION}-${BUILD_NUMBER}-macos-${ARCHS}.zip"
 
       - name: Upload macOS zip
         uses: actions/upload-artifact@v4

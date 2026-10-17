@@ -163,6 +163,79 @@ enum AppErrorCode {
   /// 备份缺少 `format` 字段或 `format` 不匹配。
   backupInvalidFormat('BACKUP_INVALID_FORMAT', '备份格式无效，或不是 LexiLoop 备份文件。'),
 
+  // ── 远程备份（WebDAV） ──
+
+  /// 远程备份尚未配置，或配置不完整（地址 / 账号 / 密码缺一）。
+  webdavNotConfigured('WEBDAV_NOT_CONFIGURED', '请先填写 WebDAV 地址、账号与密码。'),
+
+  /// WebDAV 拒绝认证（HTTP 401 / 403）。
+  ///
+  /// 文案点名「应用专用密码」：坚果云、群晖这类服务对第三方客户端
+  /// 通常要求单独生成密码，直接填登录密码必然失败，用户需要这一句提示。
+  webdavAuthFailed(
+    'WEBDAV_AUTH_FAILED',
+    'WebDAV 拒绝登录。请确认账号与密码；多数服务需要用「应用专用密码」，而不是登录密码。',
+  ),
+
+  /// 连不上 WebDAV 服务器（离线、域名解析失败、连接被拒、超时）。
+  webdavUnreachable('WEBDAV_UNREACHABLE', '无法连接 WebDAV 服务器，请检查地址与网络。'),
+
+  /// WebDAV 返回了其他非 2xx 状态。
+  webdavRequestFailed('WEBDAV_REQUEST_FAILED', 'WebDAV 请求失败，请稍后重试。'),
+
+  /// WebDAV 上的目标不存在（备份文件或目录已被删除 / 改名）。
+  webdavNotFound('WEBDAV_NOT_FOUND', '远端目标不存在，可能已被删除或改名。'),
+
+  /// 远端目录里没有可恢复的 LexiLoop 备份。
+  webdavNoBackups('WEBDAV_NO_BACKUPS', '远端目录里没有找到 LexiLoop 备份文件。'),
+
+  // ── 局域网同步 ──
+
+  /// 当前运行环境不支持局域网同步（浏览器里既不能监听端口也不能广播）。
+  ///
+  /// 与 [browserCorsBlocked] 同一套思路：换桌面端或移动端就能用，
+  /// 文案必须把这句话说出来，而不是让用户去查 Wi-Fi。
+  lanSyncUnsupported('LAN_SYNC_UNSUPPORTED', '浏览器里无法使用局域网同步。请改用桌面端或移动端。'),
+
+  /// 广播出去没有收到任何应答。
+  lanSyncHostNotFound(
+    'LAN_SYNC_HOST_NOT_FOUND',
+    '没有搜索到正在共享的设备。请确认两台设备连在同一个局域网，且对方已开启共享。',
+  ),
+
+  /// 对方已经停止共享（HTTP 404）。
+  lanSyncNotSharing('LAN_SYNC_NOT_SHARING', '对方已经停止共享。'),
+
+  /// 配对码不正确（HTTP 401）。
+  lanSyncCodeInvalid('LAN_SYNC_CODE_INVALID', '配对码不正确，请核对主机上显示的 6 位数字。'),
+
+  /// 配对码连续错误次数到达上限，共享已被自动停止。
+  lanSyncCodeLockedOut(
+    'LAN_SYNC_CODE_LOCKED_OUT',
+    '配对码连续错误次数过多，共享已自动停止。请重新开启共享。',
+  ),
+
+  /// 连不上对方设备（连接被拒、超时、主机中途停共享）。
+  lanSyncUnreachable('LAN_SYNC_UNREACHABLE', '无法连接该设备。请检查两台设备是否还在同一个局域网。'),
+
+  /// 其他非 2xx 状态。
+  lanSyncRequestFailed('LAN_SYNC_REQUEST_FAILED', '同步请求失败，请稍后重试。'),
+
+  /// 对方正在执行另一次同步（HTTP 409）。
+  lanSyncBusy('LAN_SYNC_BUSY', '对方正在同步中，请稍后重试。'),
+
+  /// 共享服务端启动失败（端口被占用、被系统策略拒绝）。
+  lanSyncHostStartFailed(
+    'LAN_SYNC_HOST_START_FAILED',
+    '无法启动共享，端口可能已被占用。请换一个端口后重试。',
+  ),
+
+  /// 两端的协议版本不一致。
+  lanSyncProtocolMismatch(
+    'LAN_SYNC_PROTOCOL_MISMATCH',
+    '两台设备的版本不兼容，请把两台设备都升级到同一版本。',
+  ),
+
   // ── AI 与外部服务 ──
 
   /// 设置中未启用 AI。

@@ -360,6 +360,178 @@ const int sessionResumeTtlMs = dayMs;
 /// 不限制正常用户的词库规模。
 const int maxBackupBytes = 100 * 1024 * 1024;
 
+// ═══════════════════════════════════════════════════════════════
+// 远程备份（WebDAV）
+// ═══════════════════════════════════════════════════════════════
+
+/// WebDAV 的普通请求超时（PROPFIND / MKCOL / 小文件 GET）。
+///
+/// 比词典数据源的 10 秒宽：WebDAV 常跑在自建 NAS 上，
+/// 建目录与列目录都可能比公网 API 慢。
+const int webdavRequestTimeoutMs = 30 * secondMs;
+
+/// WebDAV 上传备份的超时。
+///
+/// 真实备份约 27 MB，移动网络下要留足时间；超时后由用户重试，
+/// 不做断点续传（本版不支持，见 `docs/REMOTE_BACKUP.md`）。
+const int webdavUploadTimeoutMs = 5 * minuteMs;
+
+/// 自动备份的检查节奏。
+///
+/// 定时器按它醒来判断「周期到了没有、数据变了没有」，**不**代表备份周期：
+/// 备份周期由用户配置（[defaultWebdavAutoIntervalMinutes] 等）。
+/// 取 5 分钟而不是 1 分钟：自动备份是后台行为，没必要每分钟查一次库。
+const int webdavAutoCheckIntervalMs = 5 * minuteMs;
+
+/// 自动备份的默认周期（一天）。
+const int defaultWebdavAutoIntervalMinutes = 24 * 60;
+
+/// 自动备份周期可选项（分钟）；`0` 表示关闭自动备份。
+const List<int> webdavAutoIntervalOptions = <int>[
+  0,
+  6 * 60,
+  24 * 60,
+  3 * 24 * 60,
+  7 * 24 * 60,
+];
+
+/// 远端列表一次最多展示的备份条数。
+///
+/// 列表只用于「选一份恢复」，把目录里积累的上百份备份全画出来没有意义。
+const int webdavMaxListedBackups = 20;
+
+// ═══════════════════════════════════════════════════════════════
+// 局域网同步
+//
+// 语义见 `docs/LAN_SYNC.md`：一台设备开共享（只读 HTTP 服务端），
+// 同网段的另一台发现它、输配对码、拉取并全量替换本地数据。
+// ═══════════════════════════════════════════════════════════════
+
+/// 共享服务端默认监听的 TCP 端口。
+///
+/// 用户可在设置里改：8765 被别的程序占用时，换一个端口比让用户去关掉
+/// 那个程序容易得多。取值要求见 [lanSyncMinPort] / [lanSyncMaxPort]。
+const int lanSyncDefaultPort = 8765;
+
+/// 发现应答器监听的 UDP 端口（固定，用户不可改）。
+///
+/// 与 TCP 端口分开是有意的：发现只是「敲门」，能改它只会多一处
+/// 两台设备对不上的地方。真正的连接与鉴权都发生在 [lanSyncDefaultPort] 上。
+const int lanSyncDiscoveryPort = 8766;
+
+/// 局域网同步的协议版本。
+///
+/// 握手与发现报文都带它；两端不一致时明确报「版本不兼容」，
+/// 而不是让一台旧版设备用错误的字段解读新版的回复。
+const int lanSyncProtocolVersion = 1;
+
+/// 配对码的位数。
+///
+/// 6 位数字（10^6 种）配「连续错码即停共享」的限流：既要能在主机屏幕上
+/// 一眼读出来手动输入，又不能让同网段的人靠穷举拿到数据。
+const int lanSyncPairingCodeLength = 6;
+
+/// 连续多少次配对码错误后自动停止共享。
+///
+/// 这是限流而不是锁定：停掉之后用户重新开启共享会拿到一个新码，
+/// 合法用户可以立刻恢复，而穷举者每次都要让受害者重新操作一次。
+const int lanSyncPairingCodeMaxAttempts = 10;
+
+/// 配对码生成时使用的数字字符集。
+const String lanSyncPairingCodeAlphabet = '0123456789';
+
+/// 共享会话标识的字符集与长度。
+///
+/// 与配对码分开：配对码要人能念出来（纯数字、6 位），会话标识只要不重复
+/// （十六进制、16 位），用它把「本机自己的广播应答」从搜索结果里滤掉。
+const String lanSyncInstanceIdAlphabet = '0123456789abcdef';
+
+/// 见 [lanSyncInstanceIdAlphabet]。
+///
+/// 16 位十六进制 = 64 位随机量，碰撞概率低到不必去查重。
+const int lanSyncInstanceIdLength = 16;
+
+/// 局域网同步的服务标识。
+///
+/// 同时出现在 UDP 发现报文与 HTTP 握手响应里，因此放在常量层而不是
+/// 协议文件里：`lib/domain` 的发现结果模型也要用它编解码报文，
+/// 而 domain 不能反向依赖 data 层。
+const String lanSyncServiceName = 'lexiloop-lan-sync';
+
+/// 发现报文里的「有人在吗」。
+const String lanSyncDiscoveryQueryKind = 'query';
+
+/// 发现报文里的「我在」。
+const String lanSyncDiscoveryReplyKind = 'reply';
+
+/// 「未指定地址」的字符串形态。
+///
+/// 同一台机器上向广播地址发包时，内核有时会把数据报的来源地址留成它。
+/// 它永远连不上，因此既不能当成一台设备，也不能拿来回应答。
+const String lanSyncUnspecifiedAddress = '0.0.0.0';
+
+/// 握手 / 小请求的超时。
+const int lanSyncRequestTimeoutMs = 30 * secondMs;
+
+/// 拉取备份的超时。
+///
+/// 与 WebDAV 上传同一量级：局域网上 27MB 通常一两秒，
+/// 留足余量是为了容忍老旧的 2.4G Wi-Fi 与低端手机。
+const int lanSyncTransferTimeoutMs = 5 * minuteMs;
+
+/// 一次「搜索设备」等待应答的时长。
+///
+/// 取 3 秒：UDP 广播在局域网上的往返是毫秒级，剩下的时间全都花在
+/// 对端被系统调度起来处理报文上。再长只会让用户对着转圈等。
+const int lanSyncDiscoveryTimeoutMs = 3 * secondMs;
+
+/// 发现结果一次最多展示多少台设备。
+///
+/// 与 [webdavMaxListedBackups] 同理：这是「选一台来同步」，
+/// 一个宿舍或办公室网段里可能有几十台设备在应答。
+const int lanSyncMaxListedHosts = 10;
+
+/// 端口可配置区间的下界（避开特权端口）。
+const int lanSyncMinPort = 1024;
+
+/// 端口可配置区间的上界。
+const int lanSyncMaxPort = 65535;
+
+/// 2xx 的下界（含）。
+const int lanSyncStatusSuccessFloor = 200;
+
+/// 2xx 的上界（不含）。
+const int lanSyncStatusSuccessCeil = 300;
+
+/// 配对码不正确。
+const int lanSyncStatusUnauthorized = 401;
+
+/// 目标路径不存在（对方已经停止共享）。
+const int lanSyncStatusNotFound = 404;
+
+/// 冲突（同一时刻已有一次同步在进行）。
+const int lanSyncStatusConflict = 409;
+
+/// 备份超过大小上限。
+///
+/// 与「服务端出错」分开：超限是一个稳定的、可解释的结果（对方的词库太大，
+/// 换多少次都一样），报「稍后重试」只会让用户白试。
+const int lanSyncStatusTooLarge = 413;
+
+/// 服务端错误的起点。
+const int lanSyncStatusServerErrorFloor = 500;
+
+// ── IPv4 字面量校验（局域网发现的地址合法性） ──
+
+/// 一个 IPv4 地址按 `.` 分成的段数。
+const int ipv4PartCount = 4;
+
+/// 单个 IPv4 段的最大字符数（`255` 是三位）。
+const int ipv4PartMaxDigits = 3;
+
+/// 单个 IPv4 段的最大数值。
+const int ipv4OctetMax = 255;
+
 /// 到期排序中「逾期天数」的封顶值，防止陈年旧卡长期霸榜。
 const double dueOverdueCapDays = 10;
 
@@ -832,10 +1004,32 @@ const int defaultChoiceRevealDelaySeconds = 2;
 const int maxChoiceRevealDelaySeconds = 60;
 
 /// 语音朗读语速下限。
+///
+/// 这是**倍率**：1 = 正常语速，2 = 两倍速。与具体语音引擎的参数刻度无关，
+/// 「倍率 → 引擎参数」的折算在 `services/tts_service.dart` 一处完成。
 const double minSpeechRate = 0.5;
 
 /// 语音朗读语速上限。
 const double maxSpeechRate = 2;
+
+/// `AVSpeechUtterance.rate`（iOS/macOS）的刻度：正常语速。
+///
+/// iOS/macOS 的 `rate` 不是倍率——`AVSpeechUtteranceDefaultSpeechRate` 是 0.5，
+/// 上限 `AVSpeechUtteranceMaximumSpeechRate` 是 1.0（两者都在
+/// `AVSpeechSynthesis.h` 里声明）。把界面的倍率直接下发，默认的 1.0 就顶到了
+/// 引擎上限：**默认设置听起来就是最快语速**，滑条再往上拉也毫无变化。
+const double avSpeechUtteranceDefaultRate = 0.5;
+
+/// `AVSpeechUtterance.rate` 的可接受区间。
+///
+/// 与 `AVSpeechUtteranceMinimumSpeechRate` / `AVSpeechUtteranceMaximumSpeechRate`
+/// 一一对应，只是写成具名常量，好让 `_engineRate` 统一夹取系数：
+/// 界面的 0.5×–2× 折算后落在 0.25–1.0，**整条滑条都在有效区间内**，
+/// 不会出现「拉到头却没变化」的死区。
+const double minUtteranceRateFactor = 0;
+
+/// 见 [minUtteranceRateFactor]。
+const double maxUtteranceRateFactor = 1;
 
 /// 侧边栏布局的启用宽度断点。
 ///

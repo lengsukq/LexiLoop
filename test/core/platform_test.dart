@@ -22,7 +22,7 @@ void main() {
   });
 
   group('Web 行', () {
-    test('无论底层目标平台是什么，五个能力全为 false', () {
+    test('无论底层目标平台是什么，六个能力全为 false', () {
       for (final platform in TargetPlatform.values) {
         final profile = PlatformProfile(isWeb: true, targetPlatform: platform);
         final reason = 'targetPlatform=$platform';
@@ -32,6 +32,7 @@ void main() {
         expect(profile.supportsTtsFileSynthesis, isFalse, reason: reason);
         expect(profile.requiresVoicePackSetup, isFalse, reason: reason);
         expect(profile.needsBlurDowngrade, isFalse, reason: reason);
+        expect(profile.usesUtteranceRateScale, isFalse, reason: reason);
       }
     });
   });
@@ -48,6 +49,8 @@ void main() {
       expect(profile.supportsTtsFileSynthesis, isFalse);
       expect(profile.requiresVoicePackSetup, isFalse);
       expect(profile.needsBlurDowngrade, isFalse);
+      // 语速按 AVSpeechUtterance.rate 解释：必须折算，否则默认设置即最快。
+      expect(profile.usesUtteranceRateScale, isTrue);
     });
   });
 
@@ -63,6 +66,20 @@ void main() {
       expect(profile.supportsTtsFileSynthesis, isTrue);
       expect(profile.requiresVoicePackSetup, isTrue);
       expect(profile.needsBlurDowngrade, isTrue);
+      // flutter_tts 在 Android 侧会把 Dart 值 ×2，Dart 的 1.0 已是正常语速。
+      expect(profile.usesUtteranceRateScale, isFalse);
+    });
+  });
+
+  group('朗读语速刻度', () {
+    test('只有 iOS 与 macOS 走 AVSpeechUtterance 的刻度', () {
+      for (final platform in TargetPlatform.values) {
+        final profile = PlatformProfile(isWeb: false, targetPlatform: platform);
+        final expected =
+            platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+
+        expect(profile.usesUtteranceRateScale, expected, reason: '$platform');
+      }
     });
   });
 
@@ -123,18 +140,24 @@ void main() {
       expect(PlatformCaps.supportsTtsFileSynthesis, isFalse);
       expect(PlatformCaps.requiresVoicePackSetup, isFalse);
       expect(PlatformCaps.needsBlurDowngrade, isFalse);
+      expect(PlatformCaps.usesUtteranceRateScale, isTrue);
     });
 
-    test('语速区间合法且包含默认语速', () {
-      expect(PlatformCaps.minSpeechRate, lessThan(PlatformCaps.maxSpeechRate));
-      expect(PlatformCaps.minSpeechRate, 0);
-      expect(PlatformCaps.maxSpeechRate, 2);
+    test('界面语速区间合法且包含默认语速', () {
+      // 区间描述的是**倍率**，与平台无关；平台差异体现在下发前的折算上。
+      expect(minSpeechRate, lessThan(maxSpeechRate));
+      expect(minSpeechRate, 0.5);
+      expect(maxSpeechRate, 2);
+      expect(defaultSpeechRate, inInclusiveRange(minSpeechRate, maxSpeechRate));
+    });
+
+    test('折算系数区间与 AVSpeech 的可用区间一致', () {
+      expect(minUtteranceRateFactor, lessThan(maxUtteranceRateFactor));
+      expect(maxUtteranceRateFactor, 1);
+      // 默认倍率折算后必须**不是**顶格，否则「默认即最快」会原样复发。
       expect(
-        defaultSpeechRate,
-        inInclusiveRange(
-          PlatformCaps.minSpeechRate,
-          PlatformCaps.maxSpeechRate,
-        ),
+        defaultSpeechRate * avSpeechUtteranceDefaultRate,
+        lessThan(maxUtteranceRateFactor),
       );
     });
   });

@@ -24,6 +24,10 @@ dependencies:
 
   # ── 网络 ──
   dio: ^5.11.1
+  # WebDAV 的 PROPFIND/MKCOL 响应是 XML；按 local name 解析以兼容各服务
+  # 不同的命名空间前缀。此前只是传递依赖（drift_dev → xml），
+  # 这里显式声明，避免上游换实现时静默消失。
+  xml: ^7.0.1
 
   # ── 学习引擎 ──
   fsrs: ^2.0.1

@@ -46,6 +46,24 @@ final class PlatformProfile {
 
   /// 是否需要对全屏高斯模糊做性能降级。
   bool get needsBlurDowngrade => isMobile;
+
+  /// 系统朗读的语速是否用 `AVSpeechUtterance.rate` 的刻度。
+  ///
+  /// iOS 与 macOS 把 Dart 传下来的数值**原样**赋给 `AVSpeechUtterance.rate`
+  /// （`flutter_tts` 的 `setRate` 就一句赋值），那个刻度以 0.5 为正常语速、
+  /// 1.0 为最快，与 Android 的倍率语义完全不同：
+  ///
+  /// - Android：`flutter_tts` 把 Dart 值 ×2 后交给 `TextToSpeech.setSpeechRate`，
+  ///   于是 Dart 的 1.0 恰好是引擎的 1.0（正常语速），与界面倍率一致；
+  /// - Web：`SpeechSynthesisUtterance.rate` 本身就是倍率，同样一致；
+  /// - iOS/macOS：没有折算，界面倍率 1.0 直接顶到引擎上限 1.0。
+  ///
+  /// 所以只有 iOS 与 macOS 需要额外折算，见
+  /// `services/tts_service.dart` 的 `_engineRate`。
+  bool get usesUtteranceRateScale =>
+      !isWeb &&
+      (targetPlatform == TargetPlatform.macOS ||
+          targetPlatform == TargetPlatform.iOS);
 }
 
 /// 当前运行平台的能力集。
@@ -90,6 +108,10 @@ abstract final class PlatformCaps {
   ///
   /// Android 的 `setSpeechRate` 语义是倍率区间 0.0–2.0，
   /// 与旧版 Web 的 `playbackRate` 不完全一致，各端都需实测校准。
+  ///
+  /// 与界面倍率区间并存只是过渡：`tts_service.dart` 的语速折算落地后
+  /// 这两个常量会在同一次提交里删除（它们描述引擎参数，不该与界面倍率
+  /// 同住一处）。
   static const double minSpeechRate = 0;
 
   /// 系统 TTS 的语速取值范围上限。
@@ -104,4 +126,10 @@ abstract final class PlatformCaps {
   /// 而降级会立刻让 Web 的观感偏离设计稿。低端设备上的取舍见
   /// `docs/FLUTTER_WEB.md`。
   static bool get needsBlurDowngrade => profile.needsBlurDowngrade;
+
+  /// 系统朗读的语速是否用 `AVSpeechUtterance.rate` 的刻度。
+  ///
+  /// 消费方是 `services/tts_service.dart`：是则把界面倍率折算成
+  /// `0.5 × 倍率` 再下发，否则原样下发。详见 [PlatformProfile.usesUtteranceRateScale]。
+  static bool get usesUtteranceRateScale => profile.usesUtteranceRateScale;
 }

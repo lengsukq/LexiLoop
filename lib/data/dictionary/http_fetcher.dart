@@ -122,47 +122,52 @@ class DioHttpFetcher implements HttpFetcher {
         body: response.data ?? '',
       );
     } on DioException catch (error) {
-      throw _mapFailure(error);
+      throw mapDioFailure(error);
     }
   }
-
-  /// 把 `DioException` 转成调用方能处理的异常。
-  ///
-  /// **Web 上为什么换一种异常类型**：浏览器的同源策略把「被 CORS 挡下」和
-  /// 「真的连不上」报成同一个 `XMLHttpRequest error`（dio 的
-  /// `dio_web_adapter` 一律转成 `connectionError`），两者无法区分；而它们对
-  /// 用户的含义完全不同——前者换桌面端就能用，后者要去查网络。
-  ///
-  /// 这里抛 [ExternalServiceError] 而不是 [HttpFailure]，是为了让
-  /// [AppErrorCode.browserCorsBlocked] 原样落进 `provider_attempts`：
-  /// provider 的 `on HttpFailure` 会把所有非超时失败统一改写成
-  /// `providerTransientFailure`（文案「网络不可用」），恰好掩盖了真正的原因。
-  /// 抛出的仍是 `ExternalServiceError`，`DictionaryPipeline` 照常捕获并继续
-  /// 尝试下一个数据源，因此不会打断降级链。
-  ///
-  /// 超时不在改写之列：浏览器里的超时通常确实是超时，provider 的
-  /// 「请求超时」文案更准确。
-  Exception _mapFailure(DioException error) {
-    final kind = _kindOf(error);
-    if (PlatformCaps.isWeb && kind == HttpFailureKind.network) {
-      return ExternalServiceError(
-        AppErrorCode.browserCorsBlocked,
-        isTransient: true,
-        details: error.message,
-      );
-    }
-    return HttpFailure(kind, detail: error);
-  }
-
-  HttpFailureKind _kindOf(DioException error) => switch (error.type) {
-    DioExceptionType.connectionTimeout ||
-    DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout ||
-    DioExceptionType.transformTimeout => HttpFailureKind.timeout,
-    DioExceptionType.badCertificate ||
-    DioExceptionType.badResponse ||
-    DioExceptionType.cancel ||
-    DioExceptionType.connectionError ||
-    DioExceptionType.unknown => HttpFailureKind.network,
-  };
 }
+
+/// 把 `DioException` 转成调用方能处理的异常。
+///
+/// **Web 上为什么换一种异常类型**：浏览器的同源策略把「被 CORS 挡下」和
+/// 「真的连不上」报成同一个 `XMLHttpRequest error`（dio 的
+/// `dio_web_adapter` 一律转成 `connectionError`），两者无法区分；而它们对
+/// 用户的含义完全不同——前者换桌面端就能用，后者要去查网络。
+///
+/// 这里抛 [ExternalServiceError] 而不是 [HttpFailure]，是为了让
+/// [AppErrorCode.browserCorsBlocked] 原样落进 `provider_attempts`：
+/// provider 的 `on HttpFailure` 会把所有非超时失败统一改写成
+/// `providerTransientFailure`（文案「网络不可用」），恰好掩盖了真正的原因。
+/// 抛出的仍是 `ExternalServiceError`，`DictionaryPipeline` 照常捕获并继续
+/// 尝试下一个数据源，因此不会打断降级链。
+///
+/// 超时不在改写之列：浏览器里的超时通常确实是超时，provider 的
+/// 「请求超时」文案更准确。
+///
+/// **为什么提升为顶层函数**：WebDAV 远程备份走自己的 `Dio`，但它面对的
+/// 「浏览器里连不上」是同一件事，必须给出同一句文案（「改用桌面端或移动端」），
+/// 而不是让用户去查 Wi-Fi。
+Exception mapDioFailure(DioException error) {
+  final kind = mapDioFailureKind(error);
+  if (PlatformCaps.isWeb && kind == HttpFailureKind.network) {
+    return ExternalServiceError(
+      AppErrorCode.browserCorsBlocked,
+      isTransient: true,
+      details: error.message,
+    );
+  }
+  return HttpFailure(kind, detail: error);
+}
+
+/// 把 `DioException` 归成「超时」或「连不上」两类。
+HttpFailureKind mapDioFailureKind(DioException error) => switch (error.type) {
+  DioExceptionType.connectionTimeout ||
+  DioExceptionType.sendTimeout ||
+  DioExceptionType.receiveTimeout ||
+  DioExceptionType.transformTimeout => HttpFailureKind.timeout,
+  DioExceptionType.badCertificate ||
+  DioExceptionType.badResponse ||
+  DioExceptionType.cancel ||
+  DioExceptionType.connectionError ||
+  DioExceptionType.unknown => HttpFailureKind.network,
+};

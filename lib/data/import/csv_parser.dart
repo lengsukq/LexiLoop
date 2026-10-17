@@ -14,6 +14,7 @@ library;
 import 'package:csv/csv.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/dictionary/html_text.dart';
 import 'package:lexiloop/data/import/content_type.dart';
 import 'package:lexiloop/data/import/csv_columns.dart';
 import 'package:lexiloop/domain/enums.dart';
@@ -410,8 +411,18 @@ extension on ParsedCsvRow {
   );
 }
 
-List<String> _cells(List<dynamic> row) =>
-    row.map((cell) => cell?.toString().trim() ?? '').toList(growable: false);
+/// 把一行原始单元格拍平成字符串。
+///
+/// **必须在这里解一次 HTML 实体**：EasyDict 导出的释义与例句里带着
+/// `&amp;` / `&#x27;` / `&quot;` 这类实体（它的抓取结果来自 HTML 文本，
+/// 转义没有还原）。不还原就原样进库、原样出现在单词本与词条详情里——
+/// 用户看到的是「降水是&amp; 挤出」这种夹着符号的句子。
+///
+/// 边界选在**解析层**而不是展示层：库里的数据应当是干净的；让每个展示
+/// 组件各自兜底，同一份数据就会在不同页面显示成不同样子。
+List<String> _cells(List<dynamic> row) => row
+    .map((cell) => decodeHtmlEntities(cell?.toString().trim() ?? ''))
+    .toList(growable: false);
 
 String _cellAt(List<String> cells, int index) =>
     index < cells.length ? cells[index] : '';

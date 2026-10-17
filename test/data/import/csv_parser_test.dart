@@ -221,4 +221,39 @@ void main() {
       expect(ParsedCsvRow.fromJson(<String, Object?>{'term': 'cat'}), isNull);
     });
   });
+
+  group('HTML 实体', () {
+    // EasyDict 的导出是从 HTML 文本里取出来的，转义没有还原。
+    // 不在这里解掉，`&amp;` / `&#x27;` 就会原样进库、原样显示在单词本里。
+    test('释义与例句里的命名实体与数字实体都被还原', () {
+      const content =
+          '单词,释义,例句\n'
+          'rock,fish &amp; chips,It&#x27;s hard\n';
+
+      final row = parse(content).rows.single;
+
+      expect(row.definitionText, 'fish & chips');
+      expect(row.examples.single, "It's hard");
+    });
+
+    test('只解一遍：&amp;lt; 停在 &lt; 而不是继续变成 <', () {
+      // 单遍替换是刻意的——连解两遍会让「本来就想显示 &lt; 字面量」的
+      // 数据被吃掉一层。这里把这条语义钉住。
+      const content = '单词,释义\ncode,&amp;lt;tag&amp;gt;\n';
+
+      expect(parse(content).rows.single.definitionText, '&lt;tag&gt;');
+    });
+
+    test('词条本身也解实体（导出里偶尔带引号的短语）', () {
+      const content = '单词,释义\n&quot;quote&quot;,引号\n';
+
+      expect(parse(content).rows.single.term, '"quote"');
+    });
+
+    test('不含实体的文本原样保留', () {
+      const content = '单词,释义\nplain,普通 & 直接\n';
+
+      expect(parse(content).rows.single.definitionText, '普通 & 直接');
+    });
+  });
 }

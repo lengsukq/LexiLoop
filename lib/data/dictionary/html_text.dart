@@ -9,20 +9,50 @@
 library;
 
 /// HTML 命名实体与数字实体解码。
-String decodeHtmlEntities(String value) => value
-    .replaceAll(RegExp('&nbsp;', caseSensitive: false), ' ')
-    .replaceAll(RegExp('&amp;', caseSensitive: false), '&')
-    .replaceAll(RegExp('&lt;', caseSensitive: false), '<')
-    .replaceAll(RegExp('&gt;', caseSensitive: false), '>')
-    .replaceAll(RegExp('&quot;', caseSensitive: false), '"')
-    .replaceAllMapped(
-      RegExp('&#x([0-9a-fA-F]+);'),
-      (match) => _fromCodePoint(int.tryParse(match.group(1)!, radix: 16)),
-    )
-    .replaceAllMapped(
-      RegExp(r'&#(\d+);'),
-      (match) => _fromCodePoint(int.tryParse(match.group(1)!)),
-    );
+///
+/// **必须单遍替换**：早先的实现是 `replaceAll('&amp;', '&')` 之后再
+/// `replaceAll('&lt;', '<')` 这样一条链。链式替换会把上一层**刚生成的**
+/// 文本再解一次，于是 `&amp;lt;` 变成 `<` 而不是 `&lt;`——
+/// 这正是「双重反转义」的经典缺陷：本来就该显示成字面量 `&lt;` 的内容
+/// 被吃掉了两层。
+///
+/// 这里改成一次扫描：整串只匹配一次，命中的实体直接查表替换，
+/// 替换出来的字符不会再被扫描，语义因此与「按 HTML 反转义一次」一致。
+String decodeHtmlEntities(String value) {
+  if (!value.contains('&')) return value;
+  return value.replaceAllMapped(_entityPattern, (match) {
+    final body = match.group(1)!;
+    if (body.startsWith('#')) return _numericEntity(body) ?? match.group(0)!;
+    final replacement = _namedEntities[body.toLowerCase()];
+    return replacement ?? match.group(0)!;
+  });
+}
+
+/// 命不中的实体原样保留（`match.group(0)`），避免把不认识的实体吞掉。
+final RegExp _entityPattern = RegExp('&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z]+);');
+
+/// 支持的命名实体。
+///
+/// 只收 HTML 文本里真正会出现的几个：一份词典的释义与例句不需要
+/// 完整的两千多个实体表，而**多收一个用不上的实体反而会让
+/// 「为什么这个没解」变得难以回答**。
+const Map<String, String> _namedEntities = <String, String>{
+  'nbsp': ' ',
+  'amp': '&',
+  'lt': '<',
+  'gt': '>',
+  'quot': '"',
+  'apos': "'",
+};
+
+String? _numericEntity(String body) {
+  if (body.length < 2) return null;
+  final isHex = body[1] == 'x' || body[1] == 'X';
+  final digits = isHex ? body.substring(2) : body.substring(1);
+  final code = int.tryParse(digits, radix: isHex ? 16 : 10);
+  if (code == null) return null;
+  return _fromCodePoint(code);
+}
 
 /// 剥离全部 HTML 标签并去除首尾空白。
 String stripHtmlTags(String value) =>

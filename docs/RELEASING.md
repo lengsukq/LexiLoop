@@ -96,7 +96,7 @@ gh run watch <run-id> --exit-status
 | 平台 | 文件 | 说明 |
 |---|---|---|
 | Android | `LexiLoop-<version>-<build>-android.apk` | 通用 APK（包含全部 ABI） |
-| macOS | `LexiLoop-<version>-<build>-macos-<arch>.zip` | 内含 `lexiloop.app`；`arch` 取决于 runner（当前通常 `arm64`） |
+| macOS | `LexiLoop-<version>-<build>-macos-<archs>.zip` | 内含 `lexiloop.app`；`archs` 来自 `lipo -archs`，当前 Release 构建为 `x86_64-arm64`（universal） |
 
 artifact 默认保留 90 天；需要长期保存时从 run 页面下载，或后续再加 GitHub
 Release 步骤。
@@ -109,8 +109,9 @@ macOS 产物是 **ad-hoc 签名、未公证**。从浏览器下载后系统会�
 - `xattr -dr com.apple.quarantine /Applications/lexiloop.app`
 
 zip 请用 Finder「归档实用工具」或 `ditto -x -k` 解压，避免普通解压工具破坏
-签名/扩展属性。`macos-latest` 若是 arm64，产物只能在 Apple Silicon 上原生运行；
-Intel Mac 需要 Rosetta 或另建 x86_64 构建。
+签名/扩展属性。当前 Release 构建是 **universal binary（x86_64 + arm64）**，
+Intel Mac 与 Apple Silicon 都能原生运行；zip 名里的架构组合由 `lipo -archs`
+实际读出，不是 runner 的 `uname -m`。
 
 ## 5. 本地构建
 

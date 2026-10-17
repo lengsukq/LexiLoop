@@ -1,7 +1,7 @@
 name: lexiloop
 description: LexiLoop 词环 — 纯本地、Android 与 macOS 双端的词汇复习应用。
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.13.4

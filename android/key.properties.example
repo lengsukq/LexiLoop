@@ -1,0 +1,12 @@
+# 复制为 android/key.properties 后填入真实值；该文件已被 .gitignore 忽略。
+# 真实的 keystore 放在 android/app/ 下，storeFile 相对 android/app/ 解析。
+#
+# storeFile=lexiloop-release.jks
+# storePassword=<见本机安全备份>
+# keyPassword=<与 storePassword 相同>
+# keyAlias=lexiloop
+
+storePassword=changeme
+keyPassword=changeme
+keyAlias=lexiloop
+storeFile=lexiloop-release.jks

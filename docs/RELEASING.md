@@ -1,0 +1,164 @@
+# 发布构建（Android / macOS）
+
+本文记录 LexiLoop 的固定签名、GitHub Actions 手动发布流程，以及两个平台产物的
+分发限制。应用本身仍然**不依赖自建服务端**；CI 只注入构建所需的签名材料，不注入
+任何 AI / 词典密钥。
+
+## 1. 固定 Android 签名
+
+发布签名材料放在本机，**不进 git**：
+
+| 文件 | 内容 | 是否提交 |
+|---|---|---|
+| `android/app/lexiloop-release.jks` | PKCS12 格式的 RSA 4096 发布密钥，别名 `lexiloop` | 否（`/android/app/*.jks` 已忽略） |
+| `android/key.properties` | `storePassword` / `keyPassword` / `keyAlias` / `storeFile` | 否（`/android/key.properties` 已忽略） |
+| `android/key.properties.example` | 只含占位符的模板 | 是 |
+
+`android/app/build.gradle.kts` 会在 `android/key.properties` 存在时使用
+`release` 签名；不存在时回退 debug 签名并打 warning，保证普通
+`flutter run --release` 仍可用。**可分发 APK 的签名正确性由 CI 的证书比对保证**，
+所以不要跳过 workflow 里的 `Verify signer`。
+
+### 备份（重要）
+
+GitHub Secrets 只能写入、不能读回。**本机这两个文件是唯一可恢复副本**：
+
+- 把 `android/app/lexiloop-release.jks` 和 `android/key.properties`
+  复制到密码管理器 / 加密磁盘。
+- 不要重新生成密钥来“修复”问题；换 key 会让已安装的旧版本无法覆盖升级。
+- 密钥丢失后只能生成新 key，用户必须卸载旧版本再安装（本地数据需先导出备份）。
+
+### 旧安装升级
+
+当前旧包是 **debug 签名**。第一次安装 fixed-key release 包时，
+`adb install -r` 会因签名不一致失败：
+
+1. 在应用内「设置 → 数据管理」导出一份备份到设备外。
+2. 卸载旧包（`adb uninstall com.lexiloop.lexiloop`）。
+3. 安装新 APK。
+4. 重新导入备份。
+
+## 2. GitHub Secrets
+
+仓库：`lengsukq/LexiLoop`。在仓库根目录执行（值从本机文件读取，不打印）：
+
+```bash
+gh secret set ANDROID_KEYSTORE_PASSWORD < <(sed -n 's/^storePassword=//p' android/key.properties)
+gh secret set ANDROID_KEY_PASSWORD < <(sed -n 's/^keyPassword=//p' android/key.properties)
+gh secret set ANDROID_KEY_ALIAS < <(printf '%s' lexiloop)
+gh secret set ANDROID_KEYSTORE_BASE64 < <(base64 < android/app/lexiloop-release.jks)
+gh secret list
+```
+
+CI 在 `ubuntu-latest` 上把 base64 还原成 `android/app/lexiloop-release.jks`，
+再按 secrets 写出 `android/key.properties`，最后用 `keytool` 与 `apksigner`
+比对证书 SHA-256。四个值缺一不可。
+
+## 3. 手动触发 workflow
+
+workflow 文件在**默认分支 `main`**：
+
+```text
+.github/workflows/release.yml
+```
+
+原因：GitHub 的「Run workflow」按钮只认默认分支上的 `workflow_dispatch`
+workflow。Flutter 应用在 `flutter` 分支，所以 workflow 放在 `main`，构建时
+`actions/checkout` 到 `source_ref`（默认 `flutter`）。
+
+### 网页
+
+1. 打开 Actions → **Build Release (Android / macOS)**。
+2. 点 **Run workflow**，分支保持 **main**（不要切到 flutter，workflow 文件不在那里）。
+3. 选择：
+   - `platform`: `all` / `android` / `macos`
+   - `source_ref`: 默认 `flutter`
+   - `build_number`: 可留空；留空使用本次 run number
+4. Run。
+
+### 命令行
+
+```bash
+gh workflow run release.yml \
+  --ref main \
+  -f platform=all \
+  -f source_ref=flutter
+
+gh run list --workflow release.yml --limit 3
+gh run watch <run-id> --exit-status
+```
+
+`build_number` 必须是纯数字；它同时是 Android `versionCode` 和 macOS
+`CFBundleVersion`。版本名仍来自 `pubspec.yaml` 的 `version`（当前 `1.0.0`）。
+
+## 4. 产物
+
+| 平台 | 文件 | 说明 |
+|---|---|---|
+| Android | `LexiLoop-<version>-<build>-android.apk` | 通用 APK（包含全部 ABI） |
+| macOS | `LexiLoop-<version>-<build>-macos-<arch>.zip` | 内含 `lexiloop.app`；`arch` 取决于 runner（当前通常 `arm64`） |
+
+artifact 默认保留 90 天；需要长期保存时从 run 页面下载，或后续再加 GitHub
+Release 步骤。
+
+### macOS 首次启动
+
+macOS 产物是 **ad-hoc 签名、未公证**。从浏览器下载后系统会加 quarantine：
+
+- 右键 App →「打开」→ 再点「打开」；或
+- `xattr -dr com.apple.quarantine /Applications/lexiloop.app`
+
+zip 请用 Finder「归档实用工具」或 `ditto -x -k` 解压，避免普通解压工具破坏
+签名/扩展属性。`macos-latest` 若是 arm64，产物只能在 Apple Silicon 上原生运行；
+Intel Mac 需要 Rosetta 或另建 x86_64 构建。
+
+## 5. 本地构建
+
+```bash
+flutter pub get
+
+# Android release（需要 android/key.properties）
+flutter build apk --release
+
+# macOS release（本机 ad-hoc 签名）
+flutter build macos --release
+```
+
+产物：
+
+- `build/app/outputs/flutter-apk/app-release.apk`
+- `build/macos/Build/Products/Release/lexiloop.app`
+
+验签：
+
+```bash
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs \
+  build/app/outputs/flutter-apk/app-release.apk
+codesign --verify --deep --strict \
+  build/macos/Build/Products/Release/lexiloop.app
+```
+
+## 6. CI 的边界
+
+- **只构建已提交代码**：workflow checkout `flutter` 的 HEAD；本地未提交改动不会
+  进入 CI 产物。要让 CI 包含当前工作区，先提交并推送（或另建临时分支）。
+- **不跑全量测试**：本 workflow 只做 release 构建与签名校验；提交前门禁仍按
+  README 的 `dart format` / `dart analyze` / `flutter test` 执行。
+- **私有仓库分钟数**：macOS runner 按 10 倍计费；日常只验 Android 时把
+  `platform` 选 `android`。
+- **Flutter 版本固定**：workflow 使用 `3.47.5`，与本机 `.metadata` 对齐。升级
+  Flutter 时同时更新 workflow 和本文件。
+- **默认分支**：如果以后把默认分支改成 `flutter`，需要把
+  `.github/workflows/release.yml` 同步到新默认分支，否则「Run workflow」按钮
+  会消失。
+
+## 7. 轮换 / 故障处理
+
+- **证书不匹配**：先看 CI 的 `Restore signing material` 是否通过；再对比
+  `keytool -list -v` 与 `apksigner verify --print-certs` 的 SHA-256。Secret 被
+  覆盖或 keystore 被替换都会导致失败。
+- **macOS 未签名 / 签名损坏**：`codesign --verify` 失败时不要直接分发；先检查
+  Xcode 构建日志里的 `CODE_SIGN_IDENTITY`，本仓库 Release 配置应为 `-`
+  （ad-hoc）。
+- **换 key**：生成新 keystore → 更新本机 `key.properties` → 重新上传四个
+  Secrets → 重新构建。已安装用户必须卸载重装。

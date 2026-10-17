@@ -59,3 +59,15 @@ app.*.map.json
 .claude/
 *.tsbuildinfo
 test-results/
+
+# ── Android 发布签名：本地与 CI 注入，绝不提交 ──
+# android/key.properties 含 store/key 密码；*.jks 是固定发布密钥。
+# 模板见 android/key.properties.example。
+/android/key.properties
+/android/app/*.jks
+/android/app/*.keystore
+
+# Apple 签名材料（后续启用 Developer ID / 公证时使用）
+*.p12
+*.p8
+*.mobileprovision

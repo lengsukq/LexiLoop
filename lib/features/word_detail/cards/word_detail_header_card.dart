@@ -79,23 +79,24 @@ class _HeaderActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.lexiColors;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    // **两个一等动作 + 一个「⋯」**。
+    //
+    // 收敛前这里是五个平铺的文字按钮：「补全缺失内容 / 有道词典 / 编辑 /
+    // 重新生成 / 删除」。删除与重新生成之间只隔约 40 像素，而前者不可逆、
+    // 后者会覆盖手动编辑的内容——把最危险的两个放在最容易被误点的位置，
+    // 是布局问题，也是安全问题。
+    //
+    // 现在：查词典与编辑留在台面上（高频、无害），
+    // 重新生成与删除收进菜单，删除仍排最后且用危险色。
+    return Row(
       children: <Widget>[
-        OutlinedButton.icon(
-          onPressed: () => unawaited(
-            _initialize(context, ref, InitializationMode.fillMissingFields),
-          ),
-          icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-          label: const Text('补全缺失内容'),
-        ),
         OutlinedButton.icon(
           onPressed: () =>
               unawaited(YoudaoPreviewDialog.show(context, wordId: detail.id)),
           icon: const Icon(Icons.menu_book_rounded, size: 16),
           label: const Text('有道词典'),
         ),
+        const SizedBox(width: LexiSpace.s8),
         OutlinedButton.icon(
           onPressed: () => unawaited(
             EditWordDialog.show(
@@ -112,19 +113,46 @@ class _HeaderActionBar extends ConsumerWidget {
           icon: const Icon(Icons.edit_rounded, size: 16),
           label: const Text('编辑'),
         ),
-        TextButton.icon(
-          onPressed: () => unawaited(_confirmRegenerate(context, ref)),
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          label: const Text('重新生成'),
-        ),
-        TextButton.icon(
-          onPressed: () => unawaited(_confirmDelete(context, ref)),
-          icon: Icon(
-            Icons.delete_outline_rounded,
-            size: 16,
-            color: colors.danger,
-          ),
-          label: Text('删除', style: TextStyle(color: colors.danger)),
+        const Spacer(),
+        PopupMenuButton<_HeaderAction>(
+          tooltip: '更多操作',
+          icon: Icon(Icons.more_horiz_rounded, color: colors.secondaryLabel),
+          onSelected: (action) => switch (action) {
+            _HeaderAction.complete => unawaited(
+              _initialize(context, ref, InitializationMode.fillMissingFields),
+            ),
+            _HeaderAction.regenerate => unawaited(
+              _confirmRegenerate(context, ref),
+            ),
+            _HeaderAction.delete => unawaited(_confirmDelete(context, ref)),
+          },
+          itemBuilder: (context) => <PopupMenuEntry<_HeaderAction>>[
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.complete,
+              child: _MenuRow(
+                icon: Icons.auto_awesome_rounded,
+                label: '补全缺失内容',
+              ),
+            ),
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.regenerate,
+              child: _MenuRow(
+                icon: Icons.refresh_rounded,
+                label: 'AI 重新生成',
+                // 「会覆盖手动编辑」放在第二行：一是必须说清楚，
+                // 二是塞进一行会把弹层撑出边界（弹层有宽度上限）。
+                hint: '会覆盖手动编辑的释义与例句',
+              ),
+            ),
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.delete,
+              child: _MenuRow(
+                icon: Icons.delete_outline_rounded,
+                label: '删除词条',
+                danger: true,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -158,7 +186,13 @@ class _HeaderActionBar extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('重新生成'),
-        content: const Text('重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？'),
+        // 文案必须与真正传入的模式一致：这里是 `forceOverwrite`，
+        // 会把已有内容整份替换——包括手动改过的释义与例句。
+        // 此前文案写的是「会保留手动释义和例句」，正好说了反话。
+        content: const Text(
+          '重新生成会再次调用 AI，并用返回结果覆盖这个词条的内容，'
+          ' 包括你手动改过的释义与例句。这一步不可撤销，确定继续吗？',
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -534,6 +568,66 @@ class _HeaderActions extends ConsumerWidget {
           onChanged: (value) => ref
               .read(wordDetailActionsProvider)
               .setSuspended(detail.id, suspended: value),
+        ),
+      ],
+    );
+  }
+}
+
+/// 词条详情页「⋯」菜单里的动作。
+enum _HeaderAction { complete, regenerate, delete }
+
+/// 菜单行：图标 + 文案（危险动作用危险色）。
+class _MenuRow extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.label,
+    this.hint,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+
+  /// 第二行的补充说明；弹层宽度有限，长句子放这里而不是标题里。
+  final String? hint;
+
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final foreground = danger ? colors.dangerText : colors.label;
+    final hint = this.hint;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 16, color: foreground),
+        ),
+        const SizedBox(width: LexiSpace.s10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: LexiType.callout.copyWith(color: foreground),
+              ),
+              if (hint != null)
+                Text(
+                  hint,
+                  maxLines: 2,
+                  style: LexiType.footnote.copyWith(
+                    color: colors.secondaryLabel,
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );

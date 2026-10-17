@@ -162,3 +162,112 @@ class _RelatedBody extends StatelessWidget {
     );
   }
 }
+
+/// 把四类关系收进**一张**卡：上方是关系切换，下方是当前关系的词条。
+///
+/// **为什么合并**：收敛前同一个词条会连着摞 4 张同形状的卡
+/// （同义词 / 反义词 / 词族 / 易混词），每张自带标题、图标和一列行。
+/// 一个有很多关联词的词条，光这一块就占掉整屏——而用户真正想看的往往
+/// 只是其中一类。合并后：一次只展开一类，其余以「+N」的形式留在切换条上。
+///
+/// 切换用 `ChoiceChip` 而不是 `SegmentedButton`：360 宽下四个中文标签
+/// 放不下一行，`Wrap` 会折行，而 `SegmentedButton` 会溢出。
+class RelatedWordsGroup extends StatefulWidget {
+  /// 以父词条与「关系 → 词条」的分组构造。
+  const new({required this.wordId, required this.groups, super.key});
+
+  /// 父词条 ID。
+  final int wordId;
+
+  /// 关系与对应词条；空列表的关系会被忽略。
+  final Map<RelationType, List<RelatedWordView>> groups;
+
+  @override
+  State<RelatedWordsGroup> createState() => _RelatedWordsGroupState();
+}
+
+class _RelatedWordsGroupState extends State<RelatedWordsGroup> {
+  RelationType? _selected;
+
+  /// 有内容的关系，按枚举顺序（同义 → 反义 → 词族 → 易混）。
+  List<RelationType> get _available => <RelationType>[
+    for (final relation in RelationType.values)
+      if ((widget.groups[relation] ?? const <RelatedWordView>[]).isNotEmpty)
+        relation,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final available = _available;
+    if (available.isEmpty) return const SizedBox.shrink();
+    // 选中项失效时（例如切换词条导致某类清空）回落到第一类。
+    final selected = available.contains(_selected)
+        ? _selected!
+        : available.first;
+
+    // 只有一类时标题就用那类的名字（「同义词」），而不是笼统的「相关词」：
+    // 一张只装同义词的卡片，标题说「同义词」比说「相关词」更准确，
+    // 也省掉一行「只有一个选项」的切换条。
+    final single = available.length == 1;
+    final look = relatedCardLook(
+      single ? available.first : RelationType.synonym,
+    );
+    return SectionCard(
+      title: single ? look.title : '相关词',
+      icon: single ? look.icon : Icons.hub_rounded,
+      trailing: _RelationChips(
+        available: available,
+        groups: widget.groups,
+        selected: selected,
+        onSelect: (relation) => setState(() => _selected = relation),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          for (final item in widget.groups[selected]!)
+            _RelatedRow(wordId: widget.wordId, relation: selected, item: item),
+        ],
+      ),
+    );
+  }
+}
+
+/// 关系切换条。
+class _RelationChips extends StatelessWidget {
+  const new({
+    required this.available,
+    required this.groups,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<RelationType> available;
+  final Map<RelationType, List<RelatedWordView>> groups;
+  final RelationType selected;
+  final ValueChanged<RelationType> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (available.length == 1) {
+      // 只有一类时不需要切换条：标题已经说了是哪一类。
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: LexiSpace.s6,
+      runSpacing: LexiSpace.s6,
+      children: <Widget>[
+        for (final relation in available)
+          ChoiceChip(
+            label: Text(
+              '${relatedCardLook(relation).title} '
+              '${groups[relation]!.length}',
+            ),
+            selected: relation == selected,
+            onSelected: (_) => onSelect(relation),
+            visualDensity: VisualDensity.compact,
+          ),
+      ],
+    );
+  }
+}

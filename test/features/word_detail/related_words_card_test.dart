@@ -101,6 +101,38 @@ void main() {
     expect(find.text('加入词库并初始化'), findsOneWidget);
   });
 
+  testWidgets('四类关联词合成一张卡，一次只展开一类', (tester) async {
+    final wordId = await insertWordRow(
+      db,
+      synonymsJson: '[{"word":"fruit","translation":"水果"}]',
+      confusedWordsJson: '[{"word":"animal","translation":"动物"}]',
+      now: now,
+    );
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      wrapWithScope(
+        WordDetailPage(wordId: wordId),
+        overrides: <Override>[databaseProvider.overrideWithValue(db)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 一张卡、一个切换条，而不是两张各带标题的卡。
+    expect(find.text('相关词'), findsOneWidget);
+    expect(find.text('同义词 1'), findsOneWidget);
+    expect(find.text('易混词 1'), findsOneWidget);
+    // 默认展开第一类。
+    expect(find.text('fruit'), findsOneWidget);
+    expect(find.text('animal'), findsNothing);
+
+    await tester.tap(find.text('易混词 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('animal'), findsOneWidget);
+    expect(find.text('fruit'), findsNothing);
+  });
+
   testWidgets('详情页把同义词卡片接到「近义词」关系上', (tester) async {
     final wordId = await insertWordRow(
       db,

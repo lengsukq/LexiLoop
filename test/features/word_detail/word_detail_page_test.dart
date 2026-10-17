@@ -104,7 +104,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('词条不存在或已被删除'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '返回'), findsOneWidget);
+    // 按钮文案写明去处：原来是「返回」，而它在 `context.go` 进入的页面上
+    // 调 `maybePop()`，栈里没上一页时按下去什么都不发生。
+    expect(find.widgetWithText(FilledButton, '返回单词本'), findsOneWidget);
   });
 
   testWidgets('暂停开关切换后 words.is_suspended 真的变了', (tester) async {
@@ -174,8 +176,12 @@ void main() {
     await tester.pumpWidget(wrap(WordDetailPage(wordId: id)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+    // 删除已经收进「⋯」菜单：它此前与「重新生成」并排，两者都是不可逆操作。
+    await tester.tap(find.byTooltip('更多操作'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('删除词条'));
+    await tester.pumpAndSettle();
+    // 菜单项与确认对话框标题同名，此时应当只剩对话框那一处。
     expect(find.text('删除词条'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, '删除'));

@@ -73,21 +73,36 @@ void main() {
   Future<List<InitializationJobRow>> jobs() =>
       db.select(db.initializationJobs).get();
 
-  testWidgets('头部展示补全、有道、编辑、重新生成与删除入口', (tester) async {
+  /// 打开「⋯」菜单。
+  ///
+  /// 危险动作（重新生成 / 删除）与低频的「补全」收进了菜单：
+  /// 它们此前与「编辑」平铺在一行，删除离重新生成只有约 40 像素。
+  Future<void> openMenu(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('更多操作'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('头部展示两个一等动作，其余收进「⋯」菜单', (tester) async {
     final id = await insertWordRow(db);
     await open(tester, id);
 
-    expect(find.text('补全缺失内容'), findsOneWidget);
     expect(find.text('有道词典'), findsOneWidget);
     expect(find.text('编辑'), findsOneWidget);
-    expect(find.text('重新生成'), findsOneWidget);
-    expect(find.text('删除'), findsOneWidget);
+    // 台面上不再有这两个：删错一次不可逆。
+    expect(find.text('删除词条'), findsNothing);
+    expect(find.text('补全缺失内容'), findsNothing);
+
+    await openMenu(tester);
+    expect(find.text('补全缺失内容'), findsOneWidget);
+    expect(find.text('AI 重新生成'), findsOneWidget);
+    expect(find.text('删除词条'), findsOneWidget);
   });
 
   testWidgets('「补全缺失内容」按只补空缺入队', (tester) async {
     final id = await insertWordRow(db);
     await open(tester, id);
 
+    await openMenu(tester);
     await tester.tap(find.text('补全缺失内容'));
     await tester.pumpAndSettle();
 
@@ -104,9 +119,11 @@ void main() {
     final id = await insertWordRow(db);
     await open(tester, id);
 
-    await tester.tap(find.text('重新生成'));
+    await openMenu(tester);
+    await tester.tap(find.text('AI 重新生成'));
     await tester.pumpAndSettle();
-    expect(find.text('重新生成会再次调用 AI，但会保留手动释义和例句。确定继续吗？'), findsOneWidget);
+    // 文案必须与真正的 mode 一致：这里是 forceOverwrite。
+    expect(find.textContaining('覆盖这个词条的内容'), findsOneWidget);
 
     await tester.tap(find.text('继续'));
     await tester.pumpAndSettle();
@@ -121,7 +138,8 @@ void main() {
     final id = await insertWordRow(db);
     await open(tester, id);
 
-    await tester.tap(find.text('重新生成'));
+    await openMenu(tester);
+    await tester.tap(find.text('AI 重新生成'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
@@ -193,7 +211,8 @@ void main() {
     final id = await insertWordRow(db);
     await open(tester, id);
 
-    await tester.tap(find.text('删除'));
+    await openMenu(tester);
+    await tester.tap(find.text('删除词条'));
     await tester.pumpAndSettle();
     expect(find.text('删除词条'), findsOneWidget);
 

@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/word_detail/cards/definitions_card.dart';
@@ -20,10 +21,12 @@ import 'package:lexiloop/features/word_detail/cards/summary_card.dart';
 import 'package:lexiloop/features/word_detail/cards/word_detail_header_card.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
-import 'package:lexiloop/ui/widgets/error_retry_view.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
+import 'package:lexiloop/ui/widgets/page_states.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 词条详情页。
@@ -41,19 +44,20 @@ class WordDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(wordDetailProvider(wordId));
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: detail.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => ErrorRetryView(
-            message: '词条加载失败：$error',
-            onRetry: () => ref.invalidate(wordDetailProvider(wordId)),
-          ),
-          data: (word) => word == null
-              ? const _MissingView()
-              : _WordDetailBody(detail: word),
+    return PageShell(
+      child: detail.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        // **失败态必须能走出去**：本页是 `/words` 分支的子路由，
+        // 但它是从列表 `context.go` 进来的，返回栈里未必有上一页。
+        error: (error, _) => PageErrorState(
+          message: '词条加载失败：$error',
+          onRetry: () => ref.invalidate(wordDetailProvider(wordId)),
+          secondaryLabel: '返回单词本',
+          onSecondary: () => leaveWordDetail(context),
         ),
+        data: (word) => word == null
+            ? _MissingView(onBack: () => leaveWordDetail(context))
+            : _WordDetailBody(detail: word),
       ),
     );
   }
@@ -68,16 +72,23 @@ class _WordDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s16,
-        LexiSpace.s20,
-        LexiSpace.s32,
-      ),
+      // 左右栏距已经由 `PageShell` 统一给出，这里只管上下呼吸。
+      padding: const EdgeInsets.only(top: LexiSpace.s16, bottom: LexiSpace.s32),
       children: _spaced(<Widget>[
         WordDetailHeaderCard(detail: detail),
         ..._contentSections(),
-        ..._activitySections(),
+        // **「我的」区放在内容之后、且笔记排在最前面**。
+        //
+        // 收敛前这一页是一条 16 张卡的平铺列表，笔记卡排在最末——而「记一笔」
+        // 是用户回到词条页最常做的事之一，它被压在复习历史、初始化质量
+        // （开发遥测）之后，需要滚很久。分区标签让「这个词是什么」与
+        // 「我对它做了什么」在视觉上分开。
+        const _ZoneLabel(label: '我的记录'),
+        NoteCard(wordId: detail.id, initialNote: detail.userNote),
+        LearningSnapshotCard(wordId: detail.id),
+        ReviewHistoryCard(wordId: detail.id),
+        // 遥测排在最后：它可折叠、也不是用户来这页的目的。
+        InitializationQualityCard(wordId: detail.id),
       ]),
     );
   }
@@ -92,30 +103,10 @@ class _WordDetailBody extends StatelessWidget {
       ExamplesCard(wordId: detail.id, examples: detail.examples),
     if (detail.phrases.isNotEmpty) PhrasesCard(phrases: detail.phrases),
     if (detail.forms.isNotEmpty) FormsCard(forms: detail.forms),
-    if (detail.synonyms.isNotEmpty)
-      RelatedWordsCard(
-        wordId: detail.id,
-        relation: RelationType.synonym,
-        items: detail.synonyms,
-      ),
-    if (detail.antonyms.isNotEmpty)
-      RelatedWordsCard(
-        wordId: detail.id,
-        relation: RelationType.antonym,
-        items: detail.antonyms,
-      ),
-    if (detail.wordFamily.isNotEmpty)
-      RelatedWordsCard(
-        wordId: detail.id,
-        relation: RelationType.wordFamily,
-        items: detail.wordFamily,
-      ),
-    if (detail.confusedWords.isNotEmpty)
-      RelatedWordsCard(
-        wordId: detail.id,
-        relation: RelationType.confusedWith,
-        items: detail.confusedWords,
-      ),
+    // 四类关联词合成一张卡：一次只展开一类，其余以计数留在切换条上。
+    // 此前它们是四张独立的卡片，词条关联多时这一块就占掉整屏。
+    if (_relatedGroups(detail).isNotEmpty)
+      RelatedWordsGroup(wordId: detail.id, groups: _relatedGroups(detail)),
     if (detail.roots.isNotEmpty || detail.affixes.isNotEmpty)
       MorphologyCard(roots: detail.roots, affixes: detail.affixes),
     // 助记卡**始终出现**：它同时是「生成助记」的入口，早期初始化完成的
@@ -129,13 +120,14 @@ class _WordDetailBody extends StatelessWidget {
     if (detail.hasNoContent) const _NoContentCard(),
   ];
 
-  /// 学习情况类分区；它们自己处理空态，因此始终出现。
-  List<Widget> _activitySections() => <Widget>[
-    LearningSnapshotCard(wordId: detail.id),
-    ReviewHistoryCard(wordId: detail.id),
-    InitializationQualityCard(wordId: detail.id),
-    NoteCard(wordId: detail.id, initialNote: detail.userNote),
-  ];
+  /// 四类关联词按关系分组；空的分组不参与渲染。
+  Map<RelationType, List<RelatedWordView>> _relatedGroups(WordDetail detail) =>
+      <RelationType, List<RelatedWordView>>{
+        RelationType.synonym: detail.synonyms,
+        RelationType.antonym: detail.antonyms,
+        RelationType.wordFamily: detail.wordFamily,
+        RelationType.confusedWith: detail.confusedWords,
+      };
 
   /// 在分区之间插入固定间距。
   List<Widget> _spaced(List<Widget> sections) {
@@ -166,44 +158,50 @@ class _NoContentCard extends StatelessWidget {
 
 /// 词条不存在（或已被删除）时的空态。
 class _MissingView extends StatelessWidget {
-  const new();
+  const new({required this.onBack});
+
+  /// 离开本页；由页面提供，保证「能出栈就出栈、否则回单词本」。
+  final VoidCallback onBack;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(LexiSpace.s32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              Icons.search_off_rounded,
-              size: 44,
-              color: colors.tertiaryLabel,
-            ),
-            const SizedBox(height: LexiSpace.s14),
-            Text(
-              '词条不存在或已被删除',
-              style: LexiType.title.copyWith(
-                color: colors.label,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: LexiSpace.s6),
-            Text(
-              '它可能刚被删除，或来自一个尚未导入的 ID。',
-              textAlign: TextAlign.center,
-              style: LexiType.body.copyWith(color: colors.secondaryLabel),
-            ),
-            const SizedBox(height: LexiSpace.s16),
-            FilledButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              child: const Text('返回'),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget build(BuildContext context) => PageEmptyState(
+    icon: Icons.search_off_rounded,
+    title: '词条不存在或已被删除',
+    message: '它可能刚被删除，或来自一个尚未导入的 ID。',
+    primaryLabel: '返回单词本',
+    onPrimary: onBack,
+  );
+}
+
+/// 离开词条详情：能出栈就出栈，否则回单词本。
+///
+/// `Navigator.maybePop()` 在这里不可靠——本页常常是用 `context.go` 直接
+/// 进入的，栈里没有上一页，那个调用会静默地什么都不做，于是「返回」按钮
+/// 变成一个按了没反应的装饰。
+void leaveWordDetail(BuildContext context) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(wordsPath);
   }
+}
+
+/// 分区标签：把「内容」与「我的记录」在视觉上分开。
+class _ZoneLabel extends StatelessWidget {
+  const new({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: LexiSpace.s20),
+    child: Text(
+      label,
+      style: LexiType.footnote.copyWith(
+        color: context.lexiColors.tertiaryLabel,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.6,
+      ),
+    ),
+  );
 }

@@ -102,6 +102,10 @@ class TtsService {
   final SpeechEngine _engine;
 
   /// 当前已配置的语速；`null` 表示尚未配置。
+  ///
+  /// 存的是**界面倍率**而不是下发给引擎的参数：两个值只是同一份配置的两种
+  /// 表示，去重比较用哪一个都行，但存倍率能让「换算」只有一个出口——
+  /// 存引擎参数的话，读回来判断平台是否需要换算会多一层反推。
   double? _configuredRate;
 
   /// 当前已配置的语言；`null` 表示尚未配置。
@@ -138,7 +142,10 @@ class TtsService {
     final boundedRate = _boundedRate(rate);
 
     if (_configuredRate != boundedRate || _configuredLanguage != language) {
-      await _engine.configure(rate: boundedRate, language: language);
+      await _engine.configure(
+        rate: _engineRate(boundedRate),
+        language: language,
+      );
       _configuredRate = boundedRate;
       _configuredLanguage = language;
     }
@@ -167,15 +174,29 @@ class TtsService {
 
   /// 语速夹到平台可接受区间。
   ///
-  /// 设置页允许 [minSpeechRate]–[maxSpeechRate]，而 TTS 引擎自身还有
-  /// 更窄的有效区间；夹到两者交集，避免某些引擎直接静音。
-  double _boundedRate(double rate) {
-    const lower = minSpeechRate > PlatformCaps.minSpeechRate
-        ? minSpeechRate
-        : PlatformCaps.minSpeechRate;
-    const upper = maxSpeechRate < PlatformCaps.maxSpeechRate
-        ? maxSpeechRate
-        : PlatformCaps.maxSpeechRate;
-    return rate.clamp(lower, upper);
+  /// 夹的是**倍率**：设置页允许 [minSpeechRate]–[maxSpeechRate]，超出即视为
+  /// 脏数据。换算到引擎刻度后仍可能越界（Apple 的可用区间比界面区间窄），
+  /// 那一步由 [_engineRate] 的系数负责。
+  double _boundedRate(double rate) => rate.clamp(minSpeechRate, maxSpeechRate);
+
+  /// 把界面**倍率**折算成引擎认识的参数。
+  ///
+  /// Android 与 Web 的 `setSpeechRate` 都是倍率语义：Android 侧
+  /// `flutter_tts` 会自己把 Dart 值 ×2 再交给 `TextToSpeech.setSpeechRate`，
+  /// Web 侧 `SpeechSynthesisUtterance.rate` 直接就吃倍率，原样下发即可。
+  ///
+  /// iOS/macOS 不是：Dart 值被原样赋给 `AVSpeechUtterance.rate`，而那个刻度
+  /// 以 [avSpeechUtteranceDefaultRate]（0.5）为正常语速、1.0 为上限。
+  /// 若原样下发，界面默认的 1.0 就已经是引擎上限——这正是「默认设置下朗读
+  /// 快得像赶场、把滑条往上拉还没变化」的根因。这里折算出 `0.5 × 倍率`，
+  /// 让界面的 1.0 恰好等于引擎的正常语速。
+  ///
+  /// 再夹一次系数：`0.5 × 2.0` 正好顶格，界面倍率更大也不会越界，而
+  /// AVSpeech 对越界值只会静默钳住——不夹的话「设置值 ≠ 实际值」会变成
+  /// 一条无人察觉的偏差。
+  double _engineRate(double multiplier) {
+    if (!PlatformCaps.usesUtteranceRateScale) return multiplier;
+    final scaled = multiplier * avSpeechUtteranceDefaultRate;
+    return scaled.clamp(minUtteranceRateFactor, maxUtteranceRateFactor);
   }
 }

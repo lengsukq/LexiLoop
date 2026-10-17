@@ -16,6 +16,7 @@ import 'dart:math' show min;
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
 import 'package:lexiloop/services/audio/pronunciation_audio.dart';
@@ -64,6 +65,8 @@ class WordSpeaker {
   /// 预热的是「即将被点到的词」：学习界面一次只往前看几个词，提前把音频
   /// 拉好，点击时才有「秒开」的手感。按地址去重并限制并发
   /// （[audioPreloadConcurrency]），单条失败由缓存层吸收，整批照常完成。
+  ///
+  /// 只预热、不播放，因此**不涉及语速**：语速是播放时的参数。
   Future<void> preloadBatch(List<SpeechRequest> requests) async {
     if (!humanAudioEnabled) return;
     final urls = _distinctAudioUrls(requests);
@@ -89,11 +92,20 @@ class WordSpeaker {
     pronunciations: request.pronunciations,
   );
 
+  /// 播放词典录音。
+  ///
+  /// 录音按设置里的倍率放，与系统朗读共用同一套语速：两者都取自
+  /// [PlaybackSettings.speedFor]，各自引擎的换算只发生在
+  /// `TtsService._engineRate`。若播录音时不传倍率，用户把「单词语速」调到
+  /// 0.5 后会发现系统朗读变慢了、词典录音却纹丝不动。
   Future<SpeechResult> _playRecording(Uri url, SpeechRequest request) async {
     final bytes = await _cache.resolve(url);
     if (bytes == null) return await _speakWithSystemVoice(request);
     try {
-      await _player.prepare(bytes);
+      await _player.prepare(
+        bytes,
+        speed: request.playback.speedFor(request.contentType),
+      );
       await _player.play();
       return const HumanRecordingPlayed();
     } on Object {

@@ -15,7 +15,12 @@ abstract interface class AudioPlayerPort {
   /// 传入**已经下载好的字节**而不是 URL，是为了让缓存能决定命中与否：
   /// 命中时播放根本不应该再发出网络请求。
   /// 装载失败必须抛出，由上层决定是否回落到系统朗读。
-  Future<void> prepare(Uint8List audio);
+  ///
+  /// [speed] 是**倍率**（1 = 原速），在装载时就定下来：真人录音的语速与
+  /// 系统朗读共用设置页那一套倍率，两者必须落在同一刻度上，否则同一个词
+  /// 走录音和走朗读会听到两种速度。播放器可以自己改变速（`just_audio` 的
+  /// `setSpeed`），不必重新下载。
+  Future<void> prepare(Uint8List audio, {required double speed});
 
   /// 播放当前装载的音频。
   Future<void> play();

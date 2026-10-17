@@ -18,6 +18,9 @@ class FakeAudioPlayer implements AudioPlayerPort {
   /// 每次 `prepare` 收到的字节。
   final List<Uint8List> prepared = <Uint8List>[];
 
+  /// 每次 `prepare` 收到的语速倍率，与 [prepared] 一一对应。
+  final List<double> preparedSpeeds = <double>[];
+
   /// `play` 的调用次数。
   int playCount = 0;
 
@@ -34,10 +37,11 @@ class FakeAudioPlayer implements AudioPlayerPort {
   Exception? playError;
 
   @override
-  Future<void> prepare(Uint8List audio) async {
+  Future<void> prepare(Uint8List audio, {required double speed}) async {
     final error = prepareError;
     if (error != null) throw error;
     prepared.add(audio);
+    preparedSpeeds.add(speed);
   }
 
   @override

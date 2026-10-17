@@ -104,19 +104,6 @@ abstract final class PlatformCaps {
   /// 没有可供应用引导的安装入口，因此不需要这一步。
   static bool get requiresVoicePackSetup => profile.requiresVoicePackSetup;
 
-  /// 系统 TTS 的语速取值范围下限。
-  ///
-  /// Android 的 `setSpeechRate` 语义是倍率区间 0.0–2.0，
-  /// 与旧版 Web 的 `playbackRate` 不完全一致，各端都需实测校准。
-  ///
-  /// 与界面倍率区间并存只是过渡：`tts_service.dart` 的语速折算落地后
-  /// 这两个常量会在同一次提交里删除（它们描述引擎参数，不该与界面倍率
-  /// 同住一处）。
-  static const double minSpeechRate = 0;
-
-  /// 系统 TTS 的语速取值范围上限。
-  static const double maxSpeechRate = 2;
-
   /// 是否需要对全屏高斯模糊做性能降级。
   ///
   /// 旧版 `globals.css` 的环境光背景是 4 层 `blur(80px)` 径向渐变，

@@ -5,12 +5,19 @@
 /// 语音包缺失时的降级。
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/tts_service.dart';
+
+/// 语速滑条的刻度步长（与设置页的 0.05 一档一致）。
+///
+/// 用来容忍浮点累加误差：滑条从 0.5 每次加 0.05 一路加到的最大值是
+/// 1.9999999999999998，折算后自然差着一个 ULP，等号断言会误报失败。
+const double speedStepEpsilon = 0.005;
 
 /// 记录调用轨迹的假引擎。
 class FakeSpeechEngine implements SpeechEngine {
@@ -73,6 +80,11 @@ void main() {
   setUp(() {
     engine = FakeSpeechEngine();
     service = TtsService(engine);
+  });
+
+  tearDown(() {
+    // 不清理会污染同文件内后续用例的平台判定。
+    debugDefaultTargetPlatformOverride = null;
   });
 
   group('基本朗读', () {
@@ -145,6 +157,61 @@ void main() {
         playback: playback,
       );
       expect(engine.configureCalls.single.$1, maxSpeechRate);
+    });
+  });
+
+  group('倍率到引擎刻度的折算', () {
+    /// 按平台朗读一次，返回下发给引擎的语速。
+    Future<double> engineRateOn(
+      TargetPlatform platform,
+      double multiplier,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      final localEngine = FakeSpeechEngine();
+      await TtsService(localEngine)
+          .speak('apple', languageCode: 'en', rate: multiplier);
+      return localEngine.configureCalls.single.$1;
+    }
+
+    test('Android 与 Web 原样下发倍率', () async {
+      expect(await engineRateOn(TargetPlatform.android, 1), 1);
+      expect(await engineRateOn(TargetPlatform.android, 0.8), 0.8);
+    });
+
+    test('macOS / iOS 折算出 AVSpeechUtterance 的刻度', () async {
+      // 界面默认的 1× 必须落成 AVSpeech 的正常语速 0.5，而不是它的上限 1.0。
+      for (final platform in <TargetPlatform>[
+        TargetPlatform.macOS,
+        TargetPlatform.iOS,
+      ]) {
+        expect(await engineRateOn(platform, 1), avSpeechUtteranceDefaultRate);
+        expect(await engineRateOn(platform, maxSpeechRate), 1);
+      }
+    });
+
+    test('Mac 上整条滑条都落在有效区间内，且单调不减', () async {
+      var previous = 0.0;
+      for (
+        var multiplier = minSpeechRate;
+        multiplier <= maxSpeechRate;
+        // 架构守卫禁止 services/ 里的裸数字；这里用常量本身推导步长。
+        multiplier += (maxSpeechRate - minSpeechRate) / 10
+      ) {
+        final rate = await engineRateOn(TargetPlatform.macOS, multiplier);
+        expect(rate, greaterThanOrEqualTo(previous));
+        expect(rate, lessThanOrEqualTo(maxUtteranceRateFactor));
+        previous = rate;
+      }
+      // 只有最大倍率才允许顶格：这正是旧实现下「默认就已经顶格」的那一点。
+      // 用 closeTo 而不是等号：滑条按 0.05 走，累加下来是 1.9999999999999998。
+      expect(previous, closeTo(maxUtteranceRateFactor, speedStepEpsilon));
+    });
+
+    test('引擎参数越界时钳住，不把无效值送进引擎', () async {
+      expect(
+        await engineRateOn(TargetPlatform.macOS, maxSpeechRate * 10),
+        maxUtteranceRateFactor,
+      );
     });
   });
 

@@ -26,13 +26,19 @@ final class JustAudioEngine implements AudioPlayerPort {
 
   final AudioPlayer _player;
 
-  /// 装载音频字节。
+  /// 装载音频字节，并按倍率设定播放速度。
   ///
   /// 失败时按 `just_audio` 的契约直接上抛，由 `WordSpeaker` 判断是否回落——
   /// 播放器层没有发言权，它不知道「没有真人录音」是正常情况还是缺陷。
+  ///
+  /// `setSpeed` 在 `setAudioSource` 之后、`play` 之前调用：`just_audio` 的
+  /// 速度是播放器级状态，装载后再设也能生效，但连设两次（装载时 + 播放前）
+  /// 会让「谁负责语速」变得含糊，这里只在装载时设一次。
   @override
-  Future<void> prepare(Uint8List audio) =>
-      _player.setAudioSource(_InMemoryAudioSource(audio)).then((_) {});
+  Future<void> prepare(Uint8List audio, {required double speed}) async {
+    await _player.setAudioSource(_InMemoryAudioSource(audio));
+    await _player.setSpeed(speed);
+  }
 
   @override
   Future<void> play() => _player.play();

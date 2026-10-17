@@ -15,10 +15,11 @@ SpeechRequest speechRequest({
   Accent accent = Accent.us,
   List<PronunciationView> pronunciations = const <PronunciationView>[],
   LexicalContentType contentType = LexicalContentType.word,
+  PlaybackSettings playback = testPlaybackSettings,
 }) => SpeechRequest(
   term: term,
   accent: accent,
-  playback: testPlaybackSettings,
+  playback: playback,
   contentType: contentType,
   pronunciations: pronunciations,
 );

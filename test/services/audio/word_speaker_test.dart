@@ -8,6 +8,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
 import 'package:lexiloop/services/audio/pronunciation_audio.dart';
@@ -23,6 +24,9 @@ import 'audio_fixtures.dart';
 PronunciationView _withRecording() => pronunciation(
   audioUrl: Uri.parse('https://example.com/apple-us.mp3').toString(),
 );
+
+/// 一个明显慢于默认值的单词语速，用来验证倍率确实传到了播放器。
+const double slowSpeed = 0.6;
 
 void main() {
   late FakeAudioPlayer player;
@@ -67,6 +71,26 @@ void main() {
       expect(player.playCount, 1);
       expect(engine.spoken, isEmpty);
       expect(engine.configureCalls, isEmpty);
+    });
+
+    test('真人录音按设置里的倍率播放，与系统朗读同一套语速', () async {
+      const playback = PlaybackSettings(
+        choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
+        defaultAccent: Accent.us,
+        wordSpeed: slowSpeed,
+        phraseSpeed: defaultSpeechRate,
+        sentenceSpeed: defaultSpeechRate,
+        autoPlayPronunciation: true,
+      );
+      await speaker.speak(
+        speechRequest(
+          pronunciations: <PronunciationView>[_withRecording()],
+          playback: playback,
+        ),
+      );
+
+      // 不传倍率时播放器只会用原速，用户调慢的语速在录音上会完全失效。
+      expect(player.preparedSpeeds, <double>[slowSpeed]);
     });
   });
 

@@ -9,6 +9,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
+import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
@@ -80,8 +81,21 @@ class QueueBulkBar extends ConsumerWidget {
   }
 
   Future<void> _retry(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final selection = ref.read(queueSelectionProvider);
+    // **批量重试是花真金白银的动作**：每个重新排队的任务都会再去打一次
+    // 词典与 AI。同一页里「创建初始化任务」要先过一遍带预览的配置器，
+    // 这里却是一点就跑——谨慎度不一致，用户学到的规则就是「这里不用想」。
+    final confirmed = await confirmAction(
+      context,
+      title: '重试这些词条的全部任务？',
+      body:
+          '将为选中的 ${selection.length} 个词条重新排队，'
+          ' 每个任务都会再查一次词典；需要 AI 补全的会再次消耗额度。',
+      confirmLabel: '重试',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final retried = await ref
           .read(queueActionsProvider)

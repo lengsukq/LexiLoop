@@ -16,6 +16,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/features/settings/backup_size_label.dart';
 import 'package:lexiloop/features/settings/data_management_section.dart';
 import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/services/backup/backup_export_service.dart';
@@ -185,6 +186,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('clearAllDataConfirmField')), findsOneWidget);
+  });
+
+  testWidgets('导入备份必须先敲 IMPORT——它是三个动作里唯一全量覆盖的', (tester) async {
+    await pumpSection(tester);
+    await tester.tap(find.text('导入旧版 JSON 备份'));
+    await tester.pumpAndSettle();
+
+    // 对话框必须先出现，而不是直接开始导入。
+    expect(find.byKey(const Key('importBackupConfirmField')), findsOneWidget);
+    // 没敲关键字之前确认按钮必须禁用。
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('importBackupConfirmButton')),
+          )
+          .onPressed,
+      isNull,
+    );
+    // 文案要点明这是「整体替换」而不是合并。**限定在对话框内**：同一页上
+    // 还有别的分组（例如局域网同步）也会说「整体替换」，全局查找会撞车。
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('整体替换'),
+      ),
+      findsOneWidget,
+    );
   });
 
   test('字节数格式化', () {

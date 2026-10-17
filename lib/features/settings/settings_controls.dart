@@ -6,12 +6,18 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
-import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 一个设置分组卡片。
+///
+/// 只是 [SectionCard] 的一层薄壳：设置页的卡片比别处多一句 `subtitle`
+/// （解释「为什么」），而内边距/标题样式/圆角都应当与全应用一致。
+/// 曾经它自带一套 14 的内边距，与今日页的 18、统计页的 16 差一两像素——
+/// 单看看不出来，放在一起就是「哪里不齐」。
 class SettingsSectionCard extends StatelessWidget {
   /// 以标题与内容构造。
   const new({
@@ -31,35 +37,8 @@ class SettingsSectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final subtitle = this.subtitle;
-    return Surface(
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(LexiSpace.s14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: LexiType.callout.copyWith(
-              color: colors.label,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (subtitle != null) ...<Widget>[
-            const SizedBox(height: LexiSpace.s4),
-            Text(
-              subtitle,
-              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-            ),
-          ],
-          const SizedBox(height: LexiSpace.s10),
-          child,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      SectionCard(title: title, subtitle: subtitle, child: child);
 }
 
 /// 带数值回显的滑条行。
@@ -128,35 +107,59 @@ class _SettingsSliderRowState extends State<SettingsSliderRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: LexiType.body.copyWith(color: colors.label),
-                ),
+          // 标签与数值也收在同一个宽度里，否则数值会被推到卡片最右端。
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: LexiLayout.readingMaxWidth,
               ),
-              Text(
-                widget.valueText ?? _value.toStringAsFixed(2),
-                style: LexiType.body.copyWith(
-                  color: colors.accent,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      style: LexiType.body.copyWith(color: colors.label),
+                    ),
+                  ),
+                  Text(
+                    widget.valueText ?? _value.toStringAsFixed(2),
+                    style: LexiType.body.copyWith(
+                      color: colors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           if (description != null)
             Text(
               description,
               style: LexiType.caption.copyWith(color: colors.secondaryLabel),
             ),
-          Slider(
-            value: _value.clamp(widget.min, widget.max),
-            min: widget.min,
-            max: widget.max,
-            divisions: widget.divisions,
-            onChanged: (value) => setState(() => _value = value),
-            onChangeEnd: widget.onChangeEnd,
+          // **滑条限宽**。
+          //
+          // 铺满整行时它在 1280 窗口下长约 1000 像素：标签在最左、数值在
+          // 最右（相隔近 1900 像素，已经看不出谁标注谁），刻度间距还被拉到
+          // 十几像素一格——滑条的宽度本该表达「这个区间有多细」，拉长之后
+          // 反而读不出精确位置。这里与设置页正文列同宽（720），
+          // 「标签 — 滑条 — 数值」重新连成一个整体。
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: LexiLayout.readingMaxWidth,
+              ),
+              child: Slider(
+                value: _value.clamp(widget.min, widget.max),
+                min: widget.min,
+                max: widget.max,
+                divisions: widget.divisions,
+                onChanged: (value) => setState(() => _value = value),
+                onChangeEnd: widget.onChangeEnd,
+              ),
+            ),
           ),
         ],
       ),

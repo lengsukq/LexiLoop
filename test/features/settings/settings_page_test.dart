@@ -204,11 +204,19 @@ void main() {
     expect(stored, <Object?>['CET4', 'IELTS']);
   });
 
-  testWidgets('数据管理 tab 显示 CSV 导入与危险区', (tester) async {
+  testWidgets('数据管理 tab 显示 CSV 导入、远程备份与危险区', (tester) async {
     await pumpSettings(tester);
     await openTab(tester, '数据管理');
 
     expect(find.byKey(const Key('openCsvImport')), findsOneWidget);
     expect(find.byKey(const Key('clearAllData')), findsOneWidget);
+    // 远程备份分组也在同一个 tab 里，且未配置时上传按钮不可点。
+    expect(find.byKey(const Key('webdavBaseUrlField')), findsOneWidget);
+    expect(
+      tester
+          .widget<ButtonStyleButton>(find.byKey(const Key('uploadToWebdav')))
+          .onPressed,
+      isNull,
+    );
   });
 }

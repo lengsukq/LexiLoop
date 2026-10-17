@@ -15,6 +15,7 @@ import 'package:lexiloop/features/add/manual_batch_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/features/add/widgets/manual_batch_row_card.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
+import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
@@ -74,7 +75,8 @@ class _ManualBatchPanelState extends ConsumerState<ManualBatchPanel> {
             ),
           _BatchFooter(
             state: state,
-            onConfirmAll: () => unawaited(notifier.confirmAll()),
+            onConfirmAll: () =>
+                unawaited(_confirmAllWithDialog(context, notifier, state)),
             onReset: notifier.reset,
           ),
         ],
@@ -598,3 +600,28 @@ const int batchMinLines = 4;
 
 /// 多行输入框的最大行数。
 const int batchMaxLines = 8;
+
+/// 「全部确认加入」的确认门。
+///
+/// **为什么必须确认**：这是**零撤销**的批量写库——一次点按就把预览里的
+/// 每一行写成正式词条，没有任何回滚入口（逐行确认至少还是你自己点的）。
+/// 同一个应用里「创建初始化任务」要走一遍带预览的配置器、
+/// 「撤销导入批次」也要二次确认；只有这里和队列的批量重试是零确认，
+/// 用户学到的规则就成了「这里不用确认」，然后在别处丢数据。
+Future<void> _confirmAllWithDialog(
+  BuildContext context,
+  ManualBatchController notifier,
+  ManualBatchState state,
+) async {
+  final confirmed = await confirmAction(
+    context,
+    title: '全部确认加入？',
+    body:
+        '将把 ${state.pendingCount} 行预览写入正式词库，'
+        ' 这一步不会再查询词典，也没有撤销入口。'
+        ' \n\n想逐行检查的话，先取消，再展开每一行看详情。',
+    confirmLabel: '写入词库',
+  );
+  if (!confirmed) return;
+  await notifier.confirmAll();
+}

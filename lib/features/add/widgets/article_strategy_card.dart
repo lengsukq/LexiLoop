@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
+import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
@@ -57,7 +58,9 @@ class ArticleStrategyCard extends ConsumerWidget {
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
               key: const Key('articleCommit'),
-              onPressed: canCommit ? notifier.commit : null,
+              onPressed: canCommit
+                  ? () => _commitWithConfirm(context, notifier, state)
+                  : null,
               icon: const Icon(Icons.arrow_forward_rounded, size: 16),
               label: Text('确认导入 ${state.selection.selected.length} 个'),
             ),
@@ -146,3 +149,29 @@ String articleModeDescription(ImportMode mode) => switch (mode) {
   ImportMode.skipExisting => '已有词条完全跳过，不创建初始化任务。',
   ImportMode.forceDictionaryRefresh => '重新查询已有词条的词典内容，但保留学习进度。',
 };
+
+/// 提交前把「重置学习进度」的确认补上。
+///
+/// **同一件事在两条路径上谨慎度不同**：CSV 导入在提交时会弹一个
+/// 不可撤销确认（`import_page.dart` 的 `_ResetProgressDialog`），
+/// 而文章导入这边勾上就直接写——勾选框本身只是一次点击，很容易
+/// 在滚动候选词的时候被顺手带上。这里对齐成同一条规则：
+/// 只要勾了「重置学习进度」，提交前必须再确认一次。
+Future<void> _commitWithConfirm(
+  BuildContext context,
+  ArticleWizardNotifier notifier,
+  ArticleWizardState state,
+) async {
+  if (state.selection.resetLearningProgress) {
+    final confirmed = await confirmAction(
+      context,
+      title: '重置已有词条的学习进度？',
+      // 文案直接复用勾选项的说明，两处说的必须是同一件事。
+      body: '$resetProgressDescription\n\n这一步不可撤销。',
+      confirmLabel: '重置并导入',
+      destructive: true,
+    );
+    if (!confirmed) return;
+  }
+  await notifier.commit();
+}

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/app/router.dart';
+import 'package:lexiloop/ui/feedback/messenger.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
@@ -35,6 +36,10 @@ class LexiLoopApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'LexiLoop 词环',
       debugShowCheckedModeBanner: false,
+      // 让「没有 BuildContext」的代码也能把失败说给用户听，见
+      // `ui/feedback/messenger.dart`：设置写库失败是唯一一个这样的场景，
+      // 而它此前完全静默。
+      scaffoldMessengerKey: appMessengerKey,
       theme: LexiTheme.light,
       darkTheme: LexiTheme.dark,
       routerConfig: appRouter,

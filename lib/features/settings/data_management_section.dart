@@ -9,9 +9,15 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/features/dashboard/cards/platform_card.dart';
+import 'package:lexiloop/features/settings/backup_size_label.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
+import 'package:lexiloop/features/settings/import_backup_confirm.dart';
+import 'package:lexiloop/features/settings/lan_sync_section.dart';
 import 'package:lexiloop/features/settings/local_data_reset.dart';
+import 'package:lexiloop/features/settings/remote_backup_section.dart';
 import 'package:lexiloop/features/settings/settings_controls.dart';
+import 'package:lexiloop/features/settings/typed_confirm_dialog.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -28,8 +34,13 @@ const String deleteConfirmKeyword = 'DELETE';
 /// 等于把用户的注意力训练成「看到导出按钮就直接点」。
 const String exportConfirmKeyword = 'EXPORT';
 
-/// 备份字节数的展示单位。
-const List<String> backupByteUnits = <String>['B', 'KB', 'MB', 'GB'];
+/// 导入备份的二次确认关键词。
+///
+/// **导入是这一组里最危险的动作，却曾经是唯一没有确认的**：它按父子序
+/// 覆盖 12 张表（见 `data/backup/backup_import.dart`），点一下就把当前
+/// 库整个换掉，而「清空全部数据」与「导出」都要求打字确认。
+/// 确认强度必须按**后果**排，不是按动作的名字听起来危不危险：
+/// 导出的后果是可再生的（大不了再导一次），导入的后果是不可逆的覆盖。
 
 /// 数据管理分组。
 class DataManagementSection extends ConsumerStatefulWidget {
@@ -86,6 +97,16 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
             ],
           ),
         ),
+        const SizedBox(height: LexiSpace.s12),
+        const RemoteBackupSection(),
+        const SizedBox(height: LexiSpace.s12),
+        const LanSyncSection(),
+        const SizedBox(height: LexiSpace.s12),
+        // **自检卡从首页挪到这里**：它讲的是「TTS 能不能落盘、模糊会不会
+        // 降级、当前是不是侧边栏布局」，属于排查信息而不是每日任务。
+        // 摆在首页最末位时，它是整页唯一一块与「今天学什么」无关的内容，
+        // 却占着最有价值的滚动终点。
+        const PlatformCapabilityCard(),
         const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '危险区',
@@ -144,6 +165,12 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
   }
 
   Future<void> _importBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => const _ImportConfirmDialog(),
+    );
+    if (confirmed != true || !mounted) return;
+
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _importing = true);
     try {
@@ -186,7 +213,7 @@ class _DeleteConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _TypedConfirmDialog(
+    return const TypedConfirmDialog(
       title: '清空全部数据？',
       body: '此操作不可撤销。请输入 DELETE 以确认。',
       keyword: deleteConfirmKeyword,
@@ -202,7 +229,7 @@ class _ExportConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _TypedConfirmDialog(
+    return const TypedConfirmDialog(
       title: '导出 JSON 备份？',
       body:
           '备份包含全部词条、词典内容、学习记录、导入历史与设置，'
@@ -217,96 +244,13 @@ class _ExportConfirmDialog extends StatelessWidget {
   }
 }
 
-/// 要求敲对一个关键字才放行的确认对话框。
+/// 导入备份前的确认：说清楚「会覆盖什么、什么会被丢掉」。
 ///
-/// 清空数据与导出备份共用它：两者的共同点是「一步误点就不可逆」，
-/// 而确认成本只需要用户多打五个字母。
-class _TypedConfirmDialog extends StatefulWidget {
-  const new({
-    required this.title,
-    required this.body,
-    required this.keyword,
-    required this.confirmLabel,
-    required this.keyPrefix,
-  });
-
-  final String title;
-  final String body;
-  final String keyword;
-  final String confirmLabel;
-
-  /// widget 测试用的 key 前缀，派生出 `…Field` 与 `…Button` 两个 key。
-  ///
-  /// 由前缀派生而不是各传一个 key：两个对话框的差别只有标题、正文与关键字，
-  /// 让它们各自声明 key 只会多两处需要同步的名字。
-  final String keyPrefix;
-
-  /// 输入框的 key。
-  Key get fieldKey => Key('${keyPrefix}Field');
-
-  /// 确认按钮的 key。
-  Key get buttonKey => Key('${keyPrefix}Button');
+/// 文案必须点名**作用范围**：这个动作不是「合并」，而是全量替换。
+/// 用户点它之前唯一需要知道的事，就是当前库里的东西还在不在。
+class _ImportConfirmDialog extends StatelessWidget {
+  const new();
 
   @override
-  State<_TypedConfirmDialog> createState() => _TypedConfirmDialogState();
-}
-
-class _TypedConfirmDialogState extends State<_TypedConfirmDialog> {
-  final TextEditingController _controller = TextEditingController();
-  bool _matched = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(widget.body),
-          const SizedBox(height: LexiSpace.s12),
-          TextField(
-            key: widget.fieldKey,
-            controller: _controller,
-            autocorrect: false,
-            decoration: InputDecoration(hintText: widget.keyword),
-            onChanged: (value) =>
-                setState(() => _matched = value.trim() == widget.keyword),
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          key: widget.buttonKey,
-          onPressed: _matched ? () => Navigator.of(context).pop(true) : null,
-          child: Text(widget.confirmLabel),
-        ),
-      ],
-    );
-  }
-}
-
-/// 把字节数写成人类可读的大小，例如 `27.1 MB`。
-///
-/// 沿用 [backupByteUnits] 的阶梯而不是现成的格式化库：备份文件通常落在
-/// KB–MB，两级之内就够，不必为一次提示引入一个依赖。
-String formatBackupBytes(int bytes) {
-  var value = bytes.toDouble();
-  var unit = 0;
-  while (value >= 1024 && unit < backupByteUnits.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  final text = unit == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
-  return '$text ${backupByteUnits[unit]}';
+  Widget build(BuildContext context) => const BackupImportConfirmDialog();
 }

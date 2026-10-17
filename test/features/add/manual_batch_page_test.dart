@@ -288,6 +288,13 @@ void main() {
       await tester.tap(find.byKey(const Key('manualBatchConfirmAll')));
       await tester.pumpAndSettle();
 
+      // 批量写库是零撤销的，必须先过一道确认：没点之前一行都不写。
+      expect(find.text('全部确认加入？'), findsOneWidget);
+      expect(service.confirmedTokens, isEmpty);
+
+      await tester.tap(find.text('写入词库'));
+      await tester.pumpAndSettle();
+
       expect(service.confirmedTokens, hasLength(3));
       expect(find.byKey(const Key('manualBatchAllConfirmed')), findsOneWidget);
       expect(find.text('已全部加入词库'), findsOneWidget);

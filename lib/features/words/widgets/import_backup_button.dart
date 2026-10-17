@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/features/settings/import_backup_confirm.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 
@@ -26,6 +27,10 @@ class _ImportBackupButtonState extends ConsumerState<ImportBackupButton> {
   bool _busy = false;
 
   Future<void> _import() async {
+    // **与设置页同一个确认框**：这个动作整份替换 12 张表，
+    // 而此前这里是零确认——入口越显眼（就贴在「手动添加」旁边），
+    // 门槛反而越低，正好反了。
+    if (!await confirmBackupImport(context) || !mounted) return;
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {

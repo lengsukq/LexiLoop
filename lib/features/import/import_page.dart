@@ -16,10 +16,13 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_history_section.dart';
 import 'package:lexiloop/features/import/import_preview_table.dart';
 import 'package:lexiloop/features/import/import_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -32,74 +35,62 @@ class ImportPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(importWizardProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            LexiSpace.s20,
-            LexiSpace.s16,
-            LexiSpace.s20,
-            LexiSpace.s32,
+    return PageShell(
+      scrollable: true,
+      // **这一页此前没有任何返回入口**：它是顶层路由、不套外壳，也没有
+      // `AppBar`，唯一的出口是三步都走完之后结果卡上的按钮。中途想退出
+      // （选错了文件、不想导了）只能切走应用。页头补上返回，是本页
+      // 最要紧的一个改动。
+      header: PageHeader(
+        title: '导入词库',
+        subtitle: '从 EasyDict 导出的 CSV 建库；文件只在本机解析，不会上传。',
+        leading: Builder(
+          builder: (backContext) => IconButton(
+            key: const Key('importBack'),
+            tooltip: '返回',
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () {
+              // 能被推上来就回上一页（例如从设置页进来），
+              // 否则回到单词本——那是导入的主入口。
+              if (backContext.canPop()) {
+                backContext.pop();
+              } else {
+                backContext.go(wordsPath);
+              }
+            },
           ),
-          children: <Widget>[
-            const _ImportHeader(),
-            const SizedBox(height: LexiSpace.s16),
-            const _StepCard(step: 1, title: '选择语言方向', child: _LanguageStep()),
-            const SizedBox(height: LexiSpace.s12),
-            const _StepCard(
-              step: 2,
-              title: '选择 EasyDict CSV 文件',
-              child: _FileStep(),
-            ),
-            if (state.errorMessage != null) ...<Widget>[
-              const SizedBox(height: LexiSpace.s12),
-              _ErrorBanner(message: state.errorMessage!),
-            ],
-            if (state.result != null) ...<Widget>[
-              const SizedBox(height: LexiSpace.s12),
-              _ResultCard(result: state.result!),
-            ],
-            const SizedBox(height: LexiSpace.s12),
-            _StepCard(
-              step: 3,
-              title: '预览与导入模式',
-              child: state.preview == null
-                  ? const _PreviewPlaceholder()
-                  : _PreviewStep(preview: state.preview!),
-            ),
-            const SizedBox(height: LexiSpace.s12),
-            const ImportHistorySection(),
-          ],
         ),
       ),
-    );
-  }
-}
-
-class _ImportHeader extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '导入词库',
-          style: LexiType.page.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const _StepCard(step: 1, title: '选择语言方向', child: _LanguageStep()),
+          const SizedBox(height: LexiSpace.s12),
+          const _StepCard(
+            step: 2,
+            title: '选择 EasyDict CSV 文件',
+            child: _FileStep(),
           ),
-        ),
-        const SizedBox(height: LexiSpace.s4),
-        Text(
-          '支持 EasyDict 导出的 CSV：单词 / 释义 / 音标 / 例句 / 同义词等列会自动识别。',
-          style: LexiType.body.copyWith(color: colors.secondaryLabel),
-        ),
-      ],
+          if (state.errorMessage != null) ...<Widget>[
+            const SizedBox(height: LexiSpace.s12),
+            _ErrorBanner(message: state.errorMessage!),
+          ],
+          if (state.result != null) ...<Widget>[
+            const SizedBox(height: LexiSpace.s12),
+            _ResultCard(result: state.result!),
+          ],
+          const SizedBox(height: LexiSpace.s12),
+          _StepCard(
+            step: 3,
+            title: '预览与导入模式',
+            child: state.preview == null
+                ? const _PreviewPlaceholder()
+                : _PreviewStep(preview: state.preview!),
+          ),
+          const SizedBox(height: LexiSpace.s12),
+          const ImportHistorySection(),
+        ],
+      ),
     );
   }
 }
@@ -168,24 +159,23 @@ class _LanguageStep extends ConsumerWidget {
     final state = ref.watch(importWizardProvider);
     final notifier = ref.read(importWizardProvider.notifier);
 
-    return Row(
+    // `Wrap` 而不是两个 `Expanded`：按内容取宽之后，两个下拉框加起来可能
+    // 比一行窄，也可能在窄屏上放不下；`Expanded` 会把它们硬撑成两半。
+    return Wrap(
+      spacing: LexiSpace.s32,
+      runSpacing: LexiSpace.s12,
       children: <Widget>[
-        Expanded(
-          child: _LanguageDropdown(
-            key: const Key('importSourceLanguage'),
-            label: '源语言',
-            value: state.sourceLanguage,
-            onChanged: notifier.setSourceLanguage,
-          ),
+        _LanguageDropdown(
+          key: const Key('importSourceLanguage'),
+          label: '源语言',
+          value: state.sourceLanguage,
+          onChanged: notifier.setSourceLanguage,
         ),
-        const SizedBox(width: LexiSpace.s12),
-        Expanded(
-          child: _LanguageDropdown(
-            key: const Key('importTargetLanguage'),
-            label: '目标语言',
-            value: state.targetLanguage,
-            onChanged: notifier.setTargetLanguage,
-          ),
+        _LanguageDropdown(
+          key: const Key('importTargetLanguage'),
+          label: '目标语言',
+          value: state.targetLanguage,
+          onChanged: notifier.setTargetLanguage,
         ),
       ],
     );
@@ -215,9 +205,11 @@ class _LanguageDropdown extends StatelessWidget {
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s4),
+        // **不 `isExpanded`**：两个下拉框各占半行时，展开会让三角形箭头
+        // 落到各自那一半的最右端（离选中的语言约 900 像素），
+        // 控件与它显示的值看不出是一体的。让它按内容取宽。
         DropdownButton<String>(
           value: value,
-          isExpanded: true,
           underline: const SizedBox.shrink(),
           items: <DropdownMenuItem<String>>[
             for (final language in importLanguages)

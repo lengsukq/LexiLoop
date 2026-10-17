@@ -19,7 +19,9 @@ import 'package:lexiloop/features/add/widgets/article_input_step.dart';
 import 'package:lexiloop/features/add/widgets/article_preview_step.dart';
 import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
 import 'package:lexiloop/features/add/widgets/article_success_card.dart';
-import 'package:lexiloop/ui/glass.dart';
+import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 
 /// 页内边距。
 const double articlePagePadding = 20;
@@ -51,32 +53,22 @@ class _ArticlePageState extends ConsumerState<ArticlePage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(articleWizardProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: const Text('粘贴文章 · AI 选词导词'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          key: const Key('articleBack'),
-          tooltip: '返回',
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.go('/add'),
-        ),
-      ),
-      body: AmbientBackground(
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              articlePagePadding,
-              0,
-              articlePagePadding,
-              articlePageBottomPadding,
-            ),
-            children: <Widget>[_bodyFor(state)],
+    // **不再自己画 `AmbientBackground`**：外壳统一画一次。
+    return PageShell(
+      scrollable: true,
+      header: PageHeader(
+        title: '粘贴文章 · AI 选词导词',
+        subtitle: '贴一段英文，AI 挑出值得学的词与短语；先预览再入库。',
+        leading: Builder(
+          builder: (backContext) => IconButton(
+            key: const Key('articleBack'),
+            tooltip: '返回',
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => backContext.go(addWordPath),
           ),
         ),
       ),
+      child: _bodyFor(state),
     );
   }
 

@@ -31,6 +31,7 @@ void main() {
           label: '不存在',
           icon: appDestinations.first.icon,
           shortcut: 99,
+          group: DestinationGroup.reference,
         ),
       ),
       throwsStateError,

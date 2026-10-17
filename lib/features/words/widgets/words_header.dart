@@ -1,4 +1,9 @@
 /// 词库页头部：标题、词条计数与三个添加入口。
+///
+/// 现在它只是一层「把这页的页头描述出来」的薄壳——真正的排版交给
+/// `PageHeader`。保留这个类型有两个理由：词库页自己的测试按类型定位头部
+/// （`find.byType(WordsHeader)`），而且「这一页的头部长什么样」在页面
+/// 代码里读起来比一屏内联参数清楚。
 library;
 
 import 'package:flutter/material.dart';
@@ -6,9 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 
 /// 词库页头部。
 class WordsHeader extends StatelessWidget {
@@ -20,72 +23,26 @@ class WordsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s16,
-        LexiSpace.s20,
-        LexiSpace.s8,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '单词本',
-                  style: LexiType.page.copyWith(
-                    color: colors.label,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: LexiSpace.s4),
-                Text(
-                  total == null ? '加载中…' : '共 $total 个词条',
-                  style: LexiType.body.copyWith(color: colors.secondaryLabel),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: LexiSpace.s12),
-          const Flexible(child: _HeaderActions()),
-        ],
-      ),
-    );
-  }
-}
-
-/// 头部右侧的三个入口。
-///
-/// 单独成控件而不是塞进 [WordsHeader.build]：守卫对 `build()` 有 80 行
-/// 上限，而这三个入口还会随「快速添加」之类功能继续增加。
-/// 用 `Wrap` 而不是 `Row`，窄窗口下按钮会自动折行而不是溢出。
-class _HeaderActions extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.end,
-      spacing: 8,
-      runSpacing: 8,
-      children: <Widget>[
-        FilledButton.icon(
+    return PageHeader(
+      title: '单词本',
+      // 计数保留在副标题里：它是这一页最常被扫一眼的数字。
+      subtitle: total == null ? '加载中…' : '共 $total 个词条',
+      actions: <PageHeaderAction>[
+        PageHeaderAction(
+          label: '手动添加',
+          icon: Icons.add_rounded,
+          // 加词是这一页的主线动作，给它填充底；导入是准备动作。
+          primary: true,
           onPressed: () => context.go(addWordPath),
-          icon: const Icon(Icons.add_rounded, size: 17),
-          label: const Text('手动添加'),
         ),
-        OutlinedButton.icon(
+        PageHeaderAction(
+          label: 'CSV 导入',
+          icon: Icons.upload_rounded,
           onPressed: () => context.go(csvImportPath),
-          icon: const Icon(Icons.upload_rounded, size: 17),
-          label: const Text('CSV 导入'),
         ),
-        const ImportBackupButton(),
       ],
+      // 「导入备份」自带导入中状态（转圈），压不进纯动作，因此走 trailing。
+      trailing: const ImportBackupButton(),
     );
   }
 }

@@ -220,9 +220,10 @@ void main() {
     // 总词数为 0 时首页换成导入引导，六张卡片不再渲染——零词条时它们
     // 只会显示一排 0，对「下一步做什么」没有任何信息量。
     expect(find.text('今日'), findsOneWidget);
-    // 断言整句而不是 `textContaining('LexiLoop')`：空态的说明文案里
-    // 也出现了「LexiLoop」，模糊匹配会命中两处。
-    expect(find.text('LexiLoop 词环 · 纯本地'), findsOneWidget);
+    // 副标题现在是「本页要做什么」而不是品牌口号：侧边栏已经有一处
+    // 「LexiLoop」商标，页面里再来一遍就是在 1280 窗口下 40 像素内
+    // 读两遍同一个名字。
+    expect(find.text('词库还是空的——先导入，再开始复习。'), findsOneWidget);
     expect(find.byKey(emptyStateTitleKey), findsOneWidget);
     expect(find.byKey(totalWordsKey), findsNothing);
     expect(tester.takeException(), isNull);

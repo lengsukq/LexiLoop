@@ -186,6 +186,19 @@ void main() {
     expect(find.text('还没有导入记录。'), findsOneWidget);
   });
 
+  testWidgets('中途想退出时有返回入口（顶层路由 + 无外壳，此前是死胡同）', (tester) async {
+    await pumpRoutedPage(tester, _FakeImportService(deps()));
+
+    // 这一页是顶层路由：不套 AdaptiveShell，也没有 AppBar。
+    // 收敛前唯一的出口是「三步都走完后的结果卡」，选错文件就出不去。
+    expect(find.byKey(const Key('importBack')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('importBack')));
+    await tester.pumpAndSettle();
+    // 落点固定在单词本：导入是从那里进来的，回那里最符合预期。
+    expect(find.text('单词本占位'), findsOneWidget);
+  });
+
   testWidgets('解析失败时显示中文错误消息', (tester) async {
     await pumpPage(
       tester,

@@ -22,6 +22,9 @@ const String gamesPath = '/games';
 /// 限时配对页（顶层路由，不套外壳）。
 const String matchPath = '/match';
 
+/// 音标辨音页（顶层路由，不套外壳）。
+const String phoneticsPath = '/phonetics';
+
 /// 词条详情的前缀；后接词条 ID。
 const String wordDetailPathPrefix = '/words/';
 

@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 一段式选择器的一个选项。
@@ -170,3 +172,90 @@ const double sectionGap = 12;
 
 /// 同层元素之间的水平间距。
 const double inlineGap = 8;
+
+/// 可折叠的细节区。
+///
+/// 配置器打开时有预设、作用范围、字段、数据源、预览、摘要六块，除预设外
+/// 全部默认展开——一屏塞不下，用户的第一印象是「这个对话框好复杂」，
+/// 而绝大多数情况下他只需要「选个方案 → 创建任务」。
+///
+/// 收起时保留一行**当前状态摘要**（例如「8 个字段 · 缺什么补什么」），
+/// 折叠不等于隐藏：不展开也能确认自己选了什么。
+class ConfiguratorDisclosure extends StatelessWidget {
+  /// 以标题、摘要与内容构造。
+  const new({
+    required this.title,
+    required this.summary,
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
+    super.key,
+  });
+
+  /// 分区标题。
+  final String title;
+
+  /// 收起时显示的当前状态摘要。
+  final String summary;
+
+  /// 是否展开。
+  final bool expanded;
+
+  /// 切换展开状态。
+  final VoidCallback onToggle;
+
+  /// 展开后的内容。
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(LexiRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 18,
+                  color: colors.secondaryLabel,
+                ),
+                const SizedBox(width: LexiSpace.s6),
+                Text(
+                  title,
+                  style: LexiType.callout.copyWith(
+                    color: colors.label,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: LexiSpace.s8),
+                Expanded(
+                  child: Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: LexiType.footnote.copyWith(
+                      color: colors.tertiaryLabel,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          Padding(
+            padding: const EdgeInsets.only(top: LexiSpace.s6),
+            child: child,
+          ),
+      ],
+    );
+  }
+}

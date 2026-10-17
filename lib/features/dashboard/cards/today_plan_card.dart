@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 「开始学习」按钮的 Key，供测试定位。
@@ -301,15 +302,21 @@ class _StartStudyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        key: startStudyButtonKey,
-        onPressed: () => goToDestination(context, studyDestinationLabel),
-        icon: const Icon(Icons.play_arrow_rounded, size: 19),
-        label: Text(goalReached ? '继续无限学习' : '开始学习'),
-      ),
+    // **不再铺满整行**。目标为 0 时它是一个 1040 像素宽、通体蓝色、
+    // 上面只有四个字的条——首页最重的视觉元素落在一个主次不明的横条上。
+    // 按内容取宽、左对齐，让它读起来像一个按钮而不是一条横幅。
+    // 窄屏（< 480）时仍然铺满：那里每个像素都要用上，拇指也更好按。
+    final narrow = MediaQuery.sizeOf(context).width < compactHeaderWidth;
+    final button = FilledButton.icon(
+      key: startStudyButtonKey,
+      onPressed: () => goToDestination(context, studyDestinationLabel),
+      icon: const Icon(Icons.play_arrow_rounded, size: 19),
+      label: Text(goalReached ? '继续无限学习' : '开始学习'),
     );
+    if (narrow) {
+      return SizedBox(width: double.infinity, child: button);
+    }
+    return Align(alignment: Alignment.centerLeft, child: button);
   }
 }
 

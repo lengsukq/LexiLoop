@@ -22,9 +22,10 @@ import 'package:lexiloop/features/settings/question_type_section.dart';
 import 'package:lexiloop/features/settings/study_plan_section.dart';
 import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
-import 'package:lexiloop/ui/widgets/error_retry_view.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_states.dart';
 
 /// 设置页。
 class SettingsPage extends ConsumerWidget {
@@ -40,7 +41,7 @@ class SettingsPage extends ConsumerWidget {
       body: SafeArea(
         child: settings.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => ErrorRetryView(
+          error: (error, _) => PageErrorState(
             message: error is AppError ? error.message : '读取设置失败：$error',
             onRetry: () => ref.invalidate(appSettingsProvider),
           ),
@@ -63,7 +64,22 @@ class _SettingsTabs extends StatelessWidget {
       length: _tabLabels.length,
       child: Column(
         children: <Widget>[
-          const _SettingsHeader(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              LexiSpace.s20,
+              LexiSpace.s16,
+              LexiSpace.s20,
+              LexiSpace.s10,
+            ),
+            // 副标题此前是「所有改动即时生效，无需保存」——一句应用无法
+            // 兑现的承诺：写库可能失败，而失败在收敛前是静默的。
+            // 现在失败会弹提示并让开关回弹（见 `settings_providers.dart`
+            // 的 `saveSettings`），所以这句可以老实换成「这一页能做什么」。
+            child: PageHeader(
+              title: '设置',
+              subtitle: '逐项改动即时保存；保存失败会提示，并把开关恢复原值。',
+            ),
+          ),
           TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -72,56 +88,35 @@ class _SettingsTabs extends StatelessWidget {
             indicatorColor: colors.accent,
             tabs: <Widget>[for (final label in _tabLabels) Tab(text: label)],
           ),
+          // **设置页收窄到一列**：整页铺满 1040 时，每张卡片右侧都有一半
+          // 是空的，而控件（滑条、开关）只占左侧一小段——卡片看起来像没画完。
+          // 表单类页面本来就不该铺满宽屏。
+          // 左对齐而不是居中：这样内容左缘与上方的 tab 条对齐。
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s16),
-              child: TabBarView(
-                children: <Widget>[
-                  StudyPlanSection(settings: settings),
-                  QuestionTypeSection(settings: settings),
-                  PlaybackSection(settings: settings),
-                  ProvidersSection(settings: settings),
-                  VocabularySection(settings: settings),
-                  AiSettingsSection(settings: settings),
-                  const DataManagementSection(),
-                ],
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: LexiLayout.readingMaxWidth,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: LexiSpace.s16,
+                  ),
+                  child: TabBarView(
+                    children: <Widget>[
+                      StudyPlanSection(settings: settings),
+                      QuestionTypeSection(settings: settings),
+                      PlaybackSection(settings: settings),
+                      ProvidersSection(settings: settings),
+                      VocabularySection(settings: settings),
+                      AiSettingsSection(settings: settings),
+                      const DataManagementSection(),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsHeader extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s16,
-        LexiSpace.s20,
-        LexiSpace.s10,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            '设置',
-            style: LexiType.page.copyWith(
-              color: colors.label,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-            ),
-          ),
-          const SizedBox(height: LexiSpace.s4),
-          Text(
-            '所有改动即时生效，无需保存。',
-            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ],
       ),

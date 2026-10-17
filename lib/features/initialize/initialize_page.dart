@@ -14,8 +14,9 @@ import 'package:lexiloop/features/initialize/widgets/queue_bulk_bar.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_list.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_progress_card.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart';
-import 'package:lexiloop/ui/glass.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 
 /// 初始化队列页。
 class InitializePage extends ConsumerWidget {
@@ -24,17 +25,15 @@ class InitializePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const AmbientBackground(
-      child: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            _PageBody(),
-            // 浮条压在列表之上：多选条要跟着视线出现在底部，
-            // 而不是把列表往下推（那会让刚选中的行离开视野）。
-            Align(alignment: Alignment.bottomCenter, child: QueueBulkBar()),
-          ],
-        ),
-      ),
+    // **不再自己画 `AmbientBackground`**：导航外壳已经统一画一次，
+    // 这里再叠一层会让本页的光斑比别的页浓一倍（同一处颜色被乘两遍）。
+    return const Stack(
+      children: <Widget>[
+        _PageBody(),
+        // 浮条压在列表之上：多选条要跟着视线出现在底部，
+        // 而不是把列表往下推（那会让刚选中的行离开视野）。
+        Align(alignment: Alignment.bottomCenter, child: QueueBulkBar()),
+      ],
     );
   }
 }
@@ -48,47 +47,27 @@ class _PageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        pagePadding,
-        pagePadding,
-        pagePadding,
-        pagePaddingBottom,
+    return const PageShell(
+      scrollable: true,
+      header: PageHeader(title: '初始化队列', subtitle: '词条导入后会排队补全释义、音标、例句等字段。'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          QueueProgressCard(),
+          SizedBox(height: LexiLayout.sectionGap),
+          QueueToolbar(),
+          SizedBox(height: LexiLayout.cardGap),
+          QueueList(),
+        ],
       ),
-      children: <Widget>[
-        Text(
-          '初始化队列',
-          style: Theme.of(context).textTheme.headlineSmall
-              ?.copyWith(color: context.lexiColors.label),
-        ),
-        const SizedBox(height: subtitleGap),
-        Text(
-          '词条导入后会排队补全释义、音标、例句等字段。',
-          style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.lexiColors.tertiaryLabel),
-        ),
-        const SizedBox(height: sectionGap),
-        const QueueProgressCard(),
-        const SizedBox(height: sectionGap),
-        const QueueToolbar(),
-        const SizedBox(height: itemGap),
-        const QueueList(),
-      ],
     );
   }
 }
 
-/// 页面内边距。
-const double pagePadding = 20;
-
 /// 底部留白。
-const double pagePaddingBottom = 96;
 
 /// 标题与副标题的间距。
-const double subtitleGap = 6;
 
 /// 分节间距。
-const double sectionGap = 16;
 
 /// 工具栏与列表的间距。
-const double itemGap = 10;

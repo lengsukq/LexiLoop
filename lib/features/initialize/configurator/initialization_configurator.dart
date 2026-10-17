@@ -140,11 +140,12 @@ class _Body extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= wideBreakpoint;
+        // 预设之后的三块默认收起（见 `ConfiguratorDisclosure`）：
+        // 打开配置器最常见的动作是「选个方案 → 创建任务」，把 16 个字段
+        // 和 6 个数据源全铺在同一屏，只会让这个对话框显得复杂。
         final sections = <Widget>[
           const ConfiguratorPresetSection(),
-          const ConfiguratorScopeSection(),
-          const ConfiguratorFieldPicker(),
-          const ConfiguratorProviderPicker(),
+          const ConfiguratorDetails(),
         ];
         final sidebar = <Widget>[
           const ConfiguratorSummarySidebar(),
@@ -317,3 +318,53 @@ const double wideBreakpoint = 860;
 
 /// 右栏宽度。
 const double sidebarWidth = 300;
+
+/// 三项细节（作用范围 / 字段 / 数据源）的折叠组。
+///
+/// 默认全部收起；每一项收起时都显示自己的当前值，所以「不展开也知道选了
+/// 什么」。首次设置过的用户想改细节，再展开即可。
+class ConfiguratorDetails extends ConsumerStatefulWidget {
+  /// 以键构造。
+  const new({super.key});
+
+  @override
+  ConsumerState<ConfiguratorDetails> createState() =>
+      _ConfiguratorDetailsState();
+}
+
+class _ConfiguratorDetailsState extends ConsumerState<ConfiguratorDetails> {
+  bool _scope = false;
+  bool _fields = false;
+  bool _providers = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final draft = ref.watch(configuratorProvider).draft;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        ConfiguratorDisclosure(
+          title: '作用范围',
+          summary: draft.scope.label,
+          expanded: _scope,
+          onToggle: () => setState(() => _scope = !_scope),
+          child: const ConfiguratorScopeSection(),
+        ),
+        ConfiguratorDisclosure(
+          title: '要补全的字段',
+          summary: '${draft.fields.length} 个字段',
+          expanded: _fields,
+          onToggle: () => setState(() => _fields = !_fields),
+          child: const ConfiguratorFieldPicker(),
+        ),
+        ConfiguratorDisclosure(
+          title: '查询来源',
+          summary: '${draft.providers.length} 个来源 · 按顺序尝试',
+          expanded: _providers,
+          onToggle: () => setState(() => _providers = !_providers),
+          child: const ConfiguratorProviderPicker(),
+        ),
+      ],
+    );
+  }
+}

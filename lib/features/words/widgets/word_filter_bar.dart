@@ -1,17 +1,22 @@
 /// 词库页的搜索框与筛选入口。
 ///
 /// 宽屏把筛选控件直接铺在搜索框下方，窄屏收进筛选弹层；
-/// 断点与 [sidebarBreakpoint] 一致。
+/// 断点用 [LexiLayout.wideBreakpoint]，**不是**侧边栏断点。
+///
+/// 这两个断点量的不是同一件事：侧边栏断点比的是**窗口宽度**（决定导航形态），
+/// 这里比的是**内容宽度**（决定筛选控件铺开还是收进面板）。正文列被限宽到
+/// `LexiLayout.pageMaxWidth` 之后，内容宽度永远小于 1024——继续沿用侧边栏
+/// 断点，这个分支就永远不会走到，宽屏用户会一直看到「筛选」按钮。
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/widgets/word_filter_controls.dart';
 import 'package:lexiloop/features/words/widgets/word_filter_sheet.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 
 /// 词库页的搜索框与筛选入口。
@@ -22,15 +27,10 @@ class WordFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s4,
-        LexiSpace.s20,
-        LexiSpace.s8,
-      ),
+      padding: const EdgeInsets.only(top: LexiSpace.s4, bottom: LexiSpace.s8),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= sidebarBreakpoint;
+          final wide = constraints.maxWidth >= LexiLayout.wideBreakpoint;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[

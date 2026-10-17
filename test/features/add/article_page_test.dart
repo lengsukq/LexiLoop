@@ -319,6 +319,15 @@ void main() {
     await tester.tap(find.byKey(const Key('resetLearningProgress')));
     await tester.pumpAndSettle();
     await tapKey(tester, 'articleCommit');
+    await tester.pumpAndSettle();
+
+    // 勾上这个开关等于「删掉不可恢复的学习历史」，提交前必须再确认一次
+    // （与 CSV 导入那条路径同一强度）。没点确认之前不能提交。
+    expect(find.text('重置已有词条的学习进度？'), findsOneWidget);
+    expect(service.lastResetLearningProgress, isNull);
+
+    await tester.tap(find.text('重置并导入'));
+    await tester.pumpAndSettle();
 
     expect(service.lastResetLearningProgress, isTrue);
   });

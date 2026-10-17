@@ -31,11 +31,26 @@ import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/word_detail/word_detail_page.dart';
 import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/ui/adaptive_shell.dart';
+import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 
 /// 全局路由实例。
 final GoRouter appRouter = createAppRouter();
+
+/// 顶层路由的版心包装。
+///
+/// 这四条路由不套 `AdaptiveShell`，因此拿不到外壳在内容区做的限宽。
+/// 包装放在这里而不是各页自己写：**漏掉一页就是那一页在宽窗口下被拉长**，
+/// 而「哪几页是顶层路由」这件事只有这张表说得清。
+Widget _capped(Widget page, {double maxWidth = LexiLayout.immersiveMaxWidth}) =>
+    // 顶层路由拿不到外壳画的背景与版心，所以这两件事都由这里补上。
+    // 背景只在这里画一次：页面自己再画一层会变成双层光斑。
+    AmbientBackground(
+      child: ContentWidthCap(maxWidth: maxWidth, child: page),
+    );
 
 /// 构造一份新的路由表。
 ///
@@ -50,20 +65,26 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
     routes: <RouteBase>[
       GoRoute(
         path: csvImportPath,
-        builder: (context, state) => const ImportPage(),
+        // 导入页有 5 列表格，版心用普通页的宽度：840 会把「问题」列压到
+        // 只剩省略号（见 `import_preview_table.dart` 的列宽分配）。
+        builder: (context, state) =>
+            _capped(const ImportPage(), maxWidth: LexiLayout.pageMaxWidth),
       ),
       GoRoute(
         path: articlePath,
-        builder: (context, state) => const ArticlePage(),
+        builder: (context, state) => _capped(const ArticlePage()),
       ),
       // 小游戏与配对不在主导航里（它们是「独立模式，不占用今日复习队列」），
       // 从首页的「趣味训练」进入，因此是顶层路由、不套外壳。
       GoRoute(
         path: gamesPath,
         builder: (context, state) =>
-            GamesPage(initialMode: state.uri.queryParameters['mode']),
+            _capped(GamesPage(initialMode: state.uri.queryParameters['mode'])),
       ),
-      GoRoute(path: matchPath, builder: (context, state) => const MatchPage()),
+      GoRoute(
+        path: matchPath,
+        builder: (context, state) => _capped(const MatchPage()),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AdaptiveShell(navigationShell: navigationShell),

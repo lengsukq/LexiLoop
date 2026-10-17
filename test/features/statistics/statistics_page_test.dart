@@ -19,6 +19,7 @@ import 'package:lexiloop/data/db/daos/statistics_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/statistics/statistics_page.dart';
 import 'package:lexiloop/features/statistics/statistics_providers.dart';
+import 'package:lexiloop/features/statistics/widgets/trend_chart_card.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../support/app_harness.dart';

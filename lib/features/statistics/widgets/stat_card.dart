@@ -138,6 +138,11 @@ class StatMetric extends StatelessWidget {
             Flexible(
               child: Text(
                 value,
+                // 允许折成两行：数值格是固定宽度的，「累计时长」这类
+                // 「4 小时 13 分钟」在 132 宽里一行放不下，此前被截成
+                // 「4 小时 13 …」——读者以为数据没算完。
+                maxLines: 2,
+                softWrap: true,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: color ?? colors.accent,

@@ -597,8 +597,27 @@ void main() {
 
       expect(find.text('没有匹配的词条'), findsOneWidget);
       expect(find.text('调整筛选条件或清空搜索词后再试。'), findsOneWidget);
-      // 空状态里的两个导入入口消失了，只剩头部那个。
+      // 空状态里的导入入口消失了，只剩头部那个。
       expect(find.text('CSV 导入'), findsOneWidget);
+      // 但**必须留下一个能真的回到全部的按钮**：文案在教用户「清空搜索词」，
+      // 而此前没有任何可点的东西，宽屏布局甚至没有「清除筛选」入口。
+      expect(find.byKey(const Key('wordsClearAll')), findsOneWidget);
+    });
+
+    testWidgets('「清除全部筛选与搜索」把列表带回全部词条', (tester) async {
+      await insertWord(term: 'alpha');
+      await pumpPage(tester);
+
+      await tester.enterText(find.byType(TextField), 'zzz');
+      await tester.pumpAndSettle();
+      expect(find.text('没有匹配的词条'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('wordsClearAll')));
+      await tester.pumpAndSettle();
+
+      // 搜索框清空、列表回到全部——一次点击解决「我为什么看不到词」。
+      expect(find.text('alpha'), findsOneWidget);
+      expect(find.text('没有匹配的词条'), findsNothing);
     });
 
     testWidgets('结果为空时不显示分页条', (tester) async {

@@ -79,6 +79,26 @@ class WordQueryNotifier extends Notifier<WordQuery> {
     ),
   );
 
+  /// 清空**全部**查询条件，包括搜索词。
+  ///
+  /// 与 [clearFilters] 的分工是刻意的：窄屏筛选面板里的「清除筛选」只清
+  /// 筛选条件、保留搜索词（用户在面板里输入的关键词不该被面板的另一个按钮
+  /// 抹掉）。但「列表是空的、我不知道为什么空」需要的是**一键回到全部**，
+  /// 那时候保留搜索词只会让用户点了按钮列表仍然是空的。
+  ///
+  /// 两个入口用不同的文案，才不会变成「同一个按钮有时清搜索有时不清」。
+  void clearAll() => _apply(
+    state.copyWith(
+      search: '',
+      clearMasteryLevel: true,
+      clearInitializationStatus: true,
+      wrongOnly: false,
+      dueOnly: false,
+      suspendedOnly: false,
+      sort: WordSort.createdAt,
+    ),
+  );
+
   /// 翻到指定页（1 起）。
   void goToPage(int page) {
     if (page < 1) return;

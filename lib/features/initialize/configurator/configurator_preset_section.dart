@@ -29,19 +29,38 @@ class ConfiguratorPresetSection extends ConsumerWidget {
     );
     return ConfiguratorCard(
       title: '选择初始化方案',
-      trailing: active?.label ?? '自定义 ${draft.fields.length} 项',
-      child: Wrap(
-        spacing: inlineGap,
-        runSpacing: inlineGap,
-        children: <Widget>[
-          for (final preset in configuratorPresets)
-            ConfiguratorPresetTile(
-              preset: preset,
-              selected: active?.label == preset.label,
-              onTap: () =>
-                  ref.read(configuratorProvider.notifier).applyPreset(preset),
-            ),
-        ],
+      // 选中预设时**不再重复它的名字**：卡片本身已经高亮并写着它。
+      // 只有「自定义」这种卡片表达不了的状态才需要这一行。
+      trailing: active == null ? '自定义 ${draft.fields.length} 项' : null,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // **按可用宽度算列数**。写死 `Wrap` + 固定宽时，4 张卡在左栏
+          // 只放得下 3 张，第 4 张单独换行、右边空出三分之二——看起来像
+          // 布局坏了。2×2 或 1×4 都是整齐的，3+1 不是。
+          final columns =
+              constraints.maxWidth >= presetTileWidth * 4 + inlineGap * 3
+              ? 4
+              : (constraints.maxWidth >= tileWidth * 2 + inlineGap ? 2 : 1);
+          final width =
+              (constraints.maxWidth - inlineGap * (columns - 1)) / columns;
+          return Wrap(
+            spacing: inlineGap,
+            runSpacing: inlineGap,
+            children: <Widget>[
+              for (final preset in configuratorPresets)
+                SizedBox(
+                  width: width,
+                  child: ConfiguratorPresetTile(
+                    preset: preset,
+                    selected: active?.label == preset.label,
+                    onTap: () => ref
+                        .read(configuratorProvider.notifier)
+                        .applyPreset(preset),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -70,7 +89,7 @@ class ConfiguratorPresetTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final blocked = _blockedReason(ref);
     return SizedBox(
-      width: tileWidth,
+      width: double.infinity,
       child: _TileBody(
         preset: preset,
         selected: selected,
@@ -170,6 +189,9 @@ class _TileBody extends StatelessWidget {
 
 /// 预设卡片宽度。
 const double tileWidth = 156;
+
+/// 一行放下四张预设所需的最小宽度。
+const double presetTileWidth = 172;
 
 /// 预设卡片内边距。
 const double tilePadding = 12;

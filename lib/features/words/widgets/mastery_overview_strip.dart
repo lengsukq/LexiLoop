@@ -44,46 +44,82 @@ class _OverviewBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        0,
-        LexiSpace.s20,
-        LexiSpace.s8,
-      ),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s8),
       child: Surface(
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         padding: const EdgeInsets.symmetric(
           horizontal: LexiSpace.s16,
           vertical: LexiSpace.s14,
         ),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colors.accent.withValues(alpha: LexiTint.tint),
-                borderRadius: BorderRadius.circular(LexiRadius.md),
+        // **窄屏换排**：360 宽下「图标 + 文字 + 详细统计」三样挤在一行，
+        // 文字被压成三行、右侧链接贴着边缘，卡片高度涨到一百多像素。
+        // 窄屏改成「图标 + 文字」一行、链接单独一行右对齐。
+        child: LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: <Widget>[
+              if (constraints.maxWidth >= compactStripWidth)
+                _IconPlate(colors: colors),
+              if (constraints.maxWidth >= compactStripWidth)
+                const SizedBox(width: LexiSpace.s14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    _OverviewText(overview: overview),
+                    if (constraints.maxWidth < compactStripWidth)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _StatsLink(colors: colors),
+                      ),
+                  ],
+                ),
               ),
-              child: Icon(
-                Icons.menu_book_rounded,
-                size: 20,
-                color: colors.accent,
-              ),
-            ),
-            const SizedBox(width: LexiSpace.s14),
-            Expanded(child: _OverviewText(overview: overview)),
-            TextButton(
-              onPressed: () => context.go(statisticsPath),
-              child: const Text('详细统计'),
-            ),
-          ],
+              if (constraints.maxWidth >= compactStripWidth)
+                _StatsLink(colors: colors),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+/// 左侧的图标块。
+class _IconPlate extends StatelessWidget {
+  const new({required this.colors});
+
+  final LexiColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: LexiTint.tint),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
+      ),
+      child: Icon(Icons.menu_book_rounded, size: 20, color: colors.accent),
+    );
+  }
+}
+
+/// 「详细统计」入口。
+class _StatsLink extends StatelessWidget {
+  const new({required this.colors});
+
+  final LexiColors colors;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: () => context.go(statisticsPath),
+    child: const Text('详细统计'),
+  );
+}
+
+/// 一行放得下图标 + 文字 + 链接的最小宽度。
+const double compactStripWidth = 480;
 
 /// 标题、计数与进度条。
 class _OverviewText extends StatelessWidget {

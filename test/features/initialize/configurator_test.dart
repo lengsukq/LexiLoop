@@ -20,6 +20,7 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/initialize/configurator/configurator_controls.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_fields.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_providers.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
@@ -291,6 +292,49 @@ void main() {
     expect(find.byType(InitializationConfigurator), findsOneWidget);
     expect(find.text('创建任务'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('细节默认收起，且收起时仍能看到当前选择', (tester) async {
+    await insertWord('alpha');
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      wrapWithScope(
+        Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showInitializationConfigurator(
+                context,
+                initialScope: ConfiguratorScope.all,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+        overrides: [databaseProvider.overrideWithValue(db)],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    // 三块细节默认收起：配置器打开时只有「预设 + 一行摘要」，
+    // 而不是 16 个字段和 6 个数据源全铺在眼前。
+    expect(find.byType(ConfiguratorDisclosure), findsNWidgets(3));
+    // 收起时**内容没有被构建**：字段网格里的「例句」不该在树上。
+    expect(find.text('例句'), findsNothing);
+    // 但收起不等于隐藏：摘要行仍然说明当前选了什么。
+    expect(find.text('全部词条'), findsWidgets);
+    expect(find.text('1 个字段'), findsOneWidget);
+    expect(find.text('3 个来源 · 按顺序尝试'), findsOneWidget);
+
+    // 展开「要补全的字段」后字段网格才出现。
+    await tester.tap(find.text('要补全的字段'));
+    await tester.pumpAndSettle();
+    expect(find.text('例句'), findsOneWidget);
+    expect(find.byType(ConfiguratorDisclosure), findsNWidgets(3));
   });
 }
 

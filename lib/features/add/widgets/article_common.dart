@@ -12,7 +12,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
-import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
 const String articleSampleArticle =
@@ -56,6 +56,9 @@ String articleExpiryText(int expiresAt) {
 }
 
 /// 一块带标题的玻璃卡片。
+///
+/// 薄壳：文章流程的卡片比别处多一个「右侧计数」（`已选 3 / 12`），
+/// 其余（内边距、标题样式、圆角）一律交给 [SectionCard]。
 class ArticleSectionCard extends StatelessWidget {
   /// 以标题与内容构造。
   const new({
@@ -75,34 +78,8 @@ class ArticleSectionCard extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Surface(
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(articleCardPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  title,
-                  style: LexiType.callout.copyWith(
-                    color: colors.label,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              ?trailing,
-            ],
-          ),
-          const SizedBox(height: articleCardGap),
-          child,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      SectionCard(title: title, trailing: trailing, child: child);
 }
 
 /// 一个统计指标。

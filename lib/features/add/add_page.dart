@@ -21,9 +21,11 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/add/add_providers.dart';
 import 'package:lexiloop/features/add/widgets/manual_batch_panel.dart';
 import 'package:lexiloop/features/add/widgets/manual_entry_form.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 添加词条页。
@@ -32,36 +34,22 @@ class AddPage extends StatelessWidget {
   const new({super.key});
 
   @override
-  Widget build(BuildContext context) => AmbientBackground(
-    child: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          pagePadding,
-          pagePadding,
-          pagePadding,
-          pagePaddingBottom,
-        ),
-        children: <Widget>[
-          Text(
-            '添加词条',
-            style: Theme.of(context).textTheme.headlineSmall
-                ?.copyWith(color: context.lexiColors.label),
-          ),
-          const SizedBox(height: subtitleGap),
-          Text(
-            <String>[
-              '手动填写词条与释义直接入库（离线可用）；',
-              '也可以贴一批词，先查词典生成预览，逐行确认后再入库。',
-            ].join(),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: context.lexiColors.tertiaryLabel),
-          ),
-          const SizedBox(height: sectionGap),
-          const _ArticleImportCard(),
-          const SizedBox(height: sectionGap),
-          const _ManualSection(),
-        ],
-      ),
+  Widget build(BuildContext context) => const PageShell(
+    scrollable: true,
+    // 表单页收窄到阅读列宽：铺满 1040 时，输入框、分段控件都长到
+    // 一眼看不完，而字段内容只有几个字。与设置页同一个宽度。
+    maxWidth: LexiLayout.readingMaxWidth,
+    header: PageHeader(
+      title: '添加词条',
+      subtitle: '手动填写直接入库（离线可用）；也可以先查词典生成预览，逐行确认后再入库。',
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _ArticleImportCard(),
+        SizedBox(height: LexiLayout.sectionGap),
+        _ManualSection(),
+      ],
     ),
   );
 }

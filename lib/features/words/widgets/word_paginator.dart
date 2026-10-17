@@ -29,12 +29,7 @@ class WordPaginator extends ConsumerWidget {
     final pages = _pageCount(total, query.limit);
     final page = query.page;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        0,
-        LexiSpace.s20,
-        LexiSpace.s12,
-      ),
+      padding: const EdgeInsets.only(bottom: LexiSpace.s12),
       child: Row(
         children: <Widget>[
           TextButton(

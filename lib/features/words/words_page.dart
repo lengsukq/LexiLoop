@@ -20,6 +20,7 @@ import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 
 /// 单词本页面。
 class WordsPage extends ConsumerWidget {
@@ -31,23 +32,22 @@ class WordsPage extends ConsumerWidget {
     final words = ref.watch(wordListProvider);
     final total = ref.watch(wordCountProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            WordsHeader(total: total.value),
-            const MasteryOverviewStrip(),
-            const WordFilterBar(),
-            Expanded(
-              child: _WordResults(
-                words: words,
-                onRetry: () => ref.invalidate(wordListProvider),
-              ),
+    // `scrollable: false`：这一页是「固定筛选栏 + 只滚列表」，
+    // 滚动必须由列表自己掌管，外壳只负责版心与页头。
+    return PageShell(
+      header: WordsHeader(total: total.value),
+      child: Column(
+        children: <Widget>[
+          const MasteryOverviewStrip(),
+          const WordFilterBar(),
+          Expanded(
+            child: _WordResults(
+              words: words,
+              onRetry: () => ref.invalidate(wordListProvider),
             ),
-            const WordPaginator(),
-          ],
-        ),
+          ),
+          const WordPaginator(),
+        ],
       ),
     );
   }
@@ -92,12 +92,7 @@ class _WordList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s4,
-        LexiSpace.s20,
-        LexiSpace.s16,
-      ),
+      padding: const EdgeInsets.only(top: LexiSpace.s4, bottom: LexiSpace.s16),
       itemCount: entries.length,
       separatorBuilder: (_, _) => const SizedBox(height: LexiSpace.s8),
       itemBuilder: (context, index) {

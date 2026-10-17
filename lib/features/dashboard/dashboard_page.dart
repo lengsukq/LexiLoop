@@ -17,7 +17,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
-import 'package:lexiloop/features/dashboard/cards/platform_card.dart';
 import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/dashboard/cards/reminders_card.dart';
 import 'package:lexiloop/features/dashboard/cards/resume_session_card.dart';
@@ -26,10 +25,10 @@ import 'package:lexiloop/features/dashboard/cards/suggestion_card.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
-import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_tint.dart';
-import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
+import 'package:lexiloop/ui/widgets/page_states.dart';
 
 /// 空库引导的标题 Key，供测试定位。
 const Key emptyStateTitleKey = Key('dashboard-empty-title');
@@ -45,10 +44,7 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(dashboardOverviewProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(child: _DashboardBody(overview: overview)),
-    );
+    return _DashboardBody(overview: overview);
   }
 }
 
@@ -72,67 +68,40 @@ class _DashboardBody extends StatelessWidget {
 /// 正常的卡片流。
 ///
 /// 其中 [ResumeSessionCard] 只在存在可恢复会话时出现，其余六张常驻。
+///
+/// **分成两区而不是七张平铺**：平铺时「开始学习」埋在第三张卡片内部、
+/// 开发自检（平台能力）占了最有价值的末位。现在
+/// 「现在做什么」（继续 / 今日计划 / 建议）与
+/// 「再看看」（统计 / 提醒 / 训练）之间有 32 的间隔，
+/// 眼力不用数卡片也能读出一组关系。
 class _DashboardCards extends StatelessWidget {
   const new();
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(
-      LexiSpace.s20,
-      LexiSpace.s20,
-      LexiSpace.s20,
-      LexiSpace.s32,
-    ),
-    children: const <Widget>[
-      _PageHeader(),
-      // 「继续上次学习」挂在今日队列上方（对应旧版 `page.tsx:142-148` 的
-      // 位置）：用户刚回首页时最想接上的就是那条做了一半的会话，
-      // 排在今日计划之前才不会被 30 题的配额盖住。没有可恢复会话时
-      // 它自己渲染成空，不占位置。
-      ResumeSessionCard(),
-      SizedBox(height: LexiSpace.s10),
-      TodayPlanCard(),
-      SizedBox(height: LexiSpace.s10),
-      SuggestionCard(),
-      SizedBox(height: LexiSpace.s10),
-      StatisticsCard(),
-      SizedBox(height: LexiSpace.s10),
-      RemindersCard(),
-      SizedBox(height: LexiSpace.s10),
-      PracticeCard(),
-      SizedBox(height: LexiSpace.s10),
-      PlatformCapabilityCard(),
-    ],
-  );
-}
-
-/// 页面标题区。
-class _PageHeader extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => const PageShell(
+    scrollable: true,
+    header: PageHeader(title: '今日', subtitle: '继续没做完的复习，或按今日计划开始一轮。'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          '今日',
-          style: LexiType.display.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: LexiSpace.s6),
-        Text(
-          'LexiLoop 词环 · 纯本地',
-          style: LexiType.callout.copyWith(color: colors.secondaryLabel),
-        ),
-        const SizedBox(height: LexiSpace.s20),
+        // 「继续上次学习」挂在今日队列上方（对应旧版 `page.tsx:142-148` 的
+        // 位置）：用户刚回首页时最想接上的就是那条做了一半的会话，
+        // 排在今日计划之前才不会被 30 题的配额盖住。没有可恢复会话时
+        // 它自己渲染成空，不占位置。
+        ResumeSessionCard(),
+        SizedBox(height: LexiLayout.cardGap),
+        TodayPlanCard(),
+        SizedBox(height: LexiLayout.cardGap),
+        SuggestionCard(),
+        SizedBox(height: LexiLayout.sectionGap),
+        StatisticsCard(),
+        SizedBox(height: LexiLayout.cardGap),
+        RemindersCard(),
+        SizedBox(height: LexiLayout.cardGap),
+        PracticeCard(),
       ],
-    );
-  }
+    ),
+  );
 }
 
 /// 空库引导：导入 EasyDict 收藏。
@@ -144,86 +113,19 @@ class _EmptyLibraryState extends StatelessWidget {
   const new();
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s20,
-        LexiSpace.s20,
-        LexiSpace.s32,
-      ),
-      children: <Widget>[
-        const _PageHeader(),
-        const SizedBox(height: LexiSpace.s16),
-        const Center(child: _EmptyIcon()),
-        const SizedBox(height: LexiSpace.s20),
-        Text(
-          '从 EasyDict 收藏开始',
-          key: emptyStateTitleKey,
-          textAlign: TextAlign.center,
-          style: LexiType.title2.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: LexiSpace.s8),
-        Text(
-          '导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，不会导入整本词典。',
-          textAlign: TextAlign.center,
-          style: LexiType.body.copyWith(color: colors.secondaryLabel),
-        ),
-        const SizedBox(height: LexiSpace.s24),
-        FilledButton.icon(
-          key: emptyStateImportButtonKey,
-          onPressed: () => context.go(csvImportPath),
-          icon: const Icon(Icons.upload_file_rounded, size: 19),
-          label: const Text('导入 CSV'),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => PageShell(
+    scrollable: true,
+    header: const PageHeader(title: '今日', subtitle: '词库还是空的——先导入，再开始复习。'),
+    child: PageEmptyState(
+      key: emptyStateTitleKey,
+      icon: Icons.menu_book_rounded,
+      title: '从 EasyDict 收藏开始',
+      message:
+          '导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，'
+          ' 不会导入整本词典。',
+      primaryLabel: '导入 CSV',
+      primaryKey: emptyStateImportButtonKey,
+      onPrimary: () => context.go(csvImportPath),
+    ),
+  );
 }
-
-/// 空库引导的渐变图标。
-class _EmptyIcon extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      width: emptyIconSize,
-      height: emptyIconSize,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(LexiRadius.xl),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[colors.accent, colors.purple],
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colors.accent.withValues(alpha: LexiTint.border),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.menu_book_rounded,
-        size: emptyIconGlyphSize,
-        color: Colors.white,
-      ),
-    );
-  }
-}
-
-/// CSV 导入页的路由。
-///
-
-/// 空库引导图标的边长。
-const double emptyIconSize = 80;
-
-/// 空库引导图标的字形尺寸。
-const double emptyIconGlyphSize = 40;

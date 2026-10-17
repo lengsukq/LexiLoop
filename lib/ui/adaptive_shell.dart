@@ -12,6 +12,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -42,11 +43,17 @@ class AdaptiveShell extends StatelessWidget {
         // 侧边栏又不在，用户只能靠页面自己的退出按钮——那个按钮一旦写错
         // （见 `study_page.dart` 的 `_leaveToHome`），整页就没有出路。
         final content = _content();
+        // **环境光斑只画一次**。收敛前窄屏的沉浸分支直接返回 `content`，
+        // 于是学习页自己画的 `AmbientBackground`（`study_page.dart`）与
+        // 游戏页画的（`game_shell.dart`）在宽屏下与外壳画的叠成两层，
+        // 光斑颜色被乘了两遍，页面比其它页更“脏”一档。
         if (useSidebar) {
-          return AmbientBackground(child: _buildWide(context, content));
+          return AmbientBackground(
+            child: _buildWide(context, content, immersive: immersive),
+          );
         }
-        if (immersive) return content;
-        return AmbientBackground(child: _buildCompact(context, content));
+        final shell = immersive ? content : _buildCompact(context, content);
+        return AmbientBackground(child: shell);
       },
     );
   }
@@ -69,14 +76,33 @@ class AdaptiveShell extends StatelessWidget {
   Widget _content() =>
       Material(type: MaterialType.transparency, child: navigationShell);
 
-  Widget _buildWide(BuildContext context, Widget content) {
+  Widget _buildWide(
+    BuildContext context,
+    Widget content, {
+    required bool immersive,
+  }) {
     return Row(
       children: <Widget>[
         SizedBox(
           width: sidebarWidth,
           child: _Sidebar(navigationShell: navigationShell),
         ),
-        Expanded(child: content),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              key: contentCapKey,
+              constraints: BoxConstraints(
+                maxWidth: immersive
+                    ? LexiLayout.immersiveMaxWidth
+                    : LexiLayout.pageMaxWidth,
+              ),
+              // **必须显式撑满**：`Center` 给的是松约束，`Column` 在松约束
+              // 下会收缩到最宽子节点的宽度，卡片宽度就跟着内容走而不是跟着
+              // 版心走——同一页里两张卡片的宽度会不一样。
+              child: SizedBox(width: double.infinity, child: content),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -119,14 +145,7 @@ class _Sidebar extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
-                children: <Widget>[
-                  for (final destination in appDestinations)
-                    _SidebarItem(
-                      destination: destination,
-                      active: isDestinationActive(destination, location),
-                      onTap: () => _goTo(destination),
-                    ),
-                ],
+                children: _navigationChildren(context, location),
               ),
             ),
             const _SidebarFooter(),
@@ -136,6 +155,40 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
+  /// 侧边栏的分组导航。
+  ///
+  /// **为什么把「统计 / 设置」也放在滚动区里而不钉在底部**：钉底少一次
+  /// 滚动，但窗口最小高度 560、系统字体放大时，钉死的那一组会先把上方的
+  /// `Expanded` 挤到 0 再溢出。分组标题已经能表达「这几项不是主线」，
+  /// 可滚动的列表在任何字号下都不会溢出。
+  List<Widget> _navigationChildren(BuildContext context, String location) {
+    final children = <Widget>[];
+    for (final group in sidebarGroupOrder) {
+      final items = destinationsIn(group);
+      if (items.isEmpty) continue;
+      if (children.isNotEmpty) {
+        children.add(const SizedBox(height: LexiSpace.s14));
+      }
+      children.addAll(_groupChildren(group, items, location));
+    }
+    return children;
+  }
+
+  /// 一个分组：可选的组头 + 组内条目。
+  List<Widget> _groupChildren(
+    DestinationGroup group,
+    List<AppDestination> items,
+    String location,
+  ) => <Widget>[
+    if (group.label != null) _GroupLabel(label: group.label!),
+    for (final destination in items)
+      _SidebarItem(
+        destination: destination,
+        active: isDestinationActive(destination, location),
+        onTap: () => _goTo(destination),
+      ),
+  ];
+
   void _goTo(AppDestination destination) {
     final index = appDestinations.indexOf(destination);
     navigationShell.goBranch(
@@ -143,6 +196,31 @@ class _Sidebar extends StatelessWidget {
       initialLocation: index == navigationShell.currentIndex,
     );
   }
+}
+
+/// 分组标题。
+class _GroupLabel extends StatelessWidget {
+  const new({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      LexiSpace.s12,
+      0,
+      LexiSpace.s12,
+      LexiSpace.s6,
+    ),
+    child: Text(
+      label,
+      style: LexiType.caption.copyWith(
+        color: context.lexiColors.quaternaryLabel,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+      ),
+    ),
+  );
 }
 
 class _SidebarBrand extends StatelessWidget {
@@ -510,11 +588,13 @@ class _MoreSheet extends StatelessWidget {
                 crossAxisCount: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
+                mainAxisSpacing: LexiSpace.s8,
+                crossAxisSpacing: LexiSpace.s8,
                 childAspectRatio: 2.6,
                 children: <Widget>[
-                  for (final destination in destinations)
+                  // **按分组排序**：底部「更多」里的顺序与侧边栏一致，
+                  // 否则同一个应用里「添加」在两处的邻居不同。
+                  for (final destination in _sortedByGroup(destinations))
                     _MoreSheetItem(
                       destination: destination,
                       onTap: () => onSelect(destination),
@@ -564,4 +644,15 @@ class _MoreSheetItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 按 [sidebarGroupOrder] 给目的地排序，保持组内原有顺序。
+List<AppDestination> _sortedByGroup(List<AppDestination> destinations) {
+  final sorted = <AppDestination>[];
+  for (final group in sidebarGroupOrder) {
+    for (final destination in destinations) {
+      if (destination.group == group) sorted.add(destination);
+    }
+  }
+  return sorted;
 }

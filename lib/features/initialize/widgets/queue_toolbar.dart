@@ -175,30 +175,47 @@ class _ToolbarActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: toolbarGap,
-      runSpacing: toolbarGap,
+    final colors = context.lexiColors;
+    // **一个主按钮 + 其余收进「⋯」**。
+    //
+    // 收敛前这里有四个并排动作，其中两个还是同样填充底的 FilledButton：
+    // 「立即处理一批」与「创建任务」看起来同等重要，而「重试失败」与
+    // 「刷新」又混在旁边。用户站在这一页最常问的是「怎么让它动起来」，
+    // 界面上却没有一个明确的答案。
+    //
+    // 现在：处理一批是唯一的主按钮；创建任务（配置一次跑一批）与
+    // 重试失败（只在有失败时才有意义）进菜单；刷新在菜单里，
+    // 因为它只读不写、也不该抢位置。
+    return Row(
       children: <Widget>[
         FilledButton.icon(
           onPressed: busy ? null : onProcessNow,
           icon: const Icon(Icons.play_arrow, size: 16),
           label: const Text('立即处理一批'),
         ),
-        TextButton.icon(
-          onPressed: busy ? null : onRetryFailed,
-          icon: const Icon(Icons.restart_alt, size: 16),
-          label: const Text('重试失败'),
-        ),
-        FilledButton.icon(
-          onPressed: busy ? null : onConfigure,
-          icon: const Icon(Icons.tune, size: 16),
-          label: const Text('创建任务'),
-        ),
-        // 刷新不参与 busy：它只读不写，正在跑批处理时也需要它。
-        TextButton.icon(
-          onPressed: onRefresh,
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          label: const Text('刷新'),
+        const SizedBox(width: toolbarGap),
+        PopupMenuButton<_QueueAction>(
+          tooltip: '更多操作',
+          icon: Icon(Icons.more_horiz_rounded, color: colors.secondaryLabel),
+          onSelected: (action) => switch (action) {
+            _QueueAction.configure => onConfigure(),
+            _QueueAction.retryFailed => onRetryFailed(),
+            _QueueAction.refresh => onRefresh(),
+          },
+          itemBuilder: (context) => <PopupMenuEntry<_QueueAction>>[
+            const PopupMenuItem<_QueueAction>(
+              value: _QueueAction.configure,
+              child: Text('创建初始化任务…'),
+            ),
+            const PopupMenuItem<_QueueAction>(
+              value: _QueueAction.retryFailed,
+              child: Text('重试失败的任务'),
+            ),
+            const PopupMenuItem<_QueueAction>(
+              value: _QueueAction.refresh,
+              child: Text('刷新列表'),
+            ),
+          ],
         ),
       ],
     );
@@ -253,6 +270,10 @@ class _Paginator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final page = ref.watch(queueFilterProvider).page;
     final total = ref.watch(queuePageProvider).asData?.value.total ?? 0;
+    // **一条任务都没有时不显示分页条**：它会在「没有符合条件的任务」
+    // 上方画一行「第 1 / 1 页 · 共 0 个词条」，读起来像是分页坏了，
+    // 而且分页条本来就该跟着列表出现。
+    if (total == 0) return const SizedBox.shrink();
     final totalPages = _pageCount(total);
     return Row(
       children: <Widget>[
@@ -337,3 +358,6 @@ const double chipPaddingH = 10;
 
 /// 筛选按钮垂直内边距。
 const double chipPaddingV = 5;
+
+/// 队列工具栏「⋯」菜单里的动作。
+enum _QueueAction { configure, retryFailed, refresh }

@@ -245,14 +245,17 @@ void main() {
     expect(find.text('已完成'), findsNWidgets(3));
   });
 
-  testWidgets('「刷新」重新查询队列', (tester) async {
+  testWidgets('「刷新列表」重新查询队列（在「⋯」菜单里）', (tester) async {
     await pumpPage(tester);
     expect(find.text('没有符合条件的任务'), findsOneWidget);
 
     await insertWordWithJob(term: 'late');
     expect(find.text('late'), findsNothing);
 
-    await tester.tap(find.text('刷新'));
+    // 刷新只读不写，收在「⋯」里：工具栏的主位置留给「立即处理一批」。
+    await tester.tap(find.byTooltip('更多操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('刷新列表'));
     await tester.pumpAndSettle();
 
     expect(find.text('late'), findsOneWidget);
@@ -325,8 +328,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 51 个词条全是排队中，「已完成」筛不出东西；停在第 2 页会显示成「第 2 / 1 页」。
-      expect(find.text('第 1 / 1 页 · 共 0 个词条'), findsOneWidget);
+      // 51 个词条全是排队中，「已完成」筛不出东西。筛空之后**不再显示
+      // 分页条**（它会在空态上方画一行「第 1 / 1 页 · 共 0 个词条」，
+      // 读起来像分页坏了），所以这里断言的是分页条消失。
+      expect(find.textContaining('页 · 共'), findsNothing);
       expect(find.text('没有符合条件的任务'), findsOneWidget);
     });
   });
@@ -367,7 +372,18 @@ void main() {
       await tester.tap(find.text('重试这些词条的全部任务'));
       await tester.pumpAndSettle();
 
-      final jobs = await db.select(db.initializationJobs).get();
+      // 批量重试会再次打词典与 AI，必须先过确认；没点之前任务不能动。
+      expect(find.text('重试这些词条的全部任务？'), findsOneWidget);
+      var jobs = await db.select(db.initializationJobs).get();
+      expect(
+        jobs.map((job) => job.status),
+        isNot(everyElement(InitializationStatus.queued)),
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, '重试'));
+      await tester.pumpAndSettle();
+
+      jobs = await db.select(db.initializationJobs).get();
       expect(
         jobs.map((job) => job.status),
         everyElement(InitializationStatus.queued),

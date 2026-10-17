@@ -17,51 +17,58 @@ class OverviewCards extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(statisticsOverviewProvider);
     return overview.when(
-      data: (data) => Surface(
-        borderRadius: BorderRadius.circular(LexiRadius.lg),
-        padding: const EdgeInsets.all(cardPadding),
-        child: Wrap(
-          spacing: metricColumnGap,
-          runSpacing: metricRowGap,
-          children: <Widget>[
-            _Metric(
-              label: '词条总数',
-              value: '${data.totalWords}',
-              width: metricWidth,
+      data: (data) => data.totalWords == 0 && data.totalReviews == 0
+          // **新用户不该看到一排 0**：六个格子全是 0 时，这一页唯一
+          // 能得出的结论是「这里没东西可看」。给一句方向比给六个 0 有用。
+          ? const StatCard(
+              title: '概览',
+              child: EmptyHint(message: '还没有学习记录。先去「单词本」加几个词，或从「今日」开始一轮复习。'),
+            )
+          : Surface(
+              borderRadius: BorderRadius.circular(LexiRadius.lg),
+              padding: const EdgeInsets.all(cardPadding),
+              child: Wrap(
+                spacing: metricColumnGap,
+                runSpacing: metricRowGap,
+                children: <Widget>[
+                  _Metric(
+                    label: '词条总数',
+                    value: '${data.totalWords}',
+                    width: metricWidth,
+                  ),
+                  _Metric(
+                    label: '累计作答',
+                    value: '${data.totalReviews}',
+                    width: metricWidth,
+                  ),
+                  _Metric(
+                    label: '正确率',
+                    value: formatPercent(data.accuracy),
+                    unit: '%',
+                    color: context.lexiColors.success,
+                    width: metricWidth,
+                  ),
+                  _Metric(
+                    label: '连续学习',
+                    value: '${data.streakDays}',
+                    unit: '天',
+                    color: context.lexiColors.warning,
+                    width: metricWidth,
+                  ),
+                  _Metric(
+                    label: '累计时长',
+                    value: formatDuration(data.totalDurationMs),
+                    width: metricWidthWide,
+                  ),
+                  _Metric(
+                    label: '学习天数',
+                    value: '${data.activeDays}',
+                    unit: '天',
+                    width: metricWidth,
+                  ),
+                ],
+              ),
             ),
-            _Metric(
-              label: '累计作答',
-              value: '${data.totalReviews}',
-              width: metricWidth,
-            ),
-            _Metric(
-              label: '正确率',
-              value: formatPercent(data.accuracy),
-              unit: '%',
-              color: context.lexiColors.success,
-              width: metricWidth,
-            ),
-            _Metric(
-              label: '连续学习',
-              value: '${data.streakDays}',
-              unit: '天',
-              color: context.lexiColors.warning,
-              width: metricWidth,
-            ),
-            _Metric(
-              label: '累计时长',
-              value: formatDuration(data.totalDurationMs),
-              width: metricWidthWide,
-            ),
-            _Metric(
-              label: '学习天数',
-              value: '${data.activeDays}',
-              unit: '天',
-              width: metricWidth,
-            ),
-          ],
-        ),
-      ),
       loading: () => const StatCard(
         title: '概览',
         child: Center(child: CircularProgressIndicator()),
@@ -105,7 +112,9 @@ class _Metric extends StatelessWidget {
 const double metricWidth = 96;
 
 /// 宽指标格宽度（用于「累计时长」这类较长文本）。
-const double metricWidthWide = 132;
+///
+/// 168 是「4 小时 13 分钟」在 17pt 字号下不折行的宽度。
+const double metricWidthWide = 168;
 
 /// 指标之间的水平间距。
 const double metricColumnGap = 12;

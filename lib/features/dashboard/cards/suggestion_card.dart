@@ -272,7 +272,10 @@ class _MetricTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
       padding: const EdgeInsets.symmetric(vertical: LexiSpace.s8),
       decoration: BoxDecoration(
-        color: colors.fill.withValues(alpha: LexiTint.half),
+        // **`group`（4%）而不是 `half`（50%）**：`fill` 本身是中灰，
+        // 半透明叠在白卡上仍是一块结实的灰——四个指标格看起来像四个
+        // 「未加载」的占位块，而不是四个数字。4% 只够分组，不会抢读数。
+        color: colors.fill.withValues(alpha: LexiTint.group),
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: Column(

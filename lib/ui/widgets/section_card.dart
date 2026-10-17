@@ -1,10 +1,22 @@
-/// 卡片底板：玻璃面板 + 标题行 + 内容。
+/// 卡片底板：内容层的一张分区卡片 + 标题行。
 ///
-/// **为什么合并**：仪表盘与词条详情页各有一份逐字相同的实现
-/// （`SectionCard` 与 `SectionCard`），两份的文件头都写着
-/// 「待 `lib/ui/widgets/` 开放编辑后应合并过去」——这里就是那个时机。
-/// 两份拷贝的代价不是行数，而是「改一次内边距要改两个文件，漏掉的那个
-/// 只有在用户恰好走进那条路径时才会被发现」。
+/// **为什么只有这一份**：收敛前「带标题的卡片」有五套实现——`SectionCard`
+/// （内边距 18）、`SettingsSectionCard`（14）、`StatCard`（16）、
+/// `ArticleSectionCard`（14）、`ConfiguratorCard`（14）。它们的标题样式
+/// 完全一样（`LexiType.callout` + w600），差别只在内边距一两像素和
+/// 「有没有副标题 / 右侧内容 / 图标」这些**开关**上。
+///
+/// 差一两像素单看每一处都「合理」，叠在一起就是「看起来不统一」：眼睛读不出
+/// 18 与 16 的差别，只觉得哪里不对。所以这里把差异收成参数：
+///
+/// | 参数 | 用来表达 |
+/// |---|---|
+/// | `icon` | 标题前的语义图标（今日页的卡片） |
+/// | `subtitle` | 标题下的一句「为什么」（设置页） |
+/// | `trailing` | 标题右侧的附加内容（文章流程的计数） |
+///
+/// 内边距统一取 `LexiSpace.s16`、标题间距取 `LexiSpace.s12`——两者都在
+/// 间距音阶上，不再是「刚好合适的 18」。
 ///
 /// 卡片内的加载/失败/空态**没有**一并合并：它们在各页的文案与结构确实不同
 /// （详情页按分区说「正在加载释义」，仪表盘按卡片说「正在加载」），
@@ -13,31 +25,48 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 卡片内边距。
-const double sectionCardPadding = 18;
+const double sectionCardPadding = LexiSpace.s16;
 
 /// 标题与内容之间的间距。
-const double sectionCardTitleGap = 12;
+const double sectionCardTitleGap = LexiSpace.s12;
 
 /// 标题图标尺寸。
 const double _sectionCardIconSize = 16;
 
 /// 图标与标题之间的间距。
-const double _sectionCardIconGap = 8;
+const double _sectionCardIconGap = LexiSpace.s8;
+
+/// 标题与副标题之间的间距。
+const double _sectionCardSubtitleGap = LexiSpace.s4;
 
 /// 玻璃底板上的一张分区卡片。
 class SectionCard extends StatelessWidget {
   /// 以标题与内容构造。
-  const new({required this.title, required this.child, this.icon, super.key});
+  const new({
+    required this.title,
+    required this.child,
+    this.icon,
+    this.subtitle,
+    this.trailing,
+    super.key,
+  });
 
   /// 卡片标题。
   final String title;
 
   /// 标题左侧图标。
   final IconData? icon;
+
+  /// 标题下的一句补充说明（「为什么」而不是复述标题）。
+  final String? subtitle;
+
+  /// 标题右侧的附加内容。
+  final Widget? trailing;
 
   /// 卡片内容。
   final Widget child;
@@ -51,25 +80,46 @@ class SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              if (icon != null) ...<Widget>[
-                Icon(icon, size: _sectionCardIconSize, color: colors.accent),
-                const SizedBox(width: _sectionCardIconGap),
-              ],
-              Text(
+          _titleRow(colors),
+          const SizedBox(height: sectionCardTitleGap),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _titleRow(LexiColors colors) {
+    final subtitle = this.subtitle;
+    final trailing = this.trailing;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            if (icon != null) ...<Widget>[
+              Icon(icon, size: _sectionCardIconSize, color: colors.accent),
+              const SizedBox(width: _sectionCardIconGap),
+            ],
+            Expanded(
+              child: Text(
                 title,
                 style: LexiType.callout.copyWith(
                   color: colors.label,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
+            ),
+            ?trailing,
+          ],
+        ),
+        if (subtitle != null) ...<Widget>[
+          const SizedBox(height: _sectionCardSubtitleGap),
+          Text(
+            subtitle,
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: sectionCardTitleGap),
-          child,
         ],
-      ),
+      ],
     );
   }
 }

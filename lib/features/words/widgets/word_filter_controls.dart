@@ -13,6 +13,7 @@ import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
@@ -23,16 +24,21 @@ class WordFilterControls extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 两个下拉框并排在同一行：它们各占一行时，整块筛选区会白白吃掉两行
+    // 高度，把列表推到更下面。`Wrap` 让它们在窄一点的内容区里自动折行。
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _InitializationStatusPicker(),
+        Wrap(
+          spacing: LexiSpace.s24,
+          runSpacing: toolbarGap,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[_InitializationStatusPicker(), _SortPicker()],
+        ),
         SizedBox(height: toolbarGap),
         _MasteryChips(),
         SizedBox(height: toolbarGap),
         _SpecialChips(),
-        SizedBox(height: toolbarGap),
-        _SortPicker(),
       ],
     );
   }
@@ -49,15 +55,18 @@ class _InitializationStatusPicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final query = ref.watch(wordQueryProvider);
     final notifier = ref.read(wordQueryProvider.notifier);
+    // **不 `Expanded`**：下拉框铺满整行时，三角形箭头会被推到内容区最右端
+    // （1280 窗口下离标签约 1000 像素），控件与它标注的值在视觉上失去联系，
+    // 看起来像一个孤零零的「∨」。这里让它贴着文字，并给一个宽度上限。
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         const _FieldLabel('初始化状态'),
         const SizedBox(width: chipGap),
-        Expanded(
+        Flexible(
           child: DropdownButton<InitializationStatus?>(
             value: query.initializationStatus,
             isDense: true,
-            isExpanded: true,
             underline: const SizedBox.shrink(),
             items: <DropdownMenuItem<InitializationStatus?>>[
               const DropdownMenuItem<InitializationStatus?>(
@@ -86,14 +95,14 @@ class _SortPicker extends ConsumerWidget {
     final query = ref.watch(wordQueryProvider);
     final notifier = ref.read(wordQueryProvider.notifier);
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         const _FieldLabel('排序'),
         const SizedBox(width: chipGap),
-        Expanded(
+        Flexible(
           child: DropdownButton<WordSort>(
             value: query.sort,
             isDense: true,
-            isExpanded: true,
             underline: const SizedBox.shrink(),
             items: <DropdownMenuItem<WordSort>>[
               for (final sort in WordSort.values)

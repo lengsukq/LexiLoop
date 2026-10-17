@@ -63,6 +63,17 @@ const Map<String, double> widths = <String, double>{
   '宽桌面 1440': 1440,
 };
 
+/// 视口高度。
+///
+/// **必须覆盖窗口的最小高度**（`main.dart` 里限制的 560）：高度比宽度更容易
+/// 被忽略，而溢出恰恰在这里发生——固定高度的卡片、吸底条、页头叠在一起，
+/// 840 高时宽宽松松，560 高时就把列表挤成负空间。此前只测过一个 900，
+/// 等于把「最小窗口」这一档留空了。
+const Map<String, double> heights = <String, double>{
+  '常规 900': 900,
+  '最小 560': 560,
+};
+
 void main() {
   late AppDatabase db;
 
@@ -77,9 +88,10 @@ void main() {
   Future<void> pumpRoute(
     WidgetTester tester,
     String location,
-    double width,
-  ) async {
-    tester.view.physicalSize = Size(width, 900);
+    double width, {
+    double height = 900,
+  }) async {
+    tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -107,18 +119,27 @@ void main() {
       tester.takeException(),
       isNull,
       reason:
-          '$location 在 $width 宽下抛异常。\n'
-          '若是 `RenderFlex overflowed`，说明该页在这一档宽度下不自适应；\n'
+          '$location 在 $width×$height 下抛异常。\n'
+          '若是 `RenderFlex overflowed`，说明该页在这一档尺寸下不自适应；\n'
           '若是 `No Material widget found`，说明它依赖了远处的祖先。',
     );
   }
 
+  // 宽度矩阵用常规高度跑全量；最小高度再单独跑一遍全量——
+  // 两个维度都铺开会让用例数乘到 96 条，而高度问题与宽度基本正交，
+  // 用「全量 × 最小高度 + 全量 × 常规高度」就能覆盖。
   for (final path in allRoutes) {
     for (final entry in widths.entries) {
       testWidgets('$path 在 ${entry.key} 下能渲染且无异常', (tester) async {
         await pumpRoute(tester, path, entry.value);
       });
     }
+    testWidgets('$path 在最小窗口 360×560 下能渲染且无异常', (tester) async {
+      await pumpRoute(tester, path, 360, height: heights['最小 560']!);
+    });
+    testWidgets('$path 在最小窗口 1280×560 下能渲染且无异常', (tester) async {
+      await pumpRoute(tester, path, 1280, height: heights['最小 560']!);
+    });
   }
 
   testWidgets('添加页的输入框在真实路由下有 Material 祖先', (tester) async {

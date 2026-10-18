@@ -29,7 +29,7 @@ class QuestionTypeCard extends ConsumerWidget {
         error: (error, _) => Text(
           '加载失败：$error',
           style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.lexiColors.danger),
+              ?.copyWith(color: context.lexiColors.dangerText),
         ),
       ),
     );

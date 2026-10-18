@@ -21,8 +21,11 @@ import 'package:lexiloop/features/statistics/widgets/recent_daily_detail_card.da
 import 'package:lexiloop/features/statistics/widgets/recent_results_card.dart';
 import 'package:lexiloop/features/statistics/widgets/trend_chart_card.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/widgets/adaptive_columns.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 统计页。
 class StatisticsPage extends ConsumerWidget {
@@ -40,7 +43,7 @@ class StatisticsPage extends ConsumerWidget {
           PageHeaderAction(
             key: const Key('statistics-refresh'),
             label: '刷新',
-            icon: Icons.refresh_rounded,
+            icon: LucideIcons.refreshCw,
             onPressed: () => refreshStatistics(ref),
           ),
         ],
@@ -52,13 +55,22 @@ class StatisticsPage extends ConsumerWidget {
           SizedBox(height: LexiLayout.sectionGap),
           TrendChartCard(),
           SizedBox(height: LexiLayout.sectionGap),
-          MasteryDistributionCard(),
+          AdaptiveColumns(
+            primary: MasteryDistributionCard(),
+            secondary: QuestionTypeCard(),
+            secondaryWidth: 360,
+          ),
           SizedBox(height: LexiLayout.sectionGap),
-          QuestionTypeCard(),
-          SizedBox(height: LexiLayout.sectionGap),
-          RecentResultsCard(),
-          SizedBox(height: LexiLayout.sectionGap),
-          RecentDailyDetailCard(),
+          DisclosureSection(
+            title: '近期作答与每日明细',
+            child: Column(
+              children: <Widget>[
+                RecentResultsCard(),
+                SizedBox(height: LexiLayout.cardGap),
+                RecentDailyDetailCard(),
+              ],
+            ),
+          ),
         ],
       ),
     );

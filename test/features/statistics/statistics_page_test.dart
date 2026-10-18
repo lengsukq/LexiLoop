@@ -106,6 +106,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('近期作答与每日明细'));
+    await tester.tap(find.text('近期作答与每日明细'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(0, 3000),
+    );
+    await tester.pumpAndSettle();
   }
 
   group('趋势档位', () {

@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
 
 /// 统计卡片外壳。
 class StatCard extends StatelessWidget {
@@ -31,32 +32,12 @@ class StatCard extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Surface(
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(cardPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(color: colors.label),
-                ),
-              ),
-              ?trailing,
-            ],
-          ),
-          const SizedBox(height: cardTitleGap),
-          child,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SectionCard(
+    tone: LexiTone.sky,
+    title: title,
+    trailing: trailing,
+    child: child,
+  );
 }
 
 /// 异步卡片的统一包装：加载中显示占位，出错显示中文提示。
@@ -88,7 +69,7 @@ class AsyncStatCard<T> extends ConsumerWidget {
         error: (error, _) => Text(
           '加载失败：$error',
           style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.lexiColors.danger),
+              ?.copyWith(color: context.lexiColors.dangerText),
         ),
       ),
     );
@@ -250,9 +231,6 @@ class _CardPlaceholder extends StatelessWidget {
 
 /// 卡片内边距。
 const double cardPadding = 16;
-
-/// 卡片标题与内容的间距。
-const double cardTitleGap = 12;
 
 /// 指标标签与数值的间距。
 const double metricGap = 2;

@@ -55,7 +55,7 @@ class TrendChartCard extends ConsumerWidget {
                 child: Text(
                   '加载失败：$error',
                   style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: context.lexiColors.danger),
+                      ?.copyWith(color: context.lexiColors.dangerText),
                 ),
               ),
             ),
@@ -193,6 +193,7 @@ class _Chart extends StatelessWidget {
         FlSpot(index.toDouble(), values[index]),
     ],
     color: color,
+    dashArray: fill ? null : <int>[6, 4],
     dotData: const FlDotData(show: false),
     belowBarData: BarAreaData(
       show: fill,
@@ -251,16 +252,22 @@ class _Legend extends StatelessWidget {
       spacing: LexiSpace.s16,
       runSpacing: LexiSpace.s4,
       children: <Widget>[
-        _LegendDot(color: colors.accent, label: trendReviewedLabel),
-        _LegendDot(color: colors.success, label: trendCorrectLabel),
+        _LegendEntry(color: colors.accent, label: trendReviewedLabel),
+        _LegendEntry(
+          color: colors.success,
+          label: trendCorrectLabel,
+          dashed: true,
+        ),
       ],
     );
   }
 }
 
-/// 图例里的一项：圆点 + 文案。
-class _LegendDot extends StatelessWidget {
-  const new({required this.color, required this.label});
+/// 图例里的一项：实线/虚线 + 文案。
+class _LegendEntry extends StatelessWidget {
+  const new({required this.color, required this.label, this.dashed = false});
+
+  final bool dashed;
 
   final Color color;
   final String label;
@@ -271,9 +278,26 @@ class _LegendDot extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        DecoratedBox(
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: const SizedBox(width: legendDotSize, height: legendDotSize),
+        ExcludeSemantics(
+          child: SizedBox(
+            width: LexiSpace.s24,
+            child: Row(
+              children: <Widget>[
+                for (var part = 0; part < (dashed ? 3 : 1); part++)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: dashed ? LexiSpace.s2 : 0,
+                      ),
+                      child: ColoredBox(
+                        color: color,
+                        child: const SizedBox(height: LexiSpace.s2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(width: LexiSpace.s6),
         Text(
@@ -290,9 +314,6 @@ const String trendReviewedLabel = '作答';
 
 /// 图例文案：正确条。
 const String trendCorrectLabel = '正确';
-
-/// 图例圆点直径。
-const double legendDotSize = 8;
 
 /// 图例与图表之间的间距。
 const double legendGap = LexiSpace.s10;
@@ -311,8 +332,8 @@ class TrendRangeSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      runSpacing: LexiSpace.s8,
       children: <Widget>[
         for (final days in trendDayOptions)
           Padding(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/features/statistics/statistics_providers.dart';
 import 'package:lexiloop/features/statistics/widgets/stat_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 概览指标：词条数、累计作答、正确率、连续天数、累计时长。
@@ -25,6 +26,7 @@ class OverviewCards extends ConsumerWidget {
               child: EmptyHint(message: '还没有学习记录。先去「单词本」加几个词，或从「今日」开始一轮复习。'),
             )
           : Surface(
+              tone: LexiTone.mint,
               borderRadius: BorderRadius.circular(LexiRadius.lg),
               padding: const EdgeInsets.all(cardPadding),
               child: Wrap(
@@ -45,14 +47,14 @@ class OverviewCards extends ConsumerWidget {
                     label: '正确率',
                     value: formatPercent(data.accuracy),
                     unit: '%',
-                    color: context.lexiColors.success,
+                    color: context.lexiColors.successText,
                     width: metricWidth,
                   ),
                   _Metric(
                     label: '连续学习',
                     value: '${data.streakDays}',
                     unit: '天',
-                    color: context.lexiColors.warning,
+                    color: context.lexiColors.warningText,
                     width: metricWidth,
                   ),
                   _Metric(
@@ -78,7 +80,7 @@ class OverviewCards extends ConsumerWidget {
         child: Text(
           '加载失败：$error',
           style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.lexiColors.danger),
+              ?.copyWith(color: context.lexiColors.dangerText),
         ),
       ),
     );

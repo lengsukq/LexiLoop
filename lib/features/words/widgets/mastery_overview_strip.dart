@@ -14,6 +14,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 掌握概览进度带。
 class MasteryOverviewStrip extends ConsumerWidget {
@@ -46,10 +47,11 @@ class _OverviewBody extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s8),
       child: Surface(
+        variant: SurfaceVariant.plain,
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         padding: const EdgeInsets.symmetric(
           horizontal: LexiSpace.s16,
-          vertical: LexiSpace.s14,
+          vertical: LexiSpace.s8,
         ),
         // **窄屏换排**：360 宽下「图标 + 文字 + 详细统计」三样挤在一行，
         // 文字被压成三行、右侧链接贴着边缘，卡片高度涨到一百多像素。
@@ -100,7 +102,7 @@ class _IconPlate extends StatelessWidget {
         color: colors.accent.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
-      child: Icon(Icons.menu_book_rounded, size: 20, color: colors.accent),
+      child: Icon(LucideIcons.bookOpen, size: 20, color: colors.accent),
     );
   }
 }
@@ -139,7 +141,7 @@ class _OverviewText extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: Text(
-                '当前词条掌握程度',
+                '掌握概览',
                 style: LexiType.callout.copyWith(
                   color: colors.label,
                   fontWeight: FontWeight.w600,
@@ -148,8 +150,8 @@ class _OverviewText extends StatelessWidget {
             ),
             Text(
               '$percent%',
-              style: LexiType.title2.copyWith(
-                color: colors.accent,
+              style: LexiType.callout.copyWith(
+                color: colors.accentText,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -157,8 +159,7 @@ class _OverviewText extends StatelessWidget {
         ),
         const SizedBox(height: LexiSpace.s4),
         Text(
-          '已掌握 ${overview.mastered} / ${overview.total} 个词条 · '
-          '还有 ${overview.remaining} 个待继续学习',
+          '已掌握 ${overview.mastered} · 待学习 ${overview.remaining}',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s8),

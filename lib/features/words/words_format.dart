@@ -18,9 +18,9 @@ String masteryLabel(MasteryLevel level) => switch (level) {
 /// 初始化状态的中文名。
 String initializationStatusLabel(InitializationStatus status) =>
     switch (status) {
-      InitializationStatus.pending => '待初始化',
+      InitializationStatus.pending => '待补全',
       InitializationStatus.queued => '排队中',
-      InitializationStatus.running => '初始化中',
+      InitializationStatus.running => '内容补全中',
       InitializationStatus.ready => '已就绪',
       InitializationStatus.partial => '部分就绪',
       InitializationStatus.failed => '失败',

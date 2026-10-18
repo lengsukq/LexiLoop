@@ -25,9 +25,13 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/adaptive_columns.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/page_states.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词条详情页。
 ///
@@ -72,35 +76,57 @@ class _WordDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      // 左右栏距已经由 `PageShell` 统一给出，这里只管上下呼吸。
       padding: const EdgeInsets.only(top: LexiSpace.s16, bottom: LexiSpace.s32),
-      children: _spaced(<Widget>[
+      children: <Widget>[
         WordDetailHeaderCard(detail: detail),
-        ..._contentSections(),
-        // **「我的」区放在内容之后、且笔记排在最前面**。
-        //
-        // 收敛前这一页是一条 16 张卡的平铺列表，笔记卡排在最末——而「记一笔」
-        // 是用户回到词条页最常做的事之一，它被压在复习历史、初始化质量
-        // （开发遥测）之后，需要滚很久。分区标签让「这个词是什么」与
-        // 「我对它做了什么」在视觉上分开。
-        const _ZoneLabel(label: '我的记录'),
-        NoteCard(wordId: detail.id, initialNote: detail.userNote),
-        LearningSnapshotCard(wordId: detail.id),
-        ReviewHistoryCard(wordId: detail.id),
-        // 遥测排在最后：它可折叠、也不是用户来这页的目的。
-        InitializationQualityCard(wordId: detail.id),
-      ]),
+        const SizedBox(height: LexiSpace.s24),
+        AdaptiveColumns(
+          breakpoint: 920,
+          primary: Surface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _spaced(_contentSections()),
+            ),
+          ),
+          secondary: _personalRecords(),
+        ),
+      ],
     );
   }
 
+  Widget _personalRecords() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: _spaced(<Widget>[
+      const _ZoneLabel(label: '我的记录'),
+      NoteCard(wordId: detail.id, initialNote: detail.userNote),
+      LearningSnapshotCard(wordId: detail.id),
+      DisclosureSection(
+        title: '复习记录',
+        child: ReviewHistoryCard(wordId: detail.id),
+      ),
+      InitializationQualityCard(wordId: detail.id),
+    ]),
+  );
+
   /// 内容类分区；对应数据为空的分区整块不出现，而不是留一张空卡片。
   List<Widget> _contentSections() => <Widget>[
-    if (!detail.summary.isEmpty || detail.tags.isNotEmpty)
-      SummaryCard(summary: detail.summary, tags: detail.tags),
     if (detail.definitions.isNotEmpty)
       DefinitionsCard(wordId: detail.id, definitions: detail.definitions),
     if (detail.examples.isNotEmpty)
       ExamplesCard(wordId: detail.id, examples: detail.examples),
+    if (!detail.summary.isEmpty || detail.tags.isNotEmpty)
+      SummaryCard(summary: detail.summary, tags: detail.tags),
+    DisclosureSection(
+      title: '扩展知识与助记',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: _spaced(_extendedSections()),
+      ),
+    ),
+    if (detail.hasNoContent) const _NoContentCard(),
+  ];
+
+  List<Widget> _extendedSections() => <Widget>[
     if (detail.phrases.isNotEmpty) PhrasesCard(phrases: detail.phrases),
     if (detail.forms.isNotEmpty) FormsCard(forms: detail.forms),
     // 四类关联词合成一张卡：一次只展开一类，其余以计数留在切换条上。
@@ -117,7 +143,6 @@ class _WordDetailBody extends StatelessWidget {
       learning: detail.learning,
       analysis: detail.sentenceAnalysis,
     ),
-    if (detail.hasNoContent) const _NoContentCard(),
   ];
 
   /// 四类关联词按关系分组；空的分组不参与渲染。
@@ -150,8 +175,8 @@ class _NoContentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SectionCard(
       title: '内容',
-      icon: Icons.hourglass_empty_rounded,
-      child: DetailEmptyHint(text: '该词条还没有内容。它可能正在等待初始化，或数据源没有返回结果。'),
+      icon: LucideIcons.hourglass,
+      child: DetailEmptyHint(text: '该词条还没有内容。它可能正在等待补全，或数据源没有返回结果。'),
     );
   }
 }
@@ -165,7 +190,7 @@ class _MissingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PageEmptyState(
-    icon: Icons.search_off_rounded,
+    icon: LucideIcons.searchX,
     title: '词条不存在或已被删除',
     message: '它可能刚被删除，或来自一个尚未导入的 ID。',
     primaryLabel: '返回单词本',

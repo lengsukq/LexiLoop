@@ -131,7 +131,7 @@ void main() {
     await open(tester, wordId: id);
     expect(find.textContaining('文本未变化'), findsOneWidget);
 
-    await tapButton(tester, '有道词典初始化');
+    await tapButton(tester, '获取有道词典内容');
 
     expect(lookup.lastCall!['term'], 'apple');
     expect(find.text('确认应用并保存词条'), findsOneWidget);
@@ -146,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('已修改'), findsOneWidget);
 
-    await tapButton(tester, '有道词典初始化');
+    await tapButton(tester, '获取有道词典内容');
 
     expect(lookup.lastCall!['term'], 'Pear');
   });
@@ -159,7 +159,7 @@ void main() {
     await open(tester, wordId: id, onSaved: () => saved = true);
     await tester.enterText(find.byType(TextField), 'pear');
     await tester.pumpAndSettle();
-    await tapButton(tester, '有道词典初始化');
+    await tapButton(tester, '获取有道词典内容');
     await tapButton(tester, '确认应用并保存词条');
 
     expect(saved, isTrue);
@@ -177,7 +177,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final button = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, '有道词典初始化'),
+      find.widgetWithText(OutlinedButton, '获取有道词典内容'),
     );
     expect(button.onPressed, isNull);
     expect(lookup.calls, 0);
@@ -201,7 +201,7 @@ void main() {
     );
 
     await open(tester, wordId: id);
-    await tapButton(tester, '有道词典初始化');
+    await tapButton(tester, '获取有道词典内容');
 
     expect(find.text('有道词典未返回该词条的有效内容，暂不能保存修改。'), findsOneWidget);
     expect(find.text('有道返回了空页面'), findsOneWidget);
@@ -217,7 +217,7 @@ void main() {
     await open(tester, wordId: id);
     await tester.enterText(find.byType(TextField), 'banana');
     await tester.pumpAndSettle();
-    await tapButton(tester, '有道词典初始化');
+    await tapButton(tester, '获取有道词典内容');
     await tapButton(tester, '确认应用并保存词条');
 
     expect(find.text('已存在相同词条，无法修改为该文本。'), findsOneWidget);

@@ -186,7 +186,7 @@ class _EditWordDialogState extends ConsumerState<EditWordDialog> {
                 Text(
                   _error!,
                   style: LexiType.footnote.copyWith(
-                    color: context.lexiColors.danger,
+                    color: context.lexiColors.dangerText,
                   ),
                 ),
               ],
@@ -275,7 +275,7 @@ class _TargetMeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final suffix = termChanged ? '（已修改，需重新初始化内容）' : '（文本未变化，可重新获取内容）';
+    final suffix = termChanged ? '（已修改，需重新获取内容）' : '（文本未变化，可重新获取内容）';
     return Text(
       '${languageLabel(target.sourceLanguage)} → '
       '${languageLabel(target.targetLanguage)} · '
@@ -300,8 +300,8 @@ class _SaveAfterFetchHint extends StatelessWidget {
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
       child: Text(
-        '修改词条后需点击「有道词典初始化」获取新内容并确认应用，'
-        '成功后才保存词条文本；未初始化前词条不会发生变化。',
+        '修改词条后需点击「获取有道词典内容」获取新内容并确认应用，'
+        '成功后才保存词条文本；确认应用前词条不会发生变化。',
         style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
       ),
     );
@@ -336,7 +336,7 @@ class _Footer extends StatelessWidget {
         const SizedBox(width: LexiSpace.s8),
         OutlinedButton(
           onPressed: !canFetch || busy || applying ? null : onFetch,
-          child: Text(busy ? '获取中…' : '有道词典初始化'),
+          child: Text(busy ? '获取中…' : '获取有道词典内容'),
         ),
       ],
     );

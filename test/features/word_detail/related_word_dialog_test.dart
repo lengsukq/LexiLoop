@@ -156,16 +156,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('打开词条'), findsNothing);
-    await tester.tap(find.text('加入词库并初始化'));
+    await tester.tap(find.text('加入词库并内容补全'));
     await tester.pumpAndSettle();
 
-    expect(find.text('已加入词库并排入初始化队列。'), findsOneWidget);
+    expect(find.text('已加入词库并排入内容补全队列。'), findsOneWidget);
     final words = await allWords();
     expect(words, hasLength(2));
     final created = words.firstWhere((row) => row.term == 'apply');
     expect(created.initializationStatus, InitializationStatus.queued);
     expect(await jobs(), hasLength(1));
-    expect(find.text('加入词库并初始化'), findsNothing, reason: '加入之后按钮应消失，避免用户连点');
+    expect(find.text('加入词库并内容补全'), findsNothing, reason: '加入之后按钮应消失，避免用户连点');
     expect(find.text('打开词条'), findsOneWidget);
   });
 
@@ -176,12 +176,12 @@ void main() {
     await open(tester, parentWordId: parentId);
     await tester.pumpAndSettle();
 
-    expect(find.text('待初始化'), findsOneWidget);
+    expect(find.text('待补全'), findsOneWidget);
     expect(find.text('打开词条'), findsOneWidget);
-    await tester.tap(find.text('加入初始化'));
+    await tester.tap(find.text('加入内容补全'));
     await tester.pumpAndSettle();
 
-    expect(find.text('已排入初始化队列。'), findsOneWidget);
+    expect(find.text('已排入内容补全队列。'), findsOneWidget);
     expect(await allWords(), hasLength(2));
     final queued = await jobs();
     expect(queued, hasLength(1));
@@ -202,8 +202,8 @@ void main() {
 
     expect(find.text('已就绪'), findsOneWidget);
     expect(find.text('打开词条'), findsOneWidget);
-    expect(find.text('加入初始化'), findsNothing);
-    expect(find.text('加入词库并初始化'), findsNothing);
+    expect(find.text('加入内容补全'), findsNothing);
+    expect(find.text('加入词库并内容补全'), findsNothing);
   });
 
   testWidgets('与父词条相同时报错', (tester) async {
@@ -213,6 +213,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('不能把当前词条再次加入词库。'), findsOneWidget);
-    expect(find.text('加入词库并初始化'), findsNothing);
+    expect(find.text('加入词库并内容补全'), findsNothing);
   });
 }

@@ -11,6 +11,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「仅补全缺失字段」的说明。
 const String fillMissingHint = '保留现有内容，只用有道结果填充空缺部分。';
@@ -96,9 +97,7 @@ class _ModeOption extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Icon(
-              selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
+              selected ? LucideIcons.circleDot : LucideIcons.circle,
               size: 18,
               color: selected ? colors.accent : colors.tertiaryLabel,
             ),

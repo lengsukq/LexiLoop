@@ -1,7 +1,7 @@
 /// 词库页的搜索框与筛选入口。
 ///
 /// 宽屏把筛选控件直接铺在搜索框下方，窄屏收进筛选弹层；
-/// 断点用 [LexiLayout.wideBreakpoint]，**不是**侧边栏断点。
+/// 断点用 `600`，**不是**侧边栏断点。
 ///
 /// 这两个断点量的不是同一件事：侧边栏断点比的是**窗口宽度**（决定导航形态），
 /// 这里比的是**内容宽度**（决定筛选控件铺开还是收进面板）。正文列被限宽到
@@ -18,6 +18,9 @@ import 'package:lexiloop/features/words/widgets/word_filter_sheet.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词库页的搜索框与筛选入口。
 class WordFilterBar extends StatelessWidget {
@@ -28,26 +31,24 @@ class WordFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: LexiSpace.s4, bottom: LexiSpace.s8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= LexiLayout.wideBreakpoint;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  const Expanded(child: _SearchField()),
-                  if (!wide) ...<Widget>[
-                    const SizedBox(width: LexiSpace.s8),
-                    const _FilterButton(),
-                  ],
-                ],
-              ),
-              const SizedBox(height: LexiSpace.s8),
-              if (wide) const WordFilterControls(),
-            ],
-          );
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const _SearchField(),
+          const SizedBox(height: LexiSpace.s8),
+          const WordSortPicker(),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < LexiLayout.wideBreakpoint) {
+                return const _FilterButton();
+              }
+              return const DisclosureSection(
+                title: '高级筛选',
+                child: WordFilterControls(),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -82,12 +83,13 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
       onChanged: ref.read(wordQueryProvider.notifier).setSearch,
       decoration: InputDecoration(
         hintText: '搜索词条或备注…',
-        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+        fillColor: LexiTone.sky.background(Theme.of(context).brightness),
+        prefixIcon: const Icon(LucideIcons.search, size: 18),
         suffixIcon: hasText
             ? IconButton(
                 tooltip: '清除搜索',
                 onPressed: _clear,
-                icon: const Icon(Icons.close_rounded, size: 16),
+                icon: const Icon(LucideIcons.x, size: 16),
               )
             : null,
       ),
@@ -111,7 +113,7 @@ class _FilterButton extends ConsumerWidget {
     );
     return OutlinedButton.icon(
       onPressed: () => unawaited(showWordFilterSheet(context)),
-      icon: const Icon(Icons.tune_rounded, size: 16),
+      icon: const Icon(LucideIcons.slidersHorizontal, size: 16),
       label: Text(active == 0 ? '筛选' : '筛选 $active'),
     );
   }

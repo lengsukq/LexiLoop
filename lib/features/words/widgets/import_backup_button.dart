@@ -10,6 +10,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/features/settings/import_backup_confirm.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 导入旧版 JSON 备份的按钮。
 class ImportBackupButton extends ConsumerStatefulWidget {
@@ -63,7 +64,7 @@ class _ImportBackupButtonState extends ConsumerState<ImportBackupButton> {
             height: LexiSpace.s14,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : const Icon(Icons.upload_file_rounded, size: 17);
+        : const Icon(LucideIcons.fileUp, size: 17);
     final label = Text(_busy ? '导入中…' : '导入备份');
     if (widget.emphasized) {
       return FilledButton.icon(

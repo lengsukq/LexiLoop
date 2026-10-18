@@ -8,8 +8,11 @@ import 'package:lexiloop/features/word_detail/dialogs/related_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 关系类型对应的卡片标题与图标。
 ///
@@ -17,14 +20,16 @@ import 'package:lexiloop/ui/widgets/section_card.dart';
 /// 让调用方各写一遍标题，改名时必然漏掉一处（旧版正是如此）。
 /// 注意这里的「同义词 / 词族」与弹窗里的「近义词 / 同根词 / 词族」措辞
 /// 不同——那是旧版就有的两套文案，分别服务于「分区标题」与「关系徽标」。
-({String title, IconData icon}) relatedCardLook(
-  RelationType relation,
-) => switch (relation) {
-  RelationType.synonym => (title: '同义词', icon: Icons.sync_alt_rounded),
-  RelationType.antonym => (title: '反义词', icon: Icons.compare_arrows_rounded),
-  RelationType.wordFamily => (title: '词族', icon: Icons.hub_rounded),
-  RelationType.confusedWith => (title: '易混词', icon: Icons.help_outline_rounded),
-};
+({String title, IconData icon}) relatedCardLook(RelationType relation) =>
+    switch (relation) {
+      RelationType.synonym => (title: '同义词', icon: LucideIcons.arrowLeftRight),
+      RelationType.antonym => (
+        title: '反义词',
+        icon: LucideIcons.arrowsUpFromLine,
+      ),
+      RelationType.wordFamily => (title: '词族', icon: LucideIcons.network),
+      RelationType.confusedWith => (title: '易混词', icon: LucideIcons.circleHelp),
+    };
 
 /// 相关词条卡片。
 ///
@@ -58,6 +63,8 @@ class RelatedWordsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final look = relatedCardLook(relation);
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.lavender,
       title: look.title,
       icon: look.icon,
       child: Column(
@@ -102,11 +109,7 @@ class _RelatedRow extends StatelessWidget {
           children: <Widget>[
             Expanded(child: _RelatedBody(item: item)),
             const SizedBox(width: LexiSpace.s6),
-            Icon(
-              Icons.add_circle_outline_rounded,
-              size: 16,
-              color: colors.tertiaryLabel,
-            ),
+            Icon(LucideIcons.circlePlus, size: 16, color: colors.tertiaryLabel),
           ],
         ),
       ),
@@ -156,7 +159,7 @@ class _RelatedBody extends StatelessWidget {
         if (item.difference != null)
           Text(
             '区别：${item.difference}',
-            style: LexiType.footnote.copyWith(color: colors.warning),
+            style: LexiType.footnote.copyWith(color: colors.warningText),
           ),
       ],
     );
@@ -213,8 +216,10 @@ class _RelatedWordsGroupState extends State<RelatedWordsGroup> {
       single ? available.first : RelationType.synonym,
     );
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.lavender,
       title: single ? look.title : '相关词',
-      icon: single ? look.icon : Icons.hub_rounded,
+      icon: single ? look.icon : LucideIcons.network,
       trailing: _RelationChips(
         available: available,
         groups: widget.groups,

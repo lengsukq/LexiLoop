@@ -12,6 +12,7 @@ import 'package:lexiloop/features/words/widgets/import_backup_button.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词库页头部。
 class WordsHeader extends StatelessWidget {
@@ -30,14 +31,14 @@ class WordsHeader extends StatelessWidget {
       actions: <PageHeaderAction>[
         PageHeaderAction(
           label: '手动添加',
-          icon: Icons.add_rounded,
+          icon: LucideIcons.plus,
           // 加词是这一页的主线动作，给它填充底；导入是准备动作。
           primary: true,
           onPressed: () => context.go(addWordPath),
         ),
         PageHeaderAction(
           label: 'CSV 导入',
-          icon: Icons.upload_rounded,
+          icon: LucideIcons.upload,
           onPressed: () => context.go(csvImportPath),
         ),
       ],

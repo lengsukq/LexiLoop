@@ -33,7 +33,7 @@ class WordFilterControls extends ConsumerWidget {
           spacing: LexiSpace.s24,
           runSpacing: toolbarGap,
           crossAxisAlignment: WrapCrossAlignment.center,
-          children: <Widget>[_InitializationStatusPicker(), _SortPicker()],
+          children: <Widget>[_InitializationStatusPicker()],
         ),
         SizedBox(height: toolbarGap),
         _MasteryChips(),
@@ -61,7 +61,7 @@ class _InitializationStatusPicker extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const _FieldLabel('初始化状态'),
+        const _FieldLabel('内容补全状态'),
         const SizedBox(width: chipGap),
         Flexible(
           child: DropdownButton<InitializationStatus?>(
@@ -70,7 +70,7 @@ class _InitializationStatusPicker extends ConsumerWidget {
             underline: const SizedBox.shrink(),
             items: <DropdownMenuItem<InitializationStatus?>>[
               const DropdownMenuItem<InitializationStatus?>(
-                child: Text('全部初始化状态'),
+                child: Text('全部内容补全状态'),
               ),
               for (final status in InitializationStatus.values)
                 DropdownMenuItem<InitializationStatus?>(
@@ -87,8 +87,9 @@ class _InitializationStatusPicker extends ConsumerWidget {
 }
 
 /// 排序下拉框。
-class _SortPicker extends ConsumerWidget {
-  const new();
+class WordSortPicker extends ConsumerWidget {
+  /// 创建排序控件。
+  const new({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -10,8 +10,11 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 释义卡片：按语言分组，标注词性与来源，并允许用户写一条自己的释义。
 ///
@@ -30,8 +33,10 @@ class DefinitionsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final groups = _groupByLanguage(definitions);
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.mint,
       title: '释义',
-      icon: Icons.menu_book_rounded,
+      icon: LucideIcons.bookOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

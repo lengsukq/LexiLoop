@@ -103,7 +103,9 @@ void main() {
     final id = await insertWordRow(db);
     await pumpCard(tester, await entryOf(id));
 
-    await tester.tap(find.byTooltip('编辑词条'));
+    await tester.tap(find.byTooltip('词条操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('编辑词条'));
     await tester.pumpAndSettle();
 
     expect(find.text('编辑词条'), findsOneWidget);

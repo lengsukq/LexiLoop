@@ -138,6 +138,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    if (find.text('掌握概览').evaluate().isNotEmpty) {
+      await tester.tap(find.text('掌握概览'));
+      await tester.pumpAndSettle();
+    }
+    if (width >= 900) {
+      await tester.tap(find.text('高级筛选'));
+      await tester.pumpAndSettle();
+    }
   }
 
   /// 打开页面并读取当前查询条件，用于断言筛选是否真的进了状态。
@@ -288,7 +296,7 @@ void main() {
       await insertWord(term: 'failed-one', status: InitializationStatus.failed);
       await pumpPage(tester);
 
-      await tester.tap(find.text('全部初始化状态'));
+      await tester.tap(find.text('全部内容补全状态'));
       await tester.pumpAndSettle();
       // 展开后的菜单项挂在 overlay 路由里，不是 DropdownButton 的后代；
       // 卡片上的状态徽标也叫「失败」，因此取最后一个（overlay 后插入）。
@@ -551,7 +559,7 @@ void main() {
       await insertWord(term: 'd');
       await pumpPage(tester);
 
-      expect(find.text('已掌握 2 / 4 个词条 · 还有 2 个待继续学习'), findsOneWidget);
+      expect(find.text('已掌握 2 · 待学习 2'), findsOneWidget);
       expect(find.text('50%'), findsOneWidget);
     });
 

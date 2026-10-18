@@ -14,6 +14,7 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词库列表页的空状态。
 class WordEmptyView extends ConsumerWidget {
@@ -45,7 +46,7 @@ class WordEmptyView extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Icon(
-            Icons.menu_book_rounded,
+            LucideIcons.bookOpen,
             size: 44,
             color: context.lexiColors.tertiaryLabel,
           ),
@@ -93,7 +94,7 @@ class _EmptyActions extends ConsumerWidget {
         child: FilledButton.icon(
           key: const Key('wordsClearAll'),
           onPressed: () => ref.read(wordQueryProvider.notifier).clearAll(),
-          icon: const Icon(Icons.filter_alt_off_rounded, size: 17),
+          icon: const Icon(LucideIcons.filterX, size: 17),
           label: const Text('清除全部筛选与搜索'),
         ),
       );
@@ -112,12 +113,12 @@ class _EmptyActions extends ConsumerWidget {
           // 而「我只想加一个词看看」是最轻的第一次尝试。
           FilledButton.icon(
             onPressed: () => context.go(addWordPath),
-            icon: const Icon(Icons.add_rounded, size: 17),
+            icon: const Icon(LucideIcons.plus, size: 17),
             label: const Text('手动添加'),
           ),
           OutlinedButton.icon(
             onPressed: () => context.go(csvImportPath),
-            icon: const Icon(Icons.upload_rounded, size: 17),
+            icon: const Icon(LucideIcons.upload, size: 17),
             label: const Text('CSV 导入'),
           ),
           const ImportBackupButton(),

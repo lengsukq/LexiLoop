@@ -11,8 +11,11 @@ import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 助记与句子分析卡片：助记法、发音提示、常见错误与句子分析。
 ///
@@ -38,8 +41,10 @@ class MnemonicCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.lavender,
       title: '助记与句子分析',
-      icon: Icons.lightbulb_outline_rounded,
+      icon: LucideIcons.lightbulb,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -89,7 +94,7 @@ class _MnemonicActionState extends ConsumerState<_MnemonicAction> {
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
         onPressed: _busy ? null : _request,
-        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+        icon: const Icon(LucideIcons.sparkles, size: 18),
         label: Text(widget.hasMnemonic ? '重新生成助记' : 'AI 生成助记'),
       ),
     );

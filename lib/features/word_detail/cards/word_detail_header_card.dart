@@ -13,13 +13,17 @@ import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词条头部：操作栏 + 文本、状态徽章、口音切换与学习开关。
 ///
@@ -40,6 +44,7 @@ class WordDetailHeaderCard extends ConsumerWidget {
         _HeaderActionBar(detail: detail),
         const SizedBox(height: LexiSpace.s10),
         Surface(
+          variant: SurfaceVariant.raised,
           borderRadius: BorderRadius.circular(LexiRadius.lg),
           padding: const EdgeInsets.fromLTRB(
             LexiSpace.s20,
@@ -55,9 +60,11 @@ class WordDetailHeaderCard extends ConsumerWidget {
               const SizedBox(height: LexiSpace.s10),
               _PronunciationBar(detail: detail),
               const SizedBox(height: LexiSpace.s10),
-              _SourceMeta(detail: detail),
-              const SizedBox(height: LexiSpace.s6),
               _HeaderActions(detail: detail),
+              DisclosureSection(
+                title: '词条信息',
+                child: _SourceMeta(detail: detail),
+              ),
             ],
           ),
         ),
@@ -88,12 +95,16 @@ class _HeaderActionBar extends ConsumerWidget {
     //
     // 现在：查词典与编辑留在台面上（高频、无害），
     // 重新生成与删除收进菜单，删除仍排最后且用危险色。
-    return Row(
+    return Wrap(
+      spacing: LexiSpace.s8,
+      runSpacing: LexiSpace.s8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
+        backButton(context, fallbackLocation: wordsPath, tooltip: '返回单词本'),
         OutlinedButton.icon(
           onPressed: () =>
               unawaited(YoudaoPreviewDialog.show(context, wordId: detail.id)),
-          icon: const Icon(Icons.menu_book_rounded, size: 16),
+          icon: const Icon(LucideIcons.bookOpen, size: 16),
           label: const Text('有道词典'),
         ),
         const SizedBox(width: LexiSpace.s8),
@@ -110,13 +121,12 @@ class _HeaderActionBar extends ConsumerWidget {
               ),
             ),
           ),
-          icon: const Icon(Icons.edit_rounded, size: 16),
+          icon: const Icon(LucideIcons.pencil, size: 16),
           label: const Text('编辑'),
         ),
-        const Spacer(),
         PopupMenuButton<_HeaderAction>(
           tooltip: '更多操作',
-          icon: Icon(Icons.more_horiz_rounded, color: colors.secondaryLabel),
+          icon: Icon(LucideIcons.ellipsis, color: colors.secondaryLabel),
           onSelected: (action) => switch (action) {
             _HeaderAction.complete => unawaited(
               _initialize(context, ref, InitializationMode.fillMissingFields),
@@ -129,15 +139,12 @@ class _HeaderActionBar extends ConsumerWidget {
           itemBuilder: (context) => <PopupMenuEntry<_HeaderAction>>[
             const PopupMenuItem<_HeaderAction>(
               value: _HeaderAction.complete,
-              child: _MenuRow(
-                icon: Icons.auto_awesome_rounded,
-                label: '补全缺失内容',
-              ),
+              child: _MenuRow(icon: LucideIcons.sparkles, label: '补全缺失内容'),
             ),
             const PopupMenuItem<_HeaderAction>(
               value: _HeaderAction.regenerate,
               child: _MenuRow(
-                icon: Icons.refresh_rounded,
+                icon: LucideIcons.refreshCw,
                 label: 'AI 重新生成',
                 // 「会覆盖手动编辑」放在第二行：一是必须说清楚，
                 // 二是塞进一行会把弹层撑出边界（弹层有宽度上限）。
@@ -147,7 +154,7 @@ class _HeaderActionBar extends ConsumerWidget {
             const PopupMenuItem<_HeaderAction>(
               value: _HeaderAction.delete,
               child: _MenuRow(
-                icon: Icons.delete_outline_rounded,
+                icon: LucideIcons.trash2,
                 label: '删除词条',
                 danger: true,
               ),
@@ -314,14 +321,8 @@ class _TermBlock extends StatelessWidget {
               level: detail.masteryLevel,
               score: detail.masteryScore,
             ),
-            InitializationBadge(status: detail.initializationStatus),
-            DetailChip(
-              text:
-                  '${languageLabel(detail.sourceLanguage)} → '
-                  '${languageLabel(detail.targetLanguage)}',
-            ),
-            DetailChip(text: contentTypeLabel(detail.contentType)),
-            DetailChip(text: contentSourceLabel(detail.contentSource)),
+            if (detail.initializationStatus != InitializationStatus.ready)
+              InitializationBadge(status: detail.initializationStatus),
             if (detail.isSuspended)
               const DetailChip(text: '已暂停', tone: LexiBadgeTone.danger),
           ],
@@ -363,7 +364,7 @@ class _TranslationHint extends ConsumerWidget {
           const SizedBox(width: LexiSpace.s8),
           TextButton.icon(
             onPressed: () => unawaited(_request(context, ref)),
-            icon: const Icon(Icons.translate_rounded, size: 15),
+            icon: const Icon(LucideIcons.languages, size: 15),
             label: const Text('AI 翻译释义'),
           ),
         ],
@@ -466,7 +467,6 @@ class _AccentToggle extends ConsumerWidget {
                     '/$phonetic/',
                     style: LexiType.footnote.copyWith(
                       color: colors.secondaryLabel,
-                      fontFamily: 'monospace',
                     ),
                   ),
                 ],
@@ -479,7 +479,7 @@ class _AccentToggle extends ConsumerWidget {
           visualDensity: VisualDensity.compact,
           onPressed: () =>
               unawaited(_speakWord(context, ref, detail, accent: accent)),
-          icon: Icon(Icons.volume_up_rounded, size: 18, color: colors.accent),
+          icon: Icon(LucideIcons.volume2, size: 18, color: colors.accent),
         ),
       ],
     );
@@ -496,10 +496,13 @@ class _PlainPlayButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: () => unawaited(_speakWord(context, ref, detail)),
-        icon: const Icon(Icons.volume_up_rounded, size: 18),
-        label: const Text('播放发音'),
+      child: Tooltip(
+        message: '朗读',
+        child: TextButton.icon(
+          onPressed: () => unawaited(_speakWord(context, ref, detail)),
+          icon: const Icon(LucideIcons.volume2, size: 18),
+          label: const Text('播放发音'),
+        ),
       ),
     );
   }
@@ -521,6 +524,13 @@ class _SourceMeta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        _metaLine(
+          colors,
+          '${languageLabel(detail.sourceLanguage)} → '
+          '${languageLabel(detail.targetLanguage)}',
+        ),
+        _metaLine(colors, contentTypeLabel(detail.contentType)),
+        _metaLine(colors, contentSourceLabel(detail.contentSource)),
         _metaLine(colors, '创建于 ${formatTimestamp(detail.createdAt)}'),
         if (detail.updatedAt != null && detail.updatedAt != detail.createdAt)
           _metaLine(colors, '更新于 ${formatTimestamp(detail.updatedAt!)}'),
@@ -553,11 +563,6 @@ class _HeaderActions extends ConsumerWidget {
     final colors = context.lexiColors;
     return Row(
       children: <Widget>[
-        IconButton(
-          tooltip: '朗读',
-          onPressed: () => unawaited(_speakWord(context, ref, detail)),
-          icon: const Icon(Icons.volume_up_rounded),
-        ),
         const Spacer(),
         Text(
           detail.isSuspended ? '已暂停' : '学习中',

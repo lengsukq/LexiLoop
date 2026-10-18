@@ -98,7 +98,7 @@ void main() {
     // 弹窗标题里的关系徽标用的是另一套文案（与旧版一致）。
     expect(find.text('易混词'), findsWidgets);
     expect(find.text('词库状态'), findsOneWidget);
-    expect(find.text('加入词库并初始化'), findsOneWidget);
+    expect(find.text('加入词库并内容补全'), findsOneWidget);
   });
 
   testWidgets('四类关联词合成一张卡，一次只展开一类', (tester) async {
@@ -117,6 +117,9 @@ void main() {
         overrides: <Override>[databaseProvider.overrideWithValue(db)],
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('扩展知识与助记'));
+    await tester.tap(find.text('扩展知识与助记'));
     await tester.pumpAndSettle();
 
     // 一张卡、一个切换条，而不是两张各带标题的卡。
@@ -150,12 +153,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    if (find.text('扩展知识与助记').evaluate().isNotEmpty) {
+      await tester.ensureVisible(find.text('扩展知识与助记'));
+      await tester.tap(find.text('扩展知识与助记'));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('同义词'), findsOneWidget);
     await tester.tap(find.text('fruit'));
     await tester.pumpAndSettle();
 
     expect(find.text('近义词'), findsOneWidget);
-    expect(find.text('加入词库并初始化'), findsOneWidget);
+    expect(find.text('加入词库并内容补全'), findsOneWidget);
   });
 
   testWidgets('同义词卡片用近义词关系打开弹窗', (tester) async {

@@ -155,7 +155,7 @@ void main() {
     );
     await open(tester, id);
 
-    await tester.tap(find.byTooltip('朗读'));
+    await tester.tap(find.byTooltip('朗读美式发音'));
     await tester.pumpAndSettle();
 
     expect(speaker.requests, hasLength(1));

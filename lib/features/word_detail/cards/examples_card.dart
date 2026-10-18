@@ -12,8 +12,11 @@ import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 例句卡片：句子 + 翻译 + 逐条操作（朗读 / 翻译 / 删除）。
 ///
@@ -31,8 +34,10 @@ class ExamplesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.sky,
       title: '例句',
-      icon: Icons.format_quote_rounded,
+      icon: LucideIcons.quote,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -92,17 +97,17 @@ class _ExampleRow extends ConsumerWidget {
             children: <Widget>[
               _ExampleAction(
                 tooltip: '朗读这句',
-                icon: Icons.volume_up_rounded,
+                icon: LucideIcons.volume2,
                 onPressed: () => unawaited(_speak(context, ref)),
               ),
               _ExampleAction(
                 tooltip: 'AI 翻译这句',
-                icon: Icons.translate_rounded,
+                icon: LucideIcons.languages,
                 onPressed: () => unawaited(_translate(context, ref)),
               ),
               _ExampleAction(
                 tooltip: '删除这句',
-                icon: Icons.delete_outline_rounded,
+                icon: LucideIcons.trash2,
                 color: colors.danger,
                 onPressed: () => _confirmDelete(context, ref),
               ),

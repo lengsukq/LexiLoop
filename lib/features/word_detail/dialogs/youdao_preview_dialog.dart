@@ -22,6 +22,7 @@ import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 弹窗内容宽度。
 const double youdaoDialogWidth = 560;
@@ -198,12 +199,12 @@ class _ErrorView extends StatelessWidget {
     return Column(
       children: <Widget>[
         const SizedBox(height: LexiSpace.s20),
-        Icon(Icons.error_outline_rounded, size: 38, color: colors.danger),
+        Icon(LucideIcons.circleAlert, size: 38, color: colors.danger),
         const SizedBox(height: LexiSpace.s10),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: LexiType.body.copyWith(color: colors.danger),
+          style: LexiType.body.copyWith(color: colors.dangerText),
         ),
         const SizedBox(height: LexiSpace.s16),
         Row(
@@ -235,7 +236,7 @@ class _NoContentView extends StatelessWidget {
     return Column(
       children: <Widget>[
         const SizedBox(height: LexiSpace.s20),
-        Icon(Icons.menu_book_rounded, size: 38, color: colors.tertiaryLabel),
+        Icon(LucideIcons.bookOpen, size: 38, color: colors.tertiaryLabel),
         const SizedBox(height: LexiSpace.s10),
         Text(
           '有道词典未返回该词条的有效内容。',
@@ -291,7 +292,10 @@ class _ContentView extends StatelessWidget {
         ApplyModeSelector(mode: mode, onChanged: onModeChanged),
         if (error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s10),
-          Text(error!, style: LexiType.footnote.copyWith(color: colors.danger)),
+          Text(
+            error!,
+            style: LexiType.footnote.copyWith(color: colors.dangerText),
+          ),
         ],
         const SizedBox(height: LexiSpace.s12),
         Row(

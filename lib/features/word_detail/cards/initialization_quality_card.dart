@@ -18,6 +18,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 初始化质量卡片（默认折叠）。
 class InitializationQualityCard extends ConsumerWidget {
@@ -31,15 +32,15 @@ class InitializationQualityCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final attempts = ref.watch(wordProviderAttemptsProvider(wordId));
     return attempts.when(
-      loading: () => const DetailLoadingCard(title: '初始化质量'),
+      loading: () => const DetailLoadingCard(title: '内容补全质量'),
       error: (error, _) => DetailErrorCard(
-        title: '初始化质量',
+        title: '内容补全质量',
         message: '数据源调用记录加载失败：$error',
         onRetry: () => ref.invalidate(wordProviderAttemptsProvider(wordId)),
       ),
       data: (value) => _Collapsible(
-        title: '初始化质量',
-        icon: Icons.insights_rounded,
+        title: '内容补全质量',
+        icon: LucideIcons.chartNoAxesCombined,
         child: value.isEmpty
             ? const DetailEmptyHint(text: '这个词条还没有数据源调用记录。')
             : _AttemptList(attempts: value),
@@ -81,9 +82,7 @@ class _CollapsibleState extends State<_Collapsible> {
             child: TextButton.icon(
               onPressed: () => setState(() => _expanded = !_expanded),
               icon: Icon(
-                _expanded
-                    ? Icons.expand_less_rounded
-                    : Icons.expand_more_rounded,
+                _expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                 size: 18,
               ),
               label: Text(_expanded ? '收起' : '展开'),
@@ -174,7 +173,7 @@ class _AttemptRow extends StatelessWidget {
                 attempt.errorCode == null
                     ? attempt.errorMessage!
                     : '${attempt.errorCode}：${attempt.errorMessage}',
-                style: LexiType.caption.copyWith(color: colors.danger),
+                style: LexiType.caption.copyWith(color: colors.dangerText),
               ),
             ),
         ],

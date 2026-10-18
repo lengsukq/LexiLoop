@@ -137,8 +137,8 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
 
   /// 加入结果的提示文案。
   String _messageOf(RelatedAddResult result) {
-    if (!result.queued) return '该词条已在词库中且内容可用，无需重复初始化。';
-    return result.created ? '已加入词库并排入初始化队列。' : '已排入初始化队列。';
+    if (!result.queued) return '该词条已在词库中且内容可用，无需重复内容补全。';
+    return result.created ? '已加入词库并排入内容补全队列。' : '已排入内容补全队列。';
   }
 
   /// 跳到该词条的详情页。
@@ -180,7 +180,7 @@ class _RelatedWordDialogState extends ConsumerState<RelatedWordDialog> {
                 child: Text(
                   _error!,
                   style: LexiType.footnote.copyWith(
-                    color: context.lexiColors.danger,
+                    color: context.lexiColors.dangerText,
                   ),
                 ),
               ),
@@ -271,7 +271,10 @@ class _DifferenceBlock extends StatelessWidget {
         color: colors.purple.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
-      child: Text(text, style: LexiType.body.copyWith(color: colors.purple)),
+      child: Text(
+        text,
+        style: LexiType.body.copyWith(color: colors.purpleText),
+      ),
     );
   }
 }
@@ -386,7 +389,10 @@ class _MessageBlock extends StatelessWidget {
         color: colors.success.withValues(alpha: LexiTint.tint),
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
-      child: Text(text, style: LexiType.body.copyWith(color: colors.success)),
+      child: Text(
+        text,
+        style: LexiType.body.copyWith(color: colors.successText),
+      ),
     );
   }
 }
@@ -422,7 +428,7 @@ class _Actions extends StatelessWidget {
         if (canAdd)
           FilledButton(
             onPressed: adding || preview == null ? null : onAdd,
-            child: Text(existing == null ? '加入词库并初始化' : '加入初始化'),
+            child: Text(existing == null ? '加入词库并内容补全' : '加入内容补全'),
           ),
       ],
     );

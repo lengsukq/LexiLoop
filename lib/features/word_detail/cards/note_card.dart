@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 笔记输入框的定位键。
 ///
@@ -62,8 +64,9 @@ class _NoteCardState extends ConsumerState<NoteCard> {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      tone: LexiTone.peach,
       title: '我的笔记',
-      icon: Icons.edit_note_rounded,
+      icon: LucideIcons.notebookPen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
@@ -77,7 +80,7 @@ class _NoteCardState extends ConsumerState<NoteCard> {
           const SizedBox(height: LexiSpace.s10),
           FilledButton.icon(
             onPressed: _busy ? null : _save,
-            icon: const Icon(Icons.save_rounded, size: 17),
+            icon: const Icon(LucideIcons.save, size: 17),
             label: Text(_busy ? '保存中…' : '保存笔记'),
           ),
         ],

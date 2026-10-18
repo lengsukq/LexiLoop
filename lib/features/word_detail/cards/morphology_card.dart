@@ -6,8 +6,11 @@ import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词根词缀卡片：词根、前缀、后缀分区展示。
 ///
@@ -28,8 +31,10 @@ class MorphologyCard extends StatelessWidget {
     final suffixes = _affixesOf(AffixKind.suffix);
 
     return SectionCard(
+      variant: SurfaceVariant.plain,
+      tone: LexiTone.lavender,
       title: '词根词缀',
-      icon: Icons.account_tree_rounded,
+      icon: LucideIcons.network,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[

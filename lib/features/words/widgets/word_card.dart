@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
@@ -19,7 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
-import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词条卡片。
 class WordCard extends StatelessWidget {
@@ -43,32 +44,34 @@ class WordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Surface(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(LexiRadius.md),
-        padding: const EdgeInsets.symmetric(
-          horizontal: LexiSpace.s14,
-          vertical: LexiSpace.s12,
-        ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _CardHeading(entry: entry),
-                  const SizedBox(height: LexiSpace.s4),
-                  _CardMeaning(meaning: entry.meaning),
-                  const SizedBox(height: LexiSpace.s6),
-                  _CardMeta(entry: entry, isDue: isDue),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s14,
+            vertical: LexiSpace.s12,
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    _CardHeading(entry: entry),
+                    const SizedBox(height: LexiSpace.s4),
+                    _CardMeaning(meaning: entry.meaning),
+                    const SizedBox(height: LexiSpace.s6),
+                    _CardMeta(entry: entry, isDue: isDue),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: LexiSpace.s10),
-            _CardAside(entry: entry),
-          ],
+              const SizedBox(width: LexiSpace.s10),
+              _CardAside(entry: entry),
+            ],
+          ),
         ),
       ),
     );
@@ -145,7 +148,8 @@ class _CardMeta extends StatelessWidget {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
-        InitializationBadge(status: entry.initializationStatus),
+        if (entry.initializationStatus != InitializationStatus.ready)
+          InitializationBadge(status: entry.initializationStatus),
         MasteryBadge(level: entry.masteryLevel),
         Text(
           '${entry.sourceLanguage} → ${entry.targetLanguage}',
@@ -170,7 +174,6 @@ class _CardAside extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -181,18 +184,6 @@ class _CardAside extends StatelessWidget {
             _SpeakerButton(entry: entry),
             _EditButton(entry: entry),
           ],
-        ),
-        const SizedBox(height: LexiSpace.s2),
-        Text(
-          '${entry.masteryScore}',
-          style: LexiType.title.copyWith(
-            color: colors.accent,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          '熟练度',
-          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
       ],
     );
@@ -217,9 +208,9 @@ class _SpeakerButton extends ConsumerWidget {
       visualDensity: VisualDensity.compact,
       onPressed: () => unawaited(_speak(context, ref)),
       icon: Icon(
-        Icons.volume_up_rounded,
+        LucideIcons.volume2,
         size: 16,
-        color: context.lexiColors.tertiaryLabel,
+        color: context.lexiColors.accentText,
       ),
     );
   }
@@ -246,11 +237,10 @@ class _EditButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: '编辑词条',
-      iconSize: 18,
-      visualDensity: VisualDensity.compact,
-      onPressed: () => unawaited(
+    return PopupMenuButton<String>(
+      tooltip: '词条操作',
+      icon: const Icon(LucideIcons.ellipsis),
+      onSelected: (_) => unawaited(
         EditWordDialog.show(
           context,
           target: EditWordTarget(
@@ -262,11 +252,9 @@ class _EditButton extends StatelessWidget {
           ),
         ),
       ),
-      icon: Icon(
-        Icons.edit_rounded,
-        size: 15,
-        color: context.lexiColors.tertiaryLabel,
-      ),
+      itemBuilder: (context) => const <PopupMenuEntry<String>>[
+        PopupMenuItem(value: 'edit', child: Text('编辑词条')),
+      ],
     );
   }
 }

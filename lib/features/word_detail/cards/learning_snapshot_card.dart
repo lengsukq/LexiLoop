@@ -8,9 +8,11 @@ import 'package:lexiloop/features/word_detail/word_detail_format.dart';
 import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
 import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 学习情况卡片：熟练度、FSRS 卡片状态与累计正确率。
 ///
@@ -34,8 +36,9 @@ class LearningSnapshotCard extends ConsumerWidget {
         onRetry: () => ref.invalidate(wordLearningSnapshotProvider(wordId)),
       ),
       data: (value) => SectionCard(
+        tone: LexiTone.mint,
         title: '学习情况',
-        icon: Icons.insights_rounded,
+        icon: LucideIcons.chartNoAxesCombined,
         child: _SnapshotBody(snapshot: value),
       ),
     );

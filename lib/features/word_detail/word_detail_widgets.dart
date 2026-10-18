@@ -183,7 +183,10 @@ class DetailErrorCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(message, style: LexiType.body.copyWith(color: colors.danger)),
+          Text(
+            message,
+            style: LexiType.body.copyWith(color: colors.dangerText),
+          ),
           if (onRetry != null) ...<Widget>[
             const SizedBox(height: LexiSpace.s8),
             FilledButton(onPressed: onRetry, child: const Text('重试')),

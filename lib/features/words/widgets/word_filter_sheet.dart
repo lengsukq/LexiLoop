@@ -13,6 +13,7 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 打开筛选弹层。
 Future<void> showWordFilterSheet(BuildContext context) =>
@@ -50,7 +51,11 @@ class _WordFilterSheet extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(Icons.tune_rounded, size: 16, color: colors.accent),
+                  Icon(
+                    LucideIcons.slidersHorizontal,
+                    size: 16,
+                    color: colors.accent,
+                  ),
                   const SizedBox(width: LexiSpace.s6),
                   Text(
                     '筛选单词本',

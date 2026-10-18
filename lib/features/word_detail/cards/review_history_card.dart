@@ -12,6 +12,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 复习历史卡片：最近 `reviewHistoryLimit` 条作答记录。
 class ReviewHistoryCard extends ConsumerWidget {
@@ -33,7 +34,7 @@ class ReviewHistoryCard extends ConsumerWidget {
       ),
       data: (entries) => SectionCard(
         title: '复习历史',
-        icon: Icons.history_rounded,
+        icon: LucideIcons.history,
         child: entries.isEmpty
             ? const DetailEmptyHint(text: '还没有复习记录。')
             : Column(
@@ -74,7 +75,7 @@ class _LogRow extends StatelessWidget {
           ),
           const SizedBox(width: LexiSpace.s6),
           Icon(
-            entry.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            entry.isCorrect ? LucideIcons.circleCheck : LucideIcons.circleX,
             size: 14,
             color: entry.isCorrect ? colors.success : colors.danger,
           ),

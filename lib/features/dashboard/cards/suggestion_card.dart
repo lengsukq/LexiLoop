@@ -25,9 +25,12 @@ import 'package:lexiloop/services/suggestion_service.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「昨日质量」徽章文字的 Key，供测试定位（文字同时携带分数与语气色）。
 const Key suggestionQualityTextKey = Key('suggestion-quality');
@@ -51,8 +54,9 @@ class _SuggestionCardState extends ConsumerState<SuggestionCard> {
   Widget build(BuildContext context) {
     final suggestion = ref.watch(dailySuggestionProvider);
     return SectionCard(
+      tone: LexiTone.peach,
       title: '今日建议',
-      icon: Icons.lightbulb_outline,
+      icon: LucideIcons.lightbulb,
       child: suggestion.when(
         data: (data) => data == null
             ? const _EmptyHint()
@@ -64,7 +68,9 @@ class _SuggestionCardState extends ConsumerState<SuggestionCard> {
         loading: () => const DashboardLoading(),
         error: (error, _) => Text(
           '加载失败：$error',
-          style: LexiType.footnote.copyWith(color: context.lexiColors.danger),
+          style: LexiType.footnote.copyWith(
+            color: context.lexiColors.dangerText,
+          ),
         ),
       ),
     );
@@ -108,7 +114,7 @@ class _SuggestionBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _SuggestionHeader(suggestion: suggestion),
+        Text(suggestion.headline, style: LexiType.callout),
         if (suggestion.summary.isNotEmpty) ...<Widget>[
           const SizedBox(height: LexiSpace.s6),
           Text(
@@ -116,32 +122,47 @@ class _SuggestionBody extends StatelessWidget {
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
-        const SizedBox(height: LexiSpace.s10),
-        _MetricRow(metrics: suggestion.metrics),
-        _BulletGroup(
-          title: '亮点',
-          items: suggestion.strengths,
-          color: colors.success,
-        ),
-        _BulletGroup(
-          title: '风险',
-          items: suggestion.risks,
-          color: colors.warning,
-        ),
-        _BulletGroup(
-          title: '行动建议',
-          items: suggestion.actions,
-          color: colors.accent,
-        ),
-        if (items.isNotEmpty) _RecommendedSection(items: items),
+        if (items.isNotEmpty)
+          TextButton(
+            key: focusReviewButtonKey,
+            onPressed: () => goToStudyMode(context, StudyMode.aiRecommended),
+            child: const Text('开始重点复习'),
+          ),
         if (suggestion.generationWarning != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s8),
           Text(
             suggestion.generationWarning!,
-            style: LexiType.caption.copyWith(color: colors.warning),
+            style: LexiType.caption.copyWith(color: colors.warningText),
           ),
         ],
-        _RegenerateButton(busy: busy, onRegenerate: onRegenerate),
+        DisclosureSection(
+          title: '建议详情',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _SuggestionHeader(suggestion: suggestion),
+              const SizedBox(height: LexiSpace.s10),
+              _MetricRow(metrics: suggestion.metrics),
+              _BulletGroup(
+                title: '亮点',
+                items: suggestion.strengths,
+                color: colors.success,
+              ),
+              _BulletGroup(
+                title: '风险',
+                items: suggestion.risks,
+                color: colors.warning,
+              ),
+              _BulletGroup(
+                title: '行动建议',
+                items: suggestion.actions,
+                color: colors.accent,
+              ),
+              _RegenerateButton(busy: busy, onRegenerate: onRegenerate),
+              if (items.isNotEmpty) _RecommendedSection(items: items),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -396,14 +417,13 @@ class _RecommendedSection extends StatelessWidget {
             const Spacer(),
             Text(
               '${items.length} 题',
-              style: LexiType.footnote.copyWith(color: colors.danger),
+              style: LexiType.footnote.copyWith(color: colors.dangerText),
             ),
           ],
         ),
         const SizedBox(height: LexiSpace.s8),
         for (final item in items) _RecommendedEntry(item: item),
         const SizedBox(height: LexiSpace.s8),
-        const _FocusReviewButton(),
       ],
     );
   }
@@ -476,24 +496,6 @@ class _RecommendedEntry extends StatelessWidget {
   }
 }
 
-/// 「开始重点复习」入口。
-class _FocusReviewButton extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        key: focusReviewButtonKey,
-        onPressed: () => goToStudyMode(context, StudyMode.aiRecommended),
-        icon: const Icon(Icons.psychology_alt_rounded, size: 18),
-        label: const Text('开始重点复习'),
-      ),
-    );
-  }
-}
-
 /// 「重新生成」入口。
 class _RegenerateButton extends StatelessWidget {
   const new({required this.busy, required this.onRegenerate});
@@ -513,7 +515,7 @@ class _RegenerateButton extends StatelessWidget {
                 height: indicatorSize,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Icon(Icons.refresh, size: 16),
+            : const Icon(LucideIcons.refreshCw, size: 16),
         label: const Text('重新生成'),
       ),
     );

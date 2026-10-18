@@ -24,8 +24,10 @@ import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 整张卡片的 Key，供测试与无障碍定位。
 const Key resumeSessionCardKey = Key('dashboard-resume-session');
@@ -39,7 +41,10 @@ const Key resumeSessionContinueKey = Key('dashboard-resume-continue');
 /// 「继续上次学习」卡片。
 class ResumeSessionCard extends ConsumerWidget {
   /// 创建卡片。
-  const new({super.key});
+  const new({this.embedded = false, super.key});
+
+  /// 放在今日任务内时仅显示会话摘要，由任务主按钮负责继续。
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,10 +55,24 @@ class ResumeSessionCard extends ConsumerWidget {
       _ => null,
     };
     if (session == null) return const SizedBox.shrink();
+    if (embedded) {
+      return Padding(
+        key: resumeSessionCardKey,
+        padding: const EdgeInsets.only(bottom: LexiSpace.s12),
+        child: Text(
+          '${studyModeLabel(session.mode)} · 还剩 ${session.remainingCount} 题',
+          key: resumeSessionSubtitleKey,
+          style: LexiType.body.copyWith(
+            color: context.lexiColors.secondaryLabel,
+          ),
+        ),
+      );
+    }
     return SectionCard(
+      tone: LexiTone.mint,
       key: resumeSessionCardKey,
       title: '继续上次学习',
-      icon: Icons.history_rounded,
+      icon: LucideIcons.history,
       child: _ResumeSessionBody(session: session),
     );
   }
@@ -90,13 +109,13 @@ class _ResumeSessionBody extends StatelessWidget {
             Text(
               '继续',
               style: LexiType.body.copyWith(
-                color: colors.accent,
+                color: colors.accentText,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(width: LexiSpace.s2),
             Icon(
-              Icons.arrow_forward_rounded,
+              LucideIcons.arrowRight,
               size: resumeSessionArrowSize,
               color: colors.accent,
             ),

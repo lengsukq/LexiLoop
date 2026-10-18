@@ -51,6 +51,7 @@ void main() {
   /// 造一份建议；默认给满推荐词条与要点，逐条测试再按需清空。
   DailySuggestion suggestionOf({
     int? quality = 92,
+    String? warning,
     DailySuggestionMetrics stats = metrics,
     List<RecommendedStudyItem> items = const <RecommendedStudyItem>[item],
     List<String> strengths = const <String>['昨天答对 9 题'],
@@ -67,13 +68,15 @@ void main() {
     generator: SuggestionGenerator.ruleBased,
     generatedAt: 0,
     qualityScore: quality,
+    generationWarning: warning,
   );
 
   /// 挂上固定建议与最小路由表后渲染卡片。
   Future<void> showCard(
     WidgetTester tester,
-    DailySuggestion? suggestion,
-  ) async {
+    DailySuggestion? suggestion, {
+    bool details = true,
+  }) async {
     final router = GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
@@ -102,7 +105,20 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    if (details && suggestion != null) {
+      await tester.tap(find.text('建议详情'));
+      await tester.pumpAndSettle();
+    }
   }
+
+  testWidgets('建议详情默认收起，重点复习仍可直接进入', (tester) async {
+    await showCard(tester, suggestionOf(), details: false);
+    expect(find.text('apple'), findsNothing);
+    expect(find.byKey(focusReviewButtonKey), findsOneWidget);
+    await tester.tap(find.text('建议详情'));
+    await tester.pumpAndSettle();
+    expect(find.text('apple'), findsOneWidget);
+  });
 
   /// 取「昨日质量」徽章的**色调**——它承载语气分档。
   ///
@@ -124,6 +140,13 @@ void main() {
   /// 取某个指标格的数值文本。
   String metricOf(WidgetTester tester, String metric) =>
       tester.widget<Text>(find.byKey(Key('suggestion-metric-$metric'))).data!;
+
+  testWidgets('AI 回退原因在建议折叠时仍然可见', (tester) async {
+    const warning = 'AI 暂不可用，已使用本地建议。';
+    await showCard(tester, suggestionOf(warning: warning), details: false);
+    expect(find.text(warning), findsOneWidget);
+    expect(find.byKey(suggestionQualityTextKey), findsNothing);
+  });
 
   group('昨日质量徽章', () {
     testWidgets('高分显示绿色并带出分数', (tester) async {

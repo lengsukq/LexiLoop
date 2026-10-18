@@ -10,8 +10,10 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 错词与到期提醒卡片：到期数、错词数，各带一个跳转按钮。
 ///
@@ -31,8 +33,9 @@ class RemindersCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(dashboardOverviewProvider);
     return SectionCard(
+      tone: LexiTone.peach,
       title: '提醒',
-      icon: Icons.notifications_none_rounded,
+      icon: LucideIcons.bell,
       child: overview.when(
         loading: DashboardLoading.new,
         error: (error, _) => DashboardError(

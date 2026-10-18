@@ -19,16 +19,17 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/dashboard/cards/reminders_card.dart';
-import 'package:lexiloop/features/dashboard/cards/resume_session_card.dart';
 import 'package:lexiloop/features/dashboard/cards/statistics_card.dart';
 import 'package:lexiloop/features/dashboard/cards/suggestion_card.dart';
 import 'package:lexiloop/features/dashboard/cards/today_plan_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/page_states.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 空库引导的标题 Key，供测试定位。
 const Key emptyStateTitleKey = Key('dashboard-empty-title');
@@ -65,43 +66,72 @@ class _DashboardBody extends StatelessWidget {
   };
 }
 
-/// 正常的卡片流。
-///
-/// 其中 [ResumeSessionCard] 只在存在可恢复会话时出现，其余六张常驻。
-///
-/// **分成两区而不是七张平铺**：平铺时「开始学习」埋在第三张卡片内部、
-/// 开发自检（平台能力）占了最有价值的末位。现在
-/// 「现在做什么」（继续 / 今日计划 / 建议）与
-/// 「再看看」（统计 / 提醒 / 训练）之间有 32 的间隔，
-/// 眼力不用数卡片也能读出一组关系。
+/// 任务与概览构成首屏，练习和建议接在后方。
 class _DashboardCards extends StatelessWidget {
   const new();
 
   @override
-  Widget build(BuildContext context) => const PageShell(
+  Widget build(BuildContext context) => PageShell(
     scrollable: true,
-    header: PageHeader(title: '今日', subtitle: '继续没做完的复习，或按今日计划开始一轮。'),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        // 「继续上次学习」挂在今日队列上方（对应旧版 `page.tsx:142-148` 的
-        // 位置）：用户刚回首页时最想接上的就是那条做了一半的会话，
-        // 排在今日计划之前才不会被 30 题的配额盖住。没有可恢复会话时
-        // 它自己渲染成空，不占位置。
-        ResumeSessionCard(),
-        SizedBox(height: LexiLayout.cardGap),
-        TodayPlanCard(),
-        SizedBox(height: LexiLayout.cardGap),
-        SuggestionCard(),
-        SizedBox(height: LexiLayout.sectionGap),
-        StatisticsCard(),
-        SizedBox(height: LexiLayout.cardGap),
-        RemindersCard(),
-        SizedBox(height: LexiLayout.cardGap),
-        PracticeCard(),
-      ],
+    header: const PageHeader(title: '今日'),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final wide =
+            constraints.maxWidth >= LexiLayout.wideBreakpoint &&
+            MediaQuery.textScalerOf(context).scale(14) < 24;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _DashboardTop(wide: wide),
+            const SizedBox(height: LexiSpace.s20),
+            const PracticeCard(),
+            const SizedBox(height: LexiSpace.s24),
+            if (wide)
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: SuggestionCard()),
+                  SizedBox(width: LexiSpace.s24),
+                  Expanded(child: RemindersCard()),
+                ],
+              )
+            else ...<Widget>[
+              const SuggestionCard(),
+              const SizedBox(height: LexiSpace.s16),
+              const RemindersCard(),
+            ],
+          ],
+        );
+      },
     ),
   );
+}
+
+class _DashboardTop extends StatelessWidget {
+  const new({required this.wide});
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!wide) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          TodayPlanCard(),
+          SizedBox(height: LexiSpace.s16),
+          StatisticsCard(),
+        ],
+      );
+    }
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(flex: 2, child: TodayPlanCard()),
+        SizedBox(width: LexiSpace.s24),
+        Expanded(child: StatisticsCard()),
+      ],
+    );
+  }
 }
 
 /// 空库引导：导入 EasyDict 收藏。
@@ -118,10 +148,10 @@ class _EmptyLibraryState extends StatelessWidget {
     header: const PageHeader(title: '今日', subtitle: '词库还是空的——先导入，再开始复习。'),
     child: PageEmptyState(
       key: emptyStateTitleKey,
-      icon: Icons.menu_book_rounded,
+      icon: LucideIcons.bookOpen,
       title: '从 EasyDict 收藏开始',
       message:
-          '导入 EasyDict Favorites CSV。LexiLoop 只初始化你实际收藏的词条，'
+          '导入 EasyDict Favorites CSV。LexiLoop 只为你收藏的词条补全内容，'
           ' 不会导入整本词典。',
       primaryLabel: '导入 CSV',
       primaryKey: emptyStateImportButtonKey,

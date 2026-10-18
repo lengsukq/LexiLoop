@@ -10,18 +10,23 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
+import 'package:lexiloop/features/dashboard/cards/resume_session_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_navigation.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「开始学习」按钮的 Key，供测试定位。
 const Key startStudyButtonKey = Key('dashboard-start-study');
@@ -45,8 +50,10 @@ class TodayPlanCard extends ConsumerWidget {
     final plan = ref.watch(dailyPlanProvider);
     final overview = ref.watch(dashboardOverviewProvider);
     return SectionCard(
+      tone: LexiTone.mint,
+      variant: SurfaceVariant.hero,
       title: '今日计划',
-      icon: Icons.today_rounded,
+      icon: LucideIcons.calendarDays,
       child: plan.when(
         loading: DashboardLoading.new,
         error: (error, _) => DashboardError(
@@ -82,16 +89,21 @@ class _PlanBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _PlannedHeadline(
-          plan: plan,
-          goalReached: reached,
-          completedToday: overview?.completedToday ?? 0,
+        const ResumeSessionCard(embedded: true),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _PlannedHeadline(
+                plan: plan,
+                goalReached: reached,
+                completedToday: overview?.completedToday ?? 0,
+              ),
+            ),
+            if (overview != null) _GoalProgress(overview: overview),
+          ],
         ),
-        const SizedBox(height: LexiSpace.s12),
-        if (overview != null) ...<Widget>[
-          _GoalProgress(overview: overview),
-          const SizedBox(height: LexiSpace.s12),
-        ],
+        const SizedBox(height: LexiSpace.s8),
+        if (reached) const _GoalReachedBadge(),
         _PlanQueues(plan: plan),
         const SizedBox(height: LexiSpace.s12),
         _StartStudyButton(goalReached: reached),
@@ -119,30 +131,29 @@ class _PlannedHeadline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          '${plan.plannedTotal}',
-          key: plannedTotalKey,
-          style: LexiType.hero.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.8,
-          ),
+        Wrap(
+          spacing: LexiSpace.s8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            Text(
+              '${plan.plannedTotal}',
+              key: plannedTotalKey,
+              style: LexiType.hero.copyWith(color: colors.label),
+            ),
+            Text(
+              '题待完成',
+              style: LexiType.body.copyWith(color: colors.secondaryLabel),
+            ),
+          ],
         ),
-        const SizedBox(width: LexiSpace.s6),
-        Text(
-          '题待完成',
-          style: LexiType.body.copyWith(color: colors.secondaryLabel),
-        ),
-        const Spacer(),
         Text(
           goalReached
               ? '已处理 $completedToday 题，继续保持'
               : '预估 ${plan.estimatedMinutes} 分钟',
-          style: LexiType.body.copyWith(color: colors.secondaryLabel),
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -164,35 +175,34 @@ class _GoalProgress extends StatelessWidget {
     final reached = _goalReached(overview);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Text(
-              '今日完成度',
-              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-            ),
-            const Spacer(),
-            if (reached) ...<Widget>[
-              const _GoalReachedBadge(),
-              const SizedBox(width: LexiSpace.s8),
+        SizedBox(
+          width: _goalRingSize,
+          height: _goalRingSize,
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Positioned.fill(
+                child: CircularProgressIndicator(
+                  value: _progressValue(overview).clamp(0, 1),
+                  strokeWidth: 5,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: colors.fill,
+                ),
+              ),
+              Icon(
+                reached ? LucideIcons.check : LucideIcons.flag,
+                size: 20,
+                color: colors.accentText,
+              ),
             ],
-            Text(
-              _progressLabel(overview),
-              key: goalProgressKey,
-              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: LexiSpace.s6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(LexiRadius.sm),
-          child: LinearProgressIndicator(
-            value: _progressValue(overview),
-            minHeight: 6,
-            backgroundColor: colors.fill,
-            valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
-          ),
+        Text(
+          _progressLabel(overview),
+          key: goalProgressKey,
+          style: LexiType.caption.copyWith(color: colors.secondaryLabel),
         ),
       ],
     );
@@ -219,34 +229,36 @@ class _PlanQueues extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: LexiSpace.s4,
+      runSpacing: LexiSpace.s4,
       children: <Widget>[
         _QueueRow(
           mode: StudyMode.dueReview,
-          label: '到期复习',
+          label: '复习',
           value: '${plan.plannedDueReviewCount}',
-          note: ' / ${plan.dueReviewCount} 可用',
+          note: '${plan.dueReviewCount} 可用',
           valueKey: const Key('dashboard-due-review'),
         ),
         _QueueRow(
           mode: StudyMode.wrongWords,
           label: '错词',
           value: '${plan.plannedWrongWordCount}',
-          note: ' / ${plan.wrongWordCount} 可用',
+          note: '${plan.wrongWordCount} 可用',
           valueKey: const Key('dashboard-wrong-words'),
         ),
         _QueueRow(
           mode: StudyMode.newWords,
           label: '新词',
           value: '${plan.plannedNewWordCount}',
-          note: ' / ${plan.newWordCount} 可用',
+          note: '${plan.newWordCount} 可用',
           valueKey: const Key('dashboard-new-words'),
         ),
-        DashboardStatRow(
-          label: '句子复习',
+        _QueueRow(
+          mode: StudyMode.sentenceReview,
+          label: '句子',
           value: '${plan.plannedSentenceReviewCount}',
-          note: ' / ${plan.sentenceReviewCount} 可用',
+          note: '${plan.sentenceReviewCount} 可用',
           valueKey: const Key('dashboard-sentences'),
         ),
       ],
@@ -275,15 +287,21 @@ class _QueueRow extends StatelessWidget {
     // 行看起来仍像统计数字，tooltip 负责说明「点了会去哪儿」，
     // 桌面端悬停与读屏都能得到这条信息。
     return Tooltip(
-      message: '开始${studyModeLabel(mode)}',
-      child: InkWell(
-        onTap: () => goToStudyMode(context, mode),
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
-        child: DashboardStatRow(
-          label: label,
-          value: value,
-          note: note,
-          valueKey: valueKey,
+      message: '开始${studyModeLabel(mode)} · $note',
+      child: TextButton(
+        onPressed: () => goToStudyMode(context, mode),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, 32),
+          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s6),
+          backgroundColor: context.lexiColors.card,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(label, style: LexiType.caption),
+            const SizedBox(width: LexiSpace.s4),
+            Text(value, key: valueKey, style: LexiType.caption),
+          ],
         ),
       ),
     );
@@ -295,13 +313,17 @@ class _QueueRow extends StatelessWidget {
 /// **目标达成后换成「继续无限学习」**：沿用旧版 hero 的说法，让用户一眼看出
 /// 「今天已经做完了，接下来是自愿加练」。这里只换文案——无限学习本身是
 /// 后续阶段的能力，按钮的行为仍是进入每日综合模式。
-class _StartStudyButton extends StatelessWidget {
+class _StartStudyButton extends ConsumerWidget {
   const new({required this.goalReached});
 
   final bool goalReached;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = switch (ref.watch(resumableSessionProvider)) {
+      AsyncData<ResumableSession?>(:final value) => value,
+      _ => null,
+    };
     // **不再铺满整行**。目标为 0 时它是一个 1040 像素宽、通体蓝色、
     // 上面只有四个字的条——首页最重的视觉元素落在一个主次不明的横条上。
     // 按内容取宽、左对齐，让它读起来像一个按钮而不是一条横幅。
@@ -309,9 +331,17 @@ class _StartStudyButton extends StatelessWidget {
     final narrow = MediaQuery.sizeOf(context).width < compactHeaderWidth;
     final button = FilledButton.icon(
       key: startStudyButtonKey,
-      onPressed: () => goToDestination(context, studyDestinationLabel),
-      icon: const Icon(Icons.play_arrow_rounded, size: 19),
-      label: Text(goalReached ? '继续无限学习' : '开始学习'),
+      onPressed: () => session == null
+          ? goToDestination(context, studyDestinationLabel)
+          : goToStudyMode(context, session.mode),
+      icon: const Icon(LucideIcons.play, size: 19),
+      label: Text(
+        session != null
+            ? '继续学习'
+            : goalReached
+            ? '继续无限学习'
+            : '开始学习',
+      ),
     );
     if (narrow) {
       return SizedBox(width: double.infinity, child: button);
@@ -345,3 +375,5 @@ double _progressValue(DashboardOverview overview) {
   if (total == 0) return 0;
   return overview.completedToday / total;
 }
+
+const double _goalRingSize = 48;

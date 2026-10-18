@@ -151,7 +151,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(textOf(tester, totalWordsKey), '3');
-    expect(find.text('个词条'), findsOneWidget);
+    expect(find.text('词条'), findsOneWidget);
+    await tester.tap(find.text('掌握分布'));
+    await tester.pumpAndSettle();
     // 三条都是新词，分布行里的计数应为 3。
     expect(find.text('3'), findsWidgets);
   });

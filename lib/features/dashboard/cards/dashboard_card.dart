@@ -52,7 +52,7 @@ class DashboardError extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(message, style: LexiType.body.copyWith(color: colors.danger)),
+        Text(message, style: LexiType.body.copyWith(color: colors.dangerText)),
         const SizedBox(height: LexiSpace.s8),
         FilledButton(onPressed: onRetry, child: const Text('重试')),
       ],
@@ -88,13 +88,14 @@ class DashboardStatRow extends StatelessWidget {
     final colors = context.lexiColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
-      child: Row(
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: LexiSpace.s8,
+        runSpacing: LexiSpace.s4,
         children: <Widget>[
-          Expanded(
-            child: Text(
-              label,
-              style: LexiType.body.copyWith(color: colors.secondaryLabel),
-            ),
+          Text(
+            label,
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           Text(
             value,

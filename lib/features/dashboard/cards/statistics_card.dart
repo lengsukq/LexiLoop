@@ -10,9 +10,12 @@ import 'package:lexiloop/features/dashboard/cards/dashboard_card.dart';
 import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 总词数的 Key，供测试定位。
 const Key totalWordsKey = Key('dashboard-total-words');
@@ -30,8 +33,9 @@ class StatisticsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(dashboardOverviewProvider);
     return SectionCard(
+      tone: LexiTone.sky,
       title: '学习统计',
-      icon: Icons.bar_chart_rounded,
+      icon: LucideIcons.chartColumn,
       child: overview.when(
         loading: DashboardLoading.new,
         error: (error, _) => DashboardError(
@@ -56,48 +60,78 @@ class _StatisticsBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              '${overview.totalWords}',
-              key: totalWordsKey,
-              style: LexiType.hero.copyWith(
-                color: colors.label,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.8,
+            Expanded(
+              child: _OverviewMetric(
+                label: '词条',
+                value: '${overview.totalWords}',
+                valueKey: totalWordsKey,
               ),
             ),
-            const SizedBox(width: LexiSpace.s6),
-            Text(
-              '个词条',
-              style: LexiType.body.copyWith(color: colors.secondaryLabel),
+            Expanded(
+              child: _OverviewMetric(
+                label: '今日已答',
+                value: '${overview.reviewedToday}',
+                valueKey: const Key('dashboard-reviewed-today'),
+              ),
+            ),
+            Expanded(
+              child: _OverviewMetric(
+                label: '连续天数',
+                value: '${overview.streakDays}',
+                valueKey: const Key('dashboard-streak-days'),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: LexiSpace.s12),
-        for (final level in MasteryLevel.values)
-          _MasteryBar(
-            level: level,
-            count: overview.byMastery[level] ?? 0,
-            total: overview.totalWords,
-          ),
-        const SizedBox(height: LexiSpace.s12),
-        DashboardStatRow(
-          label: '今日已答',
-          value: '${overview.reviewedToday}',
-          note: _reviewedNote(overview),
-          valueKey: const Key('dashboard-reviewed-today'),
+        const SizedBox(height: LexiSpace.s8),
+        Text(
+          _reviewedNote(overview),
+          style: LexiType.caption.copyWith(color: colors.secondaryLabel),
         ),
-        DashboardStatRow(
-          label: '连续复习',
-          value: '${overview.streakDays}',
-          note: ' 天',
-          valueKey: const Key('dashboard-streak-days'),
+        DisclosureSection(
+          title: '掌握分布',
+          child: Column(
+            children: <Widget>[
+              for (final level in MasteryLevel.values)
+                _MasteryBar(
+                  level: level,
+                  count: overview.byMastery[level] ?? 0,
+                  total: overview.totalWords,
+                ),
+            ],
+          ),
         ),
       ],
     );
   }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  const new({required this.label, required this.value, required this.valueKey});
+  final String label;
+  final String value;
+  final Key valueKey;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Text(
+        value,
+        key: valueKey,
+        style: LexiType.title2.copyWith(color: context.lexiColors.label),
+      ),
+      const SizedBox(height: LexiSpace.s2),
+      Text(
+        label,
+        style: LexiType.caption.copyWith(
+          color: context.lexiColors.secondaryLabel,
+        ),
+      ),
+    ],
+  );
 }
 
 /// 「今日已答」一行右侧的补充说明。

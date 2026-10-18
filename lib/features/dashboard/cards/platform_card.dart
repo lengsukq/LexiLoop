@@ -6,8 +6,10 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 平台能力卡片：把 `PlatformCaps` 的判定结果直接摆出来。
 ///
@@ -34,8 +36,9 @@ class PlatformCapabilityCard extends StatelessWidget {
     };
 
     return SectionCard(
+      tone: LexiTone.sky,
       title: '平台能力',
-      icon: Icons.devices_rounded,
+      icon: LucideIcons.monitorSmartphone,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -102,7 +105,7 @@ class _StatusRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
-                ok ? Icons.check_circle_rounded : Icons.info_rounded,
+                ok ? LucideIcons.circleCheck : LucideIcons.info,
                 size: 13,
                 color: ok ? colors.success : colors.warning,
               ),

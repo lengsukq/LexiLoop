@@ -140,8 +140,10 @@ void main() {
     });
 
     test('成功一次后 servedCount 加一，并把累计次数回调出去', () async {
-      await fixture.get(lanSyncBackupPath, code: testCode);
-      await fixture.get(lanSyncBackupPath, code: testCode);
+      final first = await fixture.get(lanSyncBackupPath, code: testCode);
+      expect(first.statusCode, HttpStatus.ok);
+      final second = await fixture.get(lanSyncBackupPath, code: testCode);
+      expect(second.statusCode, HttpStatus.ok);
       expect(fixture.host.servedCount, 2);
       expect(fixture.exportCalls, 2);
       expect(fixture.servedCounts, <int>[1, 2]);

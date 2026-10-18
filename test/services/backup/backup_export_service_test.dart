@@ -65,7 +65,10 @@ void main() {
     final params = _share.calls.single;
     final files = params.files!;
     expect(files, hasLength(1));
-    expect(files.single.path, '${tempDir.path}/${exported.filename}');
+    expect(
+      files.single.path,
+      '${tempDir.path}${Platform.pathSeparator}${exported.filename}',
+    );
     expect(files.single.mimeType, backupMimeType);
     expect(params.fileNameOverrides, <String>[exported.filename]);
     expect(params.subject, isNotNull);

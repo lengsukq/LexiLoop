@@ -236,9 +236,14 @@ class _HttpLanSyncHost implements LanSyncHost {
       ..headers.set(lanSyncBackupRowsHeader, '${backup.totalRows}')
       ..headers.contentLength = backup.bytes.length
       ..add(backup.bytes);
-    await response.close();
+    // 导出阶段到此结束：字节已经交给 socket，下一份导出不会与它争 I/O。
+    // **在 `close()` 之前释放忙碌标记**：`close()` 会等对端把连接收干净，
+    // 对端读完后立即断开时它可能迟迟不返回；把「正在服务」一直挂在那里，
+    // 用户连续点两次「拉取」的第二次就会莫名其妙得到 409。
     _served += 1;
     _options.onServed(_served);
+    _busy = false;
+    await response.close();
   }
 
   /// 配对码是否正确；连续错码到达上限时停掉共享。

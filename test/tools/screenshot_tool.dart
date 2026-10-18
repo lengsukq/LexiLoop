@@ -29,10 +29,12 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/features/dashboard/cards/practice_card.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_appearance.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
@@ -100,6 +102,55 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     await captureScreenshot(tester, boundaryKey, 'configurator');
+  });
+
+  testWidgets('shot practice sheet', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await seedDemoData(db);
+    tester.view.physicalSize = shotSize;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final boundaryKey = GlobalKey();
+    final router = createAppRouter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          databaseProvider.overrideWithValue(db),
+          audioPlayerPortProvider.overrideWithValue(FakeAudioPlayer()),
+          audioDownloaderProvider.overrideWithValue(FakeAudioDownloader()),
+          studyClockFactoryProvider.overrideWithValue(
+            () => StudyClock(now: () => DateTime.now().millisecondsSinceEpoch),
+          ),
+          appSettingsProvider.overrideWith(
+            (ref) => appSettingsFromRaw(<String, Object?>{
+              'choiceRevealDelaySeconds': 0,
+              'autoPlayPronunciation': false,
+            }),
+          ),
+        ],
+        child: RepaintBoundary(
+          key: boundaryKey,
+          child: MaterialApp.router(
+            theme: screenshotTheme(LexiTheme.light),
+            darkTheme: screenshotTheme(LexiTheme.dark),
+            debugShowCheckedModeBanner: false,
+            builder: (context, child) => AdaptiveTypography(child: child!),
+            routerConfig: router,
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 14; i += 1) {
+      await tester.pump(const Duration(milliseconds: 90));
+    }
+    await tester.ensureVisible(find.byKey(practiceAllButtonKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(practiceAllButtonKey));
+    await tester.pumpAndSettle();
+    await captureScreenshot(tester, boundaryKey, 'practice_sheet');
+    expect(tester.takeException(), isNull);
   });
 
   for (final route in <String>[
@@ -184,6 +235,84 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // 主题多样性：同一页在「海蓝/青」与「粉/紫」下各出一张桌面明暗图。
+  // 默认主题的 13 条路由仍由上面的循环覆盖；这里只取首页与设置页，
+  // 它们分别代表「内容排版」与「控件密度」两种极端。
+  const altThemes = <String, (int, int)>{
+    'ocean': (0xFF0A84FF, 0xFF30B0C7),
+    'sakura': (0xFFFF2D55, 0xFFAF52DE),
+  };
+  for (final entry in altThemes.entries) {
+    for (final route in <String>['/', '/settings']) {
+      testWidgets('shot theme ${entry.key} $route', (tester) async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+        await seedDemoData(db);
+        tester.view.physicalSize = shotSize;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        final boundaryKey = GlobalKey();
+        final appearance = ValueNotifier<LexiAppearance>(
+          LexiAppearance(
+            primary: Color(entry.value.$1),
+            secondary: Color(entry.value.$2),
+            mode: ThemeMode.light,
+          ),
+        );
+        addTearDown(appearance.dispose);
+        final router = createAppRouter(initialLocation: route);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: <Override>[
+              databaseProvider.overrideWithValue(db),
+              audioPlayerPortProvider.overrideWithValue(FakeAudioPlayer()),
+              audioDownloaderProvider.overrideWithValue(FakeAudioDownloader()),
+              appSettingsProvider.overrideWith(
+                (ref) => appSettingsFromRaw(<String, Object?>{}),
+              ),
+            ],
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: ValueListenableBuilder<LexiAppearance>(
+                valueListenable: appearance,
+                builder: (context, value, _) {
+                  final bundle = LexiTheme.build(value);
+                  return MaterialApp.router(
+                    theme: screenshotTheme(bundle.light),
+                    darkTheme: screenshotTheme(bundle.dark),
+                    themeMode: bundle.mode,
+                    debugShowCheckedModeBanner: false,
+                    builder: (context, child) =>
+                        AdaptiveTypography(child: child!),
+                    routerConfig: router,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        for (var i = 0; i < 14; i += 1) {
+          await tester.pump(const Duration(milliseconds: 90));
+        }
+        final name = route == '/' ? 'dashboard' : 'settings';
+        await captureScreenshot(
+          tester,
+          boundaryKey,
+          'themes/${entry.key}_${name}_light',
+        );
+        appearance.value = appearance.value.copyWith(mode: ThemeMode.dark);
+        await tester.pumpAndSettle();
+        await captureScreenshot(
+          tester,
+          boundaryKey,
+          'themes/${entry.key}_${name}_dark',
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 }
 
 /// 把 `RepaintBoundary` 画进 `build/screens/<name>.png`。
@@ -220,6 +349,24 @@ ThemeData screenshotTheme(ThemeData base) {
         textStyle: WidgetStatePropertyAll<TextStyle>(label),
       ),
     ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: base.outlinedButtonTheme.style!.copyWith(
+        textStyle: WidgetStatePropertyAll<TextStyle>(label),
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: base.segmentedButtonTheme.style!.copyWith(
+        textStyle: WidgetStatePropertyAll<TextStyle>(
+          LexiType.footnote.copyWith(fontFamily: family),
+        ),
+      ),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      labelStyle: LexiType.footnote.copyWith(fontFamily: family),
+    ),
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      hintStyle: LexiType.body.copyWith(fontFamily: family),
+    ),
   );
 }
 
@@ -227,30 +374,65 @@ ThemeData screenshotTheme(ThemeData base) {
 Future<void> loadScreenshotFonts() async {
   // 装一份带中文的真字体，否则文字全是方块。注册多个常见族名，
   // 覆盖主题在 `null` 之外可能请求的名字。
-  const cjkPath = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf';
-  final cjk = File(cjkPath);
-  if (cjk.existsSync()) {
-    final bytes = await cjk.readAsBytes();
-    for (final family in <String>[
-      'LexiScreenshot',
-      'Ahem',
-      'sans-serif',
-      'Arial',
-      'CupertinoSystemText',
-      'CupertinoSystemDisplay',
-      '.SF UI Display',
-      'Roboto',
-      'PingFang SC',
-      'Hiragino Sans GB',
-      '.SF UI Text',
-      '.AppleSystemUIFont',
-      '.SF Pro Text',
-      '.SF Pro Display',
-    ]) {
-      final loader = FontLoader(family)
-        ..addFont(Future.value(ByteData.view(bytes.buffer)));
-      await loader.load();
+  //
+  // **跨平台**：项目在 Windows 上同样要出截图；只写 macOS 路径会让所有
+  // 中文变成方块（方块不是「字体没装」的证据，只是这份工具的盲区）。
+  final candidates = <String>[
+    if (Platform.isMacOS) ...<String>[
+      '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+      '/System/Library/Fonts/PingFang.ttc',
+    ],
+    if (Platform.isWindows) ...<String>[
+      r'C:\Windows\Fonts\simhei.ttf',
+      r'C:\Windows\Fonts\Deng.ttf',
+      r'C:\Windows\Fonts\arialuni.ttf',
+      r'C:\Windows\Fonts\msyh.ttc',
+      r'C:\Windows\Fonts\msyhbd.ttc',
+    ],
+    if (Platform.isLinux) ...<String>[
+      '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+      '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    ],
+  ];
+  var loadedCjk = false;
+  for (final path in candidates) {
+    final file = File(path);
+    if (!file.existsSync()) continue;
+    try {
+      final bytes = await file.readAsBytes();
+      for (final family in <String>[
+        'LexiScreenshot',
+        'Ahem',
+        'sans-serif',
+        'Arial',
+        'CupertinoSystemText',
+        'CupertinoSystemDisplay',
+        '.SF UI Display',
+        'Roboto',
+        'PingFang SC',
+        'Hiragino Sans GB',
+        'Microsoft YaHei',
+        '.SF UI Text',
+        '.AppleSystemUIFont',
+        '.SF Pro Text',
+        '.SF Pro Display',
+      ]) {
+        final loader = FontLoader(family)
+          ..addFont(Future.value(ByteData.view(bytes.buffer)));
+        await loader.load();
+      }
+      loadedCjk = true;
+      break;
+    } on Object {
+      // TTC 合集或损坏字体加载失败时换下一个候选，不让截图整体失败。
+      loadedCjk = false;
     }
+  }
+  if (!loadedCjk) {
+    // 没有可用系统字体时，至少让截图明确暴露问题，而不是静默出方块。
+    // 测试日志里能看到这一行；常规 `flutter test` 不加载本函数。
+    // ignore: avoid_print
+    print('截图字体：未找到可用的中文字体，文字可能显示为方块。');
   }
   final lucide = await rootBundle.load(
     'packages/lucide_icons_flutter/assets/lucide.ttf',
@@ -258,15 +440,32 @@ Future<void> loadScreenshotFonts() async {
   await (FontLoader(
     'packages/lucide_icons_flutter/Lucide',
   )..addFont(Future.value(lucide))).load();
-  // 图标字体：不装的话所有 Icon 都是方块。
-  const iconPath =
-      '/opt/homebrew/Caskroom/flutter/3.47.5/flutter/bin/cache/'
-      'artifacts/material_fonts/MaterialIcons-Regular.otf';
-  final icons = File(iconPath);
-  if (icons.existsSync()) {
-    final bytes = await icons.readAsBytes();
-    final loader = FontLoader('MaterialIcons')
-      ..addFont(Future.value(ByteData.view(bytes.buffer)));
-    await loader.load();
+  // 图标字体：不装的话所有 Icon 都是方块。优先用应用资源里的 MaterialIcons，
+  // 找不到再退回本机 Flutter SDK 的缓存路径（各平台/版本路径不同）。
+  var loadedIcons = false;
+  try {
+    final icons = await rootBundle.load('fonts/MaterialIcons-Regular.otf');
+    await (FontLoader('MaterialIcons')..addFont(Future.value(icons))).load();
+    loadedIcons = true;
+  } on Object {
+    loadedIcons = false;
+  }
+  if (!loadedIcons) {
+    const macIconPath =
+        '/opt/homebrew/Caskroom/flutter/3.47.5/flutter/bin/cache/'
+        'artifacts/material_fonts/MaterialIcons-Regular.otf';
+    for (final path in <String>[
+      macIconPath,
+      r'C:\flutter\bin\cache\artifacts\material_fonts\MaterialIcons-Regular.otf',
+    ]) {
+      final icons = File(path);
+      if (!icons.existsSync()) continue;
+      final bytes = await icons.readAsBytes();
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(Future.value(ByteData.view(bytes.buffer)))).load();
+      loadedIcons = true;
+      break;
+    }
   }
 }

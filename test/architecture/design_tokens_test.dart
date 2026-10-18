@@ -53,7 +53,9 @@ void main() {
       final violations = <String>[];
       final pattern = RegExp('fontSize:');
       for (final file in collectDartFiles('lib')) {
-        if (file.path.endsWith('ui/theme/lexi_type.dart')) continue;
+        if (_normalized(file.path).endsWith('ui/theme/lexi_type.dart')) {
+          continue;
+        }
         for (var i = 0; i < file.lines.length; i += 1) {
           final line = file.lines[i];
           if (line.trimLeft().startsWith('//')) continue;
@@ -181,7 +183,7 @@ void main() {
     test('LiquidGlass 只能出现在功能层', () {
       final violations = <String>[];
       for (final file in collectDartFiles('lib')) {
-        if (functionalLayerFiles.contains(file.path)) continue;
+        if (functionalLayerFiles.contains(_normalized(file.path))) continue;
         for (var i = 0; i < file.lines.length; i += 1) {
           if (file.lines[i].contains('LiquidGlass(')) {
             violations.add(file.locate(i + 1));
@@ -208,7 +210,7 @@ void main() {
       final violations = <String>[];
       final pattern = RegExp(r'withValues\(alpha:\s*[0-9]');
       for (final file in collectDartFiles('lib')) {
-        if (file.path == 'lib/ui/theme/lexi_tint.dart') continue;
+        if (_normalized(file.path) == 'lib/ui/theme/lexi_tint.dart') continue;
         for (var i = 0; i < file.lines.length; i += 1) {
           if (pattern.hasMatch(file.lines[i])) {
             violations.add(file.locate(i + 1));
@@ -235,16 +237,23 @@ void main() {
         final colors = brightness == Brightness.dark
             ? LexiColors.dark
             : LexiColors.light;
+        final tones = brightness == Brightness.dark
+            ? LexiTones.dark
+            : LexiTones.light;
         for (final tone in LexiTone.values) {
-          final background = tone.background(brightness);
-          for (final foreground in <Color>[
-            ..._textTokens(colors).values,
-            tone.foreground(brightness),
-          ]) {
+          final style = tones.styleOf(tone);
+          final background = style.background;
+          for (final entry in <String, Color>{
+            ..._textTokens(colors),
+            'tone.foreground': style.foreground,
+          }.entries) {
+            final ratio = contrastRatio(entry.value, background);
             expect(
-              contrastRatio(foreground, background),
+              ratio,
               greaterThanOrEqualTo(4.5),
-              reason: '$brightness / $tone 的文字需要保持清晰',
+              reason:
+                  '$brightness / $tone 的 ${entry.key} 需要保持清晰：'
+                  '${ratio.toStringAsFixed(2)}:1',
             );
           }
         }
@@ -341,8 +350,14 @@ void main() {
   });
 }
 
-/// 所有**文字**用色的 token 集合。
+/// 统一路径分隔符。
 ///
+/// 守卫用 `/` 写白名单，而 Windows 上 `collectDartFiles` 返回的是 `\`；
+/// 不归一化会让「token 文件豁免」在 Windows 上整体失效（本项目正是双端开发）。
+// ignore: use_raw_strings
+String _normalized(String path) => path.replaceAll('\\', '/');
+
+/// 所有**文字**用色的 token 集合。///
 /// 抽成函数而不是在用例里就地构造：就地写会触发 `prefer_const_declarations`
 /// （字面量看着像常量，但字段访问不是常量表达式），而把它写成 `const` 又编不过。
 Map<String, Color> _textTokens(LexiColors colors) => <String, Color>{

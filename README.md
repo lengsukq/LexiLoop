@@ -117,6 +117,8 @@ Web 端只用于**自测与验收**，不是主要交付形态：
 
 | 文档 | 内容 |
 |---|---|
+| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) | 配色、排版、公共组件与自适应规则 |
+| [`docs/UI_REFINEMENT_CHECKLIST.md`](docs/UI_REFINEMENT_CHECKLIST.md) | 全页面精简清单、截图、验证证据与剩余设备验收 |
 | [`docs/REMOTE_BACKUP.md`](docs/REMOTE_BACKUP.md) | **远程备份（WebDAV）**：配置、上传/恢复/自动备份的语义、失败模式与取舍 |
 | [`docs/LAN_SYNC.md`](docs/LAN_SYNC.md) | **局域网同步**：协议、发现、配对码、合并/覆盖两种模式、合并规则与重放语义、失败模式与真机清单 |
 | [`docs/FLUTTER_MIGRATION_STATUS.md`](docs/FLUTTER_MIGRATION_STATUS.md) | 迁移进度清单（已完成 / 进行中 / 待办） |

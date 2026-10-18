@@ -17,7 +17,6 @@ library;
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -29,14 +28,22 @@ import 'package:lexiloop/app/router.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
-import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
 import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
+import '../../tool/visual_fixture.dart';
 import '../services/audio/audio_fakes.dart';
+
+/// 截图保留真实阴影模糊；普通功能测试仍使用默认测试绑定。
+class VisualCaptureBinding extends AutomatedTestWidgetsFlutterBinding {
+  @override
+  bool get disableShadows => false;
+}
 
 /// 截图的宽高（macOS 默认窗口）。
 const Size shotSize = Size(1280, 840);
@@ -49,37 +56,8 @@ const Size shotSize = Size(1280, 840);
 const Size phoneSize = Size(390, 844);
 
 void main() {
-  setUpAll(() async {
-    // 装一份带中文的真字体，否则文字全是方块。注册多个常见族名，
-    // 覆盖主题在 `null` 之外可能请求的名字。
-    const cjkPath = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf';
-    final cjk = File(cjkPath);
-    if (cjk.existsSync()) {
-      final bytes = await cjk.readAsBytes();
-      for (final family in <String>[
-        'Roboto',
-        'PingFang SC',
-        'Hiragino Sans GB',
-        '.SF UI Text',
-        '.AppleSystemUIFont',
-      ]) {
-        final loader = FontLoader(family)
-          ..addFont(Future.value(ByteData.view(bytes.buffer)));
-        await loader.load();
-      }
-    }
-    // 图标字体：不装的话所有 Icon 都是方块。
-    const iconPath =
-        '/opt/homebrew/Caskroom/flutter/3.47.5/flutter/bin/cache/'
-        'artifacts/material_fonts/MaterialIcons-Regular.otf';
-    final icons = File(iconPath);
-    if (icons.existsSync()) {
-      final bytes = await icons.readAsBytes();
-      final loader = FontLoader('MaterialIcons')
-        ..addFont(Future.value(ByteData.view(bytes.buffer)));
-      await loader.load();
-    }
-  });
+  VisualCaptureBinding();
+  setUpAll(loadScreenshotFonts);
 
   testWidgets('shot configurator', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
@@ -100,7 +78,8 @@ void main() {
         child: RepaintBoundary(
           key: boundaryKey,
           child: MaterialApp(
-            theme: LexiTheme.light,
+            theme: screenshotTheme(LexiTheme.light),
+            debugShowCheckedModeBanner: false,
             home: Builder(
               builder: (context) => Scaffold(
                 body: Center(
@@ -120,12 +99,15 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    await _capture(tester, boundaryKey, 'configurator');
+    await captureScreenshot(tester, boundaryKey, 'configurator');
   });
 
   for (final route in <String>[
     '/',
     '/words',
+    '/words/1',
+    '/study',
+    '/article',
     '/statistics',
     '/add',
     '/initialize',
@@ -146,6 +128,8 @@ void main() {
       addTearDown(tester.view.reset);
 
       final boundaryKey = GlobalKey();
+      final appearance = ValueNotifier<ThemeMode>(ThemeMode.light);
+      addTearDown(appearance.dispose);
       final router = createAppRouter(initialLocation: route);
       await tester.pumpWidget(
         ProviderScope(
@@ -154,16 +138,29 @@ void main() {
             audioPlayerPortProvider.overrideWithValue(FakeAudioPlayer()),
             audioDownloaderProvider.overrideWithValue(FakeAudioDownloader()),
             studyClockFactoryProvider.overrideWithValue(
-              () => StudyClock(
-                now: () => DateTime(2026, 3, 1, 10).millisecondsSinceEpoch,
-              ),
+              () =>
+                  StudyClock(now: () => DateTime.now().millisecondsSinceEpoch),
+            ),
+            // 选项立即出现：延迟倒计时会让学习页截图只剩进度条。
+            appSettingsProvider.overrideWith(
+              (ref) => appSettingsFromRaw(<String, Object?>{
+                'choiceRevealDelaySeconds': 0,
+                'autoPlayPronunciation': false,
+              }),
             ),
           ],
           child: RepaintBoundary(
             key: boundaryKey,
-            child: MaterialApp.router(
-              theme: LexiTheme.light,
-              routerConfig: router,
+            child: ValueListenableBuilder<ThemeMode>(
+              valueListenable: appearance,
+              builder: (context, mode, _) => MaterialApp.router(
+                theme: screenshotTheme(LexiTheme.light),
+                darkTheme: screenshotTheme(LexiTheme.dark),
+                themeMode: mode,
+                debugShowCheckedModeBanner: false,
+                builder: (context, child) => AdaptiveTypography(child: child!),
+                routerConfig: router,
+              ),
             ),
           ),
         ),
@@ -173,87 +170,24 @@ void main() {
       }
 
       final name = route == '/' ? 'dashboard' : route.replaceAll('/', '');
-      await _capture(tester, boundaryKey, name);
+      await captureScreenshot(tester, boundaryKey, name);
       // 同一页再出一张手机宽度的：
       tester.view.physicalSize = phoneSize;
       await tester.pumpAndSettle();
-      await _capture(tester, boundaryKey, '${name}_phone');
+      await captureScreenshot(tester, boundaryKey, '${name}_phone');
+      appearance.value = ThemeMode.dark;
+      await tester.pumpAndSettle();
+      await captureScreenshot(tester, boundaryKey, '${name}_phone_dark');
+      tester.view.physicalSize = shotSize;
+      await tester.pumpAndSettle();
+      await captureScreenshot(tester, boundaryKey, '${name}_dark');
+      expect(tester.takeException(), isNull);
     });
   }
 }
 
-/// 塞入一批演示数据：不同掌握度、有作答记录、有初始化任务。
-Future<void> seedDemoData(AppDatabase db) async {
-  final now = DateTime(2026, 3, 1, 10).millisecondsSinceEpoch;
-  const terms = <String>[
-    'apple',
-    'banana',
-    'cherry',
-    'dragonfruit',
-    'elderberry',
-    'fig',
-    'grape',
-    'honeydew',
-  ];
-  for (var i = 0; i < terms.length; i += 1) {
-    final term = terms[i];
-    await db
-        .into(db.words)
-        .insert(
-          WordsCompanion.insert(
-            term: term,
-            normalizedTerm: term,
-            sourceLanguage: 'en',
-            targetLanguage: 'zh',
-            entryType: EntryType.word,
-            initializationStatus: const Value<InitializationStatus>(
-              InitializationStatus.ready,
-            ),
-            createdAt: now - i * 86400000,
-            updatedAt: now - i * 86400000,
-          ),
-        );
-  }
-  final ids = await db.select(db.words).get();
-  for (final word in ids) {
-    await db
-        .into(db.wordContents)
-        .insert(
-          WordContentsCompanion.insert(
-            wordId: Value<int>(word.id),
-            summaryJson: const Value<String>(
-              '{"shortDefinition":"a sample word","translation":"示例词"}',
-            ),
-            definitionsJson: const Value<String>(
-              '[{"partOfSpeech":"n.","meaning":"示例释义"}]',
-            ),
-            updatedAt: now,
-          ),
-        );
-  }
-  // 作答记录：让统计页的折线与表格有东西可画。
-  for (var day = 0; day < 12; day += 1) {
-    for (var n = 0; n < (day % 5) + 2; n += 1) {
-      await db
-          .into(db.reviewLogs)
-          .insert(
-            ReviewLogsCompanion.insert(
-              clientAnswerId: 'shot-$day-$n',
-              wordId: ids[day % ids.length].id,
-              reviewedAt: now - day * 86400000 + n * 60000,
-              rating: n.isEven ? ReviewRating.good : ReviewRating.again,
-              questionType: QuestionType.enToZhChoice,
-              isCorrect: n.isEven,
-              durationMs: const Value<int>(4200),
-              createdAt: now - day * 86400000 + n * 60000,
-            ),
-          );
-    }
-  }
-}
-
 /// 把 `RepaintBoundary` 画进 `build/screens/<name>.png`。
-Future<void> _capture(
+Future<void> captureScreenshot(
   WidgetTester tester,
   GlobalKey boundaryKey,
   String name,
@@ -267,4 +201,72 @@ Future<void> _capture(
     await out.parent.create(recursive: true);
     await out.writeAsBytes(data!.buffer.asUint8List());
   });
+}
+
+/// 离屏环境没有系统字体回退，显式加载本地字体供正文和按钮使用。
+ThemeData screenshotTheme(ThemeData base) {
+  const family = 'LexiScreenshot';
+  final label = LexiType.callout.copyWith(fontFamily: family);
+  return base.copyWith(
+    textTheme: base.textTheme.apply(fontFamily: family),
+    primaryTextTheme: base.primaryTextTheme.apply(fontFamily: family),
+    filledButtonTheme: FilledButtonThemeData(
+      style: base.filledButtonTheme.style!.copyWith(
+        textStyle: WidgetStatePropertyAll<TextStyle>(label),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: base.textButtonTheme.style!.copyWith(
+        textStyle: WidgetStatePropertyAll<TextStyle>(label),
+      ),
+    ),
+  );
+}
+
+/// 加载本机字体，截图不需要网络资源。
+Future<void> loadScreenshotFonts() async {
+  // 装一份带中文的真字体，否则文字全是方块。注册多个常见族名，
+  // 覆盖主题在 `null` 之外可能请求的名字。
+  const cjkPath = '/System/Library/Fonts/Supplemental/Arial Unicode.ttf';
+  final cjk = File(cjkPath);
+  if (cjk.existsSync()) {
+    final bytes = await cjk.readAsBytes();
+    for (final family in <String>[
+      'LexiScreenshot',
+      'Ahem',
+      'sans-serif',
+      'Arial',
+      'CupertinoSystemText',
+      'CupertinoSystemDisplay',
+      '.SF UI Display',
+      'Roboto',
+      'PingFang SC',
+      'Hiragino Sans GB',
+      '.SF UI Text',
+      '.AppleSystemUIFont',
+      '.SF Pro Text',
+      '.SF Pro Display',
+    ]) {
+      final loader = FontLoader(family)
+        ..addFont(Future.value(ByteData.view(bytes.buffer)));
+      await loader.load();
+    }
+  }
+  final lucide = await rootBundle.load(
+    'packages/lucide_icons_flutter/assets/lucide.ttf',
+  );
+  await (FontLoader(
+    'packages/lucide_icons_flutter/Lucide',
+  )..addFont(Future.value(lucide))).load();
+  // 图标字体：不装的话所有 Icon 都是方块。
+  const iconPath =
+      '/opt/homebrew/Caskroom/flutter/3.47.5/flutter/bin/cache/'
+      'artifacts/material_fonts/MaterialIcons-Regular.otf';
+  final icons = File(iconPath);
+  if (icons.existsSync()) {
+    final bytes = await icons.readAsBytes();
+    final loader = FontLoader('MaterialIcons')
+      ..addFont(Future.value(ByteData.view(bytes.buffer)));
+    await loader.load();
+  }
 }

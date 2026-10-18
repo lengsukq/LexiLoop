@@ -102,18 +102,22 @@
 
 | 旧版能力 | 旧版位置 | Flutter 状态 | Flutter 位置 |
 |---|---|---|---|
-| 8 种题型的作答控件 | `study/study-client.tsx` | 已对齐 | `lib/features/study/**`（13 个组件） |
-| 四档自评即提交 | 同上 | 已对齐 | `lib/features/study/study_rating.dart` |
-| 选择题揭示答案延迟（可设置） | 同上 | 已对齐 | `study_choice_options.dart` |
+| 8 种题型的作答控件 | `study/study-client.tsx` | 已对齐 | `lib/features/study/**` |
+| 先揭示答案、再四档自评 | 同上 | 已对齐 | `study_reveal.dart`、`study_rating.dart` |
+| 四档自评即提交并自动下一题 | 同上 | 已对齐 | `study_page.dart`（`_submitWith` / `_advance`） |
+| 揭示面板（对错 / 答案 / 释义 / 差异 / 例句） | 同上 | 已对齐（不含 AI 助记与词根） | `study_reveal.dart` |
+| 选择题揭示答案延迟（可设置） | 同上 | **已实现**（此前设置页可调、学习页未读取） | `study_page.dart`（`_startChoiceGate`）、`study_actions.dart` |
+| 选择题点选项即揭示（不写库） | 同上 | 已对齐 | `study_choice_options.dart` |
 | 拼写题「提示」（渐进式揭示） | `study-client.tsx:55-70,588,732` | 已对齐 | `lib/domain/review/hint.dart`、`lib/features/study/study_hint_bar.dart` |
 | 用提示后评级降级为「模糊」 | `study-client.tsx:397` | 已对齐 | `lib/features/study/study_providers.dart` |
-| 字符级答案 diff | `components/answer-diff.tsx` | 已对齐 | `lib/domain/review/answer_diff.dart`、`study_feedback.dart` |
+| 字符级答案 diff | `components/answer-diff.tsx` | 已对齐 | `lib/domain/review/answer_diff.dart`、`study_answer_diff.dart` |
 | 四档评级上的 FSRS 间隔预览 | `study-client.tsx:344`、`api/reviews/preview` | 已对齐 | `ReviewService.previewIntervals`、`study_interval_preview.dart` |
 | 活跃计时（失焦 / 隐藏 / 45 秒空闲暂停） | `lib/use-active-stopwatch.ts` | 已对齐 | `lib/features/study/study_clock.dart` |
 | 后续 5 题音频预取 | `study-client.tsx:105` | 已对齐 | `WordSpeaker.preloadBatch` |
-| 键盘快捷键（1-4 评分 / Space 检查 / R 重播 / S 稍后再学） | `study-client.tsx:462-541` | 已对齐 | `lib/features/study/study_page.dart`（`_ratingKeys` / `_handleKey`） |
-| 跳过（稍后再学） | `study-client.tsx` | 已对齐 | `study_progress_header.dart`、`StudyService.skipItem` |
-| 会话总结 | 同上 | 已对齐 | `study_feedback.dart` |
+| 键盘快捷键（作答时 1-4 选选项 / Space 检查；揭示后 1-4 自评；R 重播 / S 稍后再学） | `study-client.tsx:462-541` | 已对齐 | `lib/features/study/study_page.dart`（`_handleAnsweringKey` / `_handleRevealedKey`） |
+| 跳过（稍后再学，吸底动作条） | `study-client.tsx` | 已对齐 | `study_actions.dart`、`StudyService.skipItem` |
+| 自动朗读（进入题目播放一次） | 同上 | 已对齐（按答案泄露风险收窄题型） | `study_speech.dart`、`study_page.dart`（`_scheduleAutoSpeak`） |
+| 会话总结 | 同上 | 已对齐 | `study_summary.dart` |
 | 无限学习 / 新一轮 | 同上 | 已对齐 | `study_providers.dart` |
 
 ---
@@ -215,6 +219,8 @@
 | 同步 AI 助记 | 旧版学习页可 `sync:true` 当场生成助记，本版统一走初始化队列 | 需要等队列推进 | 同步生成会让一次点按占用一次完整 LLM 往返（默认超时 3 分钟）；统一走队列后，界面不必为它维护第二套加载/超时/降级状态 |
 | 单条例句的同步翻译 | 旧版 `translateExample` 直接返回译文，本版入队 `EXAMPLE_TRANSLATIONS` | 需要等队列推进 | 同上；且批量与单条共用同一条翻译路径，避免两套实现给出两种译文 |
 | 学习页题库为空时的行为 | 旧版无选项的题只能「稍后再学」，本版保留同样的限制 | — | 语义一致，仅记录以免被误认为缺陷 |
+| 揭示面板不显示 AI 助记 / 词根词缀 | 旧版揭示后可从 `DictionaryContent.learning` / `roots` / `affixes` 取；本版 `StudyWordView` 不加载这些字段 | 揭示面板只有词条、音标、释义、例句与差异 | 学习会话不应把整张 `word_contents` 拖进内存（一次 45 题）；助记与词根属于词条详情/补全队列，单独排期接入 |
+| 自动朗读的题型范围 | 旧版只跳过三种选择题，导致「根据释义拼写英文」一进题就把答案念出来 | 本版只在 `enToZh` / `enToZhChoice` / `listeningChoice` / `listeningSpelling` 自动播 | 听到发音不会泄露答案才自动播；其余题型仍可手动点朗读 |
 
 ---
 
@@ -231,6 +237,6 @@
 | 信号色 | 同一个色值既做填充（圆点、进度条）也做文字 | 拆成两组：`accent`/`danger`/`success`/`warning`/`purple` 供填充，`accentText`/`dangerText`/`successText`/`warningText`/`purpleText` 供文字 | 饱和系统色当文字压在自家 12% 淡底上只有 2–3:1（`success` 最差，1.99:1），读不清。深色模式下两组同值（黑底上饱和色本身 ≥4.6:1） |
 | 四级文字层级 | `tertiaryLabel`(1.98:1) 比 `quaternaryLabel`(2.92:1) **更弱**，层级是反的；深色下同样倒挂 | 两种外观都按「对比度单调递减」取值，且每级都 ≥4.5:1 | 这两级被用在禁用按钮、提示与 `labelSmall` 上，都是要读的文字 |
 | 徽章 | 16 处各自实现：底色透明度散在 0.06–0.16 六档，圆角在 `xs`/`sm` 之间摇摆，内边距 4 种 | 一个 `LexiBadge`：6 色调 × 2 变体（`tint`/`outline`），内边距/圆角/字号/字重固定 | 单看每个都合理，摆在同一屏里就是「长短各一截」 |
-| 学习页进度 | 「0 / 45」文字 + 线性进度条 | 44×44 进度环：环内是已完成数、弧长表达比例、旁边说还剩多少 | 进度条只能表达比例，剩下的题数还得另写一行；而学习页最需要的恰好是那个数字。一个构件同时说清三件事 |
+| 学习页进度 | 「0 / 45」文字 + 线性进度条 | 44×44 进度环：弧长表达比例，旁边一组「已完成 / 计划」计数；跳过移入吸底动作条 | 进度条只能表达比例，剩下的题数还得另写一行；而学习页最需要的恰好是那个数字。一个构件同时说清两件事；跳过与自评放在同一个拇指可达的位置 |
 | 间距 | Tailwind 的 `gap-*` / `p-*` 加若干行内值，实际出现 **25 种** | **12 档** 2pt 节奏（2–40） | 差一两个像素在单屏上看不出来，但同一列卡片之间「有的差 12、有的差 14」会让人说不出哪里别扭 |
 | 淡色透明度 | `bg-*/10`、`bg-*/15` 等，实际出现 **21 种**取值 | **6 档**（`group`/`subtle`/`tint`/`border`/`half`/`strong`） | 0.06/0.07/0.08 三档并存、0.10–0.16 五档并存，肉眼读不出差别 |

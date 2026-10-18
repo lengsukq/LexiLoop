@@ -71,3 +71,9 @@ test-results/
 *.p12
 *.p8
 *.mobileprovision
+
+# 本地运行/构建产物与工具配置（不进入版本库）
+.next/
+node_modules/
+/data/
+reasonix.toml

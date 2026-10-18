@@ -23,10 +23,14 @@ import 'package:lexiloop/features/add/widgets/manual_batch_panel.dart';
 import 'package:lexiloop/features/add/widgets/manual_entry_form.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
-import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/adaptive_columns.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 添加词条页。
 class AddPage extends StatelessWidget {
@@ -38,18 +42,10 @@ class AddPage extends StatelessWidget {
     scrollable: true,
     // 表单页收窄到阅读列宽：铺满 1040 时，输入框、分段控件都长到
     // 一眼看不完，而字段内容只有几个字。与设置页同一个宽度。
-    maxWidth: LexiLayout.readingMaxWidth,
-    header: PageHeader(
-      title: '添加词条',
-      subtitle: '手动填写直接入库（离线可用）；也可以先查词典生成预览，逐行确认后再入库。',
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _ArticleImportCard(),
-        SizedBox(height: LexiLayout.sectionGap),
-        _ManualSection(),
-      ],
+    header: PageHeader(title: '添加词条', subtitle: '手动录入，或从已有内容导入。'),
+    child: AdaptiveColumns(
+      primary: _ManualSection(),
+      secondary: _ArticleImportCard(),
     ),
   );
 }
@@ -84,12 +80,12 @@ class _ManualSectionState extends ConsumerState<_ManualSection> {
           segments: const <ButtonSegment<ManualAddMode>>[
             ButtonSegment<ManualAddMode>(
               value: ManualAddMode.offline,
-              icon: Icon(Icons.edit_note_rounded, size: 16),
+              icon: Icon(LucideIcons.notebookPen, size: 16),
               label: Text('手动填写'),
             ),
             ButtonSegment<ManualAddMode>(
               value: ManualAddMode.batch,
-              icon: Icon(Icons.auto_awesome_rounded, size: 16),
+              icon: Icon(LucideIcons.sparkles, size: 16),
               label: Text('词典批量预览'),
             ),
           ],
@@ -112,15 +108,6 @@ class _ManualSectionState extends ConsumerState<_ManualSection> {
   }
 }
 
-/// 「粘贴文章」入口的说明文案。
-///
-/// 用 `join()` 而不是相邻字符串字面量：中文文案之间不需要空格，而相邻字面量
-/// 的「缺空格」会被 `missing_whitespace_between_adjacent_strings` 判为笔误。
-final String _articleImportHint = <String>[
-  '粘贴一篇英文文章，AI 会结合你的词库与考试目标挑出值得学的',
-  '单词、短语与句子；长文可分段并发分析，边解析边勾选。',
-].join();
-
 /// 「粘贴文章」入口卡片。
 ///
 /// 整条链路（粘贴 → 分段预览 → 勾选 → 提交）是一个多步向导，因此进入
@@ -130,42 +117,52 @@ class _ArticleImportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Surface(
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(cardPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          '从已有内容导入',
+          style: LexiType.title.copyWith(color: context.lexiColors.label),
+        ),
+        const SizedBox(height: LexiSpace.s12),
+        Surface(
+          variant: SurfaceVariant.raised,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(Icons.auto_awesome_rounded, color: colors.accent, size: 20),
-              const SizedBox(width: iconGap),
-              Text(
-                '粘贴文章 · AI 选词导词',
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(color: colors.label),
+              Icon(
+                LucideIcons.fileText,
+                color: LexiTone.lavender.foreground(
+                  Theme.of(context).brightness,
+                ),
+              ),
+              const SizedBox(height: LexiSpace.s12),
+              const Text('从文章提取词汇', style: LexiType.callout),
+              const SizedBox(height: LexiSpace.s4),
+              const Text('分析英文文章，预览后加入词库。', style: LexiType.footnote),
+              TextButton(
+                key: const Key('addOpenArticleImport'),
+                onPressed: () => context.go(articlePath),
+                child: const Text('开始粘贴'),
               ),
             ],
           ),
-          const SizedBox(height: itemGap),
-          Text(
-            _articleImportHint,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: colors.secondaryLabel),
-          ),
-          const SizedBox(height: actionGap),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              key: const Key('addOpenArticleImport'),
-              onPressed: () => context.go(articlePath),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-              label: const Text('开始粘贴'),
+        ),
+        const SizedBox(height: LexiSpace.s16),
+        Surface(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              LucideIcons.fileSpreadsheet,
+              color: context.lexiColors.accentText,
             ),
+            title: const Text('导入 CSV 词库'),
+            subtitle: const Text('从 EasyDict 收藏建立词库。'),
+            trailing: const Icon(LucideIcons.chevronRight),
+            onTap: () => context.go(csvImportPath),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -188,7 +185,7 @@ class _CreatedCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.check_circle_outline, color: colors.success, size: 20),
+              Icon(LucideIcons.circleCheck, color: colors.success, size: 20),
               const SizedBox(width: iconGap),
               Text(
                 '已添加到词库',

@@ -10,9 +10,11 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
 const String articleSampleArticle =
@@ -78,8 +80,12 @@ class ArticleSectionCard extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) =>
-      SectionCard(title: title, trailing: trailing, child: child);
+  Widget build(BuildContext context) => SectionCard(
+    tone: LexiTone.sky,
+    title: title,
+    trailing: trailing,
+    child: child,
+  );
 }
 
 /// 一个统计指标。
@@ -152,12 +158,12 @@ class ArticleErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
+          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
           const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
-              style: LexiType.body.copyWith(color: colors.danger),
+              style: LexiType.body.copyWith(color: colors.dangerText),
             ),
           ),
         ],

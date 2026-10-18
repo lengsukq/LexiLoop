@@ -13,6 +13,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 分析中界面。
 class ArticleProgressStep extends ConsumerWidget {
@@ -75,7 +76,7 @@ class _ProgressBody extends ConsumerWidget {
           const SizedBox(height: articleTightGap),
           Text(
             '${progress!.failed} 批失败，可在下方单独重试',
-            style: LexiType.footnote.copyWith(color: colors.danger),
+            style: LexiType.footnote.copyWith(color: colors.dangerText),
           ),
         ],
       ],
@@ -235,14 +236,14 @@ class _BatchRowText extends StatelessWidget {
         if (isError)
           Text(
             failed.error ?? '分析失败',
-            style: LexiType.caption.copyWith(color: colors.danger),
+            style: LexiType.caption.copyWith(color: colors.dangerText),
           ),
         if (aiError != null)
           Text(
             aiError!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: LexiType.caption.copyWith(color: colors.warning),
+            style: LexiType.caption.copyWith(color: colors.warningText),
           ),
       ],
     );
@@ -291,7 +292,7 @@ class _BatchStatusAction extends StatelessWidget {
       );
     }
     if (isSuccess) {
-      return Icon(Icons.check_circle_rounded, size: 16, color: colors.success);
+      return Icon(LucideIcons.circleCheck, size: 16, color: colors.success);
     }
     return Text(
       '等待中',

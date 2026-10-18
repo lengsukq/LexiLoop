@@ -14,6 +14,7 @@ import 'package:lexiloop/features/add/widgets/article_strategy_card.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 预览步骤。
 class ArticlePreviewStep extends ConsumerWidget {
@@ -183,7 +184,7 @@ class _SummaryNotices extends ConsumerWidget {
       return Padding(
         padding: const EdgeInsets.only(top: articleCardGap),
         child: ArticleNotice(
-          icon: Icons.error_outline_rounded,
+          icon: LucideIcons.circleAlert,
           tone: colors.warning,
           message: '$aiError 已回退为展示单词与本地切句，你仍可手动勾选。',
           action: _AiRetryAction(notifier: notifier),
@@ -194,7 +195,7 @@ class _SummaryNotices extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(top: articleCardGap),
       child: ArticleNotice(
-        icon: Icons.auto_fix_high_rounded,
+        icon: LucideIcons.wandSparkles,
         message: _configureAiHint,
       ),
     );

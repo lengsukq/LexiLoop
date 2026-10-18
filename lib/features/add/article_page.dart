@@ -20,8 +20,13 @@ import 'package:lexiloop/features/add/widgets/article_preview_step.dart';
 import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
 import 'package:lexiloop/features/add/widgets/article_success_card.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/adaptive_columns.dart';
+import 'package:lexiloop/ui/widgets/flow_steps.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 页内边距。
 const double articlePagePadding = 20;
@@ -57,25 +62,45 @@ class _ArticlePageState extends ConsumerState<ArticlePage> {
     return PageShell(
       scrollable: true,
       header: PageHeader(
-        title: '粘贴文章 · AI 选词导词',
-        subtitle: '贴一段英文，AI 挑出值得学的词与短语；先预览再入库。',
+        title: '文章提词',
+        subtitle: '粘贴英文，挑选词汇，预览后导入。',
         leading: Builder(
           builder: (backContext) => IconButton(
             key: const Key('articleBack'),
             tooltip: '返回',
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(LucideIcons.arrowLeft),
             onPressed: () => backContext.go(addWordPath),
           ),
         ),
       ),
-      child: _bodyFor(state),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          FlowSteps(
+            labels: const <String>['输入文章', '分析选词', '确认导入', '完成'],
+            current: switch (state.analysis.step) {
+              ArticleStep.input => 0,
+              ArticleStep.analyzing => 1,
+              ArticleStep.preview || ArticleStep.committing => 2,
+              ArticleStep.success => 3,
+            },
+          ),
+          _bodyFor(state),
+        ],
+      ),
     );
   }
 
   Widget _bodyFor(ArticleWizardState state) => switch (state.analysis.step) {
     ArticleStep.input => const ArticleInputStep(),
     ArticleStep.analyzing => const ArticleProgressStep(),
-    ArticleStep.preview => const ArticlePreviewStep(),
+    ArticleStep.preview => AdaptiveColumns(
+      primary: const ArticlePreviewStep(),
+      secondary: SectionCard(
+        title: '原文',
+        child: SelectableText(state.draft.text, style: LexiType.body),
+      ),
+    ),
     ArticleStep.committing => const ArticleCommittingStep(),
     ArticleStep.success => ArticleSuccessCard(result: state.result!),
   };

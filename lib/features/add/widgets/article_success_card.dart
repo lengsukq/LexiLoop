@@ -12,6 +12,7 @@ import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 完成摘要。
 ///
@@ -19,7 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_type.dart';
 /// 的「缺空格」会被 `missing_whitespace_between_adjacent_strings` 判为笔误。
 String _successSummary(ArticleCommitResult result) => <String>[
   '新增 ${result.createdWords} 个，识别已有 ${result.existingWords} 个，',
-  '新增初始化任务 ${result.queuedInitializations} 个。',
+  '新增内容补全任务 ${result.queuedInitializations} 个。',
 ].join();
 
 /// 完成后的说明文案。
@@ -27,8 +28,8 @@ String _successSummary(ArticleCommitResult result) => <String>[
 /// 用 `join()` 而不是相邻字符串字面量：中文文案之间不需要空格，而相邻字面量
 /// 的「缺空格」会被 `missing_whitespace_between_adjacent_strings` 判为笔误。
 final String _successHint = <String>[
-  '新词条会由初始化队列补齐释义、音标与例句；',
-  '可在「初始化」页查看进度。',
+  '新词条会由内容补全队列补齐释义、音标与例句；',
+  '可在「内容补全」页查看进度。',
 ].join();
 
 /// 写入中界面。
@@ -51,7 +52,7 @@ class ArticleCommittingStep extends StatelessWidget {
           ),
           const SizedBox(height: articleCardGap),
           Text(
-            '创建初始化任务并应用导入策略，请勿重复提交。',
+            '创建内容补全任务并应用导入策略，请勿重复提交。',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
         ],
@@ -77,7 +78,7 @@ class ArticleSuccessCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(Icons.check_circle_rounded, size: 34, color: colors.success),
+          Icon(LucideIcons.circleCheck, size: 34, color: colors.success),
           const SizedBox(height: articleCardGap),
           Text(
             _successSummary(result),

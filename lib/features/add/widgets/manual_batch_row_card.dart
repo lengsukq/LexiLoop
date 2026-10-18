@@ -16,6 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 一行在批量列表里的位置与内容。
 class ManualBatchEntry {
@@ -116,7 +117,7 @@ class _RowHeader extends StatelessWidget {
           child: Text(
             '${entry.index + 1}',
             style: LexiType.caption.copyWith(
-              color: colors.accent,
+              color: colors.accentText,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -205,14 +206,14 @@ class _RowActions extends StatelessWidget {
           OutlinedButton.icon(
             key: Key('manualBatchConfirm-${entry.index}'),
             onPressed: busy ? null : onConfirm,
-            icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+            icon: const Icon(LucideIcons.circleCheck, size: 16),
             label: const Text('确认添加'),
           ),
         if (row.isConfirmed) ...<Widget>[
           Text(
             '词条 ID：${row.confirmedWordId}',
             style: LexiType.footnote.copyWith(
-              color: colors.success,
+              color: colors.successText,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -227,7 +228,7 @@ class _RowActions extends StatelessWidget {
             key: Key('manualBatchToggle-${entry.index}'),
             onPressed: onToggle,
             icon: Icon(
-              expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
               size: 16,
             ),
             label: Text(expanded ? '收起' : '详情'),

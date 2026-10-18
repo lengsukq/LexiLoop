@@ -17,6 +17,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 
 /// 候选列表。
 class ArticleCandidateList extends ConsumerWidget {
@@ -225,56 +226,40 @@ class _WordRow extends ConsumerWidget {
     final colors = context.lexiColors;
     final notifier = ref.read(articleWizardProvider.notifier);
     final key = articleSelectionKey(candidate).toLowerCase();
-    return InkWell(
+    return CheckboxListTile(
       key: Key('articleCandidate$key'),
-      onTap: candidate.isKnown ? null : () => notifier.toggleKey(key),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: LexiSpace.s6),
-        child: Row(
-          children: <Widget>[
-            Checkbox(
-              value: !candidate.isKnown && selected,
-              onChanged: candidate.isKnown
-                  ? null
-                  : (_) => notifier.toggleKey(key),
-            ),
-            Expanded(
-              child: Text(
-                candidate.term,
-                style: LexiType.body.copyWith(
-                  color: candidate.isKnown
-                      ? colors.tertiaryLabel
-                      : colors.label,
-                  decoration: candidate.isKnown
-                      ? TextDecoration.lineThrough
-                      : null,
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: !candidate.isKnown && selected,
+      onChanged: candidate.isKnown ? null : (_) => notifier.toggleKey(key),
+      title: Text(
+        candidate.term,
+        style: LexiType.callout.copyWith(
+          color: candidate.isKnown ? colors.tertiaryLabel : colors.label,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Wrap(
+            spacing: LexiSpace.s6,
+            runSpacing: LexiSpace.s4,
+            children: <Widget>[
+              if (candidate.cefrLevel != null)
+                ArticleBadge(
+                  label: candidate.cefrLevel!,
+                  tone: LexiBadgeTone.neutral,
                 ),
-              ),
-            ),
-            if (candidate.cefrLevel != null)
-              ArticleBadge(
-                label: candidate.cefrLevel!,
-                tone: LexiBadgeTone.accent,
-              ),
-            const SizedBox(width: LexiSpace.s6),
+              Text('出现 ${candidate.occurrences} 次', style: LexiType.footnote),
+              _StateBadge(candidate: candidate, selected: selected),
+            ],
+          ),
+          if (candidate.aiReason != null)
             Text(
-              '×${candidate.occurrences}',
+              candidate.aiReason!,
               style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
             ),
-            const SizedBox(width: LexiSpace.s6),
-            _StateBadge(candidate: candidate, selected: selected),
-            const SizedBox(width: LexiSpace.s6),
-            SizedBox(
-              width: _reasonColumnWidth,
-              child: Text(
-                candidate.aiReason ?? (candidate.isKnown ? '已在词库' : '—'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -400,7 +385,12 @@ class _CandidateCard extends ConsumerWidget {
                       color: colors.secondaryLabel,
                     ),
                   ),
-                if (card != null) _AiCardBody(card: card),
+                if (card != null)
+                  DisclosureSection(
+                    key: ValueKey<String>(key),
+                    title: '查看解析 · ${candidate.term}',
+                    child: _AiCardBody(card: card),
+                  ),
               ],
             ),
           ),
@@ -471,7 +461,7 @@ class _LabeledText extends StatelessWidget {
             TextSpan(
               text: label,
               style: LexiType.caption.copyWith(
-                color: colors.accent,
+                color: colors.accentText,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -487,4 +477,3 @@ class _LabeledText extends StatelessWidget {
 }
 
 /// 「AI 理由 / 状态」列宽——固定宽度让每行的说明文字左端对齐。
-const double _reasonColumnWidth = 96;

@@ -288,7 +288,7 @@ void main() {
     await tapKey(tester, 'articleCommit');
 
     expect(find.text('导入完成'), findsOneWidget);
-    expect(find.textContaining('新增 2 个，识别已有 0 个，新增初始化任务 2 个'), findsOneWidget);
+    expect(find.textContaining('新增 2 个，识别已有 0 个，新增内容补全任务 2 个'), findsOneWidget);
     expect(service.lastSelectedKeys, <String>{'word\u0000apple'});
     expect(service.lastMode, ImportMode.fillMissing);
   });

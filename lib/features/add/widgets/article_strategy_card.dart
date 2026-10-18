@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 导入策略卡。
 class ArticleStrategyCard extends ConsumerWidget {
@@ -61,7 +62,7 @@ class ArticleStrategyCard extends ConsumerWidget {
               onPressed: canCommit
                   ? () => _commitWithConfirm(context, notifier, state)
                   : null,
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              icon: const Icon(LucideIcons.arrowRight, size: 16),
               label: Text('确认导入 ${state.selection.selected.length} 个'),
             ),
           ),
@@ -100,9 +101,7 @@ class _ModeOption extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Icon(
-                  selected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
+                  selected ? LucideIcons.circleDot : LucideIcons.circle,
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
@@ -146,7 +145,7 @@ String articleModeLabel(ImportMode mode) => switch (mode) {
 /// 导入模式的说明。
 String articleModeDescription(ImportMode mode) => switch (mode) {
   ImportMode.fillMissing => '新增词条，并给已有词条补充缺失的释义、发音和例句。',
-  ImportMode.skipExisting => '已有词条完全跳过，不创建初始化任务。',
+  ImportMode.skipExisting => '已有词条完全跳过，不创建内容补全任务。',
   ImportMode.forceDictionaryRefresh => '重新查询已有词条的词典内容，但保留学习进度。',
 };
 

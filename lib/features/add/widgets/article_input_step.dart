@@ -15,6 +15,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 考试目标的中文名。
 const Map<VocabularyLevel, String> articleExamTargetLabels =
@@ -166,7 +167,7 @@ class _ExamTargetChip extends StatelessWidget {
           child: Text(
             label,
             style: LexiType.footnote.copyWith(
-              color: active ? Colors.white : colors.secondaryLabel,
+              color: active ? colors.onAccent : colors.secondaryLabel,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -363,14 +364,14 @@ class _AnalyzeButtons extends ConsumerWidget {
           FilledButton.icon(
             key: const Key('articleAnalyzeSegmented'),
             onPressed: canAnalyze ? notifier.analyzeSegmented : null,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+            icon: const Icon(LucideIcons.sparkles, size: 16),
             label: Text('分 $batches 批分析'),
           ),
         ] else
           FilledButton.icon(
             key: const Key('articleAnalyze'),
             onPressed: canAnalyze ? notifier.analyzeSingle : null,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+            icon: const Icon(LucideIcons.sparkles, size: 16),
             label: const Text('智能分析'),
           ),
       ],

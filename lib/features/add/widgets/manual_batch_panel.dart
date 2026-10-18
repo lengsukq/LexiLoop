@@ -19,8 +19,10 @@ import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词典批量预览面板。
 class ManualBatchPanel extends ConsumerStatefulWidget {
@@ -112,6 +114,7 @@ class _BatchInputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Surface(
+      tone: LexiTone.mint,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(inputCardPadding),
       child: Column(
@@ -331,7 +334,7 @@ class _PreviewRow extends StatelessWidget {
                     height: LexiSpace.s14,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.auto_awesome_rounded, size: 16),
+                : const Icon(LucideIcons.sparkles, size: 16),
             label: Text(state.hasBatch ? '重新生成预览' : '生成预览'),
           ),
         ),
@@ -362,7 +365,7 @@ class _BatchProgress extends StatelessWidget {
           Expanded(
             child: Text(
               '正在逐行查询词典，请稍候…（${state.previewDone}/${state.rows.length}）',
-              style: LexiType.footnote.copyWith(color: colors.accent),
+              style: LexiType.footnote.copyWith(color: colors.accentText),
             ),
           ),
         ],
@@ -431,7 +434,7 @@ class _ConfirmAllCard extends StatelessWidget {
             onPressed: state.pendingCount == 0 || state.busy
                 ? null
                 : onConfirmAll,
-            icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+            icon: const Icon(LucideIcons.circleCheck, size: 16),
             label: Text('全部确认加入（${state.pendingCount}）'),
           ),
         ],
@@ -459,7 +462,7 @@ class _AllConfirmedCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.check_circle_outline, color: colors.success, size: 18),
+              Icon(LucideIcons.circleCheck, color: colors.success, size: 18),
               const SizedBox(width: LexiSpace.s8),
               Text(
                 '已全部加入词库',
@@ -505,12 +508,12 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
+          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
           const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
-              style: LexiType.body.copyWith(color: colors.danger),
+              style: LexiType.body.copyWith(color: colors.dangerText),
             ),
           ),
         ],

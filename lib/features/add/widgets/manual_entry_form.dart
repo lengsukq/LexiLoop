@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/add/add_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 手动录入表单。
@@ -60,6 +62,7 @@ class _ManualEntryFormState extends ConsumerState<ManualEntryForm> {
     final state = ref.watch(manualEntryProvider);
     final notifier = ref.read(manualEntryProvider.notifier);
     return Surface(
+      tone: LexiTone.mint,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(formPadding),
       child: Column(
@@ -69,13 +72,16 @@ class _ManualEntryFormState extends ConsumerState<ManualEntryForm> {
           const SizedBox(height: fieldGap),
           ..._contentFields(state, notifier),
           const SizedBox(height: fieldGap),
-          ..._metaFields(state, notifier),
+          DisclosureSection(
+            title: '标签与笔记',
+            child: Column(children: _metaFields(state, notifier)),
+          ),
           if (state.error != null) ...<Widget>[
             const SizedBox(height: fieldGap),
             Text(
               state.error!,
               style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: context.lexiColors.danger),
+                  ?.copyWith(color: context.lexiColors.dangerText),
             ),
           ],
           const SizedBox(height: submitGap),
@@ -137,26 +143,34 @@ class _ManualEntryFormState extends ConsumerState<ManualEntryForm> {
       ),
     ),
     const SizedBox(height: fieldGap),
-    _LabeledField(
-      label: '音标',
-      child: TextField(
-        controller: _phonetic,
-        decoration: const InputDecoration(hintText: '/ˈæpl/'),
-        onChanged: (value) => notifier.replace(state.copyWith(phonetic: value)),
-      ),
-    ),
-    const SizedBox(height: fieldGap),
-    _LabeledField(
-      label: '例句（每行「句子 | 翻译」）',
-      child: TextField(
-        controller: _examples,
-        minLines: minLines,
-        maxLines: maxLines,
-        decoration: const InputDecoration(
-          hintText: 'I ate an apple. | 我吃了一个苹果。',
-        ),
-        onChanged: (value) =>
-            notifier.replace(state.copyWith(examplesText: value)),
+    DisclosureSection(
+      title: '音标与例句',
+      child: Column(
+        children: <Widget>[
+          _LabeledField(
+            label: '音标',
+            child: TextField(
+              controller: _phonetic,
+              decoration: const InputDecoration(hintText: '/ˈæpl/'),
+              onChanged: (value) =>
+                  notifier.replace(state.copyWith(phonetic: value)),
+            ),
+          ),
+          const SizedBox(height: fieldGap),
+          _LabeledField(
+            label: '例句（每行「句子 | 翻译」）',
+            child: TextField(
+              controller: _examples,
+              minLines: minLines,
+              maxLines: maxLines,
+              decoration: const InputDecoration(
+                hintText: 'I ate an apple. | 我吃了一个苹果。',
+              ),
+              onChanged: (value) =>
+                  notifier.replace(state.copyWith(examplesText: value)),
+            ),
+          ),
+        ],
       ),
     ),
   ];

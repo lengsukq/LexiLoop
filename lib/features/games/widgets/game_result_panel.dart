@@ -19,6 +19,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 结算页的文案。
 class GameResultLabels {
@@ -96,7 +97,7 @@ class GameResultPanel extends StatelessWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: onReplay,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
+                icon: const Icon(LucideIcons.refreshCw, size: 18),
                 label: const Text('再来一局'),
               ),
             ),
@@ -124,6 +125,7 @@ class _Hero extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Surface(
+      variant: SurfaceVariant.hero,
       borderRadius: BorderRadius.circular(LexiRadius.xl),
       padding: const EdgeInsets.symmetric(
         vertical: LexiSpace.s24,
@@ -154,7 +156,7 @@ class _Hero extends StatelessWidget {
           const SizedBox(height: LexiSpace.s6),
           Text(
             '历史最高分 ${result.leaderboard.best}',
-            style: LexiType.footnote.copyWith(color: colors.accent),
+            style: LexiType.footnote.copyWith(color: colors.accentText),
           ),
         ],
       ),
@@ -370,9 +372,7 @@ class _MistakeRow extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    expanded
-                        ? Icons.expand_less_rounded
-                        : Icons.expand_more_rounded,
+                    expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                     size: 18,
                     color: colors.tertiaryLabel,
                   ),

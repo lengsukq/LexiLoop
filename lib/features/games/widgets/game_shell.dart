@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 游戏类页面的统一外壳：环境光背景 + 安全区 + 居中的内容宽度。
 class GameScaffold extends StatelessWidget {
@@ -95,7 +96,7 @@ class GameHud extends StatelessWidget {
             Text(
               '${(core.remainingMs / 1000).ceil()}s',
               style: LexiType.callout.copyWith(
-                color: ratio < 0.25 ? colors.danger : colors.label,
+                color: ratio < 0.25 ? colors.dangerText : colors.label,
                 fontWeight: FontWeight.w700,
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               ),
@@ -103,7 +104,7 @@ class GameHud extends StatelessWidget {
             const SizedBox(width: LexiSpace.s8),
             IconButton(
               onPressed: onExit,
-              icon: const Icon(Icons.close_rounded, size: 20),
+              icon: const Icon(LucideIcons.x, size: 20),
               tooltip: '退出',
             ),
           ],
@@ -202,7 +203,7 @@ class GameErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.error_outline_rounded, size: 38, color: colors.danger),
+            Icon(LucideIcons.circleAlert, size: 38, color: colors.danger),
             const SizedBox(height: LexiSpace.s12),
             Text(
               message,

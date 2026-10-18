@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「再试一次」按钮的 Key，供回归测试定位。
 ///
@@ -101,7 +102,7 @@ class PhoneticPlayView extends StatelessWidget {
                   Text(
                     '不对。要重新选择，请先点下面的「再试一次」。',
                     style: LexiType.body.copyWith(
-                      color: context.lexiColors.danger,
+                      color: context.lexiColors.dangerText,
                     ),
                   ),
                   const SizedBox(height: LexiSpace.s12),
@@ -201,7 +202,7 @@ class _Body extends StatelessWidget {
       PhoneticChallengeType.phoneticToWord => Text(
         question.sound.phonetic,
         style: LexiType.hero.copyWith(
-          color: colors.accent,
+          color: colors.accentText,
           fontFamily: 'monospace',
           fontWeight: FontWeight.w700,
         ),
@@ -279,7 +280,7 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
       children: <Widget>[
         FilledButton.tonalIcon(
           onPressed: _busy ? null : _speak,
-          icon: const Icon(Icons.volume_up_rounded, size: 18),
+          icon: const Icon(LucideIcons.volume2, size: 18),
           label: Text(_busy ? '朗读中…' : '朗读示例词'),
         ),
         if (_error != null)
@@ -288,7 +289,7 @@ class _SpeakButtonState extends ConsumerState<_SpeakButton> {
             child: Text(
               _error!,
               textAlign: TextAlign.center,
-              style: LexiType.caption.copyWith(color: colors.danger),
+              style: LexiType.caption.copyWith(color: colors.dangerText),
             ),
           ),
       ],
@@ -317,7 +318,7 @@ class _Analysis extends StatelessWidget {
               Text(
                 entry.display,
                 style: LexiType.title2.copyWith(
-                  color: colors.accent,
+                  color: colors.accentText,
                   fontFamily: 'monospace',
                   fontWeight: FontWeight.w700,
                 ),

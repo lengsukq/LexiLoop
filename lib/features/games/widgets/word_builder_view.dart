@@ -16,6 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 单词拼图视图。
 class WordBuilderView extends StatelessWidget {
@@ -188,7 +189,7 @@ class _LetterTileBox extends StatelessWidget {
               child: Text(
                 label.toUpperCase(),
                 style: LexiType.title.copyWith(
-                  color: filled ? Colors.white : colors.label,
+                  color: filled ? colors.onAccent : colors.label,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -237,7 +238,7 @@ class _Revealed extends StatelessWidget {
         const SizedBox(height: LexiSpace.s16),
         FilledButton.icon(
           onPressed: () => onAction(const ConfirmRevealed()),
-          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+          icon: const Icon(LucideIcons.circleCheck, size: 18),
           label: const Text('记住了，继续'),
         ),
       ],

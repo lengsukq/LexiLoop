@@ -27,6 +27,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 听音辨词 / 词义冲刺视图。
 class ChoicePickView extends ConsumerStatefulWidget {
@@ -160,7 +161,7 @@ class _ListeningPrompt extends StatelessWidget {
                 width: _speakButtonSize,
                 height: _speakButtonSize,
                 child: Icon(
-                  Icons.volume_up_rounded,
+                  LucideIcons.volume2,
                   size: 44,
                   color: colors.accent,
                 ),

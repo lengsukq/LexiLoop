@@ -140,7 +140,7 @@ class _Hole extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
                             style: LexiType.body.copyWith(
-                              color: Colors.white,
+                              color: colors.onAccent,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

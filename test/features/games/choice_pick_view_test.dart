@@ -26,6 +26,7 @@ import 'package:lexiloop/features/games/widgets/game_result_panel.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';
 import 'package:lexiloop/services/game_service.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 造一道选择题；词义冲刺的选项是释义，听音辨词的选项是词形。
 GameQuestion buildQuestion({
@@ -119,7 +120,7 @@ void main() {
       await pumpView(tester, state: state, onAction: (_) {});
       expect(find.text('听发音，选择正确的英文词条'), findsOneWidget);
       expect(find.text('点击可重复播放'), findsOneWidget);
-      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+      expect(find.byIcon(LucideIcons.volume2), findsOneWidget);
       for (final term in <String>['cat', 'dog', 'pig', 'cow']) {
         expect(find.text(term), findsOneWidget);
       }
@@ -136,7 +137,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: gameAutoSpeakDelayMs));
       expect(spoken, <String>['cat']);
 
-      await tester.tap(find.byIcon(Icons.volume_up_rounded));
+      await tester.tap(find.byIcon(LucideIcons.volume2));
       await tester.pump();
       expect(spoken, <String>['cat', 'cat'], reason: '喇叭按钮可重复播放');
     });

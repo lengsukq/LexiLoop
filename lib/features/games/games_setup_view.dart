@@ -12,7 +12,11 @@ import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 可开局的小游戏（配对与音标不在本页）。
 ///
@@ -93,20 +97,43 @@ class GamesSetupView extends StatelessWidget {
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s16),
-        for (final mode in miniGameModes)
-          Padding(
-            padding: const EdgeInsets.only(bottom: LexiSpace.s8),
-            child: _ModeCard(
-              mode: mode,
-              selected: state.selectedMode == mode,
-              loading: state.loadingMode == mode,
-              onTap: loading ? null : () => onSelect(mode),
-            ),
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final largeText = MediaQuery.textScalerOf(context).scale(14) >= 24;
+            final columns = largeText || constraints.maxWidth < 320
+                ? 1
+                : constraints.maxWidth >= 760
+                ? 3
+                : 2;
+            final width =
+                (constraints.maxWidth - (columns - 1) * LexiSpace.s12) /
+                columns;
+            return Wrap(
+              spacing: LexiSpace.s12,
+              runSpacing: LexiSpace.s12,
+              children: <Widget>[
+                for (final mode in miniGameModes)
+                  SizedBox(
+                    width: width,
+                    child: _ModeCard(
+                      mode: mode,
+                      selected: state.selectedMode == mode,
+                      loading: state.loadingMode == mode,
+                      onTap: loading ? null : () => onSelect(mode),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         if (state.error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s6),
           _ErrorBanner(message: state.error!),
         ],
+        DisclosureSection(
+          title: '玩法说明',
+          child: Text(gameModeRule(state.selectedMode), style: LexiType.body),
+        ),
         const SizedBox(height: LexiSpace.s14),
         FilledButton(
           onPressed: loading ? null : () => onStart(state.selectedMode),
@@ -136,48 +163,74 @@ class _ModeCard extends StatelessWidget {
   final bool loading;
   final VoidCallback? onTap;
 
+  LexiTone get _tone => switch (mode) {
+    GameMode.wordBuilder || GameMode.wordTetris => LexiTone.lavender,
+    GameMode.listeningPick || GameMode.wordStack => LexiTone.sky,
+    GameMode.meaningBlitz => LexiTone.peach,
+    _ => LexiTone.mint,
+  };
+
+  IconData get _icon => switch (mode) {
+    GameMode.wordBuilder => LucideIcons.puzzle,
+    GameMode.listeningPick => LucideIcons.ear,
+    GameMode.meaningBlitz => LucideIcons.languages,
+    GameMode.whackAMole => LucideIcons.hammer,
+    GameMode.wordStack => LucideIcons.layers,
+    _ => LucideIcons.blocks,
+  };
+
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return Material(
-      color: selected
-          ? Color.alphaBlend(
-              colors.accent.withValues(alpha: LexiTint.tint),
-              colors.card,
-            )
-          : colors.card,
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
+    final brightness = Theme.of(context).brightness;
+    return Surface(
+      variant: SurfaceVariant.raised,
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(LexiRadius.lg),
         child: Container(
+          padding: const EdgeInsets.all(LexiSpace.s16),
           decoration: BoxDecoration(
+            color: selected ? _tone.background(brightness) : null,
             borderRadius: BorderRadius.circular(LexiRadius.lg),
-            border: Border.all(
-              color: selected ? colors.accent : colors.borderSubtle,
-            ),
+            border: selected
+                ? Border.all(color: colors.accentText, width: 2)
+                : null,
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s14,
-            vertical: LexiSpace.s12,
-          ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.sports_esports_rounded,
-                size: 20,
-                color: selected ? colors.accent : colors.tertiaryLabel,
+              Row(
+                children: <Widget>[
+                  Container(
+                    padding: const EdgeInsets.all(LexiSpace.s8),
+                    decoration: BoxDecoration(
+                      color: _tone.background(brightness),
+                      borderRadius: BorderRadius.circular(LexiRadius.sm),
+                    ),
+                    child: Icon(
+                      _icon,
+                      size: 24,
+                      color: _tone.foreground(brightness),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (loading)
+                    const SizedBox(
+                      width: LexiSpace.s16,
+                      height: LexiSpace.s16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else if (selected)
+                    Icon(
+                      LucideIcons.circleCheck,
+                      size: 20,
+                      color: colors.accentText,
+                    ),
+                ],
               ),
-              const SizedBox(width: LexiSpace.s10),
-              Expanded(child: _ModeCardText(mode: mode)),
-              if (loading)
-                const SizedBox(
-                  width: LexiSpace.s16,
-                  height: LexiSpace.s16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+              const SizedBox(height: LexiSpace.s16),
+              _ModeCardText(mode: mode),
             ],
           ),
         ),
@@ -208,11 +261,6 @@ class _ModeCardText extends StatelessWidget {
           gameModeSubtitle(mode),
           style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
-        const SizedBox(height: LexiSpace.s2),
-        Text(
-          gameModeRule(mode),
-          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
-        ),
       ],
     );
   }
@@ -234,7 +282,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.all(LexiSpace.s12),
       child: Row(
         children: <Widget>[
-          Icon(Icons.error_outline_rounded, size: 18, color: colors.danger),
+          Icon(LucideIcons.circleAlert, size: 18, color: colors.danger),
           const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(

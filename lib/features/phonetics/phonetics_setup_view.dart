@@ -17,7 +17,9 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -48,9 +50,7 @@ class PhoneticsSetupView extends StatelessWidget {
         // 与配对页同一条理由：顶层路由的准备页必须能离开这一页。
         PageHeader(
           title: '音标辨音训练',
-          subtitle:
-              '听音、音标与单词三向匹配。每轮 $phoneticItemCount 题 / '
-              '$phoneticDurationSeconds 秒，解析里给出 48 音标目录的发音要领。',
+          subtitle: '每轮 $phoneticItemCount 题 · $phoneticDurationSeconds 秒',
           leading: backButton(
             context,
             preferPop: false,
@@ -82,7 +82,7 @@ class PhoneticsSetupView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: LexiSpace.s14),
-        _CatalogSummary(),
+        DisclosureSection(title: '音标与训练说明', child: _CatalogSummary()),
         if (state.error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s12),
           Container(
@@ -140,7 +140,7 @@ class _AccentCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LexiRadius.md),
             border: Border.all(
-              color: selected ? colors.accent : colors.borderSubtle,
+              color: selected ? colors.accentText : colors.borderSubtle,
             ),
           ),
           padding: const EdgeInsets.symmetric(vertical: LexiSpace.s14),
@@ -148,7 +148,7 @@ class _AccentCard extends StatelessWidget {
           child: Text(
             label,
             style: LexiType.callout.copyWith(
-              color: selected ? colors.accent : colors.label,
+              color: selected ? colors.accentText : colors.label,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -163,6 +163,7 @@ class _CatalogSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Surface(
+      tone: LexiTone.lavender,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(

@@ -14,6 +14,7 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/games_setup_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 void main() {
   Future<void> pumpGamesPage(WidgetTester tester) async {
@@ -59,7 +60,7 @@ void main() {
       expect(find.text('趣味训练'), findsOneWidget);
       for (final mode in miniGameModes) {
         expect(find.text(gameModeTitle(mode)), findsOneWidget);
-        expect(find.text(gameModeRule(mode)), findsOneWidget);
+        expect(find.text(gameModeSubtitle(mode)), findsOneWidget);
       }
       expect(find.text('开始'), findsOneWidget);
       expect(find.byType(FilledButton), findsOneWidget);
@@ -69,7 +70,7 @@ void main() {
       await pumpGamesPage(tester);
       await tester.tap(find.text('单词拼图'));
       await tester.pump();
-      expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+      expect(find.byIcon(LucideIcons.circleCheck), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

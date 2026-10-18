@@ -163,8 +163,8 @@ class _TowerBlock extends StatelessWidget {
   static List<Color> colorsOf(LexiColors palette) => <Color>[
     palette.warning,
     palette.accent,
-    palette.purple,
-    palette.success,
+    palette.purpleText,
+    palette.successText,
   ];
 
   @override
@@ -183,7 +183,7 @@ class _TowerBlock extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: LexiType.footnote.copyWith(
           // 白字压在饱和填充上（见 tetris 同一处注释）。
-          color: Colors.white,
+          color: context.lexiColors.onAccent,
           fontWeight: FontWeight.w700,
         ),
       ),

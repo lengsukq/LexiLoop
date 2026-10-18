@@ -9,8 +9,11 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 配对准备页。
 class MatchSetupView extends StatelessWidget {
@@ -42,7 +45,7 @@ class MatchSetupView extends StatelessWidget {
         // 桌面端等于没有。这里用统一的返回动作：能出栈就出栈，否则回训练页。
         PageHeader(
           title: '限时词汇配对',
-          subtitle: '将英文和中文释义快速配对。活跃错词、近期忘记和模糊的词会优先出现。',
+          subtitle: '将英文与中文释义配对。',
           leading: backButton(
             context,
             preferPop: false,
@@ -73,6 +76,13 @@ class MatchSetupView extends StatelessWidget {
             ),
           ),
         ],
+        const DisclosureSection(
+          title: '配对规则',
+          child: Text(
+            '连续配对获得连击分。错词、近期遗忘和模糊的词会优先出现；本轮练习不占用今日计划。',
+            style: LexiType.body,
+          ),
+        ),
         const SizedBox(height: LexiSpace.s14),
         FilledButton(
           onPressed: state.loading ? null : onStart,
@@ -100,16 +110,18 @@ class _PresetCard extends StatelessWidget {
   final bool selected;
   final VoidCallback? onTap;
 
+  LexiTone get _tone => switch (preset.id) {
+    'relaxed' => LexiTone.mint,
+    'sprint' => LexiTone.peach,
+    _ => LexiTone.sky,
+  };
+
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
+    final brightness = Theme.of(context).brightness;
     return Material(
-      color: selected
-          ? Color.alphaBlend(
-              colors.accent.withValues(alpha: LexiTint.tint),
-              colors.card,
-            )
-          : colors.card,
+      color: _tone.background(brightness),
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       child: InkWell(
         onTap: onTap,
@@ -118,7 +130,8 @@ class _PresetCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(LexiRadius.lg),
             border: Border.all(
-              color: selected ? colors.accent : colors.borderSubtle,
+              color: selected ? colors.accent : _tone.border(brightness),
+              width: selected ? 2 : 1,
             ),
           ),
           padding: const EdgeInsets.symmetric(
@@ -149,11 +162,7 @@ class _PresetCard extends StatelessWidget {
                 ),
               ),
               if (selected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 18,
-                  color: colors.accent,
-                ),
+                Icon(LucideIcons.circleCheck, size: 18, color: colors.accent),
             ],
           ),
         ),

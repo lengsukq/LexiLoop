@@ -56,6 +56,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
     final controller = ref.read(gamesControllerProvider.notifier);
 
     return GameScaffold(
+      maxWidth: state is GamesSetup ? 1040 : 760,
       child: switch (state) {
         GamesSetup() => GamesSetupView(
           state: state,

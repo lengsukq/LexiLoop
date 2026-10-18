@@ -114,7 +114,9 @@ class _Block extends StatelessWidget {
       child: Material(
         // 方块底色取语义强调色，而不是写死的靛蓝：写死的色值在深色模式下
         // 不会跟着调整，且与界面其它地方的强调色不是同一个蓝。
-        color: shaking ? context.lexiColors.danger : context.lexiColors.accent,
+        color: shaking
+            ? context.lexiColors.dangerText
+            : context.lexiColors.accent,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
         child: InkWell(
           onTap: onTap,
@@ -131,7 +133,7 @@ class _Block extends StatelessWidget {
                   // 白字压在饱和填充上：这是「填充上的文字」而不是
                   // 「文字色」，所以不走 `*Text` 那一组（它们是为浅色底
                   // 上的文字准备的深色变体）。
-                  color: Colors.white,
+                  color: context.lexiColors.onAccent,
                   fontWeight: FontWeight.w700,
                 ),
               ),

@@ -49,6 +49,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // 设置页新增了「外观」并放在第一位；这些用例测的是学习计划之后的
+    // 分组，先切回学习计划，保持用例本身只关心被测分组。
+    await tester.tap(find.text('学习计划'));
+    await tester.pumpAndSettle();
   }
 
   /// 读取 `settings` 表里某个键的 JSON 值。

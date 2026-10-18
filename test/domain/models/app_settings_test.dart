@@ -535,6 +535,47 @@ void main() {
       );
     });
   });
+
+  group('外观设置', () {
+    test('默认跟随系统、薄荷主色与靛蓝次色', () {
+      final settings = appSettingsFromRaw(const <String, Object?>{});
+      expect(settings.appearance.mode, AppThemeMode.system);
+      expect(settings.appearance.primaryColor, defaultThemePrimaryColor);
+      expect(settings.appearance.secondaryColor, defaultThemeSecondaryColor);
+    });
+
+    test('解析模式、主色与次色', () {
+      final settings = appSettingsFromRaw(<String, Object?>{
+        'themeMode': 'dark',
+        'themePrimaryColor': 0xFF0A84FF,
+        'themeSecondaryColor': 0xFFFF2D55,
+      });
+      expect(settings.appearance.mode, AppThemeMode.dark);
+      expect(settings.appearance.primaryColor, 0xFF0A84FF);
+      expect(settings.appearance.secondaryColor, 0xFFFF2D55);
+    });
+
+    test('未知模式回跟随系统，非法颜色回默认值', () {
+      final settings = appSettingsFromRaw(<String, Object?>{
+        'themeMode': 'sepia',
+        'themePrimaryColor': 'blue',
+        'themeSecondaryColor': -1,
+      });
+      expect(settings.appearance.mode, AppThemeMode.system);
+      expect(settings.appearance.primaryColor, defaultThemePrimaryColor);
+      expect(settings.appearance.secondaryColor, defaultThemeSecondaryColor);
+    });
+
+    test('颜色强制不透明，且往返存储不变', () {
+      final settings = appSettingsFromRaw(<String, Object?>{
+        'themePrimaryColor': 0x000A84FF,
+      });
+      expect(settings.appearance.primaryColor, 0xFF0A84FF);
+      final reparsed = appSettingsFromRaw(settings.toStorage());
+      expect(reparsed.appearance.primaryColor, 0xFF0A84FF);
+      expect(reparsed.appearance.mode, AppThemeMode.system);
+    });
+  });
 }
 
 /// 按标识取预设；找不到直接失败——测试里写错 id 不该静默跳过。

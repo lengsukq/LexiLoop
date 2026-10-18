@@ -329,6 +329,10 @@ void main() {
       expect(find.textContaining('再试一次'), findsWidgets);
       expect(find.byKey(phoneticRetryKey), findsOneWidget);
 
+      // 新版控件更高（HUD 统计与按钮都加了内边距），在 800×600 的默认测试
+      // 画布上按钮可能落在折叠线以下；先滚进视野再点，才是用户真实路径。
+      await tester.ensureVisible(find.byKey(phoneticRetryKey));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(phoneticRetryKey));
       await tester.pump();
 

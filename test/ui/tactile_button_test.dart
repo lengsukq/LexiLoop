@@ -43,21 +43,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('减弱动态效果不移动按钮，保留键盘激活', (tester) async {
+  testWidgets('减弱动态效果不缩放按钮，保留键盘激活', (tester) async {
     var calls = 0;
     await tester.pumpWidget(example(() => calls++, reduced: true));
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.pumpAndSettle();
     expect(calls, 1);
-    final face = tester.widget<AnimatedContainer>(
+    final scale = tester.widget<AnimatedScale>(
       find.descendant(
         of: find.byType(TactileButtonFace),
-        matching: find.byType(AnimatedContainer),
+        matching: find.byType(AnimatedScale),
       ),
     );
-    expect(face.duration, Duration.zero);
-    expect(face.transform!.getTranslation().y, 0);
+    expect(scale.duration, Duration.zero);
+    expect(scale.scale, 1);
   });
 
   testWidgets('禁用操作不激活，仍可正常绘制圆角表面', (tester) async {

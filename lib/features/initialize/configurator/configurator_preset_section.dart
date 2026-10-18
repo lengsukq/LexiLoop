@@ -28,7 +28,7 @@ class ConfiguratorPresetSection extends ConsumerWidget {
       youdaoOnly: draft.youdaoOnly,
     );
     return ConfiguratorCard(
-      title: '选择初始化方案',
+      title: '选择内容补全方案',
       // 选中预设时**不再重复它的名字**：卡片本身已经高亮并写着它。
       // 只有「自定义」这种卡片表达不了的状态才需要这一行。
       trailing: active == null ? '自定义 ${draft.fields.length} 项' : null,

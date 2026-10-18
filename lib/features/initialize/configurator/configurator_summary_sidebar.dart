@@ -126,7 +126,7 @@ class SummaryRow extends StatelessWidget {
 String writeModeLabel(InitializationMode mode) => switch (mode) {
   InitializationMode.fillMissingFields => '仅补充缺失',
   InitializationMode.forceOverwrite => '刷新所选字段',
-  InitializationMode.skipInitialized => '跳过已初始化',
+  InitializationMode.skipInitialized => '跳过已补全',
 };
 
 /// 调用策略的中文名。

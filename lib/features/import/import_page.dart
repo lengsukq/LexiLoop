@@ -20,11 +20,15 @@ import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/flow_steps.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// CSV 导入页。
 class ImportPage extends ConsumerWidget {
@@ -48,7 +52,7 @@ class ImportPage extends ConsumerWidget {
           builder: (backContext) => IconButton(
             key: const Key('importBack'),
             tooltip: '返回',
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const Icon(LucideIcons.arrowLeft),
             onPressed: () {
               // 能被推上来就回上一页（例如从设置页进来），
               // 否则回到单词本——那是导入的主入口。
@@ -64,6 +68,14 @@ class ImportPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          FlowSteps(
+            labels: const <String>['选择文件', '预览确认', '导入完成'],
+            current: state.result != null
+                ? 2
+                : state.preview != null
+                ? 1
+                : 0,
+          ),
           const _StepCard(step: 1, title: '选择语言方向', child: _LanguageStep()),
           const SizedBox(height: LexiSpace.s12),
           const _StepCard(
@@ -80,15 +92,17 @@ class ImportPage extends ConsumerWidget {
             _ResultCard(result: state.result!),
           ],
           const SizedBox(height: LexiSpace.s12),
-          _StepCard(
-            step: 3,
-            title: '预览与导入模式',
-            child: state.preview == null
-                ? const _PreviewPlaceholder()
-                : _PreviewStep(preview: state.preview!),
-          ),
+          if (state.preview != null)
+            _StepCard(
+              step: 3,
+              title: '预览与导入模式',
+              child: _PreviewStep(preview: state.preview!),
+            ),
           const SizedBox(height: LexiSpace.s12),
-          const ImportHistorySection(),
+          const DisclosureSection(
+            title: '导入历史与撤销',
+            child: ImportHistorySection(),
+          ),
         ],
       ),
     );
@@ -106,6 +120,7 @@ class _StepCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Surface(
+      tone: LexiTone.sky,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(LexiSpace.s14),
       child: Column(
@@ -264,23 +279,10 @@ class _FileStep extends ConsumerWidget {
                   height: LexiSpace.s14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.folder_open_rounded, size: 16),
+              : const Icon(LucideIcons.folderOpen, size: 16),
           label: Text(preview == null ? '选择文件' : '重新选择'),
         ),
       ],
-    );
-  }
-}
-
-class _PreviewPlaceholder extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Text(
-      '选择文件后，这里会显示逐行预览与问题行。',
-      style: LexiType.body.copyWith(color: colors.secondaryLabel),
     );
   }
 }
@@ -407,9 +409,7 @@ class _ModeOption extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Icon(
-                  selected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
+                  selected ? LucideIcons.circleDot : LucideIcons.circle,
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),
@@ -469,7 +469,7 @@ class _SubmitButton extends StatelessWidget {
                   height: LexiSpace.s14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.check_rounded, size: 16),
+              : const Icon(LucideIcons.check, size: 16),
           label: Text(busy ? '导入中…' : '开始导入'),
         ),
         const SizedBox(width: LexiSpace.s12),
@@ -502,7 +502,7 @@ class _ResultCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.task_alt_rounded, size: 17, color: colors.success),
+              Icon(LucideIcons.circleCheck, size: 17, color: colors.success),
               const SizedBox(width: LexiSpace.s6),
               Text(
                 '导入完成',
@@ -517,7 +517,7 @@ class _ResultCard extends StatelessWidget {
           Text(
             '新增 ${result.created} · 已存在 ${result.existing} · '
             '重复 ${result.duplicate} · 无效 ${result.invalid} · '
-            '失败 ${result.failed}；已入队初始化 ${result.queuedInitializations} 个',
+            '失败 ${result.failed}；已入队内容补全 ${result.queuedInitializations} 个',
             style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: LexiSpace.s12),
@@ -555,13 +555,13 @@ class _ResultActions extends ConsumerWidget {
         FilledButton.icon(
           key: const Key('importGoInitialize'),
           onPressed: () => context.go('/initialize'),
-          icon: const Icon(Icons.playlist_play_rounded, size: 16),
-          label: const Text('查看初始化'),
+          icon: const Icon(LucideIcons.listVideo, size: 16),
+          label: const Text('查看内容补全'),
         ),
         OutlinedButton.icon(
           key: const Key('importGoWords'),
           onPressed: () => context.go('/words'),
-          icon: const Icon(Icons.menu_book_rounded, size: 16),
+          icon: const Icon(LucideIcons.bookOpen, size: 16),
           label: const Text('打开单词本'),
         ),
         TextButton(
@@ -591,12 +591,12 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.error_outline_rounded, size: 17, color: colors.danger),
+          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
           const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(
               message,
-              style: LexiType.body.copyWith(color: colors.danger),
+              style: LexiType.body.copyWith(color: colors.dangerText),
             ),
           ),
         ],

@@ -107,7 +107,7 @@ void main() {
         reason: '「仅补音标」不该把所有字段都勾上',
       );
 
-      notifierOf(container).applyPreset(presetByLabel('完整初始化'));
+      notifierOf(container).applyPreset(presetByLabel('完整补全'));
       expect(
         draftOf(container).draft.fields,
         containsAll(allConfiguratorFields),
@@ -132,7 +132,7 @@ void main() {
 
     test('数据源优先级可以上下移动', () async {
       final container = await openConfigurator();
-      notifierOf(container).applyPreset(presetByLabel('完整初始化'));
+      notifierOf(container).applyPreset(presetByLabel('完整补全'));
       final before = draftOf(container).draft.providers;
       expect(before.length, greaterThan(1));
 
@@ -221,7 +221,7 @@ void main() {
       await insertWord('ready', status: InitializationStatus.ready);
       final container = await openConfigurator();
 
-      notifierOf(container).applyPreset(presetByLabel('完整初始化'));
+      notifierOf(container).applyPreset(presetByLabel('完整补全'));
       notifierOf(container).setMode(InitializationMode.forceOverwrite);
 
       expect(

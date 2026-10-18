@@ -149,7 +149,7 @@ class _PreviewRow extends StatelessWidget {
               row.errorMessage ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: LexiType.footnote.copyWith(color: colors.danger),
+              style: LexiType.footnote.copyWith(color: colors.dangerText),
             ),
           ),
         ],

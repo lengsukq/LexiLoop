@@ -7,8 +7,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 一段式选择器的一个选项。
 ///
@@ -138,6 +140,7 @@ class ConfiguratorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Surface(
+      tone: LexiTone.lavender,
       borderRadius: BorderRadius.circular(LexiRadius.md),
       padding: const EdgeInsets.all(cardPadding),
       child: Column(
@@ -221,9 +224,7 @@ class ConfiguratorDisclosure extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Icon(
-                  expanded
-                      ? Icons.expand_less_rounded
-                      : Icons.expand_more_rounded,
+                  expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
                   size: 18,
                   color: colors.secondaryLabel,
                 ),

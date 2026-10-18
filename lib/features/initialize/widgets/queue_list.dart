@@ -15,6 +15,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 队列列表。
 class QueueList extends ConsumerWidget {
@@ -37,7 +38,7 @@ class QueueList extends ConsumerWidget {
       error: (error, _) => Text(
         '加载失败：$error',
         style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: context.lexiColors.danger),
+            ?.copyWith(color: context.lexiColors.dangerText),
       ),
     );
   }
@@ -51,16 +52,18 @@ class _Loaded extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _SelectAllRow(page: page),
-        for (final word in page.items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: rowGap),
-            child: _WordTile(word: word),
-          ),
-      ],
+    return Surface(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _SelectAllRow(page: page),
+          for (final word in page.items) ...<Widget>[
+            const Divider(),
+            _WordTile(word: word),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -129,6 +132,7 @@ class _WordTileState extends ConsumerState<_WordTile> {
   Widget build(BuildContext context) {
     final word = widget.word;
     return Surface(
+      variant: SurfaceVariant.plain,
       borderRadius: BorderRadius.circular(LexiRadius.md),
       padding: const EdgeInsets.symmetric(
         horizontal: LexiSpace.s14,
@@ -152,7 +156,7 @@ class _WordTileState extends ConsumerState<_WordTile> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: LexiType.footnote.copyWith(
-                color: context.lexiColors.danger,
+                color: context.lexiColors.dangerText,
               ),
             ),
           ],
@@ -211,13 +215,13 @@ class _WordHeader extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: LexiType.callout.copyWith(
-                      color: colors.accent,
+                      color: colors.accentText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 const SizedBox(width: LexiSpace.s4),
-                const Icon(Icons.open_in_new, size: 12),
+                const Icon(LucideIcons.externalLink, size: 12),
               ],
             ),
           ),
@@ -254,7 +258,7 @@ class _WordActions extends ConsumerWidget {
         if (_canRetryWord(word))
           TextButton.icon(
             onPressed: () => _retryWord(context, ref),
-            icon: const Icon(Icons.restart_alt, size: 16),
+            icon: const Icon(LucideIcons.rotateCcw, size: 16),
             label: const Text('重试'),
           ),
       ],
@@ -338,7 +342,7 @@ class _TaskDetailRow extends ConsumerWidget {
             const SizedBox(height: LexiSpace.s2),
             Text(
               task.lastError!,
-              style: LexiType.caption.copyWith(color: colors.danger),
+              style: LexiType.caption.copyWith(color: colors.dangerText),
             ),
           ],
           if (_actionable(task.status) != null) ...<Widget>[
@@ -470,7 +474,7 @@ String _two(int value) => value.toString().padLeft(2, '0');
 
 /// 任务类型的中文名。
 String taskTypeLabel(JobTaskType type) => switch (type) {
-  JobTaskType.initialize => '内容初始化',
+  JobTaskType.initialize => '内容补全',
   JobTaskType.mnemonic => '助记词',
   JobTaskType.exampleTranslations => '例句翻译',
 };

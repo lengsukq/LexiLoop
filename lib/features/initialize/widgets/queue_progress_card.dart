@@ -8,6 +8,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -20,6 +21,7 @@ class QueueProgressCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(queueProgressProvider);
     return Surface(
+      tone: LexiTone.mint,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(cardPadding),
       child: progress.when(
@@ -42,7 +44,7 @@ class QueueProgressCard extends ConsumerWidget {
         error: (error, _) => Text(
           '加载失败：$error',
           style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.lexiColors.danger),
+              ?.copyWith(color: context.lexiColors.dangerText),
         ),
       ),
     );

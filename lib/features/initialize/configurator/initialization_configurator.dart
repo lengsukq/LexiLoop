@@ -21,6 +21,7 @@ import 'package:lexiloop/features/initialize/configurator/configurator_state.dar
 import 'package:lexiloop/features/initialize/configurator/configurator_summary_sidebar.dart';
 import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 打开初始化配置器。
 ///
@@ -107,7 +108,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                '配置初始化',
+                '配置内容补全',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: colors.label,
                   fontWeight: FontWeight.w700,
@@ -123,7 +124,7 @@ class _Header extends StatelessWidget {
         ),
         IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.close, size: 18),
+          icon: const Icon(LucideIcons.x, size: 18),
           tooltip: '关闭',
         ),
       ],

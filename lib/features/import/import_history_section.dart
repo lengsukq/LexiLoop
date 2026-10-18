@@ -19,6 +19,7 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 撤销失败的提示停留时长。
 ///
@@ -44,7 +45,7 @@ class ImportHistorySection extends ConsumerWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.history_rounded, size: 16, color: colors.accent),
+              Icon(LucideIcons.history, size: 16, color: colors.accent),
               const SizedBox(width: LexiSpace.s6),
               Text(
                 '导入历史',
@@ -56,7 +57,7 @@ class ImportHistorySection extends ConsumerWidget {
               const Spacer(),
               IconButton(
                 tooltip: '刷新',
-                icon: const Icon(Icons.refresh_rounded, size: 16),
+                icon: const Icon(LucideIcons.refreshCw, size: 16),
                 onPressed: () => ref.invalidate(importHistoryProvider),
               ),
             ],
@@ -69,7 +70,7 @@ class ImportHistorySection extends ConsumerWidget {
             ),
             error: (error, _) => Text(
               error is AppError ? error.message : '读取导入历史失败：$error',
-              style: LexiType.body.copyWith(color: colors.danger),
+              style: LexiType.body.copyWith(color: colors.dangerText),
             ),
             data: (batches) => batches.isEmpty
                 ? Text(
@@ -235,7 +236,7 @@ class _BatchSummaryRow extends StatelessWidget {
         IconButton(
           tooltip: expanded ? '收起明细' : '展开明细',
           icon: Icon(
-            expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+            expanded ? LucideIcons.chevronUp : LucideIcons.chevronDown,
             size: 18,
           ),
           onPressed: onToggle,
@@ -286,7 +287,7 @@ class _BatchRows extends ConsumerWidget {
       ),
       error: (error, _) => Text(
         error is AppError ? error.message : '读取行明细失败：$error',
-        style: LexiType.footnote.copyWith(color: colors.danger),
+        style: LexiType.footnote.copyWith(color: colors.dangerText),
       ),
       data: (items) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,7 +323,9 @@ class _BatchRows extends ConsumerWidget {
                         row.errorMessage!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: LexiType.caption.copyWith(color: colors.danger),
+                        style: LexiType.caption.copyWith(
+                          color: colors.dangerText,
+                        ),
                       ),
                     ),
                   ],

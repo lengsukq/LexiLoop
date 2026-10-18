@@ -22,6 +22,7 @@ import 'package:lexiloop/services/initialization/initialization_queries.dart';
 import 'package:lexiloop/services/initialization/job_runner.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 记录调用次数的假执行器。
 class _RecordingRunner implements InitializationJobRunner {
@@ -158,7 +159,7 @@ void main() {
   testWidgets('空队列显示引导文案', (tester) async {
     await pumpPage(tester);
 
-    expect(find.text('初始化队列'), findsOneWidget);
+    expect(find.text('内容补全队列'), findsOneWidget);
     expect(find.textContaining('导入词条后任务会出现在这里'), findsOneWidget);
     expect(find.text('没有符合条件的任务'), findsOneWidget);
   });
@@ -402,12 +403,18 @@ void main() {
       );
       await pumpPage(tester);
 
-      final alphaTile = find.ancestor(
-        of: find.text('alpha'),
-        matching: find.byType(Surface),
-      );
+      // 卡片外层还有一层 Surface 容器；取最近的一层，否则会把相邻词条的
+      // 按钮也算进来。
+      final alphaTile = find
+          .ancestor(of: find.text('alpha'), matching: find.byType(Surface))
+          .first;
+      // 行内既有「词条级重试」（带旋转图标），也有展开后任务级的「重试」
+      // （纯文字按钮）；这里点的是词条级那个。
       await tester.tap(
-        find.descendant(of: alphaTile, matching: find.text('重试')),
+        find.descendant(
+          of: alphaTile,
+          matching: find.widgetWithIcon(TextButton, LucideIcons.rotateCcw),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -450,7 +457,7 @@ void main() {
     await tester.tap(find.text('展开 1 个任务'));
     await tester.pumpAndSettle();
 
-    expect(find.text('内容初始化 · 任务 #${job.id}'), findsOneWidget);
+    expect(find.text('内容补全 · 任务 #${job.id}'), findsOneWidget);
     expect(find.textContaining('重试 2/3'), findsOneWidget);
     expect(
       find.textContaining('更新时间 ${formatTaskStamp(job.updatedAt)}'),

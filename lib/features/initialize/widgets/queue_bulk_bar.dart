@@ -61,7 +61,7 @@ class QueueBulkBar extends ConsumerWidget {
                         initialScope: ConfiguratorScope.selection,
                       ),
                     ),
-                    child: const Text('配置初始化'),
+                    child: const Text('配置内容补全'),
                   ),
                   FilledButton(
                     onPressed: () => _retry(context, ref),

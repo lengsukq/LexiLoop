@@ -49,12 +49,12 @@ class _PageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return const PageShell(
       scrollable: true,
-      header: PageHeader(title: '初始化队列', subtitle: '词条导入后会排队补全释义、音标、例句等字段。'),
+      header: PageHeader(title: '内容补全队列', subtitle: '词条导入后会排队补全释义、音标、例句等字段。'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           QueueProgressCard(),
-          SizedBox(height: LexiLayout.sectionGap),
+          SizedBox(height: LexiLayout.cardGap),
           QueueToolbar(),
           SizedBox(height: LexiLayout.cardGap),
           QueueList(),

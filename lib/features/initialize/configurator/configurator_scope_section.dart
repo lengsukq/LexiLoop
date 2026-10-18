@@ -38,7 +38,7 @@ class ConfiguratorScopeSection extends ConsumerWidget {
             '刷新所选字段会覆盖词典抓来的内容（你手工编辑的释义与例句会保留），'
             '创建前还会再确认一次。',
             style: Theme.of(context).textTheme.labelSmall
-                ?.copyWith(color: context.lexiColors.warning),
+                ?.copyWith(color: context.lexiColors.warningText),
           ),
         ],
       ],

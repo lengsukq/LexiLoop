@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/data/dictionary/provider.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 逻辑字段名 → 中文名。
 ///
@@ -157,25 +158,25 @@ final List<ConfiguratorPreset> configuratorPresets = <ConfiguratorPreset>[
     label: '仅补音标',
     description: '适合新配置词典后补齐音标',
     fields: phoneticOnlyFields,
-    icon: Icons.record_voice_over,
+    icon: LucideIcons.speech,
   ),
   const ConfiguratorPreset(
     label: '基础词典信息',
     description: '释义、音标、音频和词形',
     fields: basicDictionaryFields,
-    icon: Icons.menu_book,
+    icon: LucideIcons.bookOpen,
   ),
   ConfiguratorPreset(
-    label: '完整初始化',
+    label: '完整补全',
     description: '生成完整学习内容',
     fields: allConfiguratorFields,
-    icon: Icons.auto_awesome,
+    icon: LucideIcons.sparkles,
   ),
   const ConfiguratorPreset(
     label: '有道词典',
     description: '仅使用有道词典的权威内容',
     fields: youdaoDictionaryFields,
-    icon: Icons.menu_book_outlined,
+    icon: LucideIcons.bookOpen,
     youdaoOnly: true,
   ),
 ];

@@ -150,7 +150,7 @@ void main() {
         GoRoute(
           path: '/initialize',
           builder: (context, state) =>
-              const Scaffold(body: Center(child: Text('初始化页占位'))),
+              const Scaffold(body: Center(child: Text('内容补全页占位'))),
         ),
         GoRoute(
           path: '/words',
@@ -183,6 +183,9 @@ void main() {
     expect(find.byKey(const Key('importPickFile')), findsOneWidget);
     // 还没选文件时没有预览，也没有提交按钮。
     expect(find.byKey(const Key('importSubmit')), findsNothing);
+    expect(find.text('还没有导入记录。'), findsNothing);
+    await tester.tap(find.text('导入历史与撤销'));
+    await tester.pumpAndSettle();
     expect(find.text('还没有导入记录。'), findsOneWidget);
   });
 
@@ -402,7 +405,7 @@ void main() {
       expect(find.byKey(const Key('importGoInitialize')), findsOneWidget);
       expect(find.byKey(const Key('importGoWords')), findsOneWidget);
       expect(find.byKey(const Key('importRestart')), findsOneWidget);
-      expect(find.text('查看初始化'), findsOneWidget);
+      expect(find.text('查看内容补全'), findsOneWidget);
       expect(find.text('打开单词本'), findsOneWidget);
       expect(find.text('继续导入'), findsOneWidget);
     });
@@ -413,7 +416,7 @@ void main() {
       await tester.tap(find.byKey(const Key('importGoInitialize')));
       await tester.pumpAndSettle();
 
-      expect(find.text('初始化页占位'), findsOneWidget);
+      expect(find.text('内容补全页占位'), findsOneWidget);
       expect(find.byKey(const Key('importResultCard')), findsNothing);
     });
 
@@ -455,7 +458,7 @@ void main() {
       // 语言方向保留：同一批人通常连着导同一个语种。
       expect(state.sourceLanguage, 'en');
       expect(find.byKey(const Key('importResultCard')), findsNothing);
-      expect(find.text('选择文件后，这里会显示逐行预览与问题行。'), findsOneWidget);
+      expect(find.text('选择文件后，这里会显示逐行预览与问题行。'), findsNothing);
     });
   });
 }

@@ -408,13 +408,13 @@ final FutureProvider<InitializationPreview> configuratorPreviewProvider =
     });
 
 /// 未选字段时的提示。
-const String emptyFieldsReason = '请至少选择一个初始化字段。';
+const String emptyFieldsReason = '请至少选择一个内容补全字段。';
 
 /// 未选来源时的提示。
 const String emptyProvidersReason = '请至少选择一个可用数据来源。';
 
 /// 选了「已选词条」但没勾词条时的提示。
-const String emptySelectionReason = '请先在队列列表中勾选需要初始化的词条。';
+const String emptySelectionReason = '请先在队列列表中勾选需要内容补全的词条。';
 
 /// 范围内没有需要处理的词条时的提示。
 const String emptyScopeReason = '范围内的词条都已满足所选字段，没有需要新建的任务。';

@@ -14,6 +14,7 @@ import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/initialization/initialization_models.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 队列工具栏。
 class QueueToolbar extends ConsumerStatefulWidget {
@@ -49,7 +50,7 @@ class _QueueToolbarState extends ConsumerState<QueueToolbar> {
           controller: _search,
           decoration: const InputDecoration(
             hintText: '搜索词条',
-            prefixIcon: Icon(Icons.search, size: 18),
+            prefixIcon: Icon(LucideIcons.search, size: 18),
           ),
           // 提交时才筛选：边打边查会让每敲一个字都打一次库，
           // 而词条表通常不大，用户不会为了一次查询改一次筛选条件。
@@ -186,17 +187,19 @@ class _ToolbarActions extends StatelessWidget {
     // 现在：处理一批是唯一的主按钮；创建任务（配置一次跑一批）与
     // 重试失败（只在有失败时才有意义）进菜单；刷新在菜单里，
     // 因为它只读不写、也不该抢位置。
-    return Row(
+    return Wrap(
+      spacing: toolbarGap,
+      runSpacing: toolbarGap,
       children: <Widget>[
         FilledButton.icon(
           onPressed: busy ? null : onProcessNow,
-          icon: const Icon(Icons.play_arrow, size: 16),
+          icon: const Icon(LucideIcons.play, size: 16),
           label: const Text('立即处理一批'),
         ),
         const SizedBox(width: toolbarGap),
         PopupMenuButton<_QueueAction>(
           tooltip: '更多操作',
-          icon: Icon(Icons.more_horiz_rounded, color: colors.secondaryLabel),
+          icon: Icon(LucideIcons.ellipsis, color: colors.secondaryLabel),
           onSelected: (action) => switch (action) {
             _QueueAction.configure => onConfigure(),
             _QueueAction.retryFailed => onRetryFailed(),
@@ -205,7 +208,7 @@ class _ToolbarActions extends StatelessWidget {
           itemBuilder: (context) => <PopupMenuEntry<_QueueAction>>[
             const PopupMenuItem<_QueueAction>(
               value: _QueueAction.configure,
-              child: Text('创建初始化任务…'),
+              child: Text('创建内容补全任务…'),
             ),
             const PopupMenuItem<_QueueAction>(
               value: _QueueAction.retryFailed,

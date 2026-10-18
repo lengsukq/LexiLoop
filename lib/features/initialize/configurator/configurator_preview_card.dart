@@ -27,7 +27,7 @@ class ConfiguratorPreviewCard extends ConsumerWidget {
         error: (error, _) => Text(
           '预览失败：$error',
           style: Theme.of(context).textTheme.labelMedium
-              ?.copyWith(color: context.lexiColors.danger),
+              ?.copyWith(color: context.lexiColors.dangerText),
         ),
         data: (data) => _PreviewBody(preview: data),
       ),

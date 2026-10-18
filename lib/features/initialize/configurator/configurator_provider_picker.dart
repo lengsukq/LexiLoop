@@ -12,6 +12,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 数据源列表（可用性 + 优先级排序）与调用策略。
 ///
@@ -86,7 +87,7 @@ class _ProviderList extends ConsumerWidget {
       error: (error, _) => Text(
         '加载来源状态失败：$error',
         style: Theme.of(context).textTheme.labelMedium
-            ?.copyWith(color: context.lexiColors.danger),
+            ?.copyWith(color: context.lexiColors.dangerText),
       ),
       data: (options) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -204,12 +205,12 @@ class ProviderRow extends StatelessWidget {
           if (selected) ...<Widget>[
             _PriorityBadge(index: input.index + 1),
             _MoveButton(
-              icon: Icons.keyboard_arrow_up,
+              icon: LucideIcons.chevronUp,
               tooltip: '提高优先级',
               onPressed: input.index == 0 ? null : () => onMove(-1),
             ),
             _MoveButton(
-              icon: Icons.keyboard_arrow_down,
+              icon: LucideIcons.chevronDown,
               tooltip: '降低优先级',
               onPressed: input.index == input.total - 1
                   ? null
@@ -395,9 +396,7 @@ class StrategyCard extends StatelessWidget {
         child: Row(
           children: <Widget>[
             Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
+              selected ? LucideIcons.circleDot : LucideIcons.circle,
               size: strategyIconSize,
               color: selected ? colors.accent : colors.tertiaryLabel,
             ),

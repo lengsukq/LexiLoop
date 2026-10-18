@@ -6,11 +6,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lexiloop/app/router.dart';
 import 'package:lexiloop/ui/feedback/messenger.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 快捷键 1–8 对应的数字键。
 ///
@@ -43,7 +43,8 @@ class LexiLoopApp extends StatelessWidget {
       theme: LexiTheme.light,
       darkTheme: LexiTheme.dark,
       routerConfig: appRouter,
-      builder: (context, child) => _GlobalShortcuts(child: child),
+      builder: (context, child) =>
+          AdaptiveTypography(child: _GlobalShortcuts(child: child)),
     );
   }
 }
@@ -61,7 +62,7 @@ class _GlobalShortcuts extends StatelessWidget {
     final bindings = <ShortcutActivator, VoidCallback>{};
     for (final destination in appDestinations) {
       final key = _digitKeys[destination.shortcut - 1];
-      void go() => context.go(destination.path);
+      void go() => appRouter.go(destination.path);
       bindings[SingleActivator(key, meta: true)] = go;
       bindings[SingleActivator(key, control: true)] = go;
     }

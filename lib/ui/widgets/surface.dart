@@ -1,26 +1,22 @@
-/// 内容层的表面（standard material）。
-///
-/// **为什么内容层不能用液态玻璃**：Apple 的模型只有两层——内容层（文字、图片、
-/// 列表、卡片）与功能层（侧边栏、工具栏、Tab Bar、弹窗）。Liquid Glass 属于
-/// 功能层，`materials.md` 的原话是「**Don't use Liquid Glass in the content
-/// layer.**… Instead, use standard materials for elements in the content layer,
-/// such as app backgrounds」。玻璃压在玻璃上会让所有卡片落在同一层材质上，
-/// 层级只能靠间距硬撑——这正是界面「看起来不统一」的根源。
-///
-/// 所以：卡片、列表容器、表单用 [Surface]（不透明 + 发丝描边），
-/// 只有侧边栏 / 底部栏 / 沉浸式 HUD / 弹窗才用 `LiquidGlass`。
-///
-/// 顺带的收益：少掉几十个全屏 `BackdropFilter`，低端设备不必再走模糊降级。
+/// 按内容角色区分平整阅读面与重点词卡。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_depth.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 
 /// 表面样式。
 enum SurfaceVariant {
   /// 卡片：不透明底 + 发丝描边 + 极轻投影。用于承载内容的卡片与面板。
   card,
+
+  /// 有柔和景深的重点词卡。
+  raised,
+
+  /// 今日任务等主焦点。
+  hero,
 
   /// 内嵌块：`fill` 淡底、无描边。用于卡片内部再分组的元素
   /// （选项行、输入容器、统计格）。
@@ -33,12 +29,6 @@ enum SurfaceVariant {
 /// 卡片内的默认内边距。
 const double surfaceCardPadding = LexiSpace.s20;
 
-/// 卡片投影的高度。
-///
-/// 用 `Material` 的 elevation 而不是手写 `BoxShadow`：`Material` 同时负责
-/// 投影、描边与**承载涟漪**，三者必须来自同一个节点（见 [Surface.build]）。
-const double _cardElevation = 1;
-
 /// 内容层的一张表面。
 class Surface extends StatelessWidget {
   /// 以内容构造。
@@ -47,6 +37,7 @@ class Surface extends StatelessWidget {
     this.variant = SurfaceVariant.card,
     this.padding,
     this.borderRadius,
+    this.tone,
     super.key,
   });
 
@@ -62,52 +53,58 @@ class Surface extends StatelessWidget {
   /// 圆角；为空时卡片用 `LexiRadius.lg`，内嵌块用 `LexiRadius.md`。
   final BorderRadius? borderRadius;
 
+  /// 可选的分区色；不指定时保留阅读用的中性表面。
+  final LexiTone? tone;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // 打开「增强对比度」时把描边加重：这是系统给我们的唯一信号
-    // （Flutter 没有暴露「减弱透明度」）。
-    final highContrast = MediaQuery.highContrastOf(context);
-
-    final resolvedRadius =
+    final brightness = Theme.of(context).brightness;
+    final lifted =
+        variant == SurfaceVariant.raised || variant == SurfaceVariant.hero;
+    final inset = variant == SurfaceVariant.inset;
+    final radius =
         borderRadius ??
         BorderRadius.circular(
-          variant == SurfaceVariant.inset ? LexiRadius.md : LexiRadius.lg,
+          variant == SurfaceVariant.hero
+              ? LexiRadius.xl
+              : inset
+              ? LexiRadius.md
+              : LexiRadius.lg,
         );
-
     if (variant == SurfaceVariant.plain) {
       return Padding(padding: padding ?? EdgeInsets.zero, child: child);
     }
-
-    final isInset = variant == SurfaceVariant.inset;
-    final resolvedPadding =
-        padding ?? EdgeInsets.all(isInset ? LexiSpace.s12 : surfaceCardPadding);
-
-    // **必须是 Material，不能是 DecoratedBox。**
-    //
-    // `ListTile` 与 `InkWell` 把背景与涟漪画在「最近的 Material 祖先」上。
-    // 中间夹一层带底色的 `DecoratedBox`，涟漪就会被卡片底色整个盖住；
-    // `ListTile` 在 debug 下还会直接抛断言（`_findIntermediateWidget` 沿祖先
-    // 链找 Material，途中撞见带不透明底色的 DecoratedBox 就报错）。
-    //
-    // 把底色、描边、投影都交给 `Material`，三个职责就落在同一个节点上。
-    return Material(
-      color: isInset ? colors.fill : colors.card,
+    final content = Material(
+      color: inset
+          ? colors.fill
+          : lifted
+          ? tone?.background(brightness) ?? colors.card
+          : colors.card,
       shape: RoundedRectangleBorder(
-        borderRadius: resolvedRadius,
-        side: isInset
-            ? BorderSide.none
-            : BorderSide(
-                color: highContrast ? colors.borderStrong : colors.borderSubtle,
-              ),
+        borderRadius: radius,
+        side: MediaQuery.highContrastOf(context)
+            ? BorderSide(color: colors.borderStrong)
+            : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
-      elevation: isInset ? 0 : _cardElevation,
-      shadowColor: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
-      // 不关掉的话 Material 3 会按 elevation 给底色叠一层主色调。
       surfaceTintColor: Colors.transparent,
-      child: Padding(padding: resolvedPadding, child: child),
+      child: Padding(
+        padding:
+            padding ??
+            EdgeInsets.all(inset ? LexiSpace.s12 : surfaceCardPadding),
+        child: child,
+      ),
+    );
+    if (!lifted) return content;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: brightness == Brightness.dark
+            ? LexiDepth.raisedDark
+            : LexiDepth.raised,
+      ),
+      child: content,
     );
   }
 }

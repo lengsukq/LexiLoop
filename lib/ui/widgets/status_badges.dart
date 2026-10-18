@@ -52,9 +52,9 @@ class InitializationBadge extends StatelessWidget {
     final (String label, LexiBadgeTone tone) = switch (status) {
       InitializationStatus.ready => ('已就绪', LexiBadgeTone.success),
       InitializationStatus.partial => ('部分就绪', LexiBadgeTone.warning),
-      InitializationStatus.pending => ('待初始化', LexiBadgeTone.neutral),
+      InitializationStatus.pending => ('待补全', LexiBadgeTone.neutral),
       InitializationStatus.queued => ('排队中', LexiBadgeTone.accent),
-      InitializationStatus.running => ('初始化中', LexiBadgeTone.accent),
+      InitializationStatus.running => ('内容补全中', LexiBadgeTone.accent),
       InitializationStatus.failed => ('失败', LexiBadgeTone.danger),
       InitializationStatus.disabled => ('已禁用', LexiBadgeTone.neutral),
     };

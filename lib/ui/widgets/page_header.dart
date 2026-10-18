@@ -22,6 +22,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 页头上的一个动作。
 ///
@@ -77,7 +78,7 @@ PageHeaderAction backAction(
   String label = '返回',
 }) => PageHeaderAction(
   label: label,
-  icon: Icons.arrow_back_rounded,
+  icon: LucideIcons.arrowLeft,
   onPressed: () {
     if (context.canPop()) {
       context.pop();
@@ -106,7 +107,7 @@ Widget backButton(
 }) => IconButton(
   key: const Key('pageHeaderBack'),
   tooltip: tooltip,
-  icon: const Icon(Icons.arrow_back_rounded),
+  icon: const Icon(LucideIcons.arrowLeft),
   onPressed: () {
     if (preferPop && context.canPop()) {
       context.pop();
@@ -340,7 +341,7 @@ class _OverflowMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<PageHeaderAction>(
       tooltip: '更多操作',
-      icon: Icon(Icons.more_horiz_rounded, color: colors.secondaryLabel),
+      icon: Icon(LucideIcons.ellipsis, color: colors.secondaryLabel),
       onSelected: (action) => action.onPressed(),
       itemBuilder: (context) => <PopupMenuEntry<PageHeaderAction>>[
         for (final action in actions)

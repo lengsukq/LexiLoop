@@ -10,6 +10,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+/// 宽屏侧边栏的根 key。
+///
+/// 导航形态断言（宽屏侧边栏 / 窄屏底部 Tab）需要一个稳定的锚点。侧边栏的
+/// 材质随设计调整过（曾是 `LiquidGlass`，现在是实色 `Material`），
+/// 测试不该把「用了哪种材质」当成识别依据。
+const Key appSidebarKey = Key('app-sidebar');
+
 /// 一个导航目的地的分组。
 ///
 /// **为什么要分组**：8 个目的地平铺时，侧边栏读起来是 8 条等权重的行——
@@ -105,7 +112,7 @@ const List<AppDestination> appDestinations = <AppDestination>[
   ),
   AppDestination(
     path: '/initialize',
-    label: '初始化',
+    label: '内容补全',
     icon: LucideIcons.refreshCw,
     shortcut: 6,
     group: DestinationGroup.library,

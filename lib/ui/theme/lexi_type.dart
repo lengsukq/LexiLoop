@@ -24,62 +24,56 @@ import 'package:flutter/material.dart';
 ///
 /// 字重只承担「强调」一层含义，不参与层级划分——层级由档位决定。
 abstract final class LexiType {
-  /// 11 磅：徽标、计数、间隔预览等最小号文字。
-  ///
-  /// 这是 macOS 的可读下限之上的一档；再小就只能靠颜色硬撑对比度了。
-  static const TextStyle caption = TextStyle(
-    fontSize: 11,
-    height: 14 / 11,
-    fontWeight: FontWeight.w500,
-  );
+  /// 紧凑信息与徽章。
+  static const TextStyle caption = TextStyle(fontSize: 12, height: 16 / 12);
 
-  /// 12 磅：次要说明、音标、字段标签。
-  static const TextStyle footnote = TextStyle(fontSize: 12, height: 16 / 12);
+  /// 字段说明与音标。
+  static const TextStyle footnote = TextStyle(fontSize: 13, height: 18 / 13);
 
-  /// 13 磅：正文默认档，等同 macOS 的 body。
-  static const TextStyle body = TextStyle(fontSize: 13, height: 18 / 13);
+  /// 桌面正文；手机提升到 16。
+  static const TextStyle body = TextStyle(fontSize: 14, height: 20 / 14);
 
-  /// 15 磅：选项标签、需要被强调的正文。
+  /// 操作标签。
   static const TextStyle callout = TextStyle(
-    fontSize: 15,
-    height: 20 / 15,
+    fontSize: 16,
+    height: 22 / 16,
     fontWeight: FontWeight.w500,
   );
 
-  /// 17 磅：卡片标题。
+  /// 内容分区标题。
   static const TextStyle title = TextStyle(
-    fontSize: 17,
-    height: 22 / 17,
+    fontSize: 18,
+    height: 24 / 18,
     fontWeight: FontWeight.w600,
   );
 
-  /// 22 磅：区块标题。
+  /// 主要分区。
   static const TextStyle title2 = TextStyle(
     fontSize: 22,
     height: 28 / 22,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
   );
 
-  /// 26 磅：页面标题。
+  /// 页面标题。
   static const TextStyle page = TextStyle(
-    fontSize: 26,
-    height: 32 / 26,
+    fontSize: 28,
+    height: 34 / 28,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   );
 
-  /// 30 磅：学习页的词条主视觉、词条详情的词条。
+  /// 学习词条。
   static const TextStyle display = TextStyle(
-    fontSize: 30,
-    height: 36 / 30,
-    fontWeight: FontWeight.w700,
-    letterSpacing: -0.6,
+    fontSize: 36,
+    height: 44 / 36,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.7,
   );
 
-  /// 34 磅：仪表盘与结算页的大数字。
+  /// 任务数字与成果。
   static const TextStyle hero = TextStyle(
-    fontSize: 34,
-    height: 40 / 34,
+    fontSize: 40,
+    height: 46 / 40,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.8,
   );
@@ -99,4 +93,49 @@ abstract final class LexiType {
     display,
     hero,
   ];
+}
+
+/// 手机的正文基线独立于系统辅助缩放，题目和大标题保持原有层级。
+class AdaptiveTypography extends StatelessWidget {
+  /// 包装应用及其浮层。
+  const new({required this.child, super.key});
+
+  /// 应用内容。
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    if (media.size.width >= 600) return child;
+    return MediaQuery(
+      data: media.copyWith(textScaler: CompactTextScaler(media.textScaler)),
+      child: child,
+    );
+  }
+}
+
+/// 将手机 14 磅正文提升至 16，再应用用户的系统缩放。
+@immutable
+class CompactTextScaler extends TextScaler {
+  /// 保留系统文字缩放。
+  const new(this.system);
+
+  /// 系统提供的缩放规则。
+  final TextScaler system;
+
+  @override
+  double scale(double fontSize) {
+    final base = switch (fontSize) {
+      <= 12 => fontSize + 1,
+      <= 14 => fontSize + (fontSize == 14 ? 2 : 1),
+      <= 16 => fontSize + 1,
+      <= 18 => fontSize + 2,
+      < 22 => fontSize + (22 - fontSize) / 2,
+      _ => fontSize,
+    };
+    return system.scale(base);
+  }
+
+  @override
+  double get textScaleFactor => scale(14) / 14;
 }

@@ -92,11 +92,14 @@ class PageShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    const pagePadding = _Padding(_gutter, _top, _gutter, _bottom);
+    final gutter = MediaQuery.sizeOf(context).width < 600
+        ? _gutter
+        : LexiLayout.pageGutterWide;
+    final pagePadding = _Padding(gutter, _top, gutter, _bottom);
     // 页头已经吃掉了顶部，正文只保留左右与底部。
     final bodyPadding = header == null
         ? pagePadding
-        : const _Padding(_gutter, 0, _gutter, _bottom);
+        : _Padding(gutter, 0, gutter, _bottom);
 
     // **必须是真的 `Scaffold`，不能只给一个 `Material`**：
     // `ScaffoldMessenger.showSnackBar` 需要「当前有后代 Scaffold」才能挂上去，
@@ -105,7 +108,7 @@ class PageShell extends StatelessWidget {
     // 透明底 + 不缩底部：外壳已经画了背景，这里只提供一个宿主。
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: <Widget>[
@@ -129,6 +132,7 @@ class PageShell extends StatelessWidget {
               _BottomActionBar(
                 maxWidth: maxWidth,
                 borderColor: colors.separator,
+                gutter: gutter,
                 child: bottomAction!,
               ),
           ],
@@ -155,11 +159,19 @@ class _BottomActionBar extends StatelessWidget {
     required this.child,
     required this.maxWidth,
     required this.borderColor,
+    required this.gutter,
   });
 
   final Widget child;
   final double maxWidth;
   final Color borderColor;
+
+  /// 与正文相同的左右栏距。
+  ///
+  /// 固定写 16 会让动作条在宽窗口下比正文各宽 16 像素：学习页的四档自评
+  /// 正好压在这条错位上，看起来像「底部那排没对齐」。这里接收
+  /// [PageShell] 已经解析好的栏距，正文与动作条用同一个值。
+  final double gutter;
 
   @override
   Widget build(BuildContext context) {
@@ -173,10 +185,10 @@ class _BottomActionBar extends StatelessWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                LexiLayout.pageGutter,
+              padding: EdgeInsets.fromLTRB(
+                gutter,
                 LexiSpace.s12,
-                LexiLayout.pageGutter,
+                gutter,
                 LexiSpace.s12,
               ),
               child: ConstrainedBox(

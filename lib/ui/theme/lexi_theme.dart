@@ -9,9 +9,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_depth.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/tactile_button_face.dart';
 
 /// 构建 LexiLoop 的浅色与深色主题。
 abstract final class LexiTheme {
@@ -22,8 +24,6 @@ abstract final class LexiTheme {
   static ThemeData get dark => _build(Brightness.dark, LexiColors.dark);
 
   static ThemeData _build(Brightness brightness, LexiColors colors) {
-    final isDark = brightness == Brightness.dark;
-
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -33,9 +33,7 @@ abstract final class LexiTheme {
       // 旧版使用系统字体栈（SF Pro / PingFang SC）；Flutter 默认即系统字体，
       // 无需显式指定，保证双端与系统一致。
       visualDensity: VisualDensity.standard,
-      splashFactory: isDark
-          ? InkSparkle.splashFactory
-          : InkRipple.splashFactory,
+      splashFactory: InkRipple.splashFactory,
       // 键盘焦点与 hover 的底色。
       //
       // 桌面端（macOS）用户会大量用键盘，`focusColor` 是唯一的焦点提示；
@@ -50,17 +48,30 @@ abstract final class LexiTheme {
       ),
       textTheme: _textTheme(colors),
       appBarTheme: _appBarTheme(colors),
-      cardTheme: _cardTheme(isDark),
-      inputDecorationTheme: _inputDecorationTheme(colors, isDark),
+      cardTheme: _cardTheme(colors),
+      inputDecorationTheme: _inputDecorationTheme(colors),
       filledButtonTheme: _filledButtonTheme(colors),
       textButtonTheme: _textButtonTheme(colors),
-      dialogTheme: _dialogTheme(isDark),
-      bottomSheetTheme: _bottomSheetTheme(isDark),
-      snackBarTheme: _snackBarTheme(isDark),
+      dialogTheme: _dialogTheme(colors),
+      bottomSheetTheme: _bottomSheetTheme(colors),
+      snackBarTheme: _snackBarTheme(colors),
       progressIndicatorTheme: _progressTheme(colors),
-      tooltipTheme: _tooltipTheme(isDark),
+      tooltipTheme: _tooltipTheme(colors),
+      iconTheme: IconThemeData(color: colors.secondaryLabel),
+      expansionTileTheme: _expansionTheme(colors),
     );
   }
+
+  static ExpansionTileThemeData _expansionTheme(LexiColors colors) =>
+      ExpansionTileThemeData(
+        iconColor: colors.secondaryLabel,
+        collapsedIconColor: colors.secondaryLabel,
+        textColor: colors.label,
+        collapsedTextColor: colors.label,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: EdgeInsets.zero,
+      );
 
   static ColorScheme _colorScheme(Brightness brightness, LexiColors colors) {
     return ColorScheme.fromSeed(
@@ -69,8 +80,16 @@ abstract final class LexiTheme {
     ).copyWith(
       surface: colors.surface,
       onSurface: colors.label,
-      primary: colors.accent,
-      onPrimary: Colors.white,
+      surfaceContainerHighest: colors.card,
+      secondary: colors.accentText,
+      onSecondary: colors.card,
+      secondaryContainer: Color.alphaBlend(
+        colors.accent.withValues(alpha: LexiTint.tint),
+        colors.card,
+      ),
+      onSecondaryContainer: colors.accentText,
+      primary: colors.accentText,
+      onPrimary: colors.card,
       error: colors.danger,
       outline: colors.borderDefault,
     );
@@ -87,9 +106,9 @@ abstract final class LexiTheme {
     );
   }
 
-  static CardThemeData _cardTheme(bool isDark) {
+  static CardThemeData _cardTheme(LexiColors colors) {
     return CardThemeData(
-      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      color: colors.card,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -99,16 +118,11 @@ abstract final class LexiTheme {
     );
   }
 
-  static InputDecorationTheme _inputDecorationTheme(
-    LexiColors colors,
-    bool isDark,
-  ) {
+  static InputDecorationTheme _inputDecorationTheme(LexiColors colors) {
     final radius = BorderRadius.circular(LexiRadius.md);
     return InputDecorationTheme(
       filled: true,
-      fillColor: isDark
-          ? const Color.fromRGBO(255, 255, 255, 0.05)
-          : const Color.fromRGBO(255, 255, 255, 0.7),
+      fillColor: colors.card,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: LexiSpace.s16,
         vertical: LexiSpace.s12,
@@ -134,44 +148,58 @@ abstract final class LexiTheme {
 
   static FilledButtonThemeData _filledButtonTheme(LexiColors colors) {
     return FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: colors.accent,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(
-          horizontal: LexiSpace.s20,
-          vertical: LexiSpace.s14,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-        ),
-        textStyle: LexiType.callout.copyWith(fontWeight: FontWeight.w600),
-      ),
+      style:
+          FilledButton.styleFrom(
+            backgroundColor: colors.accent,
+            foregroundColor: colors.onAccent,
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s20,
+              vertical: LexiSpace.s14,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LexiRadius.md),
+            ),
+            textStyle: LexiType.callout.copyWith(fontWeight: FontWeight.w600),
+            shadowColor: LexiDepth.buttonShadow,
+          ).copyWith(
+            elevation: WidgetStateProperty.resolveWith(
+              (states) =>
+                  states.contains(WidgetState.disabled) ||
+                      states.contains(WidgetState.pressed)
+                  ? 0
+                  : 2,
+            ),
+            animationDuration: LexiDepth.press,
+            backgroundBuilder: (context, states, child) =>
+                TactileButtonFace(states: states, child: child),
+          ),
     );
   }
 
   static TextButtonThemeData _textButtonTheme(LexiColors colors) {
     return TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: colors.accent,
+        foregroundColor: colors.accentText,
         textStyle: LexiType.callout.copyWith(fontWeight: FontWeight.w600),
       ),
     );
   }
 
-  static DialogThemeData _dialogTheme(bool isDark) {
+  static DialogThemeData _dialogTheme(LexiColors colors) {
     return DialogThemeData(
-      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      backgroundColor: colors.card,
       surfaceTintColor: Colors.transparent,
-      elevation: 0,
+      elevation: 12,
+      shadowColor: LexiDepth.buttonShadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LexiRadius.xl),
       ),
     );
   }
 
-  static BottomSheetThemeData _bottomSheetTheme(bool isDark) {
+  static BottomSheetThemeData _bottomSheetTheme(LexiColors colors) {
     return BottomSheetThemeData(
-      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      backgroundColor: colors.card,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: const RoundedRectangleBorder(
@@ -182,13 +210,11 @@ abstract final class LexiTheme {
     );
   }
 
-  static SnackBarThemeData _snackBarTheme(bool isDark) {
+  static SnackBarThemeData _snackBarTheme(LexiColors colors) {
     return SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: isDark
-          ? const Color(0xFF2C2C2E)
-          : const Color(0xFF1C1C1E),
-      contentTextStyle: LexiType.callout.copyWith(color: Colors.white),
+      backgroundColor: colors.label,
+      contentTextStyle: LexiType.callout.copyWith(color: colors.card),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LexiRadius.md),
       ),
@@ -203,13 +229,13 @@ abstract final class LexiTheme {
     );
   }
 
-  static TooltipThemeData _tooltipTheme(bool isDark) {
+  static TooltipThemeData _tooltipTheme(LexiColors colors) {
     return TooltipThemeData(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFF1C1C1E),
+        color: colors.label,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
-      textStyle: LexiType.footnote.copyWith(color: Colors.white),
+      textStyle: LexiType.footnote.copyWith(color: colors.card),
     );
   }
 

@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 空态与失败态的外边距。
 const EdgeInsets _statePadding = EdgeInsets.all(LexiSpace.s32);
@@ -45,7 +46,7 @@ class PageEmptyState extends StatelessWidget {
   const new({
     required this.title,
     required this.message,
-    this.icon = Icons.inbox_rounded,
+    this.icon = LucideIcons.inbox,
     this.primaryLabel,
     this.onPrimary,
     this.primaryKey,
@@ -178,7 +179,7 @@ class PageErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
-              Icons.error_outline_rounded,
+              LucideIcons.circleAlert,
               size: _stateIconSize,
               color: colors.danger,
             ),

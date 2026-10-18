@@ -26,6 +26,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -53,6 +54,8 @@ class SectionCard extends StatelessWidget {
     this.icon,
     this.subtitle,
     this.trailing,
+    this.tone,
+    this.variant = SurfaceVariant.card,
     super.key,
   });
 
@@ -71,16 +74,24 @@ class SectionCard extends StatelessWidget {
   /// 卡片内容。
   final Widget child;
 
+  /// 内容角色的柔和彩色分区。
+  final LexiTone? tone;
+
+  /// 按内容用途选择表面层级。
+  final SurfaceVariant variant;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Surface(
+      tone: tone,
+      variant: variant,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
       padding: const EdgeInsets.all(sectionCardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _titleRow(colors),
+          _titleRow(context, colors),
           const SizedBox(height: sectionCardTitleGap),
           child,
         ],
@@ -88,38 +99,64 @@ class SectionCard extends StatelessWidget {
     );
   }
 
-  Widget _titleRow(LexiColors colors) {
-    final subtitle = this.subtitle;
-    final trailing = this.trailing;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            if (icon != null) ...<Widget>[
-              Icon(icon, size: _sectionCardIconSize, color: colors.accent),
-              const SizedBox(width: _sectionCardIconGap),
+  Widget _titleRow(BuildContext context, LexiColors colors) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final heading = _heading(context, colors);
+          final accessory = trailing;
+          if (accessory == null) return heading;
+          if (constraints.maxWidth < 480 ||
+              MediaQuery.textScalerOf(context).scale(13) > 20) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                heading,
+                const SizedBox(height: LexiSpace.s12),
+                accessory,
+              ],
+            );
+          }
+          return Row(
+            children: <Widget>[
+              Expanded(child: heading),
+              accessory,
             ],
-            Expanded(
-              child: Text(
-                title,
-                style: LexiType.callout.copyWith(
-                  color: colors.label,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ?trailing,
-          ],
+          );
+        },
+      ),
+      if (subtitle != null) ...<Widget>[
+        const SizedBox(height: _sectionCardSubtitleGap),
+        Text(
+          subtitle!,
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        if (subtitle != null) ...<Widget>[
-          const SizedBox(height: _sectionCardSubtitleGap),
-          Text(
-            subtitle,
-            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-          ),
-        ],
       ],
-    );
-  }
+    ],
+  );
+
+  Widget _heading(BuildContext context, LexiColors colors) => Row(
+    children: <Widget>[
+      if (icon != null) ...<Widget>[
+        Icon(
+          icon,
+          size: _sectionCardIconSize,
+          color:
+              tone?.foreground(Theme.of(context).brightness) ??
+              colors.secondaryLabel,
+        ),
+        const SizedBox(width: _sectionCardIconGap),
+      ],
+      Expanded(
+        child: Text(
+          title,
+          style: LexiType.callout.copyWith(
+            color: colors.label,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ],
+  );
 }

@@ -36,7 +36,6 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
-import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
@@ -158,12 +157,12 @@ void main() {
 
     await pumpRoute(tester, '/', 1200);
     expect(find.text('更多'), findsNothing);
-    // 侧边栏是宽屏唯一的 LiquidGlass 外壳，用它把断言限定在导航里：
-    // 「今日」这类标签在页面正文里也会出现。
+    // 用侧边栏的稳定 key 把断言限定在导航里：「今日」这类标签在页面正文里
+    // 也会出现，按材质找会随设计调整而失效。
     for (final destination in appDestinations) {
       expect(
         find.descendant(
-          of: find.byType(LiquidGlass),
+          of: find.byKey(appSidebarKey),
           matching: find.text(destination.label),
         ),
         findsWidgets,

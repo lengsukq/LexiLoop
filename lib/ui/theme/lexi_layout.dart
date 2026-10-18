@@ -38,7 +38,7 @@ abstract final class LexiLayout {
   /// 普通页面正文列的宽度上限。
   ///
   /// 卡片、列表、统计格都按它收敛；超过就在内容区居中（不是靠左）。
-  static const double pageMaxWidth = 1040;
+  static const double pageMaxWidth = 1120;
 
   /// 沉浸式页面的内容宽度上限。
   ///
@@ -55,7 +55,7 @@ abstract final class LexiLayout {
   static const double readingMaxWidth = 720;
 
   /// 页面栏距（左右内边距）。
-  static const double pageGutter = 20;
+  static const double pageGutter = 16;
 
   /// 宽窗口下的栏距。
   static const double pageGutterWide = 32;
@@ -64,7 +64,7 @@ abstract final class LexiLayout {
   ///
   /// 注意它与侧边栏断点（1024）不是一回事：侧边栏断点决定**导航形态**，
   /// 这里决定**内容排布**。900 是「两栏各 440」仍然成立的宽度。
-  static const double wideBreakpoint = 900;
+  static const double wideBreakpoint = 880;
 
   /// 同级卡片之间的默认间距。
   static const double cardGap = 16;

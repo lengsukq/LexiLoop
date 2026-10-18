@@ -74,15 +74,15 @@ void main() {
   });
 
   group('三种形态', () {
-    testWidgets('卡片：card 底色 + 发丝描边 + 抬升', (tester) async {
+    testWidgets('阅读面：card 底色，无描边与投影', (tester) async {
       await tester.pumpWidget(
         wrapWithAppTheme(const Scaffold(body: Surface(child: Text('卡片')))),
       );
 
       final material = surfaceMaterial(tester);
       expect(material.color, LexiColors.light.card);
-      expect(surfaceShape(tester)!.side.color, LexiColors.light.borderSubtle);
-      expect(material.elevation, greaterThan(0));
+      expect(surfaceShape(tester)!.side, BorderSide.none);
+      expect(material.elevation, 0);
     });
 
     testWidgets('内嵌块：fill 底色 + 无描边 + 不抬升', (tester) async {

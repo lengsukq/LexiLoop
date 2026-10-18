@@ -17,22 +17,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 import '../support/contrast.dart';
 import 'source_scan.dart';
 
 /// 页面底色（浅色）。
-const Color _lightSurface = Color(0xFFF2F2F7);
+final Color _lightSurface = LexiColors.light.surface;
 
 /// 卡片底色（浅色）。
-const Color _lightCard = Color(0xFFFFFFFF);
+final Color _lightCard = LexiColors.light.card;
 
 /// 页面底色（深色）。
-const Color _darkSurface = Color(0xFF000000);
+final Color _darkSurface = LexiColors.dark.surface;
 
 /// 卡片底色（深色）。
-const Color _darkCard = Color(0xFF1C1C1E);
+final Color _darkCard = LexiColors.dark.card;
 
 /// 允许使用 `LiquidGlass` 的**功能层**文件。
 ///
@@ -229,6 +230,27 @@ void main() {
   });
 
   group('对比度', () {
+    test('彩色分区：明暗模式所有文字与角色图标均 ≥4.5:1', () {
+      for (final brightness in Brightness.values) {
+        final colors = brightness == Brightness.dark
+            ? LexiColors.dark
+            : LexiColors.light;
+        for (final tone in LexiTone.values) {
+          final background = tone.background(brightness);
+          for (final foreground in <Color>[
+            ..._textTokens(colors).values,
+            tone.foreground(brightness),
+          ]) {
+            expect(
+              contrastRatio(foreground, background),
+              greaterThanOrEqualTo(4.5),
+              reason: '$brightness / $tone 的文字需要保持清晰',
+            );
+          }
+        }
+      }
+    });
+
     /// 浅色淡底（`fill` 压在页面底上）的实际颜色。
     final lightFill = Color.alphaBlend(LexiColors.light.fill, _lightSurface);
 
@@ -259,17 +281,12 @@ void main() {
       expectAll(foregrounds, _lightCard, 4.5, where: '卡片底');
     });
 
-    test('浅色：淡底上除 quaternary 外都 ≥4.5:1', () {
-      // `quaternaryLabel` 压在 `fill` 上只有约 3.97:1，因此**禁止**这样配对；
-      // 淡色底上一律用 tertiary 或更高。这条规则写在这里，不靠人记。
-      final light = _textTokens(LexiColors.light)..remove('quaternaryLabel');
-      expectAll(light, lightFill, 4.5, where: '淡底(fill)');
-      expect(
-        contrastRatio(LexiColors.light.quaternaryLabel, lightFill),
-        lessThan(4.5),
-        reason:
-            'quaternaryLabel 在 fill 上不达标——这是**已知且被禁止**的配对，'
-            ' 若它忽然达标了，说明色板被改动，请同步更新本条与文档。',
+    test('浅色：淡底上全部文字层级 ≥4.5:1', () {
+      expectAll(
+        _textTokens(LexiColors.light),
+        lightFill,
+        4.5,
+        where: '淡底(fill)',
       );
     });
 
@@ -306,15 +323,15 @@ void main() {
       }
     });
 
-    test('主按钮：白字压强调色 ≥3:1（加粗按钮文字的下限）', () {
+    test('主按钮：实际前景色压强调色 ≥4.5:1', () {
       for (final entry in <String, LexiColors>{
         '浅色': LexiColors.light,
         '深色': LexiColors.dark,
       }.entries) {
-        final ratio = contrastRatio(Colors.white, entry.value.accent);
+        final ratio = contrastRatio(entry.value.onAccent, entry.value.accent);
         expect(
           ratio,
-          greaterThanOrEqualTo(3),
+          greaterThanOrEqualTo(4.5),
           reason:
               '${entry.key}模式的强调色按钮上白字只有 '
               '${ratio.toStringAsFixed(2)}:1',

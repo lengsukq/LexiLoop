@@ -68,7 +68,7 @@ class ResetProgressOption extends StatelessWidget {
                 Text(
                   resetProgressTitle,
                   style: LexiType.body.copyWith(
-                    color: colors.danger,
+                    color: colors.dangerText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

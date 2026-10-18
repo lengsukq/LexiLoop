@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 外边距。
 const double _errorViewPadding = 32;
@@ -46,7 +47,7 @@ class ErrorRetryView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
-              Icons.error_outline_rounded,
+              LucideIcons.circleAlert,
               size: _errorIconSize,
               color: colors.danger,
             ),

@@ -16,6 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 承载 8 个分支的自适应外壳。
 class AdaptiveShell extends StatelessWidget {
@@ -30,31 +31,34 @@ class AdaptiveShell extends StatelessWidget {
     final location = GoRouterState.of(context).uri.path;
     final immersive = isImmersivePath(location);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final useSidebar = constraints.maxWidth >= sidebarBreakpoint;
-        // 沉浸模式**只隐藏窄屏的底部 Tab Bar**，宽屏侧边栏保留。
-        //
-        // 旧版 `components/app-shell.tsx` 就是这么做的：`isStudyScreen` 只影响
-        // `!isStudyScreen && <nav class="... lg:hidden">`（移动端底栏）与底部
-        // 内边距，桌面侧边栏 `<aside class="... lg:flex">` 从不隐藏。
-        //
-        // 早先的实现把两者一起隐藏了，于是在沉浸页上：栈里没有上一页、
-        // 侧边栏又不在，用户只能靠页面自己的退出按钮——那个按钮一旦写错
-        // （见 `study_page.dart` 的 `_leaveToHome`），整页就没有出路。
-        final content = _content();
-        // **环境光斑只画一次**。收敛前窄屏的沉浸分支直接返回 `content`，
-        // 于是学习页自己画的 `AmbientBackground`（`study_page.dart`）与
-        // 游戏页画的（`game_shell.dart`）在宽屏下与外壳画的叠成两层，
-        // 光斑颜色被乘了两遍，页面比其它页更“脏”一档。
-        if (useSidebar) {
-          return AmbientBackground(
-            child: _buildWide(context, content, immersive: immersive),
-          );
-        }
-        final shell = immersive ? content : _buildCompact(context, content);
-        return AmbientBackground(child: shell);
-      },
+    return Material(
+      type: MaterialType.transparency,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useSidebar = constraints.maxWidth >= sidebarBreakpoint;
+          // 沉浸模式**只隐藏窄屏的底部 Tab Bar**，宽屏侧边栏保留。
+          //
+          // 旧版 `components/app-shell.tsx` 就是这么做的：`isStudyScreen` 只影响
+          // `!isStudyScreen && <nav class="... lg:hidden">`（移动端底栏）与底部
+          // 内边距，桌面侧边栏 `<aside class="... lg:flex">` 从不隐藏。
+          //
+          // 早先的实现把两者一起隐藏了，于是在沉浸页上：栈里没有上一页、
+          // 侧边栏又不在，用户只能靠页面自己的退出按钮——那个按钮一旦写错
+          // （见 `study_page.dart` 的 `_leaveToHome`），整页就没有出路。
+          final content = _content();
+          // **环境光斑只画一次**。收敛前窄屏的沉浸分支直接返回 `content`，
+          // 于是学习页自己画的 `AmbientBackground`（`study_page.dart`）与
+          // 游戏页画的（`game_shell.dart`）在宽屏下与外壳画的叠成两层，
+          // 光斑颜色被乘了两遍，页面比其它页更“脏”一档。
+          if (useSidebar) {
+            return AmbientBackground(
+              child: _buildWide(context, content, immersive: immersive),
+            );
+          }
+          final shell = immersive ? content : _buildCompact(context, content);
+          return AmbientBackground(child: shell);
+        },
+      ),
     );
   }
 
@@ -130,25 +134,27 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
-    return Padding(
-      padding: const EdgeInsets.all(LexiSpace.s12),
-      child: LiquidGlass(
-        borderRadius: BorderRadius.circular(LexiRadius.xl),
-        showSpecular: true,
-        showEdge: true,
-        padding: const EdgeInsets.all(LexiSpace.s16),
+    return Material(
+      key: appSidebarKey,
+      color: context.lexiColors.card,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          LexiSpace.s20,
+          LexiSpace.s24,
+          LexiSpace.s16,
+          LexiSpace.s16,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _SidebarBrand(),
-            const SizedBox(height: LexiSpace.s20),
+            const SizedBox(height: LexiSpace.s24),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: _navigationChildren(context, location),
               ),
             ),
-            const _SidebarFooter(),
           ],
         ),
       ),
@@ -231,7 +237,7 @@ class _SidebarBrand extends StatelessWidget {
     final colors = context.lexiColors;
     return Row(
       children: <Widget>[
-        Icon(Icons.loop_rounded, color: colors.accent, size: 22),
+        Icon(LucideIcons.repeat2, color: colors.accent, size: 22),
         const SizedBox(width: LexiSpace.s8),
         Text(
           'LexiLoop',
@@ -260,7 +266,7 @@ class _SidebarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final foreground = active ? colors.accent : colors.secondaryLabel;
+    final foreground = active ? colors.accentText : colors.secondaryLabel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s2),
@@ -285,7 +291,7 @@ class _SidebarItem extends StatelessWidget {
                   child: Text(
                     destination.label,
                     style: LexiType.callout.copyWith(
-                      color: active ? colors.accent : colors.label,
+                      color: active ? colors.accentText : colors.label,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
@@ -302,80 +308,6 @@ class _SidebarItem extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// 侧边栏底部状态卡。
-///
-/// **注意**：旧版这里写的是「自托管运行中」加绿色呼吸点。纯本地版没有
-/// 自托管概念，那行文案是错误信息，此处改为反映本地数据库状态。
-class _SidebarFooter extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        LiquidGlass(
-          level: GlassLevel.subtle,
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s10,
-            vertical: LexiSpace.s8,
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(Icons.storage_rounded, size: 13, color: colors.success),
-              const SizedBox(width: LexiSpace.s6),
-              Expanded(
-                child: Text(
-                  '本地数据库',
-                  style: LexiType.caption.copyWith(
-                    color: colors.secondaryLabel,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              Icon(Icons.auto_awesome, size: 12, color: colors.accent),
-              const SizedBox(width: LexiSpace.s4),
-              Text(
-                'FSRS',
-                style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: LexiSpace.s8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              // 两侧文本都要可收缩：侧边栏宽度固定，系统字体放大时
-              // 不定宽文本会直接溢出。
-              Flexible(
-                child: Text(
-                  'LexiLoop v1.0',
-                  overflow: TextOverflow.ellipsis,
-                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
-                ),
-              ),
-              const SizedBox(width: LexiSpace.s8),
-              Flexible(
-                child: Text(
-                  '⌘1-8 快捷切换',
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -402,45 +334,34 @@ class _BottomBar extends StatelessWidget {
       (d) => isDestinationActive(d, location),
     );
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          LexiSpace.s12,
-          0,
-          LexiSpace.s12,
-          LexiSpace.s8,
-        ),
-        child: LiquidGlass(
-          borderRadius: BorderRadius.circular(LexiRadius.xl),
-          showSpecular: true,
-          showEdge: true,
+    return Material(
+      color: context.lexiColors.card,
+      elevation: 4,
+      shadowColor: context.lexiColors.borderSubtle,
+      child: SafeArea(
+        top: false,
+        child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s6,
-            vertical: LexiSpace.s6,
+            horizontal: LexiSpace.s8,
+            vertical: LexiSpace.s4,
           ),
-          // InkWell 需要 Material 祖先才能绘制涟漪；LiquidGlass 只提供
-          // DecoratedBox，因此在此显式包一层透明 Material。
-          child: Material(
-            type: MaterialType.transparency,
-            child: Row(
-              children: <Widget>[
-                for (final destination in primary)
-                  Expanded(
-                    child: _BottomBarItem(
-                      destination: destination,
-                      active: isDestinationActive(destination, location),
-                      onTap: () => _goTo(destination),
-                    ),
-                  ),
+          child: Row(
+            children: <Widget>[
+              for (final destination in primary)
                 Expanded(
-                  child: _MoreButton(
-                    active: overflowActive,
-                    onTap: () => _openMoreSheet(context, overflow),
+                  child: _BottomBarItem(
+                    destination: destination,
+                    active: isDestinationActive(destination, location),
+                    onTap: () => _goTo(destination),
                   ),
                 ),
-              ],
-            ),
+              Expanded(
+                child: _MoreButton(
+                  active: overflowActive,
+                  onTap: () => _openMoreSheet(context, overflow),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -487,7 +408,7 @@ class _BottomBarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final foreground = active ? colors.accent : colors.tertiaryLabel;
+    final foreground = active ? colors.accentText : colors.tertiaryLabel;
 
     return InkWell(
       onTap: onTap,
@@ -522,7 +443,7 @@ class _MoreButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final foreground = active ? colors.accent : colors.tertiaryLabel;
+    final foreground = active ? colors.accentText : colors.tertiaryLabel;
 
     return InkWell(
       onTap: onTap,
@@ -532,7 +453,7 @@ class _MoreButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.more_horiz_rounded, size: 20, color: foreground),
+            Icon(LucideIcons.ellipsis, size: 20, color: foreground),
             const SizedBox(height: LexiSpace.s4),
             Text(
               '更多',

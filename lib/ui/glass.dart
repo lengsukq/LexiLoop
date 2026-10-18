@@ -60,32 +60,6 @@ List<double> _saturationMatrix(double s) {
   ];
 }
 
-/// 玻璃配色。
-///
-/// 数值直接取自旧版 `glass.css`，集中在此以免散落在构建逻辑里，
-/// 也便于后续按视觉稿微调时只改一处。
-abstract final class _GlassPalette {
-  /// 渐变起始色（顶部高光）。
-  static const Color gradientTopLight = Color.fromRGBO(255, 255, 255, 0.68);
-  static const Color gradientTopDark = Color.fromRGBO(255, 255, 255, 0.09);
-
-  /// 渐变结束色（主体底色）。
-  static const Color gradientBottomLight = Color.fromRGBO(255, 255, 255, 0.62);
-  static const Color gradientBottomDark = Color.fromRGBO(28, 28, 30, 0.72);
-
-  /// 上边框——旧版此边显著亮于下边框（.55 vs .25）。
-  static const Color borderTopLight = Color.fromRGBO(255, 255, 255, 0.55);
-  static const Color borderTopDark = Color.fromRGBO(255, 255, 255, 0.14);
-
-  /// 下边框。
-  static const Color borderBottomLight = Color.fromRGBO(255, 255, 255, 0.25);
-  static const Color borderBottomDark = Color.fromRGBO(255, 255, 255, 0.06);
-
-  /// 投影。
-  static const Color shadowLight = Color.fromRGBO(0, 0, 0, 0.06);
-  static const Color shadowDark = Color.fromRGBO(0, 0, 0, 0.4);
-}
-
 /// 一块液态玻璃面板。
 ///
 /// 典型用法是作为侧边栏、Tab Bar、卡片或对话框的容器。
@@ -155,11 +129,11 @@ class LiquidGlass extends StatelessWidget {
                     painter: _GlassBorderPainter(
                       radius: radius,
                       topColor: isDark
-                          ? _GlassPalette.borderTopDark
-                          : _GlassPalette.borderTopLight,
+                          ? LexiGlassPalette.borderTopDark
+                          : LexiGlassPalette.borderTopLight,
                       bottomColor: isDark
-                          ? _GlassPalette.borderBottomDark
-                          : _GlassPalette.borderBottomLight,
+                          ? LexiGlassPalette.borderBottomDark
+                          : LexiGlassPalette.borderBottomLight,
                     ),
                   ),
                 ),
@@ -183,19 +157,21 @@ class LiquidGlass extends StatelessWidget {
             : Alignment.bottomRight,
         colors: <Color>[
           if (isDark)
-            _GlassPalette.gradientTopDark
+            LexiGlassPalette.gradientTopDark
           else
-            _GlassPalette.gradientTopLight,
+            LexiGlassPalette.gradientTopLight,
           if (isDark)
-            _GlassPalette.gradientBottomDark
+            LexiGlassPalette.gradientBottomDark
           else
-            _GlassPalette.gradientBottomLight,
+            LexiGlassPalette.gradientBottomLight,
         ],
       ),
       borderRadius: radius,
       boxShadow: <BoxShadow>[
         BoxShadow(
-          color: isDark ? _GlassPalette.shadowDark : _GlassPalette.shadowLight,
+          color: isDark
+              ? LexiGlassPalette.shadowDark
+              : LexiGlassPalette.shadowLight,
           blurRadius: 24,
           offset: const Offset(0, 8),
         ),
@@ -248,11 +224,8 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
-/// 环境光背景，对应旧版 `globals.css` 的 `body::before`。
-///
-/// 旧版是 4 层径向渐变叠加 `filter: blur(80px)`。Flutter 侧用
-/// `RadialGradient` 直接绘制柔和的色斑，比真实模糊更省算力——
-/// 视觉等效而无需每帧做一次全屏高斯模糊。
+/// 全局中性页面底色。沿用入口名称以兼容外壳与顶层路由，
+/// 不再绘制装饰光斑，内容层的层级由表面与留白表达。
 class AmbientBackground extends StatelessWidget {
   /// 创建环境光背景。
   const new({required this.child, super.key});
@@ -262,64 +235,7 @@ class AmbientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final accentSpot = colors.accent.withValues(alpha: isDark ? 0.16 : 0.14);
-    final purpleSpot = colors.purple.withValues(alpha: isDark ? 0.12 : 0.1);
-    final successSpot = colors.success.withValues(alpha: isDark ? 0.08 : 0.09);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(color: colors.surface),
-      child: Stack(
-        children: <Widget>[
-          Positioned(
-            top: -180,
-            left: -140,
-            child: _Spot(color: accentSpot, size: 520),
-          ),
-          Positioned(
-            top: 120,
-            right: -180,
-            child: _Spot(color: purpleSpot, size: 480),
-          ),
-          Positioned(
-            bottom: -200,
-            left: 80,
-            child: _Spot(color: successSpot, size: 460),
-          ),
-          Positioned.fill(child: child),
-        ],
-      ),
-    );
-  }
-}
-
-class _Spot extends StatelessWidget {
-  const new({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: <Color>[
-                color,
-                color.withValues(alpha: LexiTint.none),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return ColoredBox(color: context.lexiColors.surface, child: child);
   }
 }
 

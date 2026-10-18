@@ -5,12 +5,17 @@
 /// 职责拆开：
 ///
 /// - [StudyProgressHeader]：进度与计数，只读；
-/// - [StudyPrompt]：题干，按题型分四种形态；
+/// - [StudyPrompt]：题干与作答指令；
 /// - [StudyHintBar]：拼写题的字母提示与提示按钮；
 /// - [StudyAnswerArea]：作答控件，每个题型一个组件且自持草稿；
+/// - [StudyRevealPanel]：揭示后的判定、正确答案与释义；
 /// - [StudyRatingBar]：四档自评（含间隔预览），**同时是提交入口**；
-/// - [StudyFeedbackPanel] / [StudySummaryView]：判定反馈与会话总结；
-/// - 本文件只保留「编排」：什么时候开始、什么时候提交、什么时候前进。
+/// - [StudySummaryView]：会话总结；
+/// - 本文件只保留「编排」：什么时候揭示、什么时候提交、什么时候前进。
+///
+/// **流程与 Next 版对齐**：作答 → 揭示（对错/答案/差异）→ 自评（写库）
+/// → 自动进入下一题。自评不再发生在看到答案之前，单题界面也不再出现
+/// 「回答正确」与「自评：忘了」并排的卡片（见 `docs/FLUTTER_PARITY.md`）。
 library;
 
 import 'dart:async';
@@ -25,37 +30,47 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_evaluator.dart';
+import 'package:lexiloop/features/study/study_actions.dart';
 import 'package:lexiloop/features/study/study_answer.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
-import 'package:lexiloop/features/study/study_feedback.dart';
 import 'package:lexiloop/features/study/study_hint_bar.dart';
 import 'package:lexiloop/features/study/study_interval_preview.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
-import 'package:lexiloop/features/study/study_local_verdict.dart';
 import 'package:lexiloop/features/study/study_progress_header.dart';
 import 'package:lexiloop/features/study/study_prompt.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
 import 'package:lexiloop/features/study/study_rating.dart';
+import 'package:lexiloop/features/study/study_reveal.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_states.dart';
+import 'package:lexiloop/features/study/study_summary.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/fsrs_scheduler.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/widgets/page_shell.dart';
 
-/// 四档自评快捷键 `1`–`4` 对应的数字键。
+/// 数字键 `1`–`4`。
 ///
 /// `LogicalKeyboardKey` 不支持算术运算，必须显式列表映射（与 `app.dart`
-/// 的导航快捷键同一写法）。
-const List<LogicalKeyboardKey> _ratingKeys = <LogicalKeyboardKey>[
+/// 的导航快捷键同一写法）。作答阶段它们选选项，揭示后它们才是自评。
+const List<LogicalKeyboardKey> _numberKeys = <LogicalKeyboardKey>[
   LogicalKeyboardKey.digit1,
   LogicalKeyboardKey.digit2,
   LogicalKeyboardKey.digit3,
   LogicalKeyboardKey.digit4,
 ];
 
+/// 选择题倒计时的刷新间隔（毫秒）。
+const int _choiceTickMs = 80;
+
+/// 揭示后把面板滚进视野的时长（毫秒）。
+const int _revealScrollMs = 220;
+
 /// 学习会话页面。
 ///
-/// 学习页在 `immersivePaths` 内，外壳不渲染导航，因此返回与进度条都由
+/// 学习页在 `immersivePaths` 内，外壳不渲染底部导航，因此返回与进度条都由
 /// 页面自己提供。
 class StudyPage extends ConsumerWidget {
   /// 以学习模式创建页面。
@@ -71,24 +86,22 @@ class StudyPage extends ConsumerWidget {
         ref.watch(appSettingsProvider).value?.playback.defaultAccent ??
         Accent.us;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: session.when(
-          loading: () =>
-              StudySessionBody(mode: mode, session: null, accent: accent),
-          error: (error, _) => StudyErrorView(
-            message: studyErrorMessage(error),
-            // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
-            // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
-            onRetry: () => ref.invalidate(studySessionProvider),
-            // 沉浸路由上没有导航外壳可以依赖，这一条是唯一的退路。
-            onExit: () => leaveStudyToHome(context),
-          ),
-          data: (view) =>
-              StudySessionBody(mode: mode, session: view, accent: accent),
+    return session.when(
+      loading: () =>
+          StudySessionBody(mode: mode, session: null, accent: accent),
+      error: (error, _) => PageShell(
+        maxWidth: LexiLayout.immersiveMaxWidth,
+        child: StudyErrorView(
+          message: studyErrorMessage(error),
+          // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
+          // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
+          onRetry: () => ref.invalidate(studySessionProvider),
+          // 沉浸路由上没有导航外壳可以依赖，这一条是唯一的退路。
+          onExit: () => leaveStudyToHome(context),
         ),
       ),
+      data: (view) =>
+          StudySessionBody(mode: mode, session: view, accent: accent),
     );
   }
 }
@@ -113,7 +126,7 @@ void leaveStudyToHome(BuildContext context) {
   router.go('/');
 }
 
-/// 会话主体：持有作答草稿与判定反馈，编排各子组件。
+/// 会话主体：持有作答草稿、揭示状态与判定预览，编排各子组件。
 class StudySessionBody extends ConsumerStatefulWidget {
   /// 以模式、会话与默认口音构造。
   const new({
@@ -138,10 +151,29 @@ class StudySessionBody extends ConsumerStatefulWidget {
 
 class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     with WidgetsBindingObserver {
-  ReviewOutcome? _outcome;
-  StudyItemView? _answered;
-  String? _answer;
+  /// 已经揭示、正在等待自评的题目；为 `null` 表示还在作答阶段。
+  ///
+  /// **必须冻结**：提交成功后 provider 会立刻指向下一题，而界面还要显示
+  /// 当前题的揭示面板，直到 [_advance] 主动清空。
+  StudyItemView? _revealItem;
+
+  /// 揭示时的本地判定预览（与服务判题同源）。
+  AnswerPreview? _preview;
+
+  /// 当前作答文本。
+  String _answer = '';
+
+  /// 揭示时停表得到的作答时长；提交与重试都用它。
+  int? _durationMs;
+
+  /// 提交进行中；同时是自评条的禁用条件。
   bool _busy = false;
+
+  /// 已按下、尚未落库的档位（提交瞬间的高亮）。
+  ReviewRating? _pendingRating;
+
+  /// 揭示面板的 key，用于把答案滚进视野。
+  final GlobalKey _revealKey = GlobalKey();
 
   /// 活跃计时器：只统计「答题中且未揭示答案」的前台时间。
   late final StudyClock _clock;
@@ -152,17 +184,33 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   /// 已经为哪道题发起过预览请求（失败也不重试，避免答题过程中反复打库）。
   int? _previewItemId;
 
-  /// 正在展示的题目 ID；换题时据此重置计时、提示与预览。
+  /// 正在展示的题目 ID；换题时据此重置计时、提示与选项门。
   int? _trackedItemId;
 
   /// 已经为哪道题预取过真人录音。
   int? _preloadedItemId;
+
+  /// 已经为哪道题自动播过音。
+  int? _autoSpokenItemId;
 
   /// 已揭开的提示层数；每换一题清零。
   int _hintLevel = 0;
 
   /// 本题是否用过提示；每换一题清零。
   bool _usedHint = false;
+
+  /// 选择题选项是否已经显示（受设置里的揭示延迟控制）。
+  bool _choicesVisible = true;
+
+  /// 倒计时进度，0–1。
+  double _choiceRevealProgress = 1;
+
+  /// 本次延迟的配置秒数。
+  int _choiceRevealSeconds = 0;
+
+  Timer? _choiceRevealTimer;
+  Timer? _choiceProgressTimer;
+  Timer? _autoSpeakTimer;
 
   @override
   void initState() {
@@ -175,12 +223,15 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     if (widget.session == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _start());
     } else {
+      _seedChoiceVisibility(widget.session?.currentItem);
       _scheduleItemPrep();
     }
   }
 
   @override
   void dispose() {
+    _cancelChoiceTimers();
+    _autoSpeakTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     WidgetsBinding.instance.removeObserver(this);
     _clock.dispose();
@@ -198,13 +249,15 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     super.didUpdateWidget(oldWidget);
     if (widget.session?.id != oldWidget.session?.id) {
       _resetRound();
+      _seedChoiceVisibility(widget.session?.currentItem);
       _scheduleItemPrep();
       return;
     }
-    // 反馈展示期间当前题被冻结（见 _answered），草稿必须留着。
-    if (_outcome != null) return;
-    if (_itemIdOf(oldWidget.session) != _itemIdOf(widget.session)) {
-      _answer = null;
+    // 揭示期间 provider 已经推进到下一题，但画面必须停在当前题的答案上。
+    if (_revealItem != null) return;
+    final item = widget.session?.currentItem;
+    if (item != null && item.itemId != _trackedItemId) {
+      _seedChoiceVisibility(item);
     }
     _scheduleItemPrep();
   }
@@ -212,19 +265,29 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    if (session == null) return const StudyLoadingView();
+    if (session == null) {
+      return const PageShell(
+        maxWidth: LexiLayout.immersiveMaxWidth,
+        child: StudyLoadingView(),
+      );
+    }
 
     // 没有题目时 `currentItem` 也是 `null`（`resumeIndex >= items.length`），
     // 因此「今天没词可学」与「这一轮做完了」共用结算视图——旧版
     // `study-client.tsx:548` 正是这么做的，只是标题不同。
-    final item = _answered ?? session.currentItem;
+    final item = _revealItem ?? session.currentItem;
     if (item == null) {
-      return StudySummaryView(
-        session: session,
-        onRestart: _restart,
-        onHome: _leaveToHome,
+      return PageShell(
+        maxWidth: LexiLayout.immersiveMaxWidth,
+        scrollable: true,
+        child: StudySummaryView(
+          session: session,
+          onRestart: _restart,
+          onHome: _leaveToHome,
+        ),
       );
     }
+
     // 答题区包一层输入监听：指针、滚轮、滚动都算「用户在场」，
     // 空闲判定因此不会被误触发。
     return Listener(
@@ -236,143 +299,141 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
           _clock.touch();
           return false;
         },
-        child: Column(
-          children: <Widget>[
-            StudyProgressHeader(
-              session: session,
-              onSkip: _canSkip ? _skip : null,
-              onExit: _leaveToHome,
-            ),
-            Expanded(child: _content(item)),
-          ],
+        child: PageShell(
+          maxWidth: LexiLayout.immersiveMaxWidth,
+          header: StudyProgressHeader(session: session, onExit: _leaveToHome),
+          bottomAction: _bottomAction(context, item),
+          scrollable: true,
+          child: _content(item),
         ),
       ),
     );
   }
 
+  /// 题干、提示、作答控件与揭示面板。
   Widget _content(StudyItemView item) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s12,
-        LexiSpace.s20,
-        LexiSpace.s32,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         StudyPrompt(item: item, accent: widget.accent),
         const SizedBox(height: LexiSpace.s16),
         ..._hintSection(item),
         _answerSection(item),
-        // **提交之后不再留那排灰掉的自评按钮**。
-        //
-        // 收敛前这里是「自评四档 + 判定面板 + 下一题」三块依次堆着：
-        // 提交后四档整排变灰（既点不动也没信息），判定与「下一题」被推到
-        // 它们下面——在 840 高的窗口里通常已经在折叠线之外，于是用户按下
-        // 回车后看到的唯一变化是「按钮灰了」，而真正该看的东西看不到。
-        //
-        // 自评分数并没有丢：`StudyFeedbackPanel` 自己会写「自评：记得」
-        // 与下次复习间隔，那才是这一排按钮在提交后唯一还值得说的信息。
-        if (_outcome == null) ...<Widget>[
-          const SizedBox(height: LexiSpace.s20),
-          _ratingSection(item),
-        ] else
-          ..._feedbackSection(item),
+        ..._revealSection(item),
       ],
     );
   }
 
-  /// 提示区；只有拼写类题目才有。
+  /// 提示区；只有未揭示的拼写类题目才有。
   List<Widget> _hintSection(StudyItemView item) {
-    if (!studyHintAvailable(item)) return const <Widget>[];
+    if (_revealItem != null || !studyHintAvailable(item)) {
+      return const <Widget>[];
+    }
     return <Widget>[
       StudyHintBar(item: item, accent: widget.accent, hint: _hintState(item)),
       const SizedBox(height: LexiSpace.s12),
     ];
   }
 
-  /// 作答区。
-  Widget _answerSection(StudyItemView item) => StudyAnswerArea(
-    item: item,
-    outcome: _outcome,
-    onAnswer: _setAnswer,
-    onSubmit: _submit,
-  );
+  /// 作答控件；选择题倒计时期间换成「立即显示选项」。
+  Widget _answerSection(StudyItemView item) {
+    if (_revealItem == null && !_choicesVisible) {
+      return StudyChoiceGate(
+        progress: _choiceRevealProgress,
+        remainingSeconds: _choiceRemainingSeconds,
+        onRevealNow: _revealChoicesNow,
+      );
+    }
+    return StudyAnswerArea(
+      item: item,
+      answer: _answer,
+      revealed: _revealItem != null,
+      onAnswer: _onAnswer,
+      onCheck: _reveal,
+    );
+  }
 
-  /// 四档自评（含间隔预览）。
-  Widget _ratingSection(StudyItemView item) => StudyRatingBar(
-    hint: _ratingHint(item),
-    enabled: _canRate(item),
-    selected: _outcome?.rating,
-    intervals: studyIntervalTexts(_intervals),
-    onSelect: _selectRating,
-  );
-
-  /// 判定反馈与「下一题」；未提交时为空。
-  List<Widget> _feedbackSection(StudyItemView item) {
-    final outcome = _outcome;
-    if (outcome == null) return const <Widget>[];
+  /// 揭示面板；只在揭示后且预览已算好时出现。
+  List<Widget> _revealSection(StudyItemView item) {
+    final preview = _preview;
+    if (_revealItem == null || preview == null) return const <Widget>[];
     return <Widget>[
       const SizedBox(height: LexiSpace.s16),
-      StudyFeedbackPanel(
-        outcome: outcome,
+      StudyRevealPanel(
+        key: _revealKey,
         item: item,
-        answer: _answer ?? '',
+        preview: preview,
+        answer: _answer,
         usedHint: _usedHint,
-      ),
-      const SizedBox(height: LexiSpace.s16),
-      ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: studyButtonHeight),
-        child: FilledButton(onPressed: _next, child: const Text('下一题')),
+        accent: widget.accent,
       ),
     ];
   }
 
-  /// 四档自评的提示语。
-  ///
-  /// 三种状态对应三种文案：还没作答、可以自评、已经记录。
-  String _ratingHint(StudyItemView item) {
-    if (_outcome != null) return '已记录的等级';
-    if (_awaitingAnswer(item)) return '先作答，再选择记得程度';
-    return '你记得怎么样？';
+  /// 吸底动作条：作答阶段是检查/显示答案，揭示后是四档自评。
+  Widget _bottomAction(BuildContext context, StudyItemView item) {
+    if (_revealItem != null) {
+      return StudyRatingBar(
+        hint: _ratingHint(context),
+        enabled: !_busy,
+        selected: _pendingRating,
+        intervals: studyIntervalTexts(_intervals),
+        onSelect: _selectRating,
+      );
+    }
+    if (choiceQuestionTypes.contains(item.questionType)) {
+      return StudyChoiceActions(
+        hint: _choiceHint(context),
+        onSkip: () => unawaited(_skip()),
+      );
+    }
+    final showingAnswer = item.questionType == QuestionType.enToZh;
+    return StudyCheckActions(
+      canCheck: _canReveal(item),
+      primaryLabel: showingAnswer ? '显示答案' : '检查答案',
+      onSkip: () => unawaited(_skip()),
+      onCheck: _reveal,
+      onForget: showingAnswer ? null : () => _reveal(allowEmpty: true),
+    );
   }
 
-  /// 是否「客观题但还没给出作答」。
-  ///
-  /// 客观题需要用户先选出/拼出答案，自评按钮才可用；看词说义没有客观判定，
-  /// 自评本身就是作答，因此立即可用。
-  bool _awaitingAnswer(StudyItemView item) {
-    if (!isObjectivelyScored(item.questionType)) return false;
-    return _answer?.isNotEmpty != true;
+  /// 自评条的提示语。
+  String _ratingHint(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= studyWideMinWidth;
+    return wide ? '按 1–4 记录熟悉度，选完自动进入下一题' : '选一档熟悉度，选完自动进入下一题';
   }
 
-  StudyItemView? get _item => _answered ?? widget.session?.currentItem;
+  /// 选择题动作条的提示语。
+  String _choiceHint(BuildContext context) {
+    if (!_choicesVisible) return '选项显示后点击作答';
+    final wide = MediaQuery.sizeOf(context).width >= studyWideMinWidth;
+    return wide ? '点击选项或按 1–4 作答' : '点击选项作答';
+  }
 
-  /// 跳过按钮是否可用。
-  ///
-  /// 界面上的按钮与快捷键 `S` 共用它：写成两处迟早会出现
-  /// 「按钮灰了但快捷键还能跳过」。
-  bool get _canSkip => _outcome == null && !_busy;
-
-  /// 四档自评是否可点。
-  ///
-  /// **自评按钮就是提交按钮**：旧版的交互是「先作答，再选记得程度」，
-  /// 选了即提交。所以这里不是「展示已记录等级」的只读控件。
-  ///
-  /// 提交后必须立刻禁用：再点一次会带上新的幂等键，服务层视为一次新作答，
-  /// FSRS 会被推进两遍。快捷键 `1`–`4` 与空格共用同一个判定。
-  bool _canRate(StudyItemView item) {
-    if (_outcome != null || _busy) return false;
-    return !_awaitingAnswer(item);
+  /// 倒计时剩余秒数（向上取整，至少 1）。
+  int get _choiceRemainingSeconds {
+    if (_choiceRevealSeconds <= 0) return 0;
+    final remaining = (_choiceRevealSeconds * (1 - _choiceRevealProgress))
+        .ceil();
+    return remaining < 1 ? 1 : remaining;
   }
 
   /// 提示区的当前状态。
   StudyHintState _hintState(StudyItemView item) => StudyHintState(
     level: _hintLevel,
     used: _usedHint,
-    onHint: _outcome == null && studyHintButtonAvailable(item)
+    onHint: _revealItem == null && studyHintButtonAvailable(item)
         ? _useHint
         : null,
   );
+
+  /// 当前展示的题目。
+  StudyItemView? get _item => _revealItem ?? widget.session?.currentItem;
+
+  /// 播放设置；尚未加载时用默认值兜底。
+  PlaybackSettings get _playback =>
+      ref.read(appSettingsProvider).value?.playback ??
+      PlaybackSettings.defaults;
 
   void _useHint() {
     setState(() {
@@ -381,60 +442,133 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     });
   }
 
-  void _start() {
-    if (!mounted) return;
-    unawaited(ref.read(studySessionProvider.notifier).start(widget.mode));
-  }
-
-  void _setAnswer(String value) {
-    setState(() => _answer = value);
-    // 客观题「给出作答」的这一刻才是旧版的「揭示答案」：间隔预览在这一刻取。
-    final item = _item;
-    if (item != null) _ensurePreview(item);
-  }
-
-  /// 键盘回车提交。
+  /// 作答内容变化。
   ///
-  /// 自评缺省为「记得」：用户直接回车说明他不想细究，客观题答错时服务层
-  /// 会把「记得」降级为「忘了」。界面不重复这条规则。
-  void _submit() => unawaited(_submitWith(ReviewRating.good));
+  /// 选择题选中即揭示（只揭示、不写库）；文本题只记录草稿，等「检查答案」。
+  void _onAnswer(String value) {
+    _clock.touch();
+    final item = _item;
+    if (item == null) return;
+    setState(() => _answer = value);
+    if (choiceQuestionTypes.contains(item.questionType)) _reveal();
+  }
+
+  /// 是否允许揭示。看词说义没有客观答案，任何时候都可以看答案。
+  bool _canReveal(StudyItemView item) {
+    if (item.questionType == QuestionType.enToZh) return true;
+    return _answer.trim().isNotEmpty;
+  }
+
+  /// 揭示答案：冻结当前题、停表、算本地预览、取间隔预览。
+  void _reveal({bool allowEmpty = false}) {
+    if (_busy) return;
+    final item = _item;
+    if (item == null || _revealItem != null) return;
+    if (!allowEmpty && !_canReveal(item)) return;
+
+    final preview = previewAnswer(
+      questionType: item.questionType,
+      word: item.word,
+      answer: _answer,
+    );
+    final duration = _clock.capture();
+    _cancelChoiceTimers();
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _revealItem = item;
+      _preview = preview;
+      _durationMs = duration;
+      _choicesVisible = true;
+      _choiceRevealProgress = 1;
+    });
+    _clock.setEnabled(enabled: false);
+    unawaited(_loadPreview(item));
+    _scrollRevealIntoView();
+  }
+
+  /// 把揭示面板滚进视野：窄屏上它通常在折叠线以下。
+  void _scrollRevealIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final revealContext = _revealKey.currentContext;
+      if (revealContext == null) return;
+      Scrollable.ensureVisible(
+        revealContext,
+        duration: LexiMotion.of(
+          context,
+          const Duration(milliseconds: _revealScrollMs),
+        ),
+      );
+    });
+  }
+
+  /// 取回四档评级的间隔预览。
+  ///
+  /// 失败时**不显示间隔**、也不做别的：预览只是「按这一档会排到什么时候」的
+  /// 提示，绝不能让它冒泡进作答流程——一次只读查询失败不该让人答不了题。
+  Future<void> _loadPreview(StudyItemView item) async {
+    if (_previewItemId == item.itemId) return;
+    _previewItemId = item.itemId;
+    List<FsrsIntervalPreview> previews;
+    try {
+      previews = await ref.read(intervalPreviewLoaderProvider)(item.word.id);
+    } on Object {
+      previews = const <FsrsIntervalPreview>[];
+    }
+    if (!mounted || _revealItem?.itemId != item.itemId) return;
+    setState(() => _intervals = previews);
+  }
 
   /// 点某一档自评即提交。
   void _selectRating(ReviewRating rating) {
-    if (_outcome != null) return;
+    if (_revealItem == null || _busy) return;
     unawaited(_submitWith(rating));
   }
 
   Future<void> _submitWith(ReviewRating rating) async {
-    final item = _item;
+    final item = _revealItem;
     if (item == null || _busy) return;
 
     final messenger = ScaffoldMessenger.of(context);
     final effective = _effectiveRating(item, rating);
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _pendingRating = rating;
+    });
     try {
       final outcome = await ref
           .read(studySessionProvider.notifier)
           .submit(
             rating: effective,
             userAnswer: _answer,
-            // 活跃计时器给出的时长已经扣掉暂停与空闲；服务层再夹一次上界
-            // 兜住崩溃恢复与时钟回拨。
-            durationMs: _clock.capture(),
+            // 揭示时已经停表；重试复用同一段时长，不把等待时间算进去。
+            durationMs: _durationMs ?? _clock.capture(),
           );
-      if (!mounted || outcome == null) return;
-      setState(() {
-        _outcome = outcome;
-        _answered = item;
-      });
+      if (!mounted) return;
+      _notifyOutcome(messenger, outcome);
+      _advance();
     } on Object catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(studyErrorMessage(error))));
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
-        // 结算时停表；提交失败说明这题还没结束，重新开始累计。
-        _clock.setEnabled(enabled: _outcome == null);
+        setState(() {
+          _busy = false;
+          _pendingRating = null;
+        });
       }
+    }
+  }
+
+  /// 提交成功后的两条附加信息；没有就什么都不弹。
+  void _notifyOutcome(
+    ScaffoldMessengerState messenger,
+    ReviewOutcome? outcome,
+  ) {
+    if (outcome == null) return;
+    if (outcome.adaptiveFollowUp != null) {
+      messenger.showSnackBar(const SnackBar(content: Text('这个词稍后会再出现一次')));
+    } else if (outcome.idempotent) {
+      messenger.showSnackBar(const SnackBar(content: Text('重复提交已忽略，排期未重复推进')));
     }
   }
 
@@ -444,10 +578,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   /// `study-client.tsx` 的 `rate()` 里同一条规则。服务层不知道用户点过提示，
   /// 这条判断只能放在界面层；它也是界面层**唯一**改写的评级，其余一律原样提交。
   ReviewRating _effectiveRating(StudyItemView item, ReviewRating rating) {
-    if (!_usedHint || !studyHintButtonAvailable(item)) return rating;
-    if (studyLocalExact(item: item, answer: _answer ?? '') != false) {
-      return rating;
-    }
+    if (!studyHintDowngrades(item, _answer, usedHint: _usedHint)) return rating;
     if (rating == ReviewRating.good || rating == ReviewRating.easy) {
       return ReviewRating.hard;
     }
@@ -460,6 +591,8 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     setState(() => _busy = true);
     try {
       await ref.read(studySessionProvider.notifier).skip();
+      if (!mounted) return;
+      _advance();
     } on Object catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(studyErrorMessage(error))));
     } finally {
@@ -467,13 +600,40 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     }
   }
 
-  void _next() {
+  /// 前进到下一题（或总结）：清空所有「跟着这道题走」的状态。
+  void _advance() {
+    _cancelChoiceTimers();
+    _autoSpeakTimer?.cancel();
     setState(() {
-      _outcome = null;
-      _answered = null;
-      _answer = null;
+      _clearItemState();
+      _seedChoiceVisibility(ref.read(studySessionProvider).value?.currentItem);
     });
     _scheduleItemPrep();
+  }
+
+  /// 把「跟着当前题走」的字段全部归零。
+  ///
+  /// [_advance] 与 [_resetRound] 共用：两处各抄一份字段清单，迟早会漏掉
+  /// 新增的那个（例如后来的 `_previewItemId`）。
+  void _clearItemState() {
+    _revealItem = null;
+    _preview = null;
+    _answer = '';
+    _durationMs = null;
+    _pendingRating = null;
+    _intervals = const <FsrsIntervalPreview>[];
+    _previewItemId = null;
+    _hintLevel = 0;
+    _usedHint = false;
+    _choicesVisible = true;
+    _choiceRevealProgress = 1;
+    _choiceRevealSeconds = 0;
+    _trackedItemId = null;
+  }
+
+  void _start() {
+    if (!mounted) return;
+    unawaited(ref.read(studySessionProvider.notifier).start(widget.mode));
   }
 
   void _restart() {
@@ -481,15 +641,19 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     _start();
   }
 
+  /// 重开一轮：把所有临时状态归零。
   void _resetRound() {
-    _outcome = null;
-    _answered = null;
-    _answer = null;
+    _cancelChoiceTimers();
+    _autoSpeakTimer?.cancel();
+    _clearItemState();
+    _preloadedItemId = null;
+    _autoSpokenItemId = null;
+    _clock
+      ..setEnabled(enabled: true)
+      ..reset();
   }
 
-  int? _itemIdOf(StudySessionView? session) => session?.currentItem?.itemId;
-
-  /// 换题（或首帧）之后，为当前题准备预取、间隔预览与计时。
+  /// 换题（或首帧）之后，为当前题准备预取、选项门、自动朗读与计时。
   ///
   /// 放在首帧之后：这些动作都会读写 provider 或 `setState`，在构建期间做
   /// 会直接触发断言。重复调用由 [_trackedItemId] 挡掉。
@@ -501,20 +665,125 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
       _trackedItemId = item.itemId;
       _resetItemScopedState();
       _preloadAhead(item);
-      _ensurePreview(item);
+      _startChoiceGate(item);
+      _scheduleAutoSpeak(item);
     });
   }
 
   /// 换题时清掉所有「跟着题目走」的状态。
   void _resetItemScopedState() {
+    _autoSpeakTimer?.cancel();
     setState(() {
       _hintLevel = 0;
       _usedHint = false;
+      _answer = '';
       _intervals = const <FsrsIntervalPreview>[];
       _previewItemId = null;
+      _choicesVisible = true;
+      _choiceRevealProgress = 1;
+      _choiceRevealSeconds = 0;
     });
-    _clock.setEnabled(enabled: _outcome == null);
+    _clock.setEnabled(enabled: _revealItem == null);
     _clock.reset();
+  }
+
+  /// 在 prep 之前的首帧就决定选项是否显示。
+  ///
+  /// 不预置的话，延迟 > 0 时选项会先渲染一帧、再被 prep 隐藏——肉眼能看到的
+  /// 闪烁。这里只写字段、不调 `setState`：调用点都在 `build` 之前
+  /// （`initState` / `didUpdateWidget` / `setState` 内部），下一次构建自然会
+  /// 读到新值。
+  void _seedChoiceVisibility(StudyItemView? item) {
+    if (item == null) return;
+    final seconds = _playback.choiceRevealDelaySeconds;
+    final gated =
+        choiceQuestionTypes.contains(item.questionType) &&
+        item.choices.isNotEmpty &&
+        seconds > 0;
+    _choicesVisible = !gated;
+    _choiceRevealProgress = gated ? 0 : 1;
+    _choiceRevealSeconds = gated ? seconds : 0;
+  }
+
+  /// 按设置决定是否延迟显示选项；延迟 0 时直接显示。
+  void _startChoiceGate(StudyItemView item) {
+    _cancelChoiceTimers();
+    final gated =
+        choiceQuestionTypes.contains(item.questionType) &&
+        item.choices.isNotEmpty;
+    final seconds = _playback.choiceRevealDelaySeconds;
+    if (!gated || seconds <= 0) {
+      setState(() {
+        _choicesVisible = true;
+        _choiceRevealProgress = 1;
+        _choiceRevealSeconds = 0;
+      });
+      return;
+    }
+
+    final totalTicks = (seconds * 1000 / _choiceTickMs).ceil();
+    var ticks = 0;
+    setState(() {
+      _choicesVisible = false;
+      _choiceRevealProgress = 0;
+      _choiceRevealSeconds = seconds;
+    });
+    _choiceRevealTimer = Timer(Duration(seconds: seconds), _revealChoicesNow);
+    _choiceProgressTimer = Timer.periodic(
+      const Duration(milliseconds: _choiceTickMs),
+      (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        ticks += 1;
+        setState(() {
+          _choiceRevealProgress = (ticks / totalTicks).clamp(0, 1);
+        });
+        if (ticks >= totalTicks) timer.cancel();
+      },
+    );
+  }
+
+  /// 立即显示选项；Space / 「立即显示选项」共用。
+  void _revealChoicesNow() {
+    _cancelChoiceTimers();
+    if (!mounted || _revealItem != null) return;
+    setState(() {
+      _choicesVisible = true;
+      _choiceRevealProgress = 1;
+    });
+  }
+
+  void _cancelChoiceTimers() {
+    _choiceRevealTimer?.cancel();
+    _choiceRevealTimer = null;
+    _choiceProgressTimer?.cancel();
+    _choiceProgressTimer = null;
+  }
+
+  /// 进入题目后静默播一次发音（受设置与题型限制）。
+  void _scheduleAutoSpeak(StudyItemView item) {
+    if (_autoSpokenItemId == item.itemId) return;
+    final playback = _playback;
+    if (!playback.autoPlayPronunciation ||
+        !studyAutoSpeakAllowed(item.questionType)) {
+      return;
+    }
+    _autoSpokenItemId = item.itemId;
+    _autoSpeakTimer?.cancel();
+    _autoSpeakTimer = Timer(
+      const Duration(milliseconds: studyAutoSpeakDelayMs),
+      () {
+        if (!mounted) return;
+        studyAutoSpeak(
+          speaker: ref.read(wordSpeakerProvider),
+          playback: playback,
+          accent: widget.accent,
+          item: item,
+        );
+      },
+    );
   }
 
   /// 预取当前题及其后共 [studyPreloadAheadCount] 道题的真人录音。
@@ -537,28 +806,6 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     );
   }
 
-  void _ensurePreview(StudyItemView item) {
-    if (_outcome != null || !_canRate(item)) return;
-    if (_previewItemId == item.itemId) return;
-    _previewItemId = item.itemId;
-    unawaited(_loadPreview(item));
-  }
-
-  /// 取回四档评级的间隔预览。
-  ///
-  /// 失败时**不显示间隔**、也不做别的：预览只是「按这一档会排到什么时候」的
-  /// 提示，绝不能让它冒泡进作答流程——一次只读查询失败不该让人答不了题。
-  Future<void> _loadPreview(StudyItemView item) async {
-    List<FsrsIntervalPreview> previews;
-    try {
-      previews = await ref.read(intervalPreviewLoaderProvider)(item.word.id);
-    } on Object {
-      previews = const <FsrsIntervalPreview>[];
-    }
-    if (!mounted || _trackedItemId != item.itemId) return;
-    setState(() => _intervals = previews);
-  }
-
   /// 键盘事件入口。
   ///
   /// 挂在 `HardwareKeyboard` 上而不是 `Focus` 上：后者会抢走文本输入框的焦点，
@@ -574,13 +821,11 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     }
     final item = _item;
     if (item == null || _busy) return false;
+    // 正在打字：字母、空格、数字全部让给输入法；回车由输入框的
+    // `onSubmitted` 转成「检查答案」。
+    if (_isEditingText) return false;
+
     final key = event.logicalKey;
-    if (_isEditingText) {
-      // 正在打字：字母、空格、回车都必须留给输入法；数字键保留（与旧版一致），
-      // 否则键盘用户答完拼写题还得先按 Tab 逃出输入框才能选档。
-      final rating = _ratingOfKey(key);
-      return rating != null && _rateByKey(item, rating);
-    }
     if (key == LogicalKeyboardKey.keyR) {
       unawaited(
         speakStudyWord(context, ref, word: item.word, accent: widget.accent),
@@ -588,35 +833,64 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
       return true;
     }
     if (key == LogicalKeyboardKey.keyS) {
-      if (!_canSkip) return false;
       unawaited(_skip());
       return true;
     }
-    if (_isSubmitKey(key)) {
-      if (!_canRate(item)) return false;
-      _submit();
-      return true;
-    }
-    final rating = _ratingOfKey(key);
-    return rating != null && _rateByKey(item, rating);
+    return _revealItem == null
+        ? _handleAnsweringKey(item, key)
+        : _handleRevealedKey(key);
   }
 
-  /// 空格与回车：提交（旧版是「揭示答案 / 检查答案」，本版自评即提交）。
+  /// 作答阶段的键盘语义。
+  ///
+  /// **数字键在这一阶段只用于选选项**：旧版把 `1–4` 一律当自评，用户想按
+  /// `1` 选第一个选项时反而给自己记了一次「忘了」——截图里那条矛盾的
+  /// 「回答正确 / 自评：忘了」很可能就是这么来的。
+  bool _handleAnsweringKey(StudyItemView item, LogicalKeyboardKey key) {
+    if (choiceQuestionTypes.contains(item.questionType)) {
+      if (!_choicesVisible) {
+        if (!_isSubmitKey(key)) return false;
+        _revealChoicesNow();
+        return true;
+      }
+      final index = _digitIndex(key);
+      if (index == null || index >= item.choices.length) return false;
+      _onAnswer(item.choices[index]);
+      return true;
+    }
+    if (!_isSubmitKey(key) || !_canReveal(item)) return false;
+    _reveal();
+    return true;
+  }
+
+  /// 揭示后的键盘语义：`1–4` 自评，`Space/Enter` 按「记得」。
+  bool _handleRevealedKey(LogicalKeyboardKey key) {
+    final rating = _ratingOfKey(key);
+    if (rating != null) {
+      _selectRating(rating);
+      return true;
+    }
+    if (!_isSubmitKey(key)) return false;
+    _selectRating(ReviewRating.good);
+    return true;
+  }
+
+  /// 空格与回车：作答阶段是检查/显示答案，揭示后是「记得」。
   bool _isSubmitKey(LogicalKeyboardKey key) =>
       key == LogicalKeyboardKey.space ||
       key == LogicalKeyboardKey.enter ||
       key == LogicalKeyboardKey.numpadEnter;
 
-  /// 数字键 `1`–`4` 对应的自评等级；不是这四个键时返回 `null`。
-  ReviewRating? _ratingOfKey(LogicalKeyboardKey key) {
-    final index = _ratingKeys.indexOf(key);
-    return index < 0 ? null : ReviewRating.values[index];
+  /// 数字键 `1`–`4` 的序号（0–3）；不是这四个键时返回 `null`。
+  int? _digitIndex(LogicalKeyboardKey key) {
+    final index = _numberKeys.indexOf(key);
+    return index < 0 ? null : index;
   }
 
-  bool _rateByKey(StudyItemView item, ReviewRating rating) {
-    if (!_canRate(item)) return false;
-    _selectRating(rating);
-    return true;
+  /// 数字键对应的自评等级；不是这四个键时返回 `null`。
+  ReviewRating? _ratingOfKey(LogicalKeyboardKey key) {
+    final index = _digitIndex(key);
+    return index == null ? null : ReviewRating.values[index];
   }
 
   /// 焦点是否在可编辑文本里。

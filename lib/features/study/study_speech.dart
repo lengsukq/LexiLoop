@@ -17,6 +17,24 @@ import 'package:lexiloop/services/audio/speech_request.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';
 import 'package:lexiloop/services/audio/word_speaker.dart';
 
+/// 进入题目后自动朗读前的延迟（毫秒）。
+///
+/// 与旧版学习页的自动播放、游戏页的 `gameAutoSpeakDelayMs` 同一量级：
+/// 等首帧动画与路由过渡落定，避免声音抢在画面之前。
+const int studyAutoSpeakDelayMs = 220;
+
+/// 自动朗读会直接放出答案的题型。
+///
+/// **不照抄旧版**：旧版只在选择题里跳过自动播放，于是「根据释义拼写英文」
+/// 这类题一进来就把单词念出来，题目本身就失效了。这里按「听到发音会不会
+/// 泄露答案」划界：看词说义/看词选义/听音类可以播，其余不播。
+const Set<QuestionType> studyAutoSpeakSilentTypes = <QuestionType>{
+  QuestionType.zhToEnChoice,
+  QuestionType.zhToEnSpelling,
+  QuestionType.clozeSentence,
+  QuestionType.letterBank,
+};
+
 /// 预取时向前看的题数。
 ///
 /// 与旧版 `src/app/(main)/study/study-client.tsx` 的
@@ -78,6 +96,31 @@ void studyPreloadAhead({
   ];
   if (requests.isEmpty) return;
   unawaited(speaker.preloadBatch(requests));
+}
+
+/// 该题型是否允许自动朗读（是否真的播还取决于设置开关）。
+bool studyAutoSpeakAllowed(QuestionType type) =>
+    !studyAutoSpeakSilentTypes.contains(type);
+
+/// 进入题目时静默播放一次发音。
+///
+/// 自动播放是背景行为，不弹「已改用系统朗读」之类的提示：用户并没有点任何
+/// 东西，每换一题冒一条 SnackBar 会把答题节奏切碎。失败也只是没声音，
+/// 页面上仍有朗读按钮可以重试。
+void studyAutoSpeak({
+  required WordSpeaker speaker,
+  required PlaybackSettings playback,
+  required Accent accent,
+  required StudyItemView item,
+}) {
+  if (!playback.autoPlayPronunciation) return;
+  if (!studyAutoSpeakAllowed(item.questionType)) return;
+  speaker.humanAudioEnabled = playback.humanAudioEnabled;
+  unawaited(
+    speaker.speak(
+      studySpeechRequest(word: item.word, accent: accent, playback: playback),
+    ),
+  );
 }
 
 /// 朗读一个词条，并把「降级 / 失败」提示给用户。

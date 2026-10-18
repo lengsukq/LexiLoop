@@ -2,31 +2,26 @@
 ///
 /// 已选中的块记 [LetterTile] 而不是字母文本：同一个词里可能出现重复字母
 /// （`apple` 有两个 `p`），只按文本记录就无法区分「哪一块用过了」。
+///
+/// 揭示后整块由学习页卸载：答案已经显示在揭示面板里，再留一排按不动的字母
+/// 只是占位。拼接结果由页面持有，差异对比不依赖本组件的内部状态。
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 字母拼图。
 class LetterBank extends StatefulWidget {
-  /// 以题目、判定结果与作答回调构造。
-  const new({
-    required this.item,
-    required this.outcome,
-    required this.onAnswer,
-    super.key,
-  });
+  /// 以题目与作答回调构造。
+  const new({required this.item, required this.onAnswer, super.key});
 
   /// 当前题目。
   final StudyItemView item;
-
-  /// 已提交的判定结果；未提交时为 `null`。
-  final ReviewOutcome? outcome;
 
   /// 拼接结果变化时回调。
   final ValueChanged<String> onAnswer;
@@ -46,7 +41,6 @@ class _LetterBankState extends State<LetterBank> {
 
   @override
   Widget build(BuildContext context) {
-    final locked = widget.outcome != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -60,7 +54,7 @@ class _LetterBankState extends State<LetterBank> {
               if (!_isPicked(tile))
                 _LetterTileButton(
                   tile: tile,
-                  enabled: !locked,
+                  enabled: true,
                   onTap: () => _pick(tile),
                 ),
           ],
@@ -69,16 +63,16 @@ class _LetterBankState extends State<LetterBank> {
         Row(
           children: <Widget>[
             _SmallAction(
-              icon: Icons.backspace_rounded,
+              icon: LucideIcons.delete,
               label: '退格',
-              enabled: !locked && _picked.isNotEmpty,
+              enabled: _picked.isNotEmpty,
               onTap: _backspace,
             ),
             const SizedBox(width: LexiSpace.s10),
             _SmallAction(
-              icon: Icons.clear_rounded,
+              icon: LucideIcons.x,
               label: '清空',
-              enabled: !locked && _picked.isNotEmpty,
+              enabled: _picked.isNotEmpty,
               onTap: _clear,
             ),
           ],

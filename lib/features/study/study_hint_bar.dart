@@ -14,11 +14,13 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/hint.dart';
 import 'package:lexiloop/features/study/study_layout.dart';
+import 'package:lexiloop/features/study/study_local_verdict.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 提示模式露出的首尾字母个数，同时也是最短词条长度。
 ///
@@ -73,6 +75,19 @@ bool studyHintButtonAvailable(StudyItemView item) =>
     (item.questionType == QuestionType.zhToEnSpelling ||
         item.questionType == QuestionType.listeningSpelling);
 
+/// 本题是否会被「用过提示」这条规则降为「模糊」。
+///
+/// 降档与揭示面板的说明必须用同一个判断：两处各写一遍，迟早会出现
+/// 「面板说会降、实际按记得记了」。
+bool studyHintDowngrades(
+  StudyItemView item,
+  String answer, {
+  required bool usedHint,
+}) =>
+    usedHint &&
+    studyHintButtonAvailable(item) &&
+    studyLocalExact(item: item, answer: answer) == false;
+
 /// 提示区的当前状态与回调。
 class StudyHintState {
   /// 以等级、是否用过与「再来一次」回调构造。
@@ -119,7 +134,7 @@ class StudyHintBar extends ConsumerWidget {
           pattern,
           key: const Key('study.hint.pattern'),
           style: LexiType.title.copyWith(
-            color: context.lexiColors.accent,
+            color: context.lexiColors.accentText,
             fontFamily: 'monospace',
             letterSpacing: 2,
           ),
@@ -130,7 +145,7 @@ class StudyHintBar extends ConsumerWidget {
             children: <Widget>[
               if (_needsReplay(item)) ...<Widget>[
                 _HintAction(
-                  icon: Icons.volume_up_rounded,
+                  icon: LucideIcons.volume2,
                   label: '重播发音',
                   onTap: () => unawaited(
                     speakStudyWord(
@@ -144,7 +159,7 @@ class StudyHintBar extends ConsumerWidget {
                 const SizedBox(width: LexiSpace.s8),
               ],
               _HintAction(
-                icon: Icons.lightbulb_outline_rounded,
+                icon: LucideIcons.lightbulb,
                 label: hint.level > 0 ? '提示 (${hint.level})' : '提示',
                 onTap:
                     isHintExhausted(

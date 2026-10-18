@@ -8,6 +8,9 @@
 /// `started_at` 为当前时刻、且含 PENDING 题目的会话；页面启动时
 /// `StudyService.startSession` 会把它当作可恢复会话读回来，因此题目类型、
 /// 选项、挖空句都由真实 DAO 生成，测试不必伪造 [StudyItemView]。
+///
+/// **流程断言围绕三相位**：作答 → 揭示 → 自评 → 自动下一题。任何一条用例
+/// 都不再依赖「下一题」按钮或「自评：X」文案——它们已经不存在了。
 library;
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
@@ -22,11 +25,15 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/features/study/study_choice_options.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
+import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/tts_service.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
@@ -51,6 +58,17 @@ class RecordingSpeechEngine implements SpeechEngine {
 
   @override
   Future<bool> isLanguageAvailable(String language) async => true;
+}
+
+/// 永远写库失败的服务，用来验证「提交失败留在揭示态」。
+class _FailingReviewService extends ReviewService {
+  new(super._database, super._settings);
+
+  @override
+  Future<ReviewOutcome> processAnswer(
+    AnswerInput input, {
+    required int now,
+  }) async => throw StateError('数据库写入失败');
 }
 
 /// 读取富文本某一行的纯文本。
@@ -178,36 +196,56 @@ void main() {
 
   /// 挂载学习页并等待会话加载完成，返回 provider 容器。
   ///
-  /// 画布刻意设得又窄又高：默认 800×600 装不下「题干 + 作答 + 自评 +
-  /// 反馈」，而 `ListView` 不会挂载视口外的子组件，finder 会找不到它们。
-  ///
-  /// 三个覆盖是硬要求：
+  /// 四个覆盖是硬要求：
   /// - `audioPlayerPortProvider`：`just_audio` 是平台通道插件，测试进程里不可用；
   /// - `audioDownloaderProvider`：假下载器，**不发真实网络请求**；
+  /// - `ttsServiceProvider`：默认注入一个静音假引擎，自动朗读/朗读按钮都不会
+  ///   打到平台通道；
   /// - `studyClockFactoryProvider`：活跃计时器的 `Timer` 走假时间，
   ///   不注入 `binding.clock` 就会与 `DateTime.now()` 各走一套时间。
+  ///
+  /// 设置默认「揭示延迟 0、自动朗读关」，让大多数用例不必等 2 秒；需要验证
+  /// 这两个开关的用例显式打开。
   Future<ProviderContainer> pumpStudy(
     WidgetTester tester, {
     StudyMode mode = StudyMode.daily,
     SpeechEngine? speechEngine,
     IntervalPreviewLoader? intervalPreviewLoader,
+    int choiceRevealDelaySeconds = 0,
+    bool autoPlay = false,
+    bool submitFails = false,
+    bool settle = true,
+    Size size = const Size(520, 1600),
   }) async {
-    tester.view.physicalSize = const Size(520, 1600);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
+    final settings = appSettingsFromRaw(<String, Object?>{
+      'choiceRevealDelaySeconds': choiceRevealDelaySeconds,
+      'autoPlayPronunciation': autoPlay,
+    });
     final container = ProviderContainer(
       overrides: [
         databaseProvider.overrideWithValue(db),
         audioPlayerPortProvider.overrideWithValue(audioPlayer),
         audioDownloaderProvider.overrideWithValue(audioDownloader),
+        appSettingsProvider.overrideWith((ref) => settings),
+        ttsServiceProvider.overrideWithValue(
+          TtsService(speechEngine ?? RecordingSpeechEngine()),
+        ),
         studyClockFactoryProvider.overrideWithValue(
           () => StudyClock(
             now: () => tester.binding.clock.now().millisecondsSinceEpoch,
           ),
         ),
-        if (speechEngine != null)
-          ttsServiceProvider.overrideWithValue(TtsService(speechEngine)),
+        if (submitFails)
+          reviewServiceProvider.overrideWith(
+            (ref) => _FailingReviewService(
+              ref.watch(databaseProvider),
+              ref.watch(settingsServiceProvider),
+            ),
+          ),
         if (intervalPreviewLoader != null)
           intervalPreviewLoaderProvider.overrideWithValue(
             intervalPreviewLoader,
@@ -226,7 +264,14 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      // 只推进到会话加载与首帧 prep，不跑完选择题的倒计时。
+      for (var frame = 0; frame < 10; frame += 1) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+    }
     return container;
   }
 
@@ -234,297 +279,439 @@ void main() {
   StudySessionView sessionOf(ProviderContainer container) =>
       container.read(studySessionProvider).value!;
 
-  testWidgets('没有候选词条时走结算视图，标题与做完一轮不同', (tester) async {
-    // 「今天没词可学」与「刚做完一轮」共用结算视图，只有标题不同——
-    // 照旧版 `study-client.tsx:548`。曾经这里是一个独立的空态页，
-    // 整页只剩一个 `maybePop` 的返回按钮，而学习页是分支根路由，
-    // 那个按钮点了没反应，用户被困在沉浸式页面里（见下一条用例）。
-    await pumpStudy(tester);
-
-    expect(find.text('暂时没有更多可学习词条'), findsOneWidget);
-    expect(find.text('这一轮完成了'), findsNothing);
-    // 空态也必须给得出「再来一轮」，否则导入词条后只能退出重进。
-    expect(find.text('再来一轮'), findsOneWidget);
-    expect(find.text('返回首页'), findsOneWidget);
-  });
-
-  testWidgets('会话启动失败时显示错误态与重试', (tester) async {
-    // AI 推荐模式在没有当日建议时直接抛 ConflictError，是最容易构造的失败路径。
-    await pumpStudy(tester, mode: StudyMode.aiRecommended);
-
-    expect(find.text('今日 AI 必做题已全部完成，明天再来吧。'), findsOneWidget);
-    expect(find.text('重试'), findsOneWidget);
-  });
-
-  testWidgets('看词选义渲染出全部选项', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    for (final entry in <(String, String)>[
-      ('banana', '香蕉'),
-      ('cherry', '樱桃'),
-      ('grape', '葡萄'),
-      ('lemon', '柠檬'),
-    ]) {
-      await insertWord(term: entry.$1, meaning: entry.$2);
-    }
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.enToZhChoice,
-    );
-
-    final container = await pumpStudy(tester);
-    final choices = sessionOf(container).items.first.choices;
-
-    expect(choices, hasLength(4), reason: '干扰项足够时应凑满 4 个选项');
-    for (final choice in choices) {
-      expect(find.text(choice), findsOneWidget);
-    }
-    expect(find.text('apple'), findsOneWidget, reason: '题干是英文词条');
-  });
-
-  testWidgets('看义选词在选项下显示对应释义', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertWord(term: 'banana', meaning: '香蕉');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.zhToEnChoice,
-    );
-
-    final container = await pumpStudy(tester);
-    final item = sessionOf(container).items.first;
-
-    expect(item.choices, isNotEmpty);
-    for (final choice in item.choices) {
-      expect(find.text(choice), findsOneWidget);
-    }
-    // 题干是「苹果」，正确选项 `apple` 的释义也是「苹果」，因此出现两次。
-    expect(find.text('苹果'), findsNWidgets(2));
-    expect(find.text('香蕉'), findsOneWidget, reason: '干扰项也要带释义');
-  });
-
-  testWidgets('选中选项后点自评即提交并显示判定', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertWord(term: 'banana', meaning: '香蕉');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.enToZhChoice,
-    );
-
-    final container = await pumpStudy(tester);
-    expect(find.text('回答正确'), findsNothing, reason: '提交前没有判定结果');
-
-    await tester.tap(find.text('苹果'));
-    await tester.pump();
-    // 自评按钮就是提交入口：旧版交互是「先作答，再选记得程度」。
-    await tester.tap(find.text('记得'));
+  /// 点「检查答案 / 显示答案」。
+  Future<void> checkAnswer(WidgetTester tester) async {
+    await tester.tap(find.textContaining('检查答案').last);
     await tester.pumpAndSettle();
+  }
 
-    expect(find.text('回答正确'), findsOneWidget);
-    expect(sessionOf(container).completedCount, 1);
-  });
+  group('作答与揭示', () {
+    testWidgets('没有候选词条时走结算视图，标题与做完一轮不同', (tester) async {
+      // 「今天没词可学」与「刚做完一轮」共用结算视图，只有标题不同——
+      // 照旧版 `study-client.tsx:548`。曾经这里是一个独立的空态页，
+      // 整页只剩一个 `maybePop` 的返回按钮，而学习页是分支根路由，
+      // 那个按钮点了没反应，用户被困在沉浸式页面里。
+      await pumpStudy(tester);
 
-  testWidgets('提交后自评四档收起，误触不会重复推进', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertWord(term: 'banana', meaning: '香蕉');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.enToZhChoice,
-    );
+      expect(find.text('暂时没有更多可学习词条'), findsOneWidget);
+      expect(find.text('这一轮完成了'), findsNothing);
+      expect(find.text('再来一轮'), findsOneWidget);
+      expect(find.text('返回首页'), findsOneWidget);
+    });
 
-    final container = await pumpStudy(tester);
-    await tester.tap(find.text('苹果'));
-    await tester.pump();
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+    testWidgets('会话启动失败时显示错误态与重试', (tester) async {
+      // AI 推荐模式在没有当日建议时直接抛 ConflictError，是最容易构造的失败路径。
+      await pumpStudy(tester, mode: StudyMode.aiRecommended);
 
-    // 提交后整排自评收起：既点不动，也不可能被误触产生第二次作答。
-    // 这一排此前是「变灰但仍占位」，判定与「下一题」被推到折叠线之外，
-    // 用户按完回车只看到按钮灰掉。收起来同时解决两个问题。
-    for (final label in <String>['忘了', '模糊', '简单']) {
-      expect(find.text(label), findsNothing, reason: '$label 提交后应当收起');
-    }
-    expect(sessionOf(container).completedCount, 1);
+      expect(find.text('今日 AI 必做题已全部完成，明天再来吧。'), findsOneWidget);
+      expect(find.text('重试'), findsOneWidget);
+    });
 
-    // 判定与「下一题」就在原地，不必滚到下面去找。
-    expect(find.text('下一题'), findsOneWidget);
-  });
+    testWidgets('看词选义渲染出全部选项与作答指令', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      for (final entry in <(String, String)>[
+        ('banana', '香蕉'),
+        ('cherry', '樱桃'),
+        ('grape', '葡萄'),
+        ('lemon', '柠檬'),
+      ]) {
+        await insertWord(term: entry.$1, meaning: entry.$2);
+      }
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
 
-  testWidgets('答错时反馈区显示期望答案', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertWord(term: 'banana', meaning: '香蕉');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.enToZhChoice,
-    );
+      final container = await pumpStudy(tester);
+      final item = sessionOf(container).items.first;
 
-    await pumpStudy(tester);
-    await tester.tap(find.text('香蕉'));
-    await tester.pump();
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+      expect(item.choices, hasLength(4), reason: '干扰项足够时应凑满 4 个选项');
+      for (final choice in item.choices) {
+        expect(find.text(choice), findsOneWidget);
+      }
+      expect(find.text('apple'), findsOneWidget, reason: '题干是英文词条');
+      expect(find.text('选择正确的释义'), findsOneWidget, reason: '题头说明该做什么');
+    });
 
-    expect(find.text('回答错误'), findsOneWidget);
-    expect(find.text('期望答案：苹果'), findsOneWidget);
-  });
+    testWidgets('看义选词揭示后才显示选项释义', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnChoice,
+      );
 
-  testWidgets('中译英拼写正确时判定为正确', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.zhToEnSpelling,
-    );
+      final container = await pumpStudy(tester);
+      final item = sessionOf(container).items.first;
 
-    await pumpStudy(tester);
-    await tester.enterText(find.byType(TextField), 'apple');
-    await tester.pump();
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+      expect(item.choices, isNotEmpty);
+      // 作答前只给单词：释义留到揭示后再显示，避免选项本身把答案讲出来。
+      expect(find.text('香蕉'), findsNothing);
+      expect(find.text('苹果'), findsOneWidget, reason: '题干是中文释义');
 
-    expect(find.text('回答正确'), findsOneWidget);
-  });
+      await tester.tap(find.text('apple'));
+      await tester.pumpAndSettle();
 
-  testWidgets('四档自评在作答期间可见，提交后交给判定面板', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.zhToEnSpelling,
-    );
+      // 题干、正确选项下的释义、揭示面板里的释义各一次。
+      expect(find.text('苹果'), findsNWidgets(3));
+      expect(find.text('香蕉'), findsOneWidget, reason: '揭晓后干扰项也带释义');
+    });
 
-    await pumpStudy(tester);
-    for (final label in <String>['忘了', '模糊', '记得', '简单']) {
-      expect(find.text(label), findsOneWidget, reason: '四档始终可见，用户才知道有哪些选择');
-    }
-    expect(find.text('先作答，再选择记得程度'), findsOneWidget);
+    testWidgets('选中选项即揭示，尚未写库', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
 
-    await tester.enterText(find.byType(TextField), 'apple');
-    await tester.pump();
-    expect(find.text('你记得怎么样？'), findsOneWidget);
+      final container = await pumpStudy(tester);
+      final item = sessionOf(container).items.first;
+      final correct = studyChoiceAnswer(item);
+      expect(find.text('回答正确'), findsNothing, reason: '作答前没有判定');
 
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text(correct));
+      await tester.pumpAndSettle();
 
-    // 提交后这一排由判定面板接替；自评分数仍在面板里写出来
-    // （「自评：记得」），所以收起并不丢信息。
-    expect(find.text('已记录的等级'), findsNothing);
-    expect(find.textContaining('回答'), findsWidgets);
-    expect(find.text('下一题'), findsOneWidget);
-  });
+      // 揭示只做本地预览：还没有任何一条 review_log，也没有完成计数。
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 0);
+      expect(await db.select(db.reviewLogs).get(), isEmpty);
+      // 自评条已经出现，但还没有「自评：X」这种转述。
+      expect(find.text('记得'), findsOneWidget);
+      expect(find.textContaining('自评：'), findsNothing);
+    });
 
-  testWidgets('看词说义点自评即提交', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+    testWidgets('揭示后自评即写库并自动进入下一题', (tester) async {
+      final first = await insertWord(term: 'apple', meaning: '苹果');
+      final second = await insertWord(term: 'banana', meaning: '香蕉');
+      final sessionId = await insertSession(
+        wordId: first,
+        questionType: QuestionType.enToZhChoice,
+      );
+      await addSessionItem(
+        sessionId: sessionId,
+        position: 1,
+        wordId: second,
+        questionType: QuestionType.enToZhChoice,
+      );
 
-    await pumpStudy(tester);
-    expect(find.text('apple'), findsOneWidget);
-    expect(find.text('你记得怎么样？'), findsOneWidget, reason: '主观题无需先作答');
+      final container = await pumpStudy(tester);
+      final item = sessionOf(container).items.first;
+      await tester.tap(find.text(studyChoiceAnswer(item)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
+      // 没有「下一题」可点：提交成功即前进到下一题。
+      expect(find.text('下一题'), findsNothing);
+      expect(find.text('banana'), findsOneWidget, reason: '下一题的题干');
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.rating, ReviewRating.good);
+      expect(log.isCorrect, isTrue);
+    });
 
-    expect(find.text('回答正确'), findsOneWidget);
-  });
+    testWidgets('答对后自评「忘了」不再出现自相矛盾的文案', (tester) async {
+      // 截图回归：旧界面把客观的「回答正确」与主观的「自评：忘了」并排
+      // 放在同一张卡里，还要求再点一次「下一题」。现在判定只出现在自评
+      // 之前，提交后直接进入结算。
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
 
-  testWidgets('字母拼词可拼出单词并退格', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(wordId: wordId, questionType: QuestionType.letterBank);
+      final container = await pumpStudy(tester);
+      final item = sessionOf(container).items.first;
+      await tester.tap(find.text(studyChoiceAnswer(item)));
+      await tester.pumpAndSettle();
 
-    await pumpStudy(tester);
-    for (final letter in <String>['a', 'p', 'p']) {
-      await tester.tap(find.text(letter).first);
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(find.text('自评：忘了'), findsNothing);
+
+      await tester.tap(find.text('忘了'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('这一轮完成了'), findsOneWidget);
+      expect(find.text('下一题'), findsNothing);
+      expect(find.text('自评：忘了'), findsNothing);
+      expect(find.text('掌握度'), findsNothing);
+      expect(find.text('下次复习'), findsNothing);
+      expect(sessionOf(container).completedCount, 1);
+
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.isCorrect, isTrue, reason: '客观判题仍是答对');
+      expect(log.rating, ReviewRating.again, reason: '自评仍是忘了');
+    });
+
+    testWidgets('答错时揭示面板显示期望答案与差异', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'aple');
       await tester.pump();
-    }
-    expect(find.text('app'), findsOneWidget);
+      await checkAnswer(tester);
 
-    await tester.tap(find.text('退格'));
-    await tester.pump();
-    expect(find.text('ap'), findsOneWidget);
+      expect(find.text('回答错误'), findsOneWidget);
+      expect(_plainText(tester, const Key('study.diff.actual')), '你的输入：aple');
+      expect(
+        _plainText(tester, const Key('study.diff.expected')),
+        '正确答案：apple',
+      );
+      expect(_diffParts(tester, const Key('study.diff.expected')), <String>[
+        'p',
+      ], reason: '漏掉的那个字母才是差异段');
+      expect(_diffParts(tester, const Key('study.diff.actual')), isEmpty);
+    });
 
-    await tester.tap(find.text('清空'));
-    await tester.pump();
-    expect(find.text('点击下方字母拼写'), findsOneWidget);
-  });
+    testWidgets('忘记可以直接揭示，不必先作答', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
 
-  testWidgets('例句填空渲染出挖空句与翻译', (tester) async {
-    final wordId = await insertWord(
-      term: 'apple',
-      meaning: '苹果',
-      examplesJson:
-          '[{"sentence":"I ate an apple.","translation":"我昨天吃了一个苹果。"}]',
-    );
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.clozeSentence,
-    );
+      final container = await pumpStudy(tester);
+      expect(find.text('忘记'), findsOneWidget);
+      await tester.tap(find.text('忘记'));
+      await tester.pumpAndSettle();
 
-    await pumpStudy(tester);
+      // 没有输入也能看到答案；判定是「回答错误」，但还没有写库。
+      expect(find.text('回答错误'), findsOneWidget);
+      expect(find.text('apple'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 0);
+      expect(await db.select(db.reviewLogs).get(), isEmpty);
+    });
 
-    expect(find.textContaining('____'), findsOneWidget);
-    expect(find.text('我昨天吃了一个苹果。'), findsOneWidget);
-  });
+    testWidgets('看词说义先显示答案再自评', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
-  testWidgets('朗读按钮可点，且把文本交给朗读服务', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.enToZhChoice,
-    );
+      await pumpStudy(tester);
+      expect(find.text('显示答案'), findsOneWidget);
+      expect(find.text('记得'), findsNothing, reason: '揭示前不摆自评');
 
-    // 用假引擎替换真插件：平台通道在测试进程里不可用。
-    final engine = RecordingSpeechEngine();
-    final container = await pumpStudy(tester, speechEngine: engine);
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
 
-    expect(find.byTooltip('朗读'), findsOneWidget);
-    await tester.tap(find.byTooltip('朗读'));
-    await tester.pumpAndSettle();
+      expect(find.text('参考答案'), findsOneWidget);
+      expect(find.text('苹果'), findsOneWidget);
+      expect(find.text('记得'), findsOneWidget);
 
-    expect(engine.spoken, <String>['apple']);
-    expect(container.read(studySessionProvider).hasValue, isTrue);
-  });
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+      expect(find.text('这一轮完成了'), findsOneWidget);
+    });
 
-  testWidgets('完成态显示正确率与统计数字', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.zhToEnSpelling,
-    );
+    testWidgets('拼写正确时揭示为回答正确', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
 
-    await pumpStudy(tester);
-    await tester.enterText(find.byType(TextField), 'apple');
-    await tester.pump();
-    await tester.tap(find.text('记得'));
-    await tester.pumpAndSettle();
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await checkAnswer(tester);
 
-    await tester.tap(find.text('下一题'));
-    await tester.pumpAndSettle();
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(find.byKey(const Key('study.diff.expected')), findsNothing);
+    });
 
-    expect(find.text('这一轮完成了'), findsOneWidget);
-    expect(find.text('正确率'), findsOneWidget);
-    expect(find.text('100%'), findsOneWidget);
-    expect(find.text('有效时长'), findsOneWidget);
-    expect(find.text('再来一轮'), findsOneWidget);
-    expect(find.text('返回首页'), findsOneWidget);
-  });
+    testWidgets('揭示面板折叠展示第一条例句', (tester) async {
+      final wordId = await insertWord(
+        term: 'apple',
+        meaning: '苹果',
+        examplesJson:
+            '[{"sentence":"I ate an apple.","translation":"我吃了一个苹果。"}]',
+      );
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
-  testWidgets('跳过按钮推进到下一题并计入跳过数', (tester) async {
-    final wordId = await insertWord(term: 'apple', meaning: '苹果');
-    await insertSession(
-      wordId: wordId,
-      questionType: QuestionType.zhToEnSpelling,
-    );
+      await pumpStudy(tester);
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
 
-    final container = await pumpStudy(tester);
-    await tester.tap(find.text('跳过'));
-    await tester.pumpAndSettle();
+      expect(find.text('例句'), findsOneWidget);
+      expect(find.text('I ate an apple.'), findsNothing, reason: '默认折叠');
+      await tester.tap(find.text('例句'));
+      await tester.pumpAndSettle();
+      expect(find.text('I ate an apple.'), findsOneWidget);
+      expect(find.text('我吃了一个苹果。'), findsOneWidget);
+    });
 
-    expect(sessionOf(container).skippedCount, 1);
-    expect(find.text('这一轮完成了'), findsOneWidget);
+    testWidgets('四档自评只在揭示后出现', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      for (final label in <String>['忘了', '模糊', '记得', '简单']) {
+        expect(find.text(label), findsNothing, reason: '$label 揭示前不应出现');
+      }
+
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await checkAnswer(tester);
+
+      for (final label in <String>['忘了', '模糊', '记得', '简单']) {
+        expect(find.text(label), findsOneWidget, reason: '$label 揭示后应当可选');
+      }
+    });
+
+    testWidgets('文本题回车检查答案', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('回答正确'), findsOneWidget);
+      expect(find.text('记得'), findsOneWidget);
+    });
+
+    testWidgets('字母拼词可拼出单词并退格', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.letterBank,
+      );
+
+      await pumpStudy(tester);
+      for (final letter in <String>['a', 'p', 'p']) {
+        await tester.tap(find.text(letter).first);
+        await tester.pump();
+      }
+      expect(find.text('app'), findsOneWidget);
+
+      await tester.tap(find.text('退格'));
+      await tester.pump();
+      expect(find.text('ap'), findsOneWidget);
+
+      await tester.tap(find.text('清空'));
+      await tester.pump();
+      expect(find.text('点击下方字母拼写'), findsOneWidget);
+    });
+
+    testWidgets('例句填空渲染出挖空句与翻译', (tester) async {
+      final wordId = await insertWord(
+        term: 'apple',
+        meaning: '苹果',
+        examplesJson:
+            '[{"sentence":"I ate an apple.","translation":"我昨天吃了一个苹果。"}]',
+      );
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.clozeSentence,
+      );
+
+      await pumpStudy(tester);
+
+      expect(find.textContaining('____'), findsOneWidget);
+      expect(find.text('我昨天吃了一个苹果。'), findsOneWidget);
+    });
+
+    testWidgets('朗读按钮可点，且把文本交给朗读服务', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      // 用假引擎替换真插件：平台通道在测试进程里不可用。
+      final engine = RecordingSpeechEngine();
+      final container = await pumpStudy(tester, speechEngine: engine);
+
+      expect(find.byTooltip('朗读'), findsOneWidget);
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+
+      expect(engine.spoken, <String>['apple']);
+      expect(container.read(studySessionProvider).hasValue, isTrue);
+    });
+
+    testWidgets('完成态显示正确率与统计数字', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await checkAnswer(tester);
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('这一轮完成了'), findsOneWidget);
+      expect(find.text('正确率'), findsOneWidget);
+      expect(find.text('100%'), findsOneWidget);
+      expect(find.text('有效时长'), findsOneWidget);
+      expect(find.text('再来一轮'), findsOneWidget);
+      expect(find.text('返回首页'), findsOneWidget);
+    });
+
+    testWidgets('稍后再学推进到下一题并计入跳过数', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      final container = await pumpStudy(tester);
+      expect(find.text('跳过'), findsNothing, reason: '页头不再有跳过');
+      await tester.tap(find.text('稍后再学'));
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).skippedCount, 1);
+      expect(find.text('这一轮完成了'), findsOneWidget);
+    });
+
+    testWidgets('提交失败时留在揭示态并可重试', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      final container = await pumpStudy(tester, submitFails: true);
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('数据库写入失败'), findsOneWidget);
+      // 没有前进：仍在当前题的揭示态，自评条可用。
+      expect(find.text('参考答案'), findsOneWidget);
+      expect(find.text('记得'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 0);
+      expect(await db.select(db.reviewLogs).get(), isEmpty);
+
+      // 让 SnackBar 的自动关闭定时器走完，避免测试结束时仍有挂起的 Timer。
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
   });
 
   group('间隔预览', () {
-    testWidgets('四档按钮上显示各自的排期间隔', (tester) async {
+    testWidgets('揭示后四档按钮上显示各自的排期间隔', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
       final container = await pumpStudy(tester);
+      await tester.tap(find.text('显示答案'));
       await tester.pumpAndSettle();
 
       final previews = await container
@@ -543,7 +730,7 @@ void main() {
       }
     });
 
-    testWidgets('预览失败时不显示间隔，且不阻断答题', (tester) async {
+    testWidgets('预览失败时不显示间隔，且不阻断自评', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertWord(term: 'banana', meaning: '香蕉');
       await insertSession(
@@ -555,6 +742,8 @@ void main() {
         tester,
         intervalPreviewLoader: (wordId) async => throw StateError('预览失败'),
       );
+      final item = sessionOf(container).items.first;
+      await tester.tap(find.text(studyChoiceAnswer(item)));
       await tester.pumpAndSettle();
 
       for (final rating in ReviewRating.values) {
@@ -569,13 +758,9 @@ void main() {
         );
       }
 
-      // 预览只是提示：拿不到也必须能照常作答。
-      await tester.tap(find.text('苹果'));
-      await tester.pump();
+      // 预览只是提示：拿不到也必须能照常自评。
       await tester.tap(find.text('记得'));
       await tester.pumpAndSettle();
-
-      expect(find.text('回答正确'), findsOneWidget);
       expect(sessionOf(container).completedCount, 1);
     });
   });
@@ -599,13 +784,16 @@ void main() {
 
       await tester.enterText(find.byType(TextField), 'beautifull');
       await tester.pump();
-      await tester.tap(find.text('记得'));
-      await tester.pumpAndSettle();
+      await checkAnswer(tester);
 
       expect(find.text('回答正确'), findsOneWidget, reason: '单字母手误仍判对');
-      expect(find.text('自评：模糊'), findsOneWidget, reason: '用了提示就降一档');
       expect(find.text('已使用提示，建议选择「模糊」'), findsOneWidget);
+
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
       expect(sessionOf(container).completedCount, 1);
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.rating, ReviewRating.hard, reason: '用了提示就降一档');
     });
 
     testWidgets('没用提示时同样的答案按「记得」记录', (tester) async {
@@ -618,10 +806,12 @@ void main() {
       await pumpStudy(tester);
       await tester.enterText(find.byType(TextField), 'beautifull');
       await tester.pump();
+      await checkAnswer(tester);
       await tester.tap(find.text('记得'));
       await tester.pumpAndSettle();
 
-      expect(find.text('自评：记得'), findsOneWidget);
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.rating, ReviewRating.good);
     });
 
     testWidgets('换题后提示等级清零', (tester) async {
@@ -645,9 +835,8 @@ void main() {
 
       await tester.enterText(find.byType(TextField), 'beautiful');
       await tester.pump();
+      await checkAnswer(tester);
       await tester.tap(find.text('记得'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('下一题'));
       await tester.pumpAndSettle();
 
       expect(find.text('提示'), findsOneWidget, reason: '新题回到基础提示');
@@ -656,65 +845,35 @@ void main() {
     });
   });
 
-  group('答案差异', () {
-    testWidgets('答错时展示字符级差异', (tester) async {
-      final wordId = await insertWord(term: 'apple', meaning: '苹果');
-      await insertSession(
-        wordId: wordId,
-        questionType: QuestionType.zhToEnSpelling,
-      );
-
-      await pumpStudy(tester);
-      await tester.enterText(find.byType(TextField), 'aple');
-      await tester.pump();
-      await tester.tap(find.text('记得'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('回答错误'), findsOneWidget);
-      expect(find.text('期望答案：apple'), findsOneWidget);
-      expect(_plainText(tester, const Key('study.diff.actual')), '你的输入：aple');
-      expect(
-        _plainText(tester, const Key('study.diff.expected')),
-        '正确答案：apple',
-      );
-      expect(_diffParts(tester, const Key('study.diff.expected')), <String>[
-        'p',
-      ], reason: '漏掉的那个字母才是差异段');
-      expect(_diffParts(tester, const Key('study.diff.actual')), isEmpty);
-    });
-
-    testWidgets('答对时不展示差异', (tester) async {
-      final wordId = await insertWord(term: 'apple', meaning: '苹果');
-      await insertSession(
-        wordId: wordId,
-        questionType: QuestionType.zhToEnSpelling,
-      );
-
-      await pumpStudy(tester);
-      await tester.enterText(find.byType(TextField), 'apple');
-      await tester.pump();
-      await tester.tap(find.text('记得'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('回答正确'), findsOneWidget);
-      expect(find.byKey(const Key('study.diff.expected')), findsNothing);
-    });
-  });
-
   group('键盘快捷键', () {
-    testWidgets('数字键 1-4 提交对应评级', (tester) async {
+    testWidgets('作答时数字键选选项，揭示后数字键才是自评', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
-      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
 
       final container = await pumpStudy(tester);
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      final item = sessionOf(container).items.first;
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
       await tester.pumpAndSettle();
 
+      // 数字键 1 在作答阶段只选第一个选项，不写库、不记自评。
+      final options = tester.widget<ChoiceOptions>(find.byType(ChoiceOptions));
+      expect(options.selected, item.choices.first);
+      expect(options.revealed, isTrue);
+      expect(sessionOf(container).completedCount, 0);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      await tester.pumpAndSettle();
       expect(sessionOf(container).completedCount, 1);
-      expect(find.text('自评：记得'), findsOneWidget);
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.rating, ReviewRating.again);
     });
 
-    testWidgets('未作答时数字键无效（与按钮同一可用性）', (tester) async {
+    testWidgets('文本题数字键不触发自评', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertSession(
         wordId: wordId,
@@ -726,24 +885,59 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(sessionOf(container).completedCount, 0);
-      expect(find.text('先作答，再选择记得程度'), findsOneWidget);
+      expect(find.text('检查答案'), findsOneWidget, reason: '仍在作答阶段');
     });
 
-    testWidgets('空格提交，S 跳过，R 重播发音', (tester) async {
+    testWidgets('空格两阶段：先揭示，再按记得', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
-      final engine = RecordingSpeechEngine();
-      final container = await pumpStudy(tester, speechEngine: engine);
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+      final container = await pumpStudy(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pumpAndSettle();
-      expect(engine.spoken, <String>['apple']);
+      expect(find.text('参考答案'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 0);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       await tester.pumpAndSettle();
       expect(sessionOf(container).completedCount, 1);
-      expect(find.text('自评：记得'), findsOneWidget);
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(log.rating, ReviewRating.good);
+    });
+
+    testWidgets('输入框聚焦时字母、空格、数字让位给输入法', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      final engine = RecordingSpeechEngine();
+      final container = await pumpStudy(tester, speechEngine: engine);
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+
+      expect(sessionOf(container).completedCount, 0, reason: '空格不得提交');
+      expect(sessionOf(container).skippedCount, 0, reason: 'S 不得跳过');
+      expect(engine.spoken, isEmpty, reason: 'R 不得触发朗读');
+
+      // 回车才是文本题的「检查答案」。
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text('回答正确'), findsOneWidget);
+
+      // 揭示后输入框已卸载，数字键恢复为自评。
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
     });
 
     testWidgets('S 稍后再学', (tester) async {
@@ -757,42 +951,17 @@ void main() {
       expect(sessionOf(container).skippedCount, 1);
       expect(find.text('这一轮完成了'), findsOneWidget);
     });
-
-    testWidgets('输入框聚焦时空格、字母键让位给输入法，数字键仍可用', (tester) async {
-      final wordId = await insertWord(term: 'apple', meaning: '苹果');
-      await insertSession(
-        wordId: wordId,
-        questionType: QuestionType.zhToEnSpelling,
-      );
-
-      final engine = RecordingSpeechEngine();
-      final container = await pumpStudy(tester, speechEngine: engine);
-      await tester.enterText(find.byType(TextField), 'apple');
-      await tester.pump();
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
-      await tester.pumpAndSettle();
-
-      expect(sessionOf(container).completedCount, 0, reason: '空格不得提交');
-      expect(sessionOf(container).skippedCount, 0, reason: 'S 不得跳过');
-      expect(engine.spoken, isEmpty, reason: 'R 不得触发朗读');
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
-      await tester.pumpAndSettle();
-      expect(sessionOf(container).completedCount, 1);
-      expect(find.text('自评：记得'), findsOneWidget);
-    });
   });
 
   group('活跃计时', () {
-    testWidgets('挂机超过 45 秒后作答只记录活跃上限', (tester) async {
+    testWidgets('挂机超过 45 秒后揭示只记录活跃上限', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
       await pumpStudy(tester);
       await tester.pump(const Duration(seconds: 100));
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('记得'));
       await tester.pumpAndSettle();
 
@@ -804,7 +973,28 @@ void main() {
       );
     });
 
-    testWidgets('挂机后再交互只累加真实活跃段', (tester) async {
+    testWidgets('揭示后挑选自评的时间不计入作答时长', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      await pumpStudy(tester);
+      await tester.pump(const Duration(seconds: 10));
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
+      // 思考该选哪一档的 60 秒不属于「回忆这个词」的时间。
+      await tester.pump(const Duration(seconds: 60));
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+
+      final log = await db.select(db.reviewLogs).getSingle();
+      expect(
+        log.durationMs,
+        inInclusiveRange(9 * secondMs, 11 * secondMs),
+        reason: '揭示时停表，自评等待不应计入',
+      );
+    });
+
+    testWidgets('点选项也是一次交互，揭示后空闲不再累计', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertWord(term: 'banana', meaning: '香蕉');
       await insertSession(
@@ -812,22 +1002,110 @@ void main() {
         questionType: QuestionType.enToZhChoice,
       );
 
-      await pumpStudy(tester);
+      final container = await pumpStudy(tester);
       await tester.pump(const Duration(seconds: 30));
-      // 点选项本身也是一次交互：它把活跃段续到这一刻。
-      await tester.tap(find.text('苹果'));
-      // 之后 60 秒没有任何交互：只有前 45 秒算活跃。
+      final item = sessionOf(container).items.first;
+      await tester.tap(find.text(studyChoiceAnswer(item)));
+      await tester.pumpAndSettle();
       await tester.pump(const Duration(seconds: 60));
       await tester.tap(find.text('记得'));
       await tester.pumpAndSettle();
 
       final log = await db.select(db.reviewLogs).getSingle();
-      const expected = 30 * secondMs + activeIdleTimeoutMs;
       expect(
         log.durationMs,
-        inInclusiveRange(expected, expected + 500),
-        reason: '墙钟走了 90 秒，只该记录 30 秒活跃 + 45 秒空闲容忍（余量留给 pumpAndSettle 帧步）',
+        inInclusiveRange(30 * secondMs, 30 * secondMs + 500),
+        reason: '只在作答段计时，揭示后的等待不计',
       );
+    });
+  });
+
+  group('设置生效', () {
+    testWidgets('揭示延迟：选项按设置延迟出现，可立即显示', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      final container = await pumpStudy(
+        tester,
+        choiceRevealDelaySeconds: 2,
+        settle: false,
+      );
+      final item = sessionOf(container).items.first;
+
+      expect(find.text('2 秒后显示选项'), findsOneWidget);
+      for (final choice in item.choices) {
+        expect(find.text(choice), findsNothing, reason: '延迟期间不应看到选项');
+      }
+
+      await tester.tap(find.text('立即显示选项'));
+      await tester.pumpAndSettle();
+      for (final choice in item.choices) {
+        expect(find.text(choice), findsOneWidget);
+      }
+    });
+
+    testWidgets('揭示延迟到点后自动显示选项', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertWord(term: 'banana', meaning: '香蕉');
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      final container = await pumpStudy(
+        tester,
+        choiceRevealDelaySeconds: 2,
+        settle: false,
+      );
+      final item = sessionOf(container).items.first;
+
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+
+      expect(find.text('立即显示选项'), findsNothing);
+      for (final choice in item.choices) {
+        expect(find.text(choice), findsOneWidget);
+      }
+    });
+
+    testWidgets('自动朗读：看词选义会播放一次', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      final engine = RecordingSpeechEngine();
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      await pumpStudy(tester, autoPlay: true, speechEngine: engine);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(engine.spoken, <String>['apple']);
+    });
+
+    testWidgets('自动朗读：拼写题不播放（听完就等于拿到答案）', (tester) async {
+      final wordId = await insertWord(term: 'banana', meaning: '香蕉');
+      final engine = RecordingSpeechEngine();
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester, autoPlay: true, speechEngine: engine);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(engine.spoken, isEmpty);
+    });
+
+    testWidgets('关闭自动朗读时不播放', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      final engine = RecordingSpeechEngine();
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+
+      await pumpStudy(tester, speechEngine: engine);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(engine.spoken, isEmpty);
     });
   });
 
@@ -880,6 +1158,37 @@ void main() {
 
       expect(engine.spoken, <String>['apple']);
       expect(find.text('暂无真人录音，已改用系统朗读'), findsOneWidget);
+    });
+  });
+
+  group('版面', () {
+    testWidgets('窄屏下自评条吸底，内容再长也能直接操作', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      for (final entry in <(String, String)>[
+        ('banana', '香蕉'),
+        ('cherry', '樱桃'),
+        ('grape', '葡萄'),
+      ]) {
+        await insertWord(term: entry.$1, meaning: entry.$2);
+      }
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.enToZhChoice,
+      );
+
+      final container = await pumpStudy(tester, size: const Size(390, 640));
+      final item = sessionOf(container).items.first;
+      await tester.tap(find.text(studyChoiceAnswer(item)));
+      await tester.pumpAndSettle();
+
+      final rect = tester.getRect(find.text('记得'));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.bottom, lessThanOrEqualTo(640), reason: '自评条必须吸底可见');
+      expect(
+        find.byType(SingleChildScrollView),
+        findsWidgets,
+        reason: '内容区应当可滚动',
+      );
     });
   });
 }

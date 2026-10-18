@@ -1,10 +1,10 @@
 /// 学习页顶部进度环的几何与语义测试。
 ///
-/// **为什么单独写它**：环是学习页的识别符号，它承载三件事——弧长表达比例、
-/// 环内数字是已完成数、旁边一行说还剩多少。这三件事都是「渲染出来才知道」的
+/// **为什么单独写它**：环是学习页的识别符号，它承载两件事——弧长表达比例、
+/// 旁边一组「已完成 / 计划」计数。这两件事都是「渲染出来才知道」的
 /// 几何/语义，普通断言文字存在与否的用例看不出来。
 ///
-/// 另一半是自适应：环 + 文案与计数 + 动作在 360 宽下必须折成两行而不是溢出。
+/// 另一半是自适应：环 + 文案与计数 + 结束动作在 360 宽下不得溢出。
 library;
 
 import 'dart:ui' as ui;
@@ -51,11 +51,7 @@ Future<Size> pumpHeader(
     MaterialApp(
       theme: LexiTheme.light,
       home: Scaffold(
-        body: StudyProgressHeader(
-          session: session,
-          onSkip: () {},
-          onExit: () {},
-        ),
+        body: StudyProgressHeader(session: session, onExit: () {}),
       ),
     ),
   );
@@ -110,7 +106,7 @@ Future<int> accentPixels(
 
 void main() {
   group('进度环', () {
-    testWidgets('直径等于可点区域下限，环内是已完成数', (tester) async {
+    testWidgets('直径等于可点区域下限，计数只在旁边出现一次', (tester) async {
       await pumpHeader(tester, sessionOf(completed: 12, planned: 45));
 
       final ring = tester.getSize(
@@ -128,7 +124,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(StudyProgressHeader),
-          matching: find.text('12'),
+          matching: find.text('12 / 45'),
         ),
         findsOneWidget,
       );
@@ -153,28 +149,29 @@ void main() {
     testWidgets('旁边一行说还剩多少，并带上总数', (tester) async {
       await pumpHeader(tester, sessionOf(completed: 12, planned: 45));
       expect(find.text('12 / 45'), findsOneWidget);
-      expect(find.text('还剩 33 词'), findsOneWidget);
+      expect(find.text('12'), findsNothing);
+      expect(find.text('本轮复习'), findsOneWidget);
     });
 
     testWidgets('全部完成时剩余为 0 而不是负数', (tester) async {
       await pumpHeader(tester, sessionOf(completed: 45, planned: 45));
-      expect(find.text('还剩 0 词'), findsOneWidget);
+      expect(find.text('45 / 45'), findsOneWidget);
     });
 
     testWidgets('计划数为 0 时不崩且进度为 0', (tester) async {
       await pumpHeader(tester, sessionOf(completed: 0, planned: 0));
-      expect(find.text('还剩 0 词'), findsOneWidget);
+      expect(find.text('0 / 0'), findsOneWidget);
     });
   });
 
   group('自适应', () {
-    testWidgets('360 宽下折成两行而不溢出', (tester) async {
+    testWidgets('360 宽下不溢出', (tester) async {
       final size = await pumpHeader(
         tester,
         sessionOf(completed: 12, planned: 45),
         width: 360,
       );
-      // 两行：环 + 文案一行，计数 + 动作一行。
+      // 360 宽下会折成两行（进度一行、计数与结束一行）；关键是不溢出。
       expect(size.height, greaterThan(60));
     });
 

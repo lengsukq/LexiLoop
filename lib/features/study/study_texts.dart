@@ -53,25 +53,38 @@ String studyRatingLabel(ReviewRating rating) => switch (rating) {
   ReviewRating.easy => '简单',
 };
 
-/// 掌握等级的中文文案。
-String studyMasteryLabel(MasteryLevel level) => switch (level) {
-  MasteryLevel.newWord => '新词',
-  MasteryLevel.learning => '学习中',
-  MasteryLevel.familiar => '熟悉',
-  MasteryLevel.proficient => '熟练',
-  MasteryLevel.mastered => '已掌握',
+/// 题头的作答指令。
+///
+/// 旧版题头是一个题型徽章（「看词选义」），它说明「这是什么题」却不说
+/// 「现在该做什么」。对用户来说，后者才是进入一道题时需要的那句话。
+String studyQuestionInstruction(QuestionType type) => switch (type) {
+  QuestionType.enToZh => '回忆它的含义',
+  QuestionType.enToZhChoice => '选择正确的释义',
+  QuestionType.zhToEnChoice => '根据释义选择单词',
+  QuestionType.zhToEnSpelling => '根据释义拼写英文',
+  QuestionType.listeningSpelling => '听发音拼写单词',
+  QuestionType.clozeSentence => '补全句子中的单词',
+  QuestionType.listeningChoice => '听发音选择单词',
+  QuestionType.letterBank => '根据释义拼出单词',
 };
 
-/// 题型的中文名称，用于题头的小标签。
-String studyQuestionTypeLabel(QuestionType type) => switch (type) {
-  QuestionType.enToZh => '看词说义',
-  QuestionType.enToZhChoice => '看词选义',
-  QuestionType.zhToEnChoice => '看义选词',
-  QuestionType.zhToEnSpelling => '看义拼写',
-  QuestionType.listeningSpelling => '听音拼写',
-  QuestionType.clozeSentence => '例句填空',
-  QuestionType.listeningChoice => '听音选词',
-  QuestionType.letterBank => '字母拼词',
+/// 揭示后的判定文案。
+///
+/// `null` 表示主观题（看词说义）没有客观对错，只能给参考答案。
+String studyVerdictText({required bool? isCorrect}) => isCorrect == null
+    ? '参考答案'
+    : isCorrect
+    ? '回答正确'
+    : '回答错误';
+
+/// 选择题里「算作正确」的那个选项文本。
+///
+/// 定义题的正确项是释义串，其余题的正确项是词条本身。选项文本由
+/// `question_builder` 用 [studyMeaningText] 同一套拼接生成，因此这里能得到
+/// 与服务层 `expectedAnswer` 相同的字符串。
+String studyChoiceAnswer(StudyItemView item) => switch (item.questionType) {
+  QuestionType.enToZhChoice => studyMeaningText(item.word),
+  _ => item.word.term,
 };
 
 /// 题干用的中文释义。

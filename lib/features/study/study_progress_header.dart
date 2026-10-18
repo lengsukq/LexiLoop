@@ -1,7 +1,10 @@
 /// 学习会话的顶部进度与计数。
 ///
-/// 学习页在沉浸模式下运行，外壳不提供导航，因此「跳过 / 结束」必须由这里
-/// 自带；进度也在这里，让用户随时知道还剩多少。
+/// 学习页在沉浸模式下运行，外壳不提供导航，因此「结束」必须由这里自带；
+/// 进度也在这里，让用户随时知道还剩多少。
+///
+/// **「跳过」不在页头**：它已经移到底部动作条（`稍后再学`），与自评/检查
+/// 答案同一个位置，窄屏上拇指够得到；页头只留「结束」这一个退出动作。
 ///
 /// **为什么是环而不是条**：进度条只能表达「比例」，剩下的题数还得另外写一行
 /// 文字；而学习页最需要的恰好是那个数字。改成环之后，环内放已完成数、环的
@@ -24,41 +27,25 @@ import 'package:lexiloop/ui/theme/lexi_type.dart';
 
 /// 顶部进度与计数。
 class StudyProgressHeader extends StatelessWidget {
-  /// 以会话、跳过回调（为空表示禁用）与结束回调构造。
-  const new({
-    required this.session,
-    required this.onSkip,
-    required this.onExit,
-    super.key,
-  });
+  /// 以会话与结束回调构造。
+  const new({required this.session, required this.onExit, super.key});
 
   /// 当前会话。
   final StudySessionView session;
-
-  /// 跳过回调；提交后为 `null`，此时按钮禁用。
-  final VoidCallback? onSkip;
 
   /// 结束回调。
   final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s20,
-        LexiSpace.s12,
-        LexiSpace.s20,
-        LexiSpace.s8,
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        runSpacing: LexiSpace.s8,
-        children: <Widget>[
-          _SessionProgress(session: session),
-          _CountsAndActions(session: session, onSkip: onSkip, onExit: onExit),
-        ],
-      ),
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      runSpacing: LexiSpace.s8,
+      children: <Widget>[
+        _SessionProgress(session: session),
+        _CountsAndActions(session: session, onExit: onExit),
+      ],
     );
   }
 }
@@ -72,10 +59,6 @@ class _SessionProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final remaining = (session.plannedCount - session.completedCount).clamp(
-      0,
-      session.plannedCount,
-    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -97,7 +80,7 @@ class _SessionProgress extends StatelessWidget {
               ),
             ),
             Text(
-              '还剩 $remaining 词',
+              '本轮复习',
               style: LexiType.caption.copyWith(color: colors.secondaryLabel),
             ),
           ],
@@ -146,17 +129,7 @@ class _ProgressRing extends StatelessWidget {
             ),
             child: child,
           ),
-          // 环内的数字是**已完成数**：它是随作答增长的那个，也是用户扫一眼
-          // 想确认的那个。比例由弧长表达，不再重复写成百分比。
-          child: Center(
-            child: Text(
-              '$completed',
-              style: LexiType.caption.copyWith(
-                color: colors.label,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          child: const SizedBox.shrink(),
         ),
       ),
     );
@@ -215,16 +188,11 @@ class _ProgressRingPainter extends CustomPainter {
       old.strokeWidth != strokeWidth;
 }
 
-/// 正确 / 错误计数与「跳过 / 结束」。
+/// 正确 / 错误计数与「结束」。
 class _CountsAndActions extends StatelessWidget {
-  const new({
-    required this.session,
-    required this.onSkip,
-    required this.onExit,
-  });
+  const new({required this.session, required this.onExit});
 
   final StudySessionView session;
-  final VoidCallback? onSkip;
   final VoidCallback onExit;
 
   @override
@@ -246,7 +214,6 @@ class _CountsAndActions extends StatelessWidget {
           color: colors.danger,
         ),
         const SizedBox(width: LexiSpace.s6),
-        _HeaderAction(label: '跳过', enabled: onSkip != null, onTap: onSkip),
         _HeaderAction(label: '结束', enabled: true, onTap: onExit),
       ],
     );
@@ -313,7 +280,7 @@ class _CountChip extends StatelessWidget {
   }
 }
 
-/// 顶部的小动作按钮（跳过 / 结束）。
+/// 顶部的小动作按钮（结束）。
 class _HeaderAction extends StatelessWidget {
   const new({required this.label, required this.enabled, required this.onTap});
 

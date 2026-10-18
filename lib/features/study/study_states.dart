@@ -15,6 +15,7 @@ import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 加载态。
 class StudyLoadingView extends StatelessWidget {
@@ -65,7 +66,7 @@ class StudyErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.error_outline_rounded, size: 40, color: colors.danger),
+            Icon(LucideIcons.circleAlert, size: 40, color: colors.danger),
             const SizedBox(height: LexiSpace.s12),
             Text(
               message,

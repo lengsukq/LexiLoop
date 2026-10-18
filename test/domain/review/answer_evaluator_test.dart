@@ -6,8 +6,10 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
+import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_evaluator.dart';
 
 /// 构造一个词条；只覆盖被测字段。
@@ -450,6 +452,106 @@ void main() {
       );
       expect(result.isCorrect, isTrue);
       expect(result.expectedAnswer, '苹果');
+    });
+  });
+
+  group('界面预览与服务判题同源', () {
+    /// 构造与 [_word] 对应的学习页词条视图。
+    StudyWordView studyWord({
+      String term = 'apple',
+      LexicalContentType contentType = LexicalContentType.word,
+      List<DefinitionValue> definitions = const <DefinitionValue>[
+        DefinitionValue(language: 'zh', text: '苹果'),
+      ],
+    }) => StudyWordView(
+      id: 1,
+      term: term,
+      sourceLanguage: 'en',
+      targetLanguage: 'zh',
+      contentType: contentType,
+      definitions: definitions,
+      pronunciations: const <PronunciationView>[],
+      examples: const <ExampleView>[],
+    );
+
+    test('八种题型的期望答案与写库判题完全一致', () {
+      final word = _word(
+        definitionsJson:
+            '[{"language":"zh","text":"苹果"},{"language":"zh","text":"苹果树"}]',
+      );
+      final view = studyWord(
+        definitions: const <DefinitionValue>[
+          DefinitionValue(language: 'zh', text: '苹果'),
+          DefinitionValue(language: 'zh', text: '苹果树'),
+        ],
+      );
+      for (final type in QuestionType.values) {
+        final answer = switch (type) {
+          QuestionType.enToZh || QuestionType.enToZhChoice => '苹果；苹果树',
+          _ => 'apple',
+        };
+        final evaluated = evaluateAnswer(
+          _answer(questionType: type, userAnswer: answer),
+          word,
+        );
+        final preview = previewAnswer(
+          questionType: type,
+          word: view,
+          answer: answer,
+        );
+        expect(
+          preview.expectedAnswer,
+          evaluated.expectedAnswer,
+          reason: '${type.wire} 的期望答案必须与写库路径一致',
+        );
+        if (type == QuestionType.enToZh) {
+          expect(preview.isCorrect, isNull, reason: '主观题没有客观对错');
+        } else {
+          expect(
+            preview.isCorrect,
+            evaluated.isCorrect,
+            reason: '${type.wire} 的预览对错必须与写库路径一致',
+          );
+        }
+      }
+    });
+
+    test('拼写容错在预览里同样生效', () {
+      final view = studyWord(term: 'definitely');
+      expect(
+        previewAnswer(
+          questionType: QuestionType.zhToEnSpelling,
+          word: view,
+          answer: 'definately',
+        ).isCorrect,
+        isTrue,
+        reason: '长词单字母手误服务层判对，预览不能显示红叉',
+      );
+    });
+
+    test('句子模糊容错在预览里同样生效', () {
+      final view = studyWord(
+        term: 'I ate an apple yesterday.',
+        contentType: LexicalContentType.sentence,
+        definitions: const <DefinitionValue>[],
+      );
+      final preview = previewAnswer(
+        questionType: QuestionType.zhToEnSpelling,
+        word: view,
+        answer: 'I ate an apple yesterday',
+      );
+      expect(preview.isCorrect, isTrue);
+      expect(preview.expectedAnswer, 'I ate an apple yesterday.');
+    });
+
+    test('没有释义的选择题退回自评，预览不谎报对错', () {
+      final preview = previewAnswer(
+        questionType: QuestionType.enToZhChoice,
+        word: studyWord(definitions: const <DefinitionValue>[]),
+        answer: '苹果',
+      );
+      expect(preview.isCorrect, isNull);
+      expect(preview.expectedAnswer, '');
     });
   });
 }

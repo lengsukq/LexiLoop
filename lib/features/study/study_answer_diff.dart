@@ -3,11 +3,13 @@
 /// 对应旧版 `src/components/answer-diff.tsx`。算法在
 /// `domain/review/answer_diff.dart`，这里只负责上色：红色是「你写的多出来的
 /// 部分」，绿色是「正确答案里你漏掉的部分」。
+///
+/// 判定由调用方给（揭示面板的本地预览），本组件不再依赖服务层的
+/// `ReviewOutcome`——自评之前就要显示差异。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_diff.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -26,24 +28,35 @@ const Set<QuestionType> _diffQuestionTypes = <QuestionType>{
   QuestionType.letterBank,
 };
 
+/// 这道题是否有「差在哪」可言。
+///
+/// 只有要把答案拼出来的题型才值得画差异；选择题的错因是选错了项，选项上已经
+/// 标出来了。揭示面板用它决定要不要留出差异块的位置。
+bool studyAnswerDiffApplies(StudyItemView item) =>
+    _diffQuestionTypes.contains(item.questionType);
+
 /// 答案差异：词条走字符级，句子走词级。
 class StudyAnswerDiff extends StatelessWidget {
-  /// 以题目、判定结果与用户作答构造。
+  /// 以题目、期望答案、用户作答与判定结果构造。
   const new({
     required this.item,
-    required this.outcome,
+    required this.expectedAnswer,
     required this.answer,
+    required this.isCorrect,
     super.key,
   });
 
   /// 当前题目。
   final StudyItemView item;
 
-  /// 本次作答的判定结果。
-  final ReviewOutcome outcome;
+  /// 服务层同源的期望答案。
+  final String expectedAnswer;
 
   /// 用户实际提交的答案文本（字母拼词是拼出的字母串）。
   final String answer;
+
+  /// 本地预览的判定结果。
+  final bool isCorrect;
 
   @override
   Widget build(BuildContext context) => _diffView() ?? const SizedBox.shrink();
@@ -53,9 +66,9 @@ class StudyAnswerDiff extends StatelessWidget {
   /// 判对就不展示：差异是「你错在哪」的说明，答对了还列一堆红字只会让人
   /// 以为自己错了。
   Widget? _diffView() {
-    if (outcome.isCorrect) return null;
+    if (isCorrect) return null;
     if (!_diffQuestionTypes.contains(item.questionType)) return null;
-    final expected = outcome.expectedAnswer;
+    final expected = expectedAnswer;
     if (item.word.contentType == LexicalContentType.sentence) {
       final diff = sentenceDiff(expected: expected, actual: answer);
       return diff == null ? null : _SentenceDiffView(diff: diff);

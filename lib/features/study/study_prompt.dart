@@ -18,8 +18,8 @@ import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
-import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 朗读按钮的边长（逻辑像素），同时满足触控热区下限。
 const double _speakButtonSize = 44;
@@ -40,6 +40,7 @@ class StudyPrompt extends StatelessWidget {
     // 内容层用 `Surface` 而不是液态玻璃：卡片是承载内容的地方，
     // 玻璃只属于功能层（侧边栏 / HUD / 弹窗）。见 `ui/widgets/surface.dart`。
     return Surface(
+      variant: SurfaceVariant.raised,
       padding: const EdgeInsets.all(LexiSpace.s20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,16 +68,19 @@ class StudyPrompt extends StatelessWidget {
   };
 }
 
-/// 题头：题型标签。
+/// 题头：这一步该做什么。
 class _PromptHeader extends StatelessWidget {
   const new({required this.type});
 
   final QuestionType type;
 
   @override
-  Widget build(BuildContext context) => LexiBadge(
-    label: studyQuestionTypeLabel(type),
-    tone: LexiBadgeTone.accent,
+  Widget build(BuildContext context) => Text(
+    studyQuestionInstruction(type),
+    style: LexiType.footnote.copyWith(
+      color: context.lexiColors.secondaryLabel,
+      fontWeight: FontWeight.w600,
+    ),
   );
 }
 
@@ -161,22 +165,9 @@ class _ListeningPrompt extends StatelessWidget {
         SpeakButton(word: word, accent: accent),
         const SizedBox(width: LexiSpace.s12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                '听音作答',
-                style: LexiType.title2.copyWith(
-                  color: colors.label,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: LexiSpace.s4),
-              Text(
-                '听不清时可以再点一次朗读',
-                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-              ),
-            ],
+          child: Text(
+            '点喇叭播放，听不清可再点一次',
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
           ),
         ),
       ],
@@ -271,7 +262,7 @@ class SpeakButton extends ConsumerWidget {
             unawaited(speakStudyWord(context, ref, word: word, accent: accent)),
         tooltip: '朗读',
         iconSize: 20,
-        icon: Icon(Icons.volume_up_rounded, color: colors.accent),
+        icon: Icon(LucideIcons.volume2, color: colors.accent),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 展示新增 / 编辑对话框。
 ///
@@ -125,7 +126,7 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
               Text(
                 error,
                 key: const Key('aiProviderEditorError'),
-                style: LexiType.footnote.copyWith(color: colors.danger),
+                style: LexiType.footnote.copyWith(color: colors.dangerText),
               ),
             ],
           ],
@@ -176,10 +177,7 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
       suffixIcon: IconButton(
         key: const Key('aiProviderEditorRevealApiKey'),
         tooltip: _obscured ? '显示' : '隐藏',
-        icon: Icon(
-          _obscured ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-          size: 18,
-        ),
+        icon: Icon(_obscured ? LucideIcons.eye : LucideIcons.eyeOff, size: 18),
         onPressed: () => setState(() => _obscured = !_obscured),
       ),
     ),

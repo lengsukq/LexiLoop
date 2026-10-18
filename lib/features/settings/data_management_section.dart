@@ -23,6 +23,8 @@ import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 二次确认时要求输入的词。
 const String deleteConfirmKeyword = 'DELETE';
@@ -78,20 +80,20 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
               FilledButton.icon(
                 key: const Key('exportBackup'),
                 onPressed: _exporting ? null : _exportBackup,
-                icon: const Icon(Icons.save_alt_rounded, size: 16),
+                icon: const Icon(LucideIcons.download, size: 16),
                 label: Text(_exporting ? '导出中…' : '导出 JSON 备份'),
               ),
               const SizedBox(height: LexiSpace.s8),
               OutlinedButton.icon(
                 onPressed: _importing ? null : _importBackup,
-                icon: const Icon(Icons.upload_file_rounded, size: 16),
+                icon: const Icon(LucideIcons.fileUp, size: 16),
                 label: Text(_importing ? '导入中…' : '导入旧版 JSON 备份'),
               ),
               const SizedBox(height: LexiSpace.s8),
               OutlinedButton.icon(
                 key: const Key('openCsvImport'),
                 onPressed: () => context.go('/import'),
-                icon: const Icon(Icons.table_chart_rounded, size: 16),
+                icon: const Icon(LucideIcons.table2, size: 16),
                 label: const Text('导入 EasyDict CSV 词库'),
               ),
             ],
@@ -106,7 +108,10 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
         // 降级、当前是不是侧边栏布局」，属于排查信息而不是每日任务。
         // 摆在首页最末位时，它是整页唯一一块与「今天学什么」无关的内容，
         // 却占着最有价值的滚动终点。
-        const PlatformCapabilityCard(),
+        const DisclosureSection(
+          title: '设备与运行信息',
+          child: PlatformCapabilityCard(),
+        ),
         const SizedBox(height: LexiSpace.s12),
         SettingsSectionCard(
           title: '危险区',
@@ -124,7 +129,7 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
                 key: const Key('clearAllData'),
                 style: FilledButton.styleFrom(backgroundColor: colors.danger),
                 onPressed: _clearAll,
-                icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                icon: const Icon(LucideIcons.trash2, size: 16),
                 label: const Text('清空全部数据'),
               ),
             ],

@@ -17,6 +17,7 @@ import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 
 /// 推理强度的可选项；空串表示「交给模型自己决定」。
 const List<String> reasoningEffortOptions = <String>[
@@ -46,7 +47,7 @@ class AiParamsSection extends StatelessWidget {
     final ai = config.ai;
     return SettingsSectionCard(
       title: 'AI 参数',
-      subtitle: '一份配置供词条初始化、翻译与建议共用；发音由系统 TTS 独立负责。',
+      subtitle: '一份配置供词条内容补全、翻译与建议共用；发音由系统 TTS 独立负责。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -63,11 +64,19 @@ class AiParamsSection extends StatelessWidget {
             const SizedBox(height: LexiSpace.s8),
             _TargetPickers(config: config, onChanged: onChanged),
             const SizedBox(height: LexiSpace.s8),
-            _TuningFields(config: config, onChanged: onChanged),
-            const SizedBox(height: LexiSpace.s8),
-            _ThinkingFields(config: config, onChanged: onChanged),
-            const SizedBox(height: LexiSpace.s8),
-            _RetryFields(config: config, onChanged: onChanged),
+            DisclosureSection(
+              title: '高级模型参数',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _TuningFields(config: config, onChanged: onChanged),
+                  const SizedBox(height: LexiSpace.s8),
+                  _ThinkingFields(config: config, onChanged: onChanged),
+                  const SizedBox(height: LexiSpace.s8),
+                  _RetryFields(config: config, onChanged: onChanged),
+                ],
+              ),
+            ),
           ],
         ],
       ),

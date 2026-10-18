@@ -14,6 +14,7 @@ import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 一次探测的进行中状态与结果。
 class AiProbeState {
@@ -118,7 +119,7 @@ class AiProviderCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: LexiSpace.s6),
                 child: Text(
                   '接口地址或 API Key 为空，该 Provider 目前不可用。',
-                  style: LexiType.footnote.copyWith(color: colors.danger),
+                  style: LexiType.footnote.copyWith(color: colors.dangerText),
                 ),
               ),
             const SizedBox(height: LexiSpace.s8),
@@ -152,7 +153,7 @@ class AiProviderCard extends StatelessWidget {
           key: Key('aiProviderEdit-${provider.id}'),
           tooltip: '编辑',
           icon: Icon(
-            Icons.edit_rounded,
+            LucideIcons.pencil,
             size: 18,
             color: colors.secondaryLabel,
           ),
@@ -161,11 +162,7 @@ class AiProviderCard extends StatelessWidget {
         IconButton(
           key: Key('aiProviderRemove-${provider.id}'),
           tooltip: '删除',
-          icon: Icon(
-            Icons.delete_outline_rounded,
-            size: 18,
-            color: colors.danger,
-          ),
+          icon: Icon(LucideIcons.trash2, size: 18, color: colors.danger),
           onPressed: data.onRemove,
         ),
       ],
@@ -245,7 +242,7 @@ class AiProviderCard extends StatelessWidget {
           InputChip(
             key: Key('aiProviderModel-${provider.id}-$model'),
             label: Text(model, style: LexiType.footnote),
-            deleteIcon: const Icon(Icons.close_rounded, size: 14),
+            deleteIcon: const Icon(LucideIcons.x, size: 14),
             onDeleted: () => actions.onRemoveModel(model),
             visualDensity: VisualDensity.compact,
           ),
@@ -267,7 +264,7 @@ class AiProviderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Icon(
-            result.success ? Icons.check_circle_rounded : Icons.error_rounded,
+            result.success ? LucideIcons.circleCheck : LucideIcons.circleAlert,
             size: 15,
             color: result.success ? colors.success : colors.danger,
           ),
@@ -297,7 +294,7 @@ class AiProviderCard extends StatelessWidget {
           onPressed: data.test.busy ? null : actions.onTest,
           icon: data.test.busy
               ? _spinner()
-              : const Icon(Icons.bolt_rounded, size: 16),
+              : const Icon(LucideIcons.zap, size: 16),
           label: Text(data.test.busy ? '测试中' : '测试连接'),
         ),
         OutlinedButton.icon(
@@ -305,7 +302,7 @@ class AiProviderCard extends StatelessWidget {
           onPressed: data.models.busy ? null : actions.onFetchModels,
           icon: data.models.busy
               ? _spinner()
-              : const Icon(Icons.refresh_rounded, size: 16),
+              : const Icon(LucideIcons.refreshCw, size: 16),
           label: Text(data.models.busy ? '读取中' : '从 Models 接口获取'),
         ),
         TextButton(

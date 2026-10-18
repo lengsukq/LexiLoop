@@ -110,6 +110,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('AI 模型'));
     await tester.pumpAndSettle();
+    if (find.text('高级模型参数').evaluate().isNotEmpty) {
+      await tester.ensureVisible(find.text('高级模型参数'));
+      await tester.tap(find.text('高级模型参数'));
+      await tester.pumpAndSettle();
+    }
   }
 
   /// 从 `appSettingsProvider` 解析出当前的 LLM 配置。

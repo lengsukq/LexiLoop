@@ -31,6 +31,7 @@ import 'package:lexiloop/services/remote_backup/webdav_state_store.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 从远端恢复的二次确认关键词。
 ///
@@ -182,21 +183,21 @@ class _RemoteBackupSectionState extends ConsumerState<RemoteBackupSection> {
       OutlinedButton.icon(
         key: const Key('testWebdavConnection'),
         onPressed: _busy || !configured ? null : _testConnection,
-        icon: const Icon(Icons.wifi_tethering_rounded, size: 16),
+        icon: const Icon(LucideIcons.wifi, size: 16),
         label: const Text('测试连接'),
       ),
       const SizedBox(height: LexiSpace.s8),
       FilledButton.icon(
         key: const Key('uploadToWebdav'),
         onPressed: _busy || !configured ? null : _uploadNow,
-        icon: const Icon(Icons.cloud_upload_rounded, size: 16),
+        icon: const Icon(LucideIcons.cloudUpload, size: 16),
         label: Text(_busy ? '处理中…' : '立即上传一份备份'),
       ),
       const SizedBox(height: LexiSpace.s8),
       OutlinedButton.icon(
         key: const Key('restoreFromWebdav'),
         onPressed: _busy || !configured ? null : _restoreFromRemote,
-        icon: const Icon(Icons.cloud_download_rounded, size: 16),
+        icon: const Icon(LucideIcons.cloudDownload, size: 16),
         label: const Text('从远端恢复（覆盖本地）'),
       ),
       const SizedBox(height: LexiSpace.s8),

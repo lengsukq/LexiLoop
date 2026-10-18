@@ -16,6 +16,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词汇水平分组。
 class VocabularySection extends ConsumerWidget {
@@ -125,9 +126,7 @@ class _LevelOption extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Icon(
-                  selected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_unchecked_rounded,
+                  selected ? LucideIcons.circleDot : LucideIcons.circle,
                   size: 17,
                   color: selected ? colors.accent : colors.tertiaryLabel,
                 ),

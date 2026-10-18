@@ -24,8 +24,12 @@ import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_states.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 设置页。
 class SettingsPage extends ConsumerWidget {
@@ -45,87 +49,167 @@ class SettingsPage extends ConsumerWidget {
             message: error is AppError ? error.message : '读取设置失败：$error',
             onRetry: () => ref.invalidate(appSettingsProvider),
           ),
-          data: (value) => _SettingsTabs(settings: value),
+          data: (value) => _SettingsBody(settings: value),
         ),
       ),
     );
   }
 }
 
-class _SettingsTabs extends StatelessWidget {
+/// 分类切换只影响展示，已打开分组保持表单与滚动状态。
+class _SettingsBody extends StatefulWidget {
   const new({required this.settings});
 
   final AppSettings settings;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return DefaultTabController(
-      length: _tabLabels.length,
-      child: Column(
-        children: <Widget>[
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
-              LexiSpace.s20,
-              LexiSpace.s16,
-              LexiSpace.s20,
-              LexiSpace.s10,
-            ),
-            // 副标题此前是「所有改动即时生效，无需保存」——一句应用无法
-            // 兑现的承诺：写库可能失败，而失败在收敛前是静默的。
-            // 现在失败会弹提示并让开关回弹（见 `settings_providers.dart`
-            // 的 `saveSettings`），所以这句可以老实换成「这一页能做什么」。
-            child: PageHeader(
-              title: '设置',
-              subtitle: '逐项改动即时保存；保存失败会提示，并把开关恢复原值。',
-            ),
-          ),
-          TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelColor: colors.accent,
-            unselectedLabelColor: colors.secondaryLabel,
-            indicatorColor: colors.accent,
-            tabs: <Widget>[for (final label in _tabLabels) Tab(text: label)],
-          ),
-          // **设置页收窄到一列**：整页铺满 1040 时，每张卡片右侧都有一半
-          // 是空的，而控件（滑条、开关）只占左侧一小段——卡片看起来像没画完。
-          // 表单类页面本来就不该铺满宽屏。
-          // 左对齐而不是居中：这样内容左缘与上方的 tab 条对齐。
-          Expanded(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: LexiLayout.readingMaxWidth,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: LexiSpace.s16,
-                  ),
-                  child: TabBarView(
-                    children: <Widget>[
-                      StudyPlanSection(settings: settings),
-                      QuestionTypeSection(settings: settings),
-                      PlaybackSection(settings: settings),
-                      ProvidersSection(settings: settings),
-                      VocabularySection(settings: settings),
-                      AiSettingsSection(settings: settings),
-                      const DataManagementSection(),
-                    ],
-                  ),
+  State<_SettingsBody> createState() => _SettingsBodyState();
+}
+
+class _SettingsBodyState extends State<_SettingsBody> {
+  int _selected = 0;
+  bool _detail = false;
+  final Set<int> _visited = <int>{0};
+
+  void _open(int index) => setState(() {
+    _selected = index;
+    _visited.add(index);
+    _detail = true;
+  });
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 760;
+      return PopScope<Object?>(
+        canPop: wide || !_detail,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && mounted) setState(() => _detail = false);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: LexiSpace.s16),
+                child: PageHeader(
+                  title: !wide && _detail ? _tabLabels[_selected] : '设置',
+                  leading: !wide && _detail
+                      ? IconButton(
+                          tooltip: '设置分类',
+                          onPressed: () => setState(() => _detail = false),
+                          icon: const Icon(LucideIcons.arrowLeft),
+                        )
+                      : null,
                 ),
               ),
-            ),
+              Expanded(child: wide ? _wideContent() : _compactContent()),
+            ],
           ),
+        ),
+      );
+    },
+  );
+
+  Widget _wideContent() => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      SizedBox(width: _categoryWidth, child: _categories(wide: true)),
+      const SizedBox(width: LexiSpace.s24),
+      Expanded(child: _content()),
+    ],
+  );
+
+  Widget _compactContent() => IndexedStack(
+    index: _detail ? 1 : 0,
+    children: <Widget>[_categories(wide: false), _content()],
+  );
+
+  Widget _categories({required bool wide}) => ListView(
+    children: <Widget>[
+      for (var index = 0; index < _tabLabels.length; index++)
+        ListTile(
+          selected: wide && index == _selected,
+          selectedTileColor: LexiTone.lavender.background(
+            Theme.of(context).brightness,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LexiRadius.md),
+          ),
+          leading: _CategoryIcon(index: index),
+          title: Text(_tabLabels[index], style: LexiType.body),
+          trailing: wide ? null : const Icon(LucideIcons.chevronRight),
+          onTap: () => _open(index),
+        ),
+      const SizedBox(height: LexiSpace.s24),
+      const DisclosureSection(
+        title: '关于词环',
+        child: Text(
+          'LexiLoop v1.0\n词条与学习记录保存在本机，使用 FSRS 安排复习。',
+          style: LexiType.footnote,
+        ),
+      ),
+    ],
+  );
+
+  Widget _content() => Align(
+    alignment: Alignment.topLeft,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: LexiLayout.readingMaxWidth),
+      child: IndexedStack(
+        index: _selected,
+        children: <Widget>[
+          for (var index = 0; index < _tabLabels.length; index++)
+            if (_visited.contains(index))
+              KeyedSubtree(key: ValueKey<int>(index), child: _section(index))
+            else
+              const SizedBox.shrink(),
         ],
       ),
+    ),
+  );
+
+  Widget _section(int index) => switch (index) {
+    0 => StudyPlanSection(settings: widget.settings),
+    1 => QuestionTypeSection(settings: widget.settings),
+    2 => PlaybackSection(settings: widget.settings),
+    3 => ProvidersSection(settings: widget.settings),
+    4 => VocabularySection(settings: widget.settings),
+    5 => AiSettingsSection(settings: widget.settings),
+    _ => const DataManagementSection(),
+  };
+}
+
+class _CategoryIcon extends StatelessWidget {
+  const new({required this.index});
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final (tone, icon) = _categorySymbols[index];
+    final brightness = Theme.of(context).brightness;
+    return Container(
+      padding: const EdgeInsets.all(LexiSpace.s8),
+      decoration: BoxDecoration(
+        color: tone.background(brightness),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+      ),
+      child: Icon(icon, size: 18, color: tone.foreground(brightness)),
     );
   }
 }
 
-/// tab 顺序与 `AppSettings` 的分组顺序一致，「AI 模型」紧随词汇设置——
-/// 它同样是「与学习内容无关、但用户必须能改」的一组。
+const _categorySymbols = <(LexiTone, IconData)>[
+  (LexiTone.mint, LucideIcons.calendarDays),
+  (LexiTone.sky, LucideIcons.listChecks),
+  (LexiTone.peach, LucideIcons.volume2),
+  (LexiTone.sky, LucideIcons.bookOpen),
+  (LexiTone.lavender, LucideIcons.graduationCap),
+  (LexiTone.lavender, LucideIcons.sparkles),
+  (LexiTone.peach, LucideIcons.database),
+];
+
 const List<String> _tabLabels = <String>[
   '学习计划',
   '题型',
@@ -135,3 +219,5 @@ const List<String> _tabLabels = <String>[
   'AI 模型',
   '数据管理',
 ];
+
+const double _categoryWidth = 190;

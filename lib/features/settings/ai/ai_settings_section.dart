@@ -30,6 +30,7 @@ import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「AI 模型」分组。
 class AiSettingsSection extends ConsumerStatefulWidget {
@@ -109,7 +110,7 @@ class _AiSettingsSectionState extends ConsumerState<AiSettingsSection> {
             child: FilledButton.icon(
               key: const Key('aiAddProvider'),
               onPressed: () => unawaited(_addProvider(config)),
-              icon: const Icon(Icons.add_rounded, size: 18),
+              icon: const Icon(LucideIcons.plus, size: 18),
               label: const Text('添加 Provider'),
             ),
           ),

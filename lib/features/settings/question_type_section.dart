@@ -23,6 +23,7 @@ import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 题型分组。
 class QuestionTypeSection extends ConsumerStatefulWidget {
@@ -185,7 +186,7 @@ class _PresetBar extends StatelessWidget {
         OutlinedButton.icon(
           key: const Key('questionTypeResetBalanced'),
           onPressed: onReset,
-          icon: const Icon(Icons.refresh_rounded, size: 16),
+          icon: const Icon(LucideIcons.refreshCw, size: 16),
           label: const Text('重置均衡'),
           style: OutlinedButton.styleFrom(
             foregroundColor: colors.secondaryLabel,

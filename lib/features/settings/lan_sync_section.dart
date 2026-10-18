@@ -35,6 +35,7 @@ import 'package:lexiloop/services/lan_sync/lan_sync_state_store.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 设备发现对话框的宽度（固定尺寸，不是间距——不参与 LexiSpace 音阶）。
 const double lanSyncHostPickerWidth = 420;
@@ -267,14 +268,14 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     OutlinedButton.icon(
       key: const Key('lanSyncCopyCode'),
       onPressed: () => _copyCode(session.pairingCode),
-      icon: const Icon(Icons.copy_rounded, size: 16),
+      icon: const Icon(LucideIcons.copy, size: 16),
       label: const Text('复制配对码'),
     ),
     const SizedBox(height: LexiSpace.s8),
     OutlinedButton.icon(
       key: const Key('lanSyncStopShare'),
       onPressed: _busy ? null : _stopSharing,
-      icon: const Icon(Icons.stop_circle_outlined, size: 16),
+      icon: const Icon(LucideIcons.circleStop, size: 16),
       label: const Text('停止共享'),
     ),
   ];
@@ -282,7 +283,7 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
   Widget _startButton() => FilledButton.icon(
     key: const Key('lanSyncStartShare'),
     onPressed: _busy ? null : _startSharing,
-    icon: const Icon(Icons.wifi_tethering_rounded, size: 16),
+    icon: const Icon(LucideIcons.wifi, size: 16),
     label: const Text('开启共享'),
   );
 
@@ -295,7 +296,7 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     OutlinedButton.icon(
       key: const Key('lanSyncDiscover'),
       onPressed: _busy ? null : _discover,
-      icon: const Icon(Icons.search_rounded, size: 16),
+      icon: const Icon(LucideIcons.search, size: 16),
       label: Text(_busy ? '搜索中…' : '搜索设备'),
     ),
     ..._discoveryResult(),
@@ -342,12 +343,12 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
         ButtonSegment<LanSyncPullMode>(
           value: LanSyncPullMode.merge,
           label: Text('合并'),
-          icon: Icon(Icons.merge_rounded, size: 16),
+          icon: Icon(LucideIcons.merge, size: 16),
         ),
         ButtonSegment<LanSyncPullMode>(
           value: LanSyncPullMode.replace,
           label: Text('覆盖'),
-          icon: Icon(Icons.sync_alt_rounded, size: 16),
+          icon: Icon(LucideIcons.arrowLeftRight, size: 16),
         ),
       ];
 
@@ -401,7 +402,7 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
   Widget _hostTile(DiscoveredLanHost host, LexiColors colors) => ListTile(
     key: Key('lanSyncHost-${host.address}'),
     contentPadding: EdgeInsets.zero,
-    leading: const Icon(Icons.devices_rounded),
+    leading: const Icon(LucideIcons.monitorSmartphone),
     title: Text(_hostLabel(host)),
     subtitle: Text(
       '${host.address}:${host.port}',

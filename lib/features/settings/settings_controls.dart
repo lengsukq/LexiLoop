@@ -11,6 +11,8 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 一个设置分组卡片。
 ///
@@ -37,8 +39,18 @@ class SettingsSectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) =>
-      SectionCard(title: title, subtitle: subtitle, child: child);
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      SectionCard(
+        variant: SurfaceVariant.plain,
+        title: title,
+        subtitle: subtitle,
+        child: child,
+      ),
+      const Divider(),
+    ],
+  );
 }
 
 /// 带数值回显的滑条行。
@@ -125,7 +137,7 @@ class _SettingsSliderRowState extends State<SettingsSliderRow> {
                   Text(
                     widget.valueText ?? _value.toStringAsFixed(2),
                     style: LexiType.body.copyWith(
-                      color: colors.accent,
+                      color: colors.accentText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -248,7 +260,7 @@ class SettingsNotice extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.info_outline_rounded, size: 15, color: color),
+          Icon(LucideIcons.info, size: 15, color: color),
           const SizedBox(width: LexiSpace.s8),
           Expanded(
             child: Text(

@@ -166,6 +166,8 @@ void main() {
   testWidgets('数据源开关写入 settings 表', (tester) async {
     await pumpSettings(tester);
     await openTab(tester, '数据源');
+    await tester.tap(find.text('Merriam-Webster 密钥'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('providerSwitch-youdao')));
     await tester.pumpAndSettle();
@@ -176,6 +178,8 @@ void main() {
   testWidgets('Merriam-Webster Key 写入后能从 raw 读回', (tester) async {
     await pumpSettings(tester);
     await openTab(tester, '数据源');
+    await tester.tap(find.text('Merriam-Webster 密钥'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byKey(const Key('merriamWebsterDictionaryKeyField')),

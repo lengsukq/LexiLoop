@@ -18,6 +18,7 @@ import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 
 /// Merriam-Webster 词典 API Key 的存储键。
 const String merriamWebsterDictionaryKeyName = 'merriamWebsterDictionaryKey';
@@ -68,7 +69,7 @@ class _ProvidersSectionState extends ConsumerState<ProvidersSection> {
       children: <Widget>[
         SettingsSectionCard(
           title: '词典与翻译数据源',
-          subtitle: '初始化词条时按启用顺序调用；全部关闭则只能用 CSV 自带的内容。',
+          subtitle: '补全词条时按启用顺序调用；全部关闭则只能用 CSV 自带的内容。',
           child: Column(
             children: <Widget>[
               SettingsSwitchRow(
@@ -107,27 +108,30 @@ class _ProvidersSectionState extends ConsumerState<ProvidersSection> {
           ),
         ),
         const SizedBox(height: LexiSpace.s12),
-        SettingsSectionCard(
-          title: 'Merriam-Webster API Key',
-          subtitle: '只保存在本机数据库里，不会上传到任何服务器。',
-          child: Column(
-            children: <Widget>[
-              _SecretField(
-                fieldKey: const Key('merriamWebsterDictionaryKeyField'),
-                label: '词典 API Key',
-                controller: _dictionaryKey,
-                onChanged: (value) =>
-                    _saveRaw(merriamWebsterDictionaryKeyName, value),
-              ),
-              const SizedBox(height: LexiSpace.s8),
-              _SecretField(
-                fieldKey: const Key('merriamWebsterThesaurusKeyField'),
-                label: '同义词词典 API Key',
-                controller: _thesaurusKey,
-                onChanged: (value) =>
-                    _saveRaw(merriamWebsterThesaurusKeyName, value),
-              ),
-            ],
+        DisclosureSection(
+          title: 'Merriam-Webster 密钥',
+          child: SettingsSectionCard(
+            title: 'Merriam-Webster API Key',
+            subtitle: '只保存在本机数据库里，不会上传到任何服务器。',
+            child: Column(
+              children: <Widget>[
+                _SecretField(
+                  fieldKey: const Key('merriamWebsterDictionaryKeyField'),
+                  label: '词典 API Key',
+                  controller: _dictionaryKey,
+                  onChanged: (value) =>
+                      _saveRaw(merriamWebsterDictionaryKeyName, value),
+                ),
+                const SizedBox(height: LexiSpace.s8),
+                _SecretField(
+                  fieldKey: const Key('merriamWebsterThesaurusKeyField'),
+                  label: '同义词词典 API Key',
+                  controller: _thesaurusKey,
+                  onChanged: (value) =>
+                      _saveRaw(merriamWebsterThesaurusKeyName, value),
+                ),
+              ],
+            ),
           ),
         ),
       ],

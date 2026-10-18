@@ -6,11 +6,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/app/router.dart';
 import 'package:lexiloop/ui/feedback/messenger.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
-import 'package:lexiloop/ui/theme/lexi_theme.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/theme/theme_providers.dart';
 
 /// 快捷键 1–8 对应的数字键。
 ///
@@ -27,12 +29,13 @@ const List<LogicalKeyboardKey> _digitKeys = <LogicalKeyboardKey>[
 ];
 
 /// LexiLoop 应用根组件。
-class LexiLoopApp extends StatelessWidget {
+class LexiLoopApp extends ConsumerWidget {
   /// 创建应用根组件。
   const new({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bundle = ref.watch(themeBundleProvider);
     return MaterialApp.router(
       title: 'LexiLoop 词环',
       debugShowCheckedModeBanner: false,
@@ -40,8 +43,11 @@ class LexiLoopApp extends StatelessWidget {
       // `ui/feedback/messenger.dart`：设置写库失败是唯一一个这样的场景，
       // 而它此前完全静默。
       scaffoldMessengerKey: appMessengerKey,
-      theme: LexiTheme.light,
-      darkTheme: LexiTheme.dark,
+      theme: bundle.light,
+      darkTheme: bundle.dark,
+      themeMode: bundle.mode,
+      themeAnimationDuration: LexiMotion.standard,
+      themeAnimationCurve: Curves.easeOutCubic,
       routerConfig: appRouter,
       builder: (context, child) =>
           AdaptiveTypography(child: _GlobalShortcuts(child: child)),

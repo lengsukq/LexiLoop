@@ -18,9 +18,9 @@ import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -497,29 +497,8 @@ class _ErrorBanner extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      key: const Key('manualBatchError'),
-      padding: const EdgeInsets.all(LexiSpace.s12),
-      decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: LexiTint.tint),
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
-          const SizedBox(width: LexiSpace.s8),
-          Expanded(
-            child: Text(
-              message,
-              style: LexiType.body.copyWith(color: colors.dangerText),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      InlineNotice(key: const Key('manualBatchError'), message: message);
 }
 
 /// 带标签的字段。

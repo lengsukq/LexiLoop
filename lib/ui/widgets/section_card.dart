@@ -142,9 +142,9 @@ class SectionCard extends StatelessWidget {
         Icon(
           icon,
           size: _sectionCardIconSize,
-          color:
-              tone?.foreground(Theme.of(context).brightness) ??
-              colors.secondaryLabel,
+          color: tone == null
+              ? colors.secondaryLabel
+              : context.lexiTones.styleOf(tone!).foreground,
         ),
         const SizedBox(width: _sectionCardIconGap),
       ],

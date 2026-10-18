@@ -40,7 +40,7 @@ class StudyPrompt extends StatelessWidget {
     // 内容层用 `Surface` 而不是液态玻璃：卡片是承载内容的地方，
     // 玻璃只属于功能层（侧边栏 / HUD / 弹窗）。见 `ui/widgets/surface.dart`。
     return Surface(
-      variant: SurfaceVariant.raised,
+      variant: SurfaceVariant.hero,
       padding: const EdgeInsets.all(LexiSpace.s20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

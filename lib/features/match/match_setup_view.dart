@@ -8,12 +8,12 @@ import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:lexiloop/ui/widgets/selection_card.dart';
 
 /// 配对准备页。
 class MatchSetupView extends StatelessWidget {
@@ -36,7 +36,6 @@ class MatchSetupView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     return ListView(
       children: <Widget>[
         // **准备阶段必须能离开这一页**：`/match` 是顶层路由，没有侧边栏，
@@ -64,17 +63,7 @@ class MatchSetupView extends StatelessWidget {
           ),
         if (state.error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s6),
-          Container(
-            decoration: BoxDecoration(
-              color: colors.danger.withValues(alpha: LexiTint.tint),
-              borderRadius: BorderRadius.circular(LexiRadius.md),
-            ),
-            padding: const EdgeInsets.all(LexiSpace.s12),
-            child: Text(
-              state.error!,
-              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
-            ),
-          ),
+          InlineNotice(message: state.error!),
         ],
         const DisclosureSection(
           title: '配对规则',
@@ -92,7 +81,9 @@ class MatchSetupView extends StatelessWidget {
         Text(
           '至少需要 4 个带释义且释义不重复的可学习词条。',
           textAlign: TextAlign.center,
-          style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
+          style: LexiType.caption.copyWith(
+            color: context.lexiColors.tertiaryLabel,
+          ),
         ),
       ],
     );
@@ -118,55 +109,14 @@ class _PresetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    final brightness = Theme.of(context).brightness;
-    return Material(
-      color: _tone.background(brightness),
-      borderRadius: BorderRadius.circular(LexiRadius.lg),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(LexiRadius.lg),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(LexiRadius.lg),
-            border: Border.all(
-              color: selected ? colors.accent : _tone.border(brightness),
-              width: selected ? 2 : 1,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s14,
-            vertical: LexiSpace.s12,
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      preset.name,
-                      style: LexiType.callout.copyWith(
-                        color: colors.label,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${preset.pairs} 组 · ${preset.seconds} 秒 · '
-                      '${preset.description}',
-                      style: LexiType.footnote.copyWith(
-                        color: colors.quaternaryLabel,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (selected)
-                Icon(LucideIcons.circleCheck, size: 18, color: colors.accent),
-            ],
-          ),
-        ),
-      ),
+    return SelectionCard(
+      title: preset.name,
+      subtitle:
+          '${preset.pairs} 组 · ${preset.seconds} 秒 · ${preset.description}',
+      tone: _tone,
+      selected: selected,
+      onTap: onTap,
+      compact: true,
     );
   }
 }

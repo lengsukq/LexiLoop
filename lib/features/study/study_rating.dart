@@ -182,16 +182,16 @@ class _RatingButton extends StatelessWidget {
       selected: selected,
       child: Material(
         color: background,
-        borderRadius: BorderRadius.circular(LexiRadius.sm),
+        borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(LexiRadius.sm),
+          borderRadius: BorderRadius.circular(LexiRadius.md),
           child: Container(
             constraints: const BoxConstraints(minHeight: 48),
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(LexiRadius.sm),
+              borderRadius: BorderRadius.circular(LexiRadius.md),
               border: Border.all(
                 color: foreground.withValues(
                   alpha: selected ? LexiTint.half : LexiTint.border,

@@ -13,8 +13,8 @@ import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 界面里展示的示例文章（旧版 `article-tab.tsx` 的 `SAMPLE_ARTICLE`）。
 const String articleSampleArticle =
@@ -147,29 +147,8 @@ class ArticleErrorBanner extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      key: const Key('articleErrorBanner'),
-      padding: const EdgeInsets.all(articleCardPadding),
-      decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: LexiTint.tint),
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
-          const SizedBox(width: LexiSpace.s8),
-          Expanded(
-            child: Text(
-              message,
-              style: LexiType.body.copyWith(color: colors.dangerText),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      InlineNotice(key: const Key('articleErrorBanner'), message: message);
 }
 
 /// 提示横幅（AI 回退 / 未配置 AI）。

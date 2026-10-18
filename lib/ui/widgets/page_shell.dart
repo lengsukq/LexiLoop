@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 一份解析完的内边距。
 ///
@@ -91,7 +92,6 @@ class PageShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     final gutter = MediaQuery.sizeOf(context).width < 600
         ? _gutter
         : LexiLayout.pageGutterWide;
@@ -131,7 +131,6 @@ class PageShell extends StatelessWidget {
             if (bottomAction != null)
               _BottomActionBar(
                 maxWidth: maxWidth,
-                borderColor: colors.separator,
                 gutter: gutter,
                 child: bottomAction!,
               ),
@@ -153,18 +152,20 @@ class PageShell extends StatelessWidget {
       EdgeInsets.fromLTRB(value.left, value.top, value.right, value.bottom);
 }
 
-/// 吸底动作条。
+/// 吸底动作条：浮在内容之上的圆角卡片。
+///
+/// 不复用「整条白底 + 顶部分隔线」：那条横幅在宽窗口下会变成一块
+/// 与页面同宽的白板，和内容卡片的圆角语言断裂。这里让它成为一张
+/// 有影的浮动卡，内容与动作条用同一个栏距。
 class _BottomActionBar extends StatelessWidget {
   const new({
     required this.child,
     required this.maxWidth,
-    required this.borderColor,
     required this.gutter,
   });
 
   final Widget child;
   final double maxWidth;
-  final Color borderColor;
 
   /// 与正文相同的左右栏距。
   ///
@@ -175,21 +176,24 @@ class _BottomActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: borderColor)),
-      ),
-      child: SafeArea(
-        top: false,
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          gutter,
+          LexiSpace.s8,
+          gutter,
+          LexiSpace.s8,
+        ),
         child: Align(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                gutter,
-                LexiSpace.s12,
-                gutter,
-                LexiSpace.s12,
+            child: Surface(
+              variant: SurfaceVariant.raised,
+              borderRadius: BorderRadius.circular(LexiRadius.xl),
+              padding: const EdgeInsets.symmetric(
+                horizontal: LexiSpace.s16,
+                vertical: LexiSpace.s8,
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(

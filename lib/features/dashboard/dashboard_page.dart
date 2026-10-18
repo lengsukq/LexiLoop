@@ -26,6 +26,7 @@ import 'package:lexiloop/features/dashboard/dashboard_providers.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/widgets/lexi_reveal.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/page_states.dart';
@@ -73,7 +74,7 @@ class _DashboardCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PageShell(
     scrollable: true,
-    header: const PageHeader(title: '今日'),
+    header: const PageHeader(title: '今日', subtitle: '今天要复习的词、错词与新词，都从这里开始。'),
     child: LayoutBuilder(
       builder: (context, constraints) {
         final wide =
@@ -82,23 +83,26 @@ class _DashboardCards extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            _DashboardTop(wide: wide),
+            LexiReveal(child: _DashboardTop(wide: wide)),
             const SizedBox(height: LexiSpace.s20),
-            const PracticeCard(),
+            const LexiReveal(index: 1, child: PracticeCard()),
             const SizedBox(height: LexiSpace.s24),
             if (wide)
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Expanded(child: SuggestionCard()),
-                  SizedBox(width: LexiSpace.s24),
-                  Expanded(child: RemindersCard()),
-                ],
+              const LexiReveal(
+                index: 2,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(child: SuggestionCard()),
+                    SizedBox(width: LexiSpace.s24),
+                    Expanded(child: RemindersCard()),
+                  ],
+                ),
               )
             else ...<Widget>[
-              const SuggestionCard(),
+              const LexiReveal(index: 2, child: SuggestionCard()),
               const SizedBox(height: LexiSpace.s16),
-              const RemindersCard(),
+              const LexiReveal(index: 3, child: RemindersCard()),
             ],
           ],
         );

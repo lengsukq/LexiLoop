@@ -11,10 +11,10 @@ import 'package:lexiloop/features/games/games_providers.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -128,7 +128,7 @@ class GamesSetupView extends StatelessWidget {
         ),
         if (state.error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s6),
-          _ErrorBanner(message: state.error!),
+          InlineNotice(message: state.error!),
         ],
         DisclosureSection(
           title: '玩法说明',
@@ -182,7 +182,7 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    final brightness = Theme.of(context).brightness;
+    final tone = context.lexiTones.styleOf(_tone);
     return Surface(
       variant: SurfaceVariant.raised,
       padding: EdgeInsets.zero,
@@ -191,7 +191,7 @@ class _ModeCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(LexiSpace.s16),
           decoration: BoxDecoration(
-            color: selected ? _tone.background(brightness) : null,
+            color: selected ? tone.background : null,
             borderRadius: BorderRadius.circular(LexiRadius.lg),
             border: selected
                 ? Border.all(color: colors.accentText, width: 2)
@@ -205,14 +205,10 @@ class _ModeCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(LexiSpace.s8),
                     decoration: BoxDecoration(
-                      color: _tone.background(brightness),
+                      color: tone.background,
                       borderRadius: BorderRadius.circular(LexiRadius.sm),
                     ),
-                    child: Icon(
-                      _icon,
-                      size: 24,
-                      color: _tone.foreground(brightness),
-                    ),
+                    child: Icon(_icon, size: 24, color: tone.foreground),
                   ),
                   const Spacer(),
                   if (loading)
@@ -262,36 +258,6 @@ class _ModeCardText extends StatelessWidget {
           style: LexiType.footnote.copyWith(color: colors.quaternaryLabel),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const new({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: LexiTint.tint),
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-      ),
-      padding: const EdgeInsets.all(LexiSpace.s12),
-      child: Row(
-        children: <Widget>[
-          Icon(LucideIcons.circleAlert, size: 18, color: colors.danger),
-          const SizedBox(width: LexiSpace.s8),
-          Expanded(
-            child: Text(
-              message,
-              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

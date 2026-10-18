@@ -11,7 +11,6 @@ import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
-import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 一个设置分组卡片。
@@ -39,17 +38,9 @@ class SettingsSectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: <Widget>[
-      SectionCard(
-        variant: SurfaceVariant.plain,
-        title: title,
-        subtitle: subtitle,
-        child: child,
-      ),
-      const Divider(),
-    ],
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: LexiSpace.s16),
+    child: SectionCard(title: title, subtitle: subtitle, child: child),
   );
 }
 

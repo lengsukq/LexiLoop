@@ -22,6 +22,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/error_retry_view.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 单词本页面。
 class WordsPage extends ConsumerWidget {
@@ -110,10 +111,9 @@ class _WordList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.lexiColors.card,
+    return Surface(
+      padding: EdgeInsets.zero,
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      clipBehavior: Clip.antiAlias,
       child: ListView.separated(
         shrinkWrap: shrinkWrap,
         physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,

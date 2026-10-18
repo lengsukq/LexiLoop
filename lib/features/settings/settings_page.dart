@@ -15,6 +15,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/settings/ai/ai_settings_section.dart';
+import 'package:lexiloop/features/settings/appearance_section.dart';
 import 'package:lexiloop/features/settings/data_management_section.dart';
 import 'package:lexiloop/features/settings/playback_section.dart';
 import 'package:lexiloop/features/settings/providers_section.dart';
@@ -24,6 +25,7 @@ import 'package:lexiloop/features/settings/vocabulary_section.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
@@ -95,6 +97,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
                 padding: const EdgeInsets.symmetric(vertical: LexiSpace.s16),
                 child: PageHeader(
                   title: !wide && _detail ? _tabLabels[_selected] : '设置',
+                  subtitle: !wide && _detail ? null : '外观、学习计划与数据管理都在这里。',
                   leading: !wide && _detail
                       ? IconButton(
                           tooltip: '设置分类',
@@ -131,9 +134,10 @@ class _SettingsBodyState extends State<_SettingsBody> {
       for (var index = 0; index < _tabLabels.length; index++)
         ListTile(
           selected: wide && index == _selected,
-          selectedTileColor: LexiTone.lavender.background(
-            Theme.of(context).brightness,
+          selectedTileColor: context.lexiColors.accent.withValues(
+            alpha: LexiTint.tint,
           ),
+          selectedColor: context.lexiColors.accentText,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LexiRadius.md),
           ),
@@ -171,12 +175,13 @@ class _SettingsBodyState extends State<_SettingsBody> {
   );
 
   Widget _section(int index) => switch (index) {
-    0 => StudyPlanSection(settings: widget.settings),
-    1 => QuestionTypeSection(settings: widget.settings),
-    2 => PlaybackSection(settings: widget.settings),
-    3 => ProvidersSection(settings: widget.settings),
-    4 => VocabularySection(settings: widget.settings),
-    5 => AiSettingsSection(settings: widget.settings),
+    0 => AppearanceSection(settings: widget.settings),
+    1 => StudyPlanSection(settings: widget.settings),
+    2 => QuestionTypeSection(settings: widget.settings),
+    3 => PlaybackSection(settings: widget.settings),
+    4 => ProvidersSection(settings: widget.settings),
+    5 => VocabularySection(settings: widget.settings),
+    6 => AiSettingsSection(settings: widget.settings),
     _ => const DataManagementSection(),
   };
 }
@@ -188,19 +193,20 @@ class _CategoryIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (tone, icon) = _categorySymbols[index];
-    final brightness = Theme.of(context).brightness;
+    final style = context.lexiTones.styleOf(tone);
     return Container(
       padding: const EdgeInsets.all(LexiSpace.s8),
       decoration: BoxDecoration(
-        color: tone.background(brightness),
+        color: style.background,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
-      child: Icon(icon, size: 18, color: tone.foreground(brightness)),
+      child: Icon(icon, size: 18, color: style.foreground),
     );
   }
 }
 
 const _categorySymbols = <(LexiTone, IconData)>[
+  (LexiTone.lavender, LucideIcons.palette),
   (LexiTone.mint, LucideIcons.calendarDays),
   (LexiTone.sky, LucideIcons.listChecks),
   (LexiTone.peach, LucideIcons.volume2),
@@ -211,6 +217,7 @@ const _categorySymbols = <(LexiTone, IconData)>[
 ];
 
 const List<String> _tabLabels = <String>[
+  '外观',
   '学习计划',
   '题型',
   '播放',

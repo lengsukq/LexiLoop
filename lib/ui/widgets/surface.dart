@@ -1,4 +1,4 @@
-/// 按内容角色区分平整阅读面与重点词卡。
+/// 按内容角色区分平整阅读面、重点词卡与内嵌块。
 library;
 
 import 'package:flutter/material.dart';
@@ -9,13 +9,13 @@ import 'package:lexiloop/ui/theme/lexi_tones.dart';
 
 /// 表面样式。
 enum SurfaceVariant {
-  /// 卡片：不透明底 + 发丝描边 + 极轻投影。用于承载内容的卡片与面板。
+  /// 卡片：不透明底 + 发丝描边 + 静置影。用于承载内容的卡片与面板。
   card,
 
   /// 有柔和景深的重点词卡。
   raised,
 
-  /// 今日任务等主焦点。
+  /// 今日任务等主焦点：主/次色低透明渐变 + 浮动影。
   hero,
 
   /// 内嵌块：`fill` 淡底、无描边。用于卡片内部再分组的元素
@@ -63,10 +63,11 @@ class Surface extends StatelessWidget {
     final lifted =
         variant == SurfaceVariant.raised || variant == SurfaceVariant.hero;
     final inset = variant == SurfaceVariant.inset;
+    final hero = variant == SurfaceVariant.hero;
     final radius =
         borderRadius ??
         BorderRadius.circular(
-          variant == SurfaceVariant.hero
+          hero
               ? LexiRadius.xl
               : inset
               ? LexiRadius.md
@@ -75,36 +76,89 @@ class Surface extends StatelessWidget {
     if (variant == SurfaceVariant.plain) {
       return Padding(padding: padding ?? EdgeInsets.zero, child: child);
     }
+
+    final toneStyle = tone == null ? null : context.lexiTones.styleOf(tone!);
+    final base = inset
+        ? colors.fill
+        : lifted
+        ? toneStyle?.background ?? colors.card
+        : colors.card;
+    final body = Padding(
+      padding:
+          padding ?? EdgeInsets.all(inset ? LexiSpace.s12 : surfaceCardPadding),
+      child: child,
+    );
     final content = Material(
-      color: inset
-          ? colors.fill
-          : lifted
-          ? tone?.background(brightness) ?? colors.card
-          : colors.card,
+      color: base,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
-        side: MediaQuery.highContrastOf(context)
-            ? BorderSide(color: colors.borderStrong)
-            : BorderSide.none,
+        side: _borderSide(context, colors, inset: inset),
       ),
       clipBehavior: Clip.antiAlias,
       surfaceTintColor: Colors.transparent,
-      child: Padding(
-        padding:
-            padding ??
-            EdgeInsets.all(inset ? LexiSpace.s12 : surfaceCardPadding),
-        child: child,
-      ),
+      child: hero
+          ? Stack(
+              children: <Widget>[
+                Positioned.fill(child: _heroWash(context)),
+                body,
+              ],
+            )
+          : body,
     );
-    if (!lifted) return content;
+
+    final shadows = switch (variant) {
+      SurfaceVariant.hero => LexiDepth.of(
+        LexiDepth.floating,
+        LexiDepth.floatingDark,
+        isDark: brightness == Brightness.dark,
+      ),
+      SurfaceVariant.raised => LexiDepth.of(
+        LexiDepth.raised,
+        LexiDepth.raisedDark,
+        isDark: brightness == Brightness.dark,
+      ),
+      SurfaceVariant.card => LexiDepth.of(
+        LexiDepth.resting,
+        LexiDepth.restingDark,
+        isDark: brightness == Brightness.dark,
+      ),
+      _ => const <BoxShadow>[],
+    };
+    if (shadows.isEmpty) return content;
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: shadows),
+      child: content,
+    );
+  }
+
+  /// 描边：普通卡片一条发丝线，内嵌块不画；高对比度模式加重。
+  BorderSide _borderSide(
+    BuildContext context,
+    LexiColors colors, {
+    required bool inset,
+  }) {
+    if (inset) return BorderSide.none;
+    if (MediaQuery.highContrastOf(context)) {
+      return BorderSide(color: colors.borderStrong);
+    }
+    return BorderSide(color: colors.borderSubtle);
+  }
+
+  /// hero 卡的主/次色低透明渐变。
+  Widget _heroWash(BuildContext context) {
+    final colors = context.lexiColors;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: brightness == Brightness.dark
-            ? LexiDepth.raisedDark
-            : LexiDepth.raised,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            colors.accent.withValues(alpha: dark ? 0.16 : 0.10),
+            colors.secondary.withValues(alpha: dark ? 0.12 : 0.06),
+          ],
+        ),
       ),
-      child: content,
     );
   }
 }

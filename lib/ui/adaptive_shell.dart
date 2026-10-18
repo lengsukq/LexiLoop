@@ -13,6 +13,7 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -134,28 +135,40 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
 
-    return Material(
-      key: appSidebarKey,
-      color: context.lexiColors.card,
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s8,
+        LexiSpace.s8,
+        LexiSpace.s4,
+        LexiSpace.s8,
+      ),
+      child: LiquidGlass(
+        key: appSidebarKey,
+        borderRadius: BorderRadius.circular(LexiRadius.xxl),
+        showSpecular: true,
+        showEdge: true,
+        showShadow: true,
         padding: const EdgeInsets.fromLTRB(
           LexiSpace.s20,
           LexiSpace.s24,
           LexiSpace.s16,
           LexiSpace.s16,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const _SidebarBrand(),
-            const SizedBox(height: LexiSpace.s24),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: _navigationChildren(context, location),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const _SidebarBrand(),
+              const SizedBox(height: LexiSpace.s24),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: _navigationChildren(context, location),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -271,17 +284,28 @@ class _SidebarItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s2),
       child: Material(
-        color: active
-            ? colors.accent.withValues(alpha: LexiTint.tint)
-            : Colors.transparent,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(LexiRadius.md),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: Padding(
+          child: AnimatedContainer(
+            duration: LexiMotion.quick,
+            curve: LexiMotion.spring,
             padding: const EdgeInsets.symmetric(
               horizontal: LexiSpace.s12,
               vertical: LexiSpace.s10,
+            ),
+            decoration: BoxDecoration(
+              color: active
+                  ? colors.accent.withValues(alpha: LexiTint.tint)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(LexiRadius.md),
+              border: Border.all(
+                color: active
+                    ? colors.accent.withValues(alpha: LexiTint.border)
+                    : Colors.transparent,
+              ),
             ),
             child: Row(
               children: <Widget>[
@@ -334,34 +358,44 @@ class _BottomBar extends StatelessWidget {
       (d) => isDestinationActive(d, location),
     );
 
-    return Material(
-      color: context.lexiColors.card,
-      elevation: 4,
-      shadowColor: context.lexiColors.borderSubtle,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s8,
-            vertical: LexiSpace.s4,
-          ),
-          child: Row(
-            children: <Widget>[
-              for (final destination in primary)
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        LexiSpace.s8,
+        LexiSpace.s4,
+        LexiSpace.s8,
+        LexiSpace.s8,
+      ),
+      child: LiquidGlass(
+        level: GlassLevel.elevated,
+        borderRadius: BorderRadius.circular(LexiRadius.xxl),
+        showSpecular: true,
+        showShadow: true,
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s8,
+          vertical: LexiSpace.s4,
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: <Widget>[
+                for (final destination in primary)
+                  Expanded(
+                    child: _BottomBarItem(
+                      destination: destination,
+                      active: isDestinationActive(destination, location),
+                      onTap: () => _goTo(destination),
+                    ),
+                  ),
                 Expanded(
-                  child: _BottomBarItem(
-                    destination: destination,
-                    active: isDestinationActive(destination, location),
-                    onTap: () => _goTo(destination),
+                  child: _MoreButton(
+                    active: overflowActive,
+                    onTap: () => _openMoreSheet(context, overflow),
                   ),
                 ),
-              Expanded(
-                child: _MoreButton(
-                  active: overflowActive,
-                  onTap: () => _openMoreSheet(context, overflow),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -418,7 +452,21 @@ class _BottomBarItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(destination.icon, size: 20, color: foreground),
+            AnimatedContainer(
+              duration: LexiMotion.quick,
+              curve: LexiMotion.spring,
+              padding: const EdgeInsets.symmetric(
+                horizontal: LexiSpace.s14,
+                vertical: LexiSpace.s2,
+              ),
+              decoration: BoxDecoration(
+                color: active
+                    ? colors.accent.withValues(alpha: LexiTint.tint)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(LexiRadius.pill),
+              ),
+              child: Icon(destination.icon, size: 20, color: foreground),
+            ),
             const SizedBox(height: LexiSpace.s4),
             Text(
               destination.label,
@@ -453,7 +501,21 @@ class _MoreButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(LucideIcons.ellipsis, size: 20, color: foreground),
+            AnimatedContainer(
+              duration: LexiMotion.quick,
+              curve: LexiMotion.spring,
+              padding: const EdgeInsets.symmetric(
+                horizontal: LexiSpace.s14,
+                vertical: LexiSpace.s2,
+              ),
+              decoration: BoxDecoration(
+                color: active
+                    ? colors.accent.withValues(alpha: LexiTint.tint)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(LexiRadius.pill),
+              ),
+              child: Icon(LucideIcons.ellipsis, size: 20, color: foreground),
+            ),
             const SizedBox(height: LexiSpace.s4),
             Text(
               '更多',

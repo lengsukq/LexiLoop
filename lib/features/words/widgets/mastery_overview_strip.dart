@@ -47,7 +47,6 @@ class _OverviewBody extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s8),
       child: Surface(
-        variant: SurfaceVariant.plain,
         borderRadius: BorderRadius.circular(LexiRadius.lg),
         padding: const EdgeInsets.symmetric(
           horizontal: LexiSpace.s16,

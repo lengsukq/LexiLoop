@@ -24,9 +24,11 @@ import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/flow_steps.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 import 'package:lexiloop/ui/widgets/reset_progress_option.dart';
+import 'package:lexiloop/ui/widgets/selection_card.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -390,55 +392,15 @@ class _ModeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s6),
-      child: Material(
-        color: selected
-            ? colors.accent.withValues(alpha: LexiTint.tint)
-            : colors.fill,
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: LexiSpace.s12,
-              vertical: LexiSpace.s10,
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  selected ? LucideIcons.circleDot : LucideIcons.circle,
-                  size: 17,
-                  color: selected ? colors.accent : colors.tertiaryLabel,
-                ),
-                const SizedBox(width: LexiSpace.s10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        _modeLabel(mode),
-                        style: LexiType.body.copyWith(
-                          color: selected ? colors.accent : colors.label,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: LexiSpace.s2),
-                      Text(
-                        _modeDescription(mode),
-                        style: LexiType.footnote.copyWith(
-                          color: colors.secondaryLabel,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: SelectionCard(
+        title: _modeLabel(mode),
+        subtitle: _modeDescription(mode),
+        tone: LexiTone.sky,
+        selected: selected,
+        onTap: onTap,
+        compact: true,
       ),
     );
   }
@@ -581,27 +543,7 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return Container(
-      key: const Key('importErrorBanner'),
-      padding: const EdgeInsets.all(LexiSpace.s12),
-      decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: LexiTint.tint),
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(LucideIcons.circleAlert, size: 17, color: colors.danger),
-          const SizedBox(width: LexiSpace.s8),
-          Expanded(
-            child: Text(
-              message,
-              style: LexiType.body.copyWith(color: colors.dangerText),
-            ),
-          ),
-        ],
-      ),
-    );
+    return InlineNotice(key: const Key('importErrorBanner'), message: message);
   }
 }
 

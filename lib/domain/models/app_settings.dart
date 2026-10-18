@@ -52,6 +52,72 @@ enum VocabularyLevel {
   }
 }
 
+/// 界面外观模式。
+///
+/// **为什么不直接用 Flutter 的 `ThemeMode`**：`lib/domain` 必须保持纯 Dart
+/// （架构守卫禁止引入 Flutter），设置模型不能携带界面类型。界面层在
+/// `ui/theme/lexi_appearance.dart` 里做一次映射。
+enum AppThemeMode {
+  /// 跟随系统。
+  system('system'),
+
+  /// 始终浅色。
+  light('light'),
+
+  /// 始终深色。
+  dark('dark');
+
+  new(this.wire);
+
+  /// 存储标识。
+  final String wire;
+
+  /// 按存储标识反查；未知值返回 [AppThemeMode.system]。
+  static AppThemeMode fromWire(String? wire) {
+    for (final value in values) {
+      if (value.wire == wire) return value;
+    }
+    return AppThemeMode.system;
+  }
+}
+
+/// 外观设置：模式、主色、次色。
+///
+/// 颜色存成 ARGB 整数而不是字符串，既避免解析歧义，也让「坏值」只有
+/// 一个判断入口（[AppearanceSettings] 的解析器）。用户选的是色种，
+/// 最终渲染色由主题引擎按明暗模式推导。
+class AppearanceSettings {
+  /// 以模式与两个色种构造。
+  const new({
+    required this.mode,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  /// 外观模式。
+  final AppThemeMode mode;
+
+  /// 主色色种（ARGB）。
+  final int primaryColor;
+
+  /// 次色色种（ARGB）。
+  final int secondaryColor;
+
+  /// 默认外观：跟随系统、薄荷绿主色、靛蓝次色。
+  static const AppearanceSettings defaults = AppearanceSettings(
+    mode: AppThemeMode.system,
+    primaryColor: defaultThemePrimaryColor,
+    secondaryColor: defaultThemeSecondaryColor,
+  );
+
+  /// 转回存储键值。
+  Map<String, Object?> toStorage() => <String, Object?>{
+    'themeMode': mode.wire,
+    'themePrimaryColor': primaryColor,
+    'themeSecondaryColor': secondaryColor,
+  };
+}
+
 /// 单个题型的开关与权重。
 class QuestionTypeSetting {
   /// 以各字段构造。
@@ -444,6 +510,7 @@ class AppSettings {
     required this.vocabularyLevel,
     required this.examTargets,
     required this.questionTypeConfig,
+    required this.appearance,
   });
 
   /// 存储层的原始键值（含未建模的键，写回时必须原样保留）。
@@ -467,6 +534,9 @@ class AppSettings {
   /// 题型配置。
   final QuestionTypeConfig questionTypeConfig;
 
+  /// 界面外观（模式、主色、次色）。
+  final AppearanceSettings appearance;
+
   /// 默认设置（无任何用户配置时）。
   static const AppSettings defaults = AppSettings(
     raw: <String, Object?>{},
@@ -476,6 +546,7 @@ class AppSettings {
     vocabularyLevel: VocabularyLevel.auto,
     examTargets: <VocabularyLevel>[],
     questionTypeConfig: QuestionTypeConfig.defaults,
+    appearance: AppearanceSettings.defaults,
   );
 
   /// 合并为可写回存储的键值映射。
@@ -486,6 +557,7 @@ class AppSettings {
     ...studyPlan.toStorage(),
     ...playback.toStorage(),
     ...providers.toStorage(),
+    ...appearance.toStorage(),
     'vocabularyLevel': vocabularyLevel.wire,
     'examTargets': examTargets.map((level) => level.wire).toList(),
     'questionTypeConfig': questionTypeConfig.toJson(),
@@ -507,6 +579,7 @@ AppSettings appSettingsFromRaw(Map<String, Object?> raw) {
     ),
     examTargets: _examTargets(raw['examTargets']),
     questionTypeConfig: questionTypeConfigFromJson(raw['questionTypeConfig']),
+    appearance: _parseAppearance(reader),
   );
 }
 
@@ -596,6 +669,18 @@ ProviderSettings _parseProviders(_SettingsReader reader) {
   );
 }
 
+AppearanceSettings _parseAppearance(_SettingsReader reader) {
+  const fallback = AppearanceSettings.defaults;
+  return AppearanceSettings(
+    mode: AppThemeMode.fromWire(reader.stringValue('themeMode')),
+    primaryColor: reader.colorInt('themePrimaryColor', fallback.primaryColor),
+    secondaryColor: reader.colorInt(
+      'themeSecondaryColor',
+      fallback.secondaryColor,
+    ),
+  );
+}
+
 /// 带类型兜底的设置读取器。
 ///
 /// 存在的意义是把「取一个键、检查类型、夹到区间、否则用默认值」这套
@@ -623,6 +708,25 @@ class _SettingsReader {
   bool boolValue(String key, {required bool fallback}) {
     final value = _raw[key];
     return value is bool ? value : fallback;
+  }
+
+  /// 读取字符串；类型不符或为空时返回 `null`。
+  String? stringValue(String key) {
+    final value = _raw[key];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  /// 读取 ARGB 色种。
+  ///
+  /// 只接受整数：字符串色值（如 `"#35C989"`）在不同来源里含义不一，
+  /// 与其猜格式，不如当成坏值回默认。透明色一律补成不透明——主题色
+  /// 带 alpha 会让按钮底与卡片底互相透出，不是用户想要的。
+  int colorInt(String key, int fallback) {
+    final value = _raw[key];
+    if (value is! num) return fallback;
+    final rounded = value.round();
+    if (rounded < 0 || rounded > 0xFFFFFFFF) return fallback;
+    return 0xFF000000 | (rounded & 0x00FFFFFF);
   }
 
   /// 朗读语速：三种粒度共用同一合法区间。

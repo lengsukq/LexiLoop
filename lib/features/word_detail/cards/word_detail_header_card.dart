@@ -44,8 +44,8 @@ class WordDetailHeaderCard extends ConsumerWidget {
         _HeaderActionBar(detail: detail),
         const SizedBox(height: LexiSpace.s10),
         Surface(
-          variant: SurfaceVariant.raised,
-          borderRadius: BorderRadius.circular(LexiRadius.lg),
+          variant: SurfaceVariant.hero,
+          borderRadius: BorderRadius.circular(LexiRadius.xl),
           padding: const EdgeInsets.fromLTRB(
             LexiSpace.s20,
             LexiSpace.s16,

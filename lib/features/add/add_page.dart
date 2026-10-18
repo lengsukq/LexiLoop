@@ -93,7 +93,7 @@ class _ManualSectionState extends ConsumerState<_ManualSection> {
           onSelectionChanged: (selection) =>
               setState(() => _mode = selection.first),
         ),
-        const SizedBox(height: sectionGap),
+        const SizedBox(height: LexiSpace.s16),
         if (_mode == ManualAddMode.batch)
           const ManualBatchPanel()
         else if (state.isCreated)
@@ -132,9 +132,7 @@ class _ArticleImportCard extends StatelessWidget {
             children: <Widget>[
               Icon(
                 LucideIcons.fileText,
-                color: LexiTone.lavender.foreground(
-                  Theme.of(context).brightness,
-                ),
+                color: context.lexiTones.styleOf(LexiTone.lavender).foreground,
               ),
               const SizedBox(height: LexiSpace.s12),
               const Text('从文章提取词汇', style: LexiType.callout),
@@ -179,28 +177,26 @@ class _CreatedCard extends StatelessWidget {
     final colors = context.lexiColors;
     return Surface(
       borderRadius: BorderRadius.circular(LexiRadius.lg),
-      padding: const EdgeInsets.all(cardPadding),
+      padding: const EdgeInsets.all(LexiSpace.s16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
               Icon(LucideIcons.circleCheck, color: colors.success, size: 20),
-              const SizedBox(width: iconGap),
+              const SizedBox(width: LexiSpace.s8),
               Text(
                 '已添加到词库',
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(color: colors.label),
+                style: LexiType.title.copyWith(color: colors.label),
               ),
             ],
           ),
-          const SizedBox(height: itemGap),
+          const SizedBox(height: LexiSpace.s6),
           Text(
             '词条 ID：$wordId。可以在「词库」里找到它。',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: colors.secondaryLabel),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
-          const SizedBox(height: actionGap),
+          const SizedBox(height: LexiSpace.s14),
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
@@ -213,27 +209,3 @@ class _CreatedCard extends StatelessWidget {
     );
   }
 }
-
-/// 页面内边距。
-const double pagePadding = 20;
-
-/// 底部留白。
-const double pagePaddingBottom = 96;
-
-/// 标题与副标题的间距。
-const double subtitleGap = 6;
-
-/// 分节间距。
-const double sectionGap = 16;
-
-/// 卡片内边距。
-const double cardPadding = 16;
-
-/// 图标与文本的间距。
-const double iconGap = 8;
-
-/// 行间距。
-const double itemGap = 6;
-
-/// 正文与按钮的间距。
-const double actionGap = 14;

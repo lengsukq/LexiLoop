@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 
@@ -85,17 +86,7 @@ class PhoneticsSetupView extends StatelessWidget {
         DisclosureSection(title: '音标与训练说明', child: _CatalogSummary()),
         if (state.error != null) ...<Widget>[
           const SizedBox(height: LexiSpace.s12),
-          Container(
-            decoration: BoxDecoration(
-              color: colors.danger.withValues(alpha: LexiTint.tint),
-              borderRadius: BorderRadius.circular(LexiRadius.md),
-            ),
-            padding: const EdgeInsets.all(LexiSpace.s12),
-            child: Text(
-              state.error!,
-              style: LexiType.footnote.copyWith(color: colors.dangerDeep),
-            ),
-          ),
+          InlineNotice(message: state.error!),
         ],
         const SizedBox(height: LexiSpace.s16),
         FilledButton(

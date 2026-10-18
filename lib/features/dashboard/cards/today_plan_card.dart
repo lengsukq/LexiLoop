@@ -291,16 +291,26 @@ class _QueueRow extends StatelessWidget {
       child: TextButton(
         onPressed: () => goToStudyMode(context, mode),
         style: TextButton.styleFrom(
-          minimumSize: const Size(0, 32),
-          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s6),
+          minimumSize: const Size(0, 34),
+          padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s10),
           backgroundColor: context.lexiColors.card,
+          foregroundColor: context.lexiColors.label,
+          shape: const StadiumBorder(),
+          side: BorderSide(color: context.lexiColors.borderSubtle),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(label, style: LexiType.caption),
             const SizedBox(width: LexiSpace.s4),
-            Text(value, key: valueKey, style: LexiType.caption),
+            Text(
+              value,
+              key: valueKey,
+              style: LexiType.caption.copyWith(
+                color: context.lexiColors.accentText,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),

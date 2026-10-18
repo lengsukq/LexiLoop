@@ -11,6 +11,7 @@ import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 游戏类页面的统一外壳：环境光背景 + 安全区 + 居中的内容宽度。
@@ -118,12 +119,20 @@ class GameHud extends StatelessWidget {
           ),
         ),
         const SizedBox(height: LexiSpace.s10),
-        Row(
-          children: <Widget>[
-            _Stat(label: '得分', value: '${core.tally.score}'),
-            _Stat(label: '连击', value: '×${core.tally.combo}'),
-            _Stat(label: mistakeLabel, value: '${core.tally.mistakeCount}'),
-          ],
+        Surface(
+          variant: SurfaceVariant.inset,
+          borderRadius: BorderRadius.circular(LexiRadius.pill),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s12,
+            vertical: LexiSpace.s8,
+          ),
+          child: Row(
+            children: <Widget>[
+              _Stat(label: '得分', value: '${core.tally.score}'),
+              _Stat(label: '连击', value: '×${core.tally.combo}'),
+              _Stat(label: mistakeLabel, value: '${core.tally.mistakeCount}'),
+            ],
+          ),
         ),
       ],
     );

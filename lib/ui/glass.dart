@@ -16,6 +16,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_depth.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 
 /// 玻璃层级的强度档位，对应旧版 CSS 的 4 个类。
@@ -72,6 +73,8 @@ class LiquidGlass extends StatelessWidget {
     this.padding,
     this.showSpecular = false,
     this.showEdge = false,
+    this.showShadow = false,
+    this.tint,
     this.clipBehavior = Clip.antiAlias,
     super.key,
   });
@@ -94,6 +97,15 @@ class LiquidGlass extends StatelessWidget {
   /// 是否叠加底部边缘光（旧版 `.liquid-glass-edge`）。
   final bool showEdge;
 
+  /// 是否在面板外绘制悬浮影。
+  ///
+  /// 玻璃本身要裁切模糊层，影不能画在裁切里面；打开后由外层
+  /// `DecoratedBox` 承担。
+  final bool showShadow;
+
+  /// 可选的染色；导航栏用主色轻微染色，避免所有主题下都是同一块白玻璃。
+  final Color? tint;
+
   /// 裁切行为。
   final Clip clipBehavior;
 
@@ -101,13 +113,14 @@ class LiquidGlass extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final radius = borderRadius ?? BorderRadius.zero;
+    final color = tint ?? context.lexiColors.accent;
 
     // 低端 Android 上把模糊半径减半，避免全屏多层模糊掉到 40fps 以下。
     final sigma = PlatformCaps.needsBlurDowngrade
         ? level.blurSigma * 0.5
         : level.blurSigma;
 
-    return ClipRRect(
+    final panel = ClipRRect(
       borderRadius: radius,
       clipBehavior: clipBehavior,
       child: BackdropFilter(
@@ -116,7 +129,7 @@ class LiquidGlass extends StatelessWidget {
           inner: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
         ),
         child: DecoratedBox(
-          decoration: _decoration(isDark, radius),
+          decoration: _decoration(isDark, radius, color),
           child: Stack(
             children: <Widget>[
               if (showSpecular) _specular(isDark, radius),
@@ -144,9 +157,27 @@ class LiquidGlass extends StatelessWidget {
         ),
       ),
     );
+    if (!showShadow) return panel;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: LexiDepth.of(
+          LexiDepth.floating,
+          LexiDepth.floatingDark,
+          isDark: isDark,
+        ),
+      ),
+      child: panel,
+    );
   }
 
-  BoxDecoration _decoration(bool isDark, BorderRadius radius) {
+  BoxDecoration _decoration(bool isDark, BorderRadius radius, Color color) {
+    final top = isDark
+        ? LexiGlassPalette.gradientTopDark
+        : LexiGlassPalette.gradientTopLight;
+    final bottom = isDark
+        ? LexiGlassPalette.gradientBottomDark
+        : LexiGlassPalette.gradientBottomLight;
     return BoxDecoration(
       gradient: LinearGradient(
         begin: level == GlassLevel.elevated
@@ -156,26 +187,14 @@ class LiquidGlass extends StatelessWidget {
             ? const Alignment(0.45, 1)
             : Alignment.bottomRight,
         colors: <Color>[
-          if (isDark)
-            LexiGlassPalette.gradientTopDark
-          else
-            LexiGlassPalette.gradientTopLight,
-          if (isDark)
-            LexiGlassPalette.gradientBottomDark
-          else
-            LexiGlassPalette.gradientBottomLight,
+          Color.alphaBlend(color.withValues(alpha: LexiTint.subtle), top),
+          Color.alphaBlend(
+            color.withValues(alpha: isDark ? LexiTint.tint : LexiTint.group),
+            bottom,
+          ),
         ],
       ),
       borderRadius: radius,
-      boxShadow: <BoxShadow>[
-        BoxShadow(
-          color: isDark
-              ? LexiGlassPalette.shadowDark
-              : LexiGlassPalette.shadowLight,
-          blurRadius: 24,
-          offset: const Offset(0, 8),
-        ),
-      ],
     );
   }
 
@@ -224,10 +243,15 @@ class LiquidGlass extends StatelessWidget {
   }
 }
 
-/// 全局中性页面底色。沿用入口名称以兼容外壳与顶层路由，
-/// 不再绘制装饰光斑，内容层的层级由表面与留白表达。
+/// 全局环境背景：主色左上、次色右下的静态径向渐变。
+///
+/// **为什么又画渐变**：旧版这里曾有 4 层 `blur(80px)` 光斑，低端 Android
+/// 掉帧后被移除，只剩纯色。主题化之后纯色页面会把「换了主色」这件事
+/// 压缩到按钮上；改回**静态**渐变（不模糊、不做动画）既让整页跟着主题走，
+/// 又不会像 4 层模糊那样吃 GPU。透明度压得很低，文字对比度仍按页面底
+/// 验算（`design_tokens_test` 会算最亮叠加处）。
 class AmbientBackground extends StatelessWidget {
-  /// 创建环境光背景。
+  /// 创建环境背景。
   const new({required this.child, super.key});
 
   /// 背景之上的内容。
@@ -235,7 +259,46 @@ class AmbientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(color: context.lexiColors.surface, child: child);
+    final colors = context.lexiColors;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(child: ColoredBox(color: colors.surface)),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.85, -1),
+                  radius: 1.3,
+                  colors: <Color>[
+                    colors.accent.withValues(alpha: dark ? 0.18 : 0.11),
+                    colors.accent.withValues(alpha: LexiTint.none),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.bottomRight,
+                  radius: 1.1,
+                  colors: <Color>[
+                    colors.secondary.withValues(alpha: dark ? 0.14 : 0.07),
+                    colors.secondary.withValues(alpha: LexiTint.none),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
   }
 }
 

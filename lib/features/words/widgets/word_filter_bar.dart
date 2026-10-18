@@ -18,7 +18,6 @@ import 'package:lexiloop/features/words/widgets/word_filter_sheet.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
-import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -83,7 +82,6 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
       onChanged: ref.read(wordQueryProvider.notifier).setSearch,
       decoration: InputDecoration(
         hintText: '搜索词条或备注…',
-        fillColor: LexiTone.sky.background(Theme.of(context).brightness),
         prefixIcon: const Icon(LucideIcons.search, size: 18),
         suffixIcon: hasText
             ? IconButton(

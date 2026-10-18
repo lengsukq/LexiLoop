@@ -12,6 +12,7 @@ import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 
 /// 词库列表的分页条。
 class WordPaginator extends ConsumerWidget {
@@ -30,27 +31,35 @@ class WordPaginator extends ConsumerWidget {
     final page = query.page;
     return Padding(
       padding: const EdgeInsets.only(bottom: LexiSpace.s12),
-      child: Row(
-        children: <Widget>[
-          TextButton(
-            onPressed: page > 1 ? () => _go(ref, page - 1) : null,
-            child: const Text('上一页'),
-          ),
-          const SizedBox(width: toolbarGap),
-          Expanded(
-            child: Text(
-              '第 $page / $pages 页 · 共 $total 个词条',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelMedium
-                  ?.copyWith(color: context.lexiColors.tertiaryLabel),
+      child: Surface(
+        variant: SurfaceVariant.inset,
+        borderRadius: BorderRadius.circular(LexiRadius.pill),
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s8,
+          vertical: LexiSpace.s4,
+        ),
+        child: Row(
+          children: <Widget>[
+            TextButton(
+              onPressed: page > 1 ? () => _go(ref, page - 1) : null,
+              child: const Text('上一页'),
             ),
-          ),
-          const SizedBox(width: toolbarGap),
-          TextButton(
-            onPressed: page < pages ? () => _go(ref, page + 1) : null,
-            child: const Text('下一页'),
-          ),
-        ],
+            const SizedBox(width: toolbarGap),
+            Expanded(
+              child: Text(
+                '第 $page / $pages 页 · 共 $total 个词条',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelMedium
+                    ?.copyWith(color: context.lexiColors.tertiaryLabel),
+              ),
+            ),
+            const SizedBox(width: toolbarGap),
+            TextButton(
+              onPressed: page < pages ? () => _go(ref, page + 1) : null,
+              child: const Text('下一页'),
+            ),
+          ],
+        ),
       ),
     );
   }

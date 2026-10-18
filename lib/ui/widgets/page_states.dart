@@ -20,10 +20,15 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 空态与失败态的外边距。
 const EdgeInsets _statePadding = EdgeInsets.all(LexiSpace.s32);
+
+/// 状态卡的最大宽度：再宽会读成「一整页都是错误」。
+const double _stateMaxWidth = 560;
 
 /// 状态图标的尺寸。
 const double _stateIconSize = 40;
@@ -80,46 +85,48 @@ class PageEmptyState extends StatelessWidget {
     final colors = context.lexiColors;
     final accent = iconColor ?? colors.accent;
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: _statePadding,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: LexiTint.tint),
-                shape: BoxShape.circle,
-              ),
-              child: SizedBox(
-                width: _emptyIconPlateSize,
-                height: _emptyIconPlateSize,
-                child: Icon(icon, size: _stateIconSize, color: accent),
-              ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _stateMaxWidth),
+          child: Surface(
+            variant: SurfaceVariant.raised,
+            padding: const EdgeInsets.all(LexiSpace.s24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                _StateIcon(
+                  icon: icon,
+                  background: accent.withValues(alpha: LexiTint.tint),
+                  foreground: accent,
+                  elevated: true,
+                ),
+                const SizedBox(height: _stateIconGap),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: LexiType.title.copyWith(
+                    color: colors.label,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: _stateTextGap),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: LexiType.body.copyWith(color: colors.secondaryLabel),
+                ),
+                if (primaryLabel != null && onPrimary != null) ...<Widget>[
+                  const SizedBox(height: _stateActionGap),
+                  FilledButton(
+                    key: primaryKey,
+                    onPressed: onPrimary,
+                    child: Text(primaryLabel!),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: _stateIconGap),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: LexiType.title.copyWith(
-                color: colors.label,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: _stateTextGap),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: LexiType.body.copyWith(color: colors.secondaryLabel),
-            ),
-            if (primaryLabel != null && onPrimary != null) ...<Widget>[
-              const SizedBox(height: _stateActionGap),
-              FilledButton(
-                key: primaryKey,
-                onPressed: onPrimary,
-                child: Text(primaryLabel!),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -173,51 +180,97 @@ class PageErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: _statePadding,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              LucideIcons.circleAlert,
-              size: _stateIconSize,
-              color: colors.danger,
-            ),
-            const SizedBox(height: _stateIconGap),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: LexiType.title.copyWith(
-                color: colors.label,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: _stateTextGap),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: LexiType.body.copyWith(color: colors.secondaryLabel),
-            ),
-            if (details != null) ...<Widget>[
-              const SizedBox(height: _stateTextGap),
-              _Details(details: details!, colors: colors),
-            ],
-            const SizedBox(height: _stateActionGap),
-            Row(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _stateMaxWidth),
+          child: Surface(
+            variant: SurfaceVariant.raised,
+            padding: const EdgeInsets.all(LexiSpace.s24),
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                if (secondaryLabel != null && onSecondary != null) ...<Widget>[
-                  OutlinedButton(
-                    onPressed: onSecondary,
-                    child: Text(secondaryLabel!),
+                _StateIcon(
+                  icon: LucideIcons.circleAlert,
+                  background: colors.danger.withValues(alpha: LexiTint.tint),
+                  foreground: colors.danger,
+                ),
+                const SizedBox(height: _stateIconGap),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: LexiType.title.copyWith(
+                    color: colors.label,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(width: LexiSpace.s12),
+                ),
+                const SizedBox(height: _stateTextGap),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: LexiType.body.copyWith(color: colors.secondaryLabel),
+                ),
+                if (details != null) ...<Widget>[
+                  const SizedBox(height: _stateTextGap),
+                  _Details(details: details!, colors: colors),
                 ],
-                FilledButton(onPressed: onRetry, child: Text(retryLabel)),
+                const SizedBox(height: _stateActionGap),
+                Wrap(
+                  spacing: LexiSpace.s12,
+                  runSpacing: LexiSpace.s8,
+                  alignment: WrapAlignment.center,
+                  children: <Widget>[
+                    if (secondaryLabel != null && onSecondary != null)
+                      OutlinedButton(
+                        onPressed: onSecondary,
+                        child: Text(secondaryLabel!),
+                      ),
+                    FilledButton(onPressed: onRetry, child: Text(retryLabel)),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// 状态图标：圆角底盘 + 可选投影。
+class _StateIcon extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    this.elevated = false,
+  });
+
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final bool elevated;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(LexiRadius.xl),
+        boxShadow: elevated
+            ? <BoxShadow>[
+                BoxShadow(
+                  color: foreground.withValues(alpha: LexiTint.tint),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
+      ),
+      child: SizedBox(
+        width: _emptyIconPlateSize,
+        height: _emptyIconPlateSize,
+        child: Icon(icon, size: _stateIconSize, color: foreground),
       ),
     );
   }
@@ -234,20 +287,12 @@ class _Details extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 520),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: Text(
-            '技术细节',
-            style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
-          ),
-          children: <Widget>[
-            SelectableText(
-              details,
-              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-            ),
-          ],
+      child: DisclosureSection(
+        title: '技术细节',
+        titleStyle: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
+        child: SelectableText(
+          details,
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
       ),
     );

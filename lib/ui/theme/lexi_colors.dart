@@ -1,10 +1,16 @@
-/// LexiLoop 的语义色与圆角：清透蓝底、鲜绿主色与柔和彩色分区。
+/// LexiLoop 的语义色与圆角：清透蓝底、可换主色与柔和彩色分区。
 ///
 /// 用 `ThemeExtension` 而非散落的常量，好处是随 `Theme.of(context)` 自动
 /// 切换明暗，组件不需要判断当前模式。旧版靠 CSS 变量 + 媒体查询达到同样效果。
+///
+/// **主色/次色可换之后，色板不再是一份写死的常量**：中性色（页面底、卡片、
+/// 四级文字、分隔线、边框）仍然固定，强调色与次色由用户选的色种推导；
+/// 推导保证「文字压在任何自有背景上 ≥4.5:1」，见 [LexiColorMath]。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/ui/theme/lexi_color_math.dart';
 
 /// LexiLoop 的语义色板。
 ///
@@ -21,6 +27,8 @@ class LexiColors extends ThemeExtension<LexiColors> {
     required this.quaternaryLabel,
     required this.accent,
     required this.accentDeep,
+    required this.secondary,
+    required this.secondaryDeep,
     required this.danger,
     required this.dangerDeep,
     required this.success,
@@ -30,6 +38,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
     required this.purple,
     required this.purpleDeep,
     required this.accentText,
+    required this.secondaryText,
     required this.dangerText,
     required this.successText,
     required this.warningText,
@@ -46,7 +55,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
 
   /// 卡片底色——内容层表面（`Surface`）的不透明底。
   ///
-  /// 浅色用纯白、深色用 `#1C1C1E`：卡片必须与页面底拉开一档，否则发丝
+  /// 浅色用纯白、深色用 `#232D3F`：卡片必须与页面底拉开一档，否则发丝
   /// 描边就成了唯一的层级线索。
   final Color card;
 
@@ -62,11 +71,17 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 四级文本色（`--ll-quaternary-label`）。
   final Color quaternaryLabel;
 
-  /// 主强调色：鲜绿，用于主动作、选中和进度。
+  /// 主强调色：用户选择的主色，用于主动作、选中和进度。
   final Color accent;
 
-  /// 强调色的深色变体（`--ll-accent-deep`）。
+  /// 强调色的深色变体（渐变终点、按压态）。
   final Color accentDeep;
+
+  /// 次强调色：用户选择的次色，用于次级动作、双色渐变与图表第二序列。
+  final Color secondary;
+
+  /// 次色的深色变体。
+  final Color secondaryDeep;
 
   /// 危险色（`--ll-danger`）。
   final Color danger;
@@ -86,7 +101,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 警告色深色变体（`--ll-warning-deep`）。
   final Color warningDeep;
 
-  /// 紫色强调（`--ll-purple`）。
+  /// 紫色强调（`--ll-purple`）；语义固定，表示关联词等辅助分类。
   final Color purple;
 
   /// 紫色深色变体（`--ll-purple-deep`）。
@@ -94,18 +109,18 @@ class LexiColors extends ThemeExtension<LexiColors> {
 
   /// 强调色作为**文字**时的取值。
   ///
-  /// 饱和的 [accent] 只适合做填充、圆点与进度条：它当文字压在浅色底上只有
-  /// 3.2–3.6:1，达不到 4.5:1。这一组是专供文字的深色变体，在页面底
-  /// （`surface`）、卡片底（白）与淡色底（`fill`）上都 ≥4.5:1。
+  /// 饱和的 [accent] 只适合做填充、圆点与进度条：它当文字压在浅色底上
+  /// 往往不足 4.5:1。这一组是按当前主色算出来的、在页面底/卡片底/淡底上
+  /// 都 ≥4.5:1 的文字色。
   final Color accentText;
+
+  /// 次色作为文字时的取值。
+  final Color secondaryText;
 
   /// 危险色作为文字时的取值。
   final Color dangerText;
 
   /// 成功色作为文字时的取值。
-  ///
-  /// 浅色下 [success] 当文字只有 1.99:1——这是整套色板里最严重的一处，
-  /// 所以它必须有一份独立的文字色。
   final Color successText;
 
   /// 警告色作为文字时的取值。
@@ -129,75 +144,109 @@ class LexiColors extends ThemeExtension<LexiColors> {
   /// 最强的边框（`--ll-border-strong`）。
   final Color borderStrong;
 
-  /// 浅色模式色板。
-  static const LexiColors light = LexiColors(
-    surface: Color(0xFFF3F6FC),
-    card: Color(0xFFFFFFFF),
-    label: Color(0xFF252B3B),
-    // 四级标签按「对比度单调递减」取值，且**每一级都 ≥4.5:1**。
-    // 原先 tertiary(#AEAEB2, 1.98:1) 比 quaternary(#8E8E93, 2.92:1) 更弱，
-    // 层级是反的，而且两级都读不清——它们被用在禁用按钮、提示与
-    // `labelSmall` 上，那些都是要读的文字。
-    secondaryLabel: Color(0xFF586275),
-    tertiaryLabel: Color(0xFF60697A),
-    quaternaryLabel: Color(0xFF626A7A),
-    accent: Color(0xFF35C989),
-    accentDeep: Color(0xFF146C4B),
-    danger: Color(0xFFFF3B30),
-    dangerDeep: Color(0xFFD70015),
-    success: Color(0xFF49816A),
-    successDeep: Color(0xFF248A3D),
-    warning: Color(0xFFFF9500),
-    warningDeep: Color(0xFFC93400),
-    purple: Color(0xFFAF52DE),
-    purpleDeep: Color(0xFF8944AB),
-    accentText: Color(0xFF146C4B),
-    dangerText: Color(0xFFC2140F),
-    successText: Color(0xFF146B31),
-    warningText: Color(0xFF8A5200),
-    purpleText: Color(0xFF7A3B99),
-    separator: Color.fromRGBO(60, 60, 67, 0.12),
-    fill: Color.fromRGBO(78, 116, 173, 0.08),
-    borderSubtle: Color.fromRGBO(60, 60, 67, 0.08),
-    borderDefault: Color.fromRGBO(60, 60, 67, 0.14),
-    borderStrong: Color.fromRGBO(60, 60, 67, 0.24),
+  /// 按色种与明暗模式推导整套色板。
+  ///
+  /// 中性色固定；强调色、次色及其文字色由 [LexiColorMath] 校准。
+  // ignore: prefer_constructors_over_static_methods
+  static LexiColors resolve({
+    required Color primarySeed,
+    required Color secondarySeed,
+    required Brightness brightness,
+  }) {
+    final dark = brightness == Brightness.dark;
+    final surface = dark ? const Color(0xFF171D2B) : const Color(0xFFF3F6FC);
+    final card = dark ? const Color(0xFF232D3F) : const Color(0xFFFFFFFF);
+    final fill = dark
+        ? const Color.fromRGBO(120, 120, 128, 0.18)
+        : const Color.fromRGBO(78, 116, 173, 0.08);
+
+    final accent = LexiColorMath.accent(primarySeed, dark: dark);
+    final secondary = LexiColorMath.accent(secondarySeed, dark: dark);
+    // 文字色要在页面底、卡片底与「淡底压卡片」三种背景上都站得住。
+    // 少算最后一种，徽章/内嵌块里的彩色文字就会掉到 4:1 以下。
+    final backgrounds = <Color>[
+      surface,
+      card,
+      Color.alphaBlend(fill, card),
+      Color.alphaBlend(fill, surface),
+    ];
+    final accentText = LexiColorMath.ensureReadable(
+      LexiColorMath.deepen(accent, dark: dark),
+      backgrounds,
+      // 比 4.5 多留一点余量：同样的文字还会压在四种分区底色上，
+      // 只按页面底/卡片底卡到 4.5 会让「淡蓝分区 + 主色文字」掉到 4.44。
+      min: 4.8,
+    );
+    final secondaryText = LexiColorMath.ensureReadable(
+      LexiColorMath.deepen(secondary, dark: dark),
+      backgrounds,
+      min: 4.8,
+    );
+
+    return LexiColors(
+      surface: surface,
+      card: card,
+      label: dark ? const Color(0xFFE8EDF7) : const Color(0xFF252B3B),
+      // 四级标签按「对比度单调递减」取值，且**每一级都 ≥4.5:1**。
+      secondaryLabel: dark ? const Color(0xFFAFBACC) : const Color(0xFF586275),
+      tertiaryLabel: dark ? const Color(0xFFA3AFC2) : const Color(0xFF60697A),
+      quaternaryLabel: dark ? const Color(0xFF9AA6BA) : const Color(0xFF626A7A),
+      accent: accent,
+      accentDeep: LexiColorMath.deepen(accent, dark: dark),
+      secondary: secondary,
+      secondaryDeep: LexiColorMath.deepen(secondary, dark: dark),
+      danger: dark ? const Color(0xFFFF453A) : const Color(0xFFFF3B30),
+      dangerDeep: dark ? const Color(0xFFFF453A) : const Color(0xFFD70015),
+      success: dark ? const Color(0xFF91C9AE) : const Color(0xFF49816A),
+      successDeep: dark ? const Color(0xFF91C9AE) : const Color(0xFF248A3D),
+      warning: dark ? const Color(0xFFFF9F0A) : const Color(0xFFFF9500),
+      warningDeep: dark ? const Color(0xFFFF9F0A) : const Color(0xFFC93400),
+      purple: dark ? const Color(0xFFBF5AF2) : const Color(0xFFAF52DE),
+      purpleDeep: dark ? const Color(0xFFBF5AF2) : const Color(0xFF8944AB),
+      accentText: accentText,
+      secondaryText: secondaryText,
+      dangerText: dark ? const Color(0xFFFFA198) : const Color(0xFFC2140F),
+      successText: dark ? const Color(0xFF91C9AE) : const Color(0xFF146B31),
+      warningText: dark ? const Color(0xFFFF9F0A) : const Color(0xFF8A5200),
+      purpleText: dark ? const Color(0xFFD6ADE8) : const Color(0xFF7A3B99),
+      separator: dark
+          ? const Color.fromRGBO(84, 84, 88, 0.34)
+          : const Color.fromRGBO(60, 60, 67, 0.12),
+      fill: fill,
+      borderSubtle: dark
+          ? const Color.fromRGBO(255, 255, 255, 0.08)
+          : const Color.fromRGBO(60, 60, 67, 0.08),
+      borderDefault: dark
+          ? const Color.fromRGBO(255, 255, 255, 0.14)
+          : const Color.fromRGBO(60, 60, 67, 0.14),
+      borderStrong: dark
+          ? const Color.fromRGBO(255, 255, 255, 0.24)
+          : const Color.fromRGBO(60, 60, 67, 0.24),
+    );
+  }
+
+  /// 默认主色/次色的浅色色板。
+  static final LexiColors light = LexiColors.resolve(
+    primarySeed: const Color(defaultThemePrimaryColor),
+    secondarySeed: const Color(defaultThemeSecondaryColor),
+    brightness: Brightness.light,
   );
 
-  /// 深色模式色板。
-  static const LexiColors dark = LexiColors(
-    surface: Color(0xFF171D2B),
-    card: Color(0xFF232D3F),
-    label: Color(0xFFE8EDF7),
-    secondaryLabel: Color(0xFFAFBACC),
-    tertiaryLabel: Color(0xFFA3AFC2),
-    quaternaryLabel: Color(0xFF9AA6BA),
-    accent: Color(0xFF66DCA8),
-    accentDeep: Color(0xFF66DCA8),
-    danger: Color(0xFFFF453A),
-    dangerDeep: Color(0xFFFF453A),
-    success: Color(0xFF91C9AE),
-    successDeep: Color(0xFF91C9AE),
-    warning: Color(0xFFFF9F0A),
-    warningDeep: Color(0xFFFF9F0A),
-    purple: Color(0xFFBF5AF2),
-    purpleDeep: Color(0xFFBF5AF2),
-    // 深色底上饱和色本身就 ≥4.6:1（黑底与 #1C1C1E 卡片底都过），
-    // 因此文字色与填充色同值，不需要再深一档。
-    accentText: Color(0xFF66DCA8),
-    dangerText: Color(0xFFFFA198),
-    successText: Color(0xFF91C9AE),
-    warningText: Color(0xFFFF9F0A),
-    purpleText: Color(0xFFD6ADE8),
-    separator: Color.fromRGBO(84, 84, 88, 0.34),
-    fill: Color.fromRGBO(120, 120, 128, 0.24),
-    borderSubtle: Color.fromRGBO(255, 255, 255, 0.08),
-    borderDefault: Color.fromRGBO(255, 255, 255, 0.14),
-    borderStrong: Color.fromRGBO(255, 255, 255, 0.24),
+  /// 默认主色/次色的深色色板。
+  static final LexiColors dark = LexiColors.resolve(
+    primarySeed: const Color(defaultThemePrimaryColor),
+    secondarySeed: const Color(defaultThemeSecondaryColor),
+    brightness: Brightness.dark,
   );
 
-  /// 强调色上的文字；浅色白字，深色使用深底文字。
-  Color get onAccent =>
-      accent.computeLuminance() > 0.3 ? const Color(0xFF143B2B) : Colors.white;
+  /// 强调色上的文字。
+  Color get onAccent => LexiColorMath.bestOn(accent);
+
+  /// 次色上的文字。
+  Color get onSecondary => LexiColorMath.bestOn(secondary);
+
+  /// 危险色上的文字。
+  Color get onDanger => LexiColorMath.bestOn(danger);
 
   @override
   LexiColors copyWith({
@@ -208,6 +257,8 @@ class LexiColors extends ThemeExtension<LexiColors> {
     Color? quaternaryLabel,
     Color? accent,
     Color? accentDeep,
+    Color? secondary,
+    Color? secondaryDeep,
     Color? danger,
     Color? dangerDeep,
     Color? success,
@@ -217,6 +268,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
     Color? purple,
     Color? purpleDeep,
     Color? accentText,
+    Color? secondaryText,
     Color? dangerText,
     Color? successText,
     Color? warningText,
@@ -237,6 +289,8 @@ class LexiColors extends ThemeExtension<LexiColors> {
       quaternaryLabel: quaternaryLabel ?? this.quaternaryLabel,
       accent: accent ?? this.accent,
       accentDeep: accentDeep ?? this.accentDeep,
+      secondary: secondary ?? this.secondary,
+      secondaryDeep: secondaryDeep ?? this.secondaryDeep,
       danger: danger ?? this.danger,
       dangerDeep: dangerDeep ?? this.dangerDeep,
       success: success ?? this.success,
@@ -246,6 +300,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
       purple: purple ?? this.purple,
       purpleDeep: purpleDeep ?? this.purpleDeep,
       accentText: accentText ?? this.accentText,
+      secondaryText: secondaryText ?? this.secondaryText,
       dangerText: dangerText ?? this.dangerText,
       successText: successText ?? this.successText,
       warningText: warningText ?? this.warningText,
@@ -270,6 +325,8 @@ class LexiColors extends ThemeExtension<LexiColors> {
       quaternaryLabel: Color.lerp(quaternaryLabel, other.quaternaryLabel, t)!,
       accent: Color.lerp(accent, other.accent, t)!,
       accentDeep: Color.lerp(accentDeep, other.accentDeep, t)!,
+      secondary: Color.lerp(secondary, other.secondary, t)!,
+      secondaryDeep: Color.lerp(secondaryDeep, other.secondaryDeep, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       dangerDeep: Color.lerp(dangerDeep, other.dangerDeep, t)!,
       success: Color.lerp(success, other.success, t)!,
@@ -279,6 +336,7 @@ class LexiColors extends ThemeExtension<LexiColors> {
       purple: Color.lerp(purple, other.purple, t)!,
       purpleDeep: Color.lerp(purpleDeep, other.purpleDeep, t)!,
       accentText: Color.lerp(accentText, other.accentText, t)!,
+      secondaryText: Color.lerp(secondaryText, other.secondaryText, t)!,
       dangerText: Color.lerp(dangerText, other.dangerText, t)!,
       successText: Color.lerp(successText, other.successText, t)!,
       warningText: Color.lerp(warningText, other.warningText, t)!,
@@ -292,32 +350,33 @@ class LexiColors extends ThemeExtension<LexiColors> {
   }
 }
 
-/// LexiLoop 的圆角档位，对应旧版 CSS 的 `--radius-*`。
+/// LexiLoop 的圆角档位。
+///
+/// 2026-10-18 起整体上调一档：iOS 26 的卡片与浮层比旧版更圆，小圆角
+/// 会被读成「网页表格」。`xxs` 保持 4，只给边长 12–16 的微型元素。
 abstract final class LexiRadius {
   /// 微型圆角（4px）——热力图小方块、行内 diff 标签。
-  ///
-  /// 只给边长 12～16 的微型元素用；再大就该走 [xs] 以上。
   static const double xxs = 4;
 
-  /// 极小圆角（6px）——内嵌的小标签、输入框内的色块。
-  static const double xs = 6;
+  /// 极小圆角（8px）——内嵌的小标签、输入框内的色块。
+  static const double xs = 8;
 
-  /// 小圆角（10px）——标签、徽章。
-  static const double sm = 10;
+  /// 小圆角（12px）——标签、徽章、图标底盘。
+  static const double sm = 12;
 
-  /// 中圆角（14px）——输入框、小卡片。
+  /// 中圆角（16px）——输入框、内嵌块。
   static const double md = 16;
 
-  /// 大圆角（18px）——卡片。
-  static const double lg = 20;
+  /// 大圆角（22px）——卡片。
+  static const double lg = 22;
 
-  /// 特大圆角（22px）——浮层、对话框。
-  static const double xl = 24;
+  /// 特大圆角（28px）——hero 卡、浮层、对话框。
+  static const double xl = 28;
 
-  /// 最大圆角（28px）——底部 Sheet。
-  static const double xxl = 28;
+  /// 最大圆角（34px）——底部 Sheet、导航胶囊。
+  static const double xxl = 34;
 
-  /// 胶囊圆角——计数胶囊、筛选 chip。
+  /// 胶囊圆角——计数胶囊、筛选 chip、按钮。
   ///
   /// 用一个大到「一定超过元素半高」的值表达胶囊形状；Flutter 会把圆角
   /// 夹到半高，因此不需要按元素尺寸计算。
@@ -335,7 +394,7 @@ extension LexiColorsContext on BuildContext {
 
 /// 玻璃配色。
 ///
-/// 功能层采用中性高光与灰绿深底，集中定义避免散落在构建逻辑里，
+/// 功能层采用中性高光与深底，集中定义避免散落在构建逻辑里，
 /// 也便于后续按视觉稿微调时只改一处。
 abstract final class LexiGlassPalette {
   /// 渐变起始色（顶部高光）。

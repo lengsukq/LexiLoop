@@ -96,3 +96,98 @@
   内容补全「行内重试」在嵌套 Surface 下的歧义 finder、宽屏侧边栏不再用
   LiquidGlass 的识别方式；浅色 `quaternaryLabel` 调整为 `#626A7A`，保持
   「四级标签对比度单调递减且淡底上 ≥4.5:1」。
+
+## 主题化与 iOS 风格统一（2026-10-18）
+
+### 功能
+
+- 设置 › 外观：跟随系统/浅色/深色；主色、次色各 12 个预设 + 自定义色相/饱和度；
+  实时预览与恢复默认。写入 `themeMode` / `themePrimaryColor` /
+  `themeSecondaryColor` 三个键，随即生效并持久化。
+- 主色驱动主动作、链接、进度、选中与焦点；次色驱动次级动作、双色渐变、
+  图表第二序列与环境光第二光斑。危险/成功/警告/关联紫保持固定语义。
+- 色种推导承诺所有文字 ≥4.5:1（强调文字按 4.8 留余量）；12 个预设 × 明暗 ×
+  四种文字背景与四种分区色的矩阵全部算过。
+
+### 视觉
+
+- 圆角整体上调一档：卡片 22、hero/弹窗 28、Sheet/导航 34，按钮统一胶囊。
+- 阴影分四级：静置卡、抬升卡、浮动导航、模态弹层；普通卡片不再是无影白块。
+- 功能层磨玻璃：侧边栏、底部 Tab Bar、更多 Sheet、筛选 Sheet、配置器、批量条；
+  内容层仍用不透明 `Surface`，并加发丝描边。
+- 环境背景改为主/次色静态径向渐变，不再只是纯色，也不做模糊动画。
+- 页面转场按平台选择 Cupertino / FadeForwards；按压改为 0.98 缩放并尊重
+  「减弱动态效果」；首页分区做 40ms 错峰淡入。
+- Material 控件纳入主题：Switch、Checkbox、Slider、Chip、SegmentedButton、
+  PopupMenu、ListTile、Scrollbar、OutlinedButton、Dialog、BottomSheet。
+- 导航：侧边栏内缩玻璃圆角面板；底部 Tab 改浮动玻璃胶囊，选中项有胶囊底。
+- 新增 `SelectionCard`（游戏/配对/音标/导入/配置器统一可选卡）与
+  `InlineNotice`（四处自绘错误条统一）。
+- 页面：今日补副标题与 hero 计划卡；单词本搜索改中性底、列表加静置影；
+  词条详情头部改 hero；学习题干改 hero、自评按钮圆角统一；添加页删除 8 个
+  局部间距常量；设置页改分组卡并把「外观」置顶；统计/游戏/导入沿用新 token。
+
+### 验证（本轮）
+
+- `dart analyze --fatal-infos --fatal-warnings`：**No issues found**。
+- 全量测试：**2,179 通过 / 3 项真实环境测试跳过**（新增主题对比度、外观写库、
+  主题接线、SelectionCard/InlineNotice 等用例；Windows 路径与字体问题一并修正）。
+- 设计 token 守卫：新增 Windows 路径归一化（此前 `/` 白名单在 Windows 上失效）。
+- 新增：`theme_palette_test`、`appearance_section_test`、`theme_apply_test`；
+  `surface_test`、`tactile_button_test`、`settings_page_test` 按新结构更新。
+- 截图：13 条路由的桌面/手机/深色共 52 张已重生成；新增
+  `build/screens/themes/{ocean,sakura}_{dashboard,settings}_{light,dark}.png`
+  共 8 张主题对照图。截图工具在 Windows 上自动加载 SimHei / 微软雅黑，
+  不再输出方块字。
+- Web 构建：`flutter build web --release` 通过（JS 构建；`flutter_tts` 的
+  Wasm dry-run 警告来自依赖，不影响构建）。
+- macOS 构建未执行：本轮开发机为 Windows，无法在本机运行
+  `flutter build macos`；macOS 原生验收沿用上一轮记录。
+
+### 顺带修掉的非主题问题
+
+- 局域网共享服务端在 `response.close()` 之后才释放「正在服务」标记；对端读完
+  立即断开时 `close()` 可能迟迟不返回，用户连续拉两次的第二次会误得 409。
+  现在字节交给 socket 后先释放标记，再等待关闭。
+- 备份导出的 Windows 路径分隔符断言、跨平台截图字体、设计 token 守卫的
+  路径分隔符归一化。
+
+## 练习入口与折叠分区（2026-10-18 晚）
+
+### 练习入口
+
+- 首页练习区从「裸标题 + 四块竖排瓷砖 + 两条孤立折叠行」收成一张
+  `SectionCard`：首屏 4 个精选入口（限时配对 / 音标辨音 / 听力拼写 /
+  单词拼图），底部一个「查看全部 11 项练习」。
+- 完整入口进入「全部练习」弹层，按配对与音标（2）/ 专项练习（3）/
+  趣味训练（6）分组；每行都直达原地址，「打开趣味训练页」保留。
+- 入口数据拆到 `lib/features/dashboard/practice_catalog.dart`，卡片与弹层
+  共用；删除 `_PracticeGroup` 与标题右侧悬空的「趣味训练」按钮。
+- 弹层宽窗口上限 560，手机高度上限 82% 并可滚动；内容使用不透明 Sheet
+  材质，不新增玻璃白名单。
+
+### 折叠分区
+
+- `ExpansionTileThemeData` 统一为 `fill` 淡底、`md` 圆角、48 高点击区、
+  12 磅内边距；展开内容与头行在同一分区里。
+- `DisclosureSection` 标题改为 `callout` + w600，新增可选 `titleStyle`
+  （错误态「技术细节」保留弱层级），展开动画走 `LexiMotion.standard` +
+  `spring` 并尊重「减弱动态效果」。
+- 统计卡「掌握分布」、建议卡「建议详情」、词条详情两个折叠区、设置页
+  「关于词环」、统计页「近期作答与每日明细」、导入历史、配对/游戏/音标
+  说明、空态/失败态「技术细节」全部使用同一套样式；`lib/` 内除
+  `disclosure_section.dart` 外不再出现裸 `ExpansionTile`。
+
+### 验证（本轮）
+
+- `dart analyze --fatal-infos --fatal-warnings`：**No issues found**。
+- 全量测试：**2,182 通过 / 3 项真实环境测试跳过**（新增 3 个练习卡/弹层
+  用例；`disclosure_section_test`、`dashboard_page_test`、
+  `visual_layout_test` 保持通过）。
+- 截图：[首页](../build/screens/dashboard.png)、[全部练习弹层](../build/screens/practice_sheet.png)、
+  [手机首页](../build/screens/dashboard_phone.png)、[深色首页](../build/screens/dashboard_dark.png)
+  等受影响的页面已重生成；截图工具重新打开练习弹层后截取。
+- 首屏约束：390×844 下「限时配对」「音标辨音」仍在底栏上方；360×900
+  大字体与 1280×560 低高度无溢出。
+- Web 构建：`flutter build web --release --no-wasm-dry-run` 通过。
+- macOS 构建未执行：开发机为 Windows，原生验收沿用上一轮记录。

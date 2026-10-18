@@ -1,14 +1,20 @@
 # LexiLoop 设计系统
 
-> 2026-10-17 更新：现行视觉为清透蓝底 / 鲜绿主色 / 柔和彩色分区，移除背景光斑；图标统一 Lucide。
-> 全页面取舍与验证证据见 [全页面覆盖清单](UI_REFINEMENT_CHECKLIST.md)。
+> 2026-10-18 更新：主色/次色可由用户选择（设置 › 外观），并新增深色/浅色/跟随系统三种模式。
+> 视觉基调保持清透蓝底、大圆角、功能层磨玻璃与分层阴影；图标统一 Lucide。
+> 全页面取舍与验证证据见 [全页面覆盖清单](UI_REFINEMENT_CHECKLIST.md)；主题推导细节见
+> [主题系统](THEMING.md)。
 > 下文关于旧蓝色、旧背景光斑和旧布局的缺陷说明是历史背景，不是当前配色要求。
 
 | 角色 | 浅色 | 深色 |
 |---|---|---|
-| 页面 / 卡片 | `#EDF3FB` / `#FFFFFF` | `#171C19` / `#222A25` |
-| 主 / 次级文字 | `#242A27` / `#52645C` | `#E8EDE9` / `#ABB7AE` |
-| 主色 / 按钮文字 | `#137A57` / 白色 | `#8DC5A5` / `#171C19` |
+| 页面 / 卡片 | `#F3F6FC` / `#FFFFFF` | `#171D2B` / `#232D3F` |
+| 主 / 次级文字 | `#252B3B` / `#586275` | `#E8EDF7` / `#AFBACC` |
+| 默认主色 / 按钮文字 | `#35C989` / 自动取黑或白 | 同色种自动提亮 / 自动取黑或白 |
+| 默认次色 | `#5E5CE6` | 同色种自动提亮 |
+
+主色与次色不是写死的常量：用户选的是**色种**，主题层按明暗模式推导强调色、
+文字色与分区色，并保证所有文字 ≥4.5:1。危险/成功/警告/关联紫仍是固定语义色。
 
 色彩承担分区层级，不只用于按钮：今日计划与新建表单用薄荷绿，词典、资料与统计用浅蓝，练习与配置用淡紫，建议与提醒用杏色。全部由 `LexiTone` 提供不透明底、强调色与同色系边框；词条列表与输入框保留阅读表面。选中态同时提供描边和勾选标记，错误与警告继续使用独立语义色。
 
@@ -23,7 +29,8 @@
 
 正文在桌面保留 13 磅音阶；窄于 600 的手机视口通过 `AdaptiveTypography`
 提升到 16 磅，辅助文字随之提升，大标题保持原有层级，然后再叠加系统辅助缩放。
-共享 `DisclosureSection` 保留内部表单状态，并把展开状态与内部滚动位置隔离。
+共享 `DisclosureSection` 保留内部表单状态，并把展开状态与内部滚动位置隔离；
+头行统一为 `fill` 淡底圆角行，不再是一行裸文字。
 
 这份文档说明 Flutter 版的视觉体系**是什么、为什么是这样、怎么防止它退化**。
 它对应旧版的 `src/app/globals.css` 与 `components/**` 里散落的样式，但不是逐条
@@ -66,7 +73,7 @@ Apple 的 `materials.md` 把界面分成两层，这个划分决定了用什么�
 > Instead, use standard materials for elements in the content layer.
 
 玻璃压在玻璃上会让所有卡片落在同一层材质上，层级只能靠间距硬撑——这正是
-「看起来不统一」的结构性根源。收敛后 `LiquidGlass` 只剩 **7 处**，全在功能层：
+「看起来不统一」的结构性根源。收敛后 `LiquidGlass` 只剩 **6 处 / 4 个文件**，全在功能层：
 
 ```
 lib/ui/adaptive_shell.dart                                        桌面侧边栏 / 侧边栏状态条 / 底部 Tab Bar / 「更多」Sheet
@@ -147,11 +154,18 @@ headlineSmall 24…），而全应用有 75 处在用 `Theme.of(context).textThe
 ### 3.3 圆角（`LexiRadius`）
 
 ```
-xxs 4   xs 6   sm 10   md 14   lg 18   xl 22   xxl 28   pill 999
+xxs 4   xs 8   sm 12   md 16   lg 22   xl 28   xxl 34   pill 999
 ```
 
 `xxs` 只给边长 12–16 的微型元素（热力图方块、行内 diff 标签）。高度 ≤10 的
 进度条与小圆点一律用 `pill`——Flutter 会把圆角夹到半高，不必按尺寸计算。
+按钮统一胶囊；卡片 `lg`；hero 卡与对话框 `xl`；底部 Sheet `xxl`。
+
+### 3.3.1 阴影（`LexiDepth`）
+
+阴影分四级：`resting`（普通卡）、`raised`（重点卡）、`floating`（导航/浮条）、
+`modal`（弹窗/Sheet）。每级由「宽而淡的环境影 + 窄而实的接触影」叠成，深色
+模式单独一套更实的黑色阴影。普通卡片不再是无影白块。
 
 ### 3.4 间距（`LexiSpace`）
 
@@ -179,10 +193,19 @@ none 0   group 0.04   subtle 0.06   tint 0.12   border 0.30   half 0.50   strong
 
 ### 3.6 动效（`LexiMotion`）
 
+```
+quick 120ms   standard 220ms   emphasized 320ms
+spring = Cubic(0.16, 1, 0.3, 1)   pressScale = 0.98
+```
+
 `MediaQuery.disableAnimationsOf` 是系统给应用的唯一「减弱动态效果」信号
-（macOS「辅助功能 › 显示器 › 减少动态效果」）。收敛前全仓 **0 处**使用。
-`LexiMotion.of(context, duration)` 在开启时折成 `Duration.zero`——隐式动画
-组件收到零时长会直接落到终态，调用方不需要写分支。
+（macOS「辅助功能 › 显示器 › 减少动态效果」）。`LexiMotion.of(context, duration)`
+在开启时折成 `Duration.zero`——隐式动画组件收到零时长会直接落到终态，调用方
+不需要写分支。分区入场（`LexiReveal`）用 `AnimationController` 的时长表达错峰，
+不用 `Future.delayed`，测试的 `pumpAndSettle` 才能自然走完。
+
+页面转场按平台选择：iOS/macOS 用 `CupertinoPageTransitionsBuilder`，其余用
+`FadeForwardsPageTransitionsBuilder`；主题切换时长 220ms、曲线 `easeOutCubic`。
 
 ### 3.7 版面（`LexiLayout`）
 
@@ -192,18 +215,17 @@ none 0   group 0.04   subtle 0.06   tint 0.12   border 0.30   half 0.50   strong
 
 | 档位 | 值 | 用在哪 |
 |---|---|---|
-| `pageMaxWidth` | 1040 | 普通页的正文列（今日 / 单词本 / 词条详情 / 统计 / 设置 / 初始化 / 添加） |
+| `pageMaxWidth` | 1120 | 普通页的正文列（今日 / 单词本 / 词条详情 / 统计 / 设置 / 初始化 / 添加） |
 | `immersiveMaxWidth` | 840 | 沉浸页与单列向导（学习 / 游戏 / 配对 / 音标 / 文章） |
 | `readingMaxWidth` | 720 | 长文本段落（释义、例句、笔记） |
-| `wideBreakpoint` | 900 | 双栏布局阈值（与侧边栏断点 1024 是两件事） |
+| `wideBreakpoint` | 880 | 双栏布局阈值（与侧边栏断点 1024 是两件事） |
 | `cardGap` / `sectionGap` | 16 / 32 | 同级卡片之间 / 分区之间 |
 | `minTapTarget` | 44 | 触控热区下限（原 `studyMinTapTarget`，提升为全局） |
 | `labelColumnWidth` | 88 | 键值对里的键列（原先 88 / 76 / 118 三套并存） |
 
-`pageMaxWidth` 取 1040 不是拍的：默认窗口 1280 减去 256 侧边栏与 40 栏距
-后可用 984，**小于 1040**，因此默认窗口下的渲染结果与限宽前完全一致，
-只有宽于约 1336 的窗口才开始出现居中留白。这样改版面不会带来
-「一打开就变窄」的回归。
+`pageMaxWidth` 取 1120 不是拍的：默认窗口 1280 减去 256 侧边栏与 40 栏距
+后可用 984，**小于 1120**，因此默认窗口下的渲染结果与限宽前完全一致，
+只有更宽的窗口才开始出现居中留白。这样改版面不会带来「一打开就变窄」的回归。
 
 限宽有两处实现，共用同一个 `contentCapKey` 供守卫测量：
 
@@ -218,14 +240,27 @@ none 0   group 0.04   subtle 0.06   tint 0.12   border 0.30   half 0.50   strong
 
 ---
 
+### 3.8 外观（`LexiColors.resolve` / `LexiTones`）
+
+主色/次色由用户选择，见 [主题系统](THEMING.md)。设计系统侧只需记住三条：
+
+1. 中性色（页面底/卡片/四级文字/分隔线）固定，换主题不会改变阅读层级；
+2. 强调色与次色由色种推导，文字色按实际背景收敛，至少 4.8:1 留余量；
+3. 分区色只混入 4% 的主/次色，并在染色后复查四级标签对比度。
+
 ## 4. 组件
 
 | 组件 | 位置 | 说明 |
 |---|---|---|
-| `Surface` | `lib/ui/widgets/surface.dart` | 内容层表面。`card`（不透明 + 发丝描边 + 投影）/ `inset`（`fill` 淡底、无描边）/ `plain`（纯分组） |
+| `Surface` | `lib/ui/widgets/surface.dart` | 内容层表面。`card`（不透明 + 发丝描边 + 静置影）/ `raised`（抬升影）/ `hero`（主次色渐变 + 浮动影）/ `inset`（`fill` 淡底）/ `plain`（纯分组） |
+| `SectionCard` | `lib/ui/widgets/section_card.dart` | 带标题的内容卡片；设置页的 `SettingsSectionCard` 是它的分组壳 |
 | `LexiBadge` | `lib/ui/widgets/badge.dart` | 徽章。6 色调 × 2 变体（`tint` / `outline`），内边距/圆角/字号/字重固定 |
-| `LiquidGlass` | `lib/ui/glass.dart` | 功能层玻璃。**不要用在内容层** |
-| `AmbientBackground` | `lib/ui/glass.dart` | 页面底的环境光斑 |
+| `SelectionCard` | `lib/ui/widgets/selection_card.dart` | 可选卡片。选中态 = 主色描边 + 分区底 + 勾选 + 120ms 过渡 |
+| `DisclosureSection` | `lib/ui/widgets/disclosure_section.dart` | 折叠分区。`fill` 淡底圆角头 + 48 高点击区，展开内容接在同一分区；保留内部表单状态与滚动位置 |
+| `InlineNotice` | `lib/ui/widgets/inline_notice.dart` | 内联提示。info / success / warning / danger 四种语气 |
+| `LexiReveal` | `lib/ui/widgets/lexi_reveal.dart` | 分区淡入 + 8px 上移；按 `LexiMotion.stagger` 错峰，减弱动效时直接终态 |
+| `LiquidGlass` | `lib/ui/glass.dart` | 功能层玻璃。支持主色轻微染色、悬浮影与顶部高光；**不要用在内容层** |
+| `AmbientBackground` | `lib/ui/glass.dart` | 页面底的主/次色静态径向渐变 |
 
 `MasteryBadge` / `InitializationBadge` / `ArticleBadge` / `DetailChip` /
 `_CardTag` 等只负责「状态 → 文案 + 色调」的映射，长相一律交给 `LexiBadge`。
@@ -307,7 +342,7 @@ none 0   group 0.04   subtle 0.06   tint 0.12   border 0.30   half 0.50   strong
 | `LexiLayout.wideBreakpoint`（900） | **内容**宽度 | 页内排布：筛选栏铺开 / 收进面板 |
 
 迁移时踩过一次：词库的筛选栏原本用 `sidebarBreakpoint` 判断「宽屏就平铺
-筛选控件」。内容被限宽到 ≤1040 之后，那个条件**永远不成立**，宽屏用户
+筛选控件」。内容被限宽到 ≤1120 之后，那个条件**永远不成立**，宽屏用户
 会一直看到「筛选」按钮——而且不会有任何报错，只是功能悄悄退化。
 凡是在 `LayoutBuilder` 里按 `constraints.maxWidth` 分支的地方，
 比的都必须是 `LexiLayout.wideBreakpoint`。
@@ -368,15 +403,15 @@ Y 轴不再留「4 小时 13 …」这类截断：数值格允许折两行，长
 | 控件 | 症状 | 现在 |
 |---|---|---|
 | 筛选/排序下拉框 | `Expanded` + `isExpanded: true` 让箭头落在内容区最右端，离标签约 1000px，控件与它标注的值失去联系 | 不 `Expanded`，用 `Flexible` 贴着标签；两个下拉框并排一行 |
-| 设置页滑条 | 铺满 1040，标签在最左、数值在最右（相隔近 1900px），刻度被拉到十几像素一格，读不出精确位置 | 整页收窄到 `LexiLayout.readingMaxWidth`（720），滑条与正文列同宽 |
+| 设置页滑条 | 铺满 1120，标签在最左、数值在最右（相隔近 1900px），刻度被拉到十几像素一格，读不出精确位置 | 整页收窄到 `LexiLayout.readingMaxWidth`（720），滑条与正文列同宽 |
 
 判断依据是「控件与它的标签/数值是否还读得成一个整体」，不是控件占了多少像素。
 
 补充两条实测出来的：
 
-* **表单页整页收窄**（添加词条 720）：输入框铺到 1040 时，一个只填几个字的
+* **表单页整页收窄**（添加词条 720）：输入框铺到 1120 时，一个只填几个字的
   字段也长得一眼看不完；收窄之后字段标签正好落在输入框上方。
-* **主按钮不铺满整行**：首页「开始学习」目标为 0 时是一条 1040 宽、通体
+* **主按钮不铺满整行**：首页「开始学习」目标为 0 时是一条 1120 宽、通体
   蓝色、上面四个字的横幅——全页最重的视觉元素落在一个主次不明的横条上。
   按内容取宽、左对齐；只有窄屏（< 480）才铺满，那里拇指更好按。
 
@@ -432,6 +467,27 @@ Tab、也没有 AppBar。它们的「离开」只能由页面自己给。收敛�
 守卫：`test/features/initialize/configurator_test.dart` 的「细节默认收起」用例
 断言收起时字段网格**没有被构建**（`find.text('例句') findsNothing`），
 展开后才出现——只断言「摘要行还在」是不够的，那条断言在展开时同样成立。
+
+### 4.5.6 折叠分区与练习入口
+
+`DisclosureSection` 的头行不再是裸文字 + 箭头：`ExpansionTileThemeData` 统一
+给 `fill` 淡底、`md` 圆角、12 磅横向内边距与 48 磅最小点击高度，展开内容接在
+同一块分区里。统计卡的「掌握分布」、建议卡的「建议详情」、词条详情的
+「复习记录 / 扩展知识与助记」、设置页「关于词环」、统计页「近期作答与每日
+明细」以及空态/失败态的「技术细节」由此读成同一类控件，而不是散落在页面里的
+一行行「没收尾的列表项」。
+
+首页练习区也从「裸标题 + 四块瓷砖 + 两条孤立折叠行」收成一张 `SectionCard`：
+首屏只留 4 个精选入口（限时配对 / 音标辨音 / 听力拼写 / 单词拼图），底部是
+「查看全部 11 项练习」；完整入口在弹层里按「配对与音标 / 专项练习 / 趣味训练」
+分组。练习不再被拆成两层折叠，专项模式也不必靠一条单独的分区标题才能找到。
+目录数据集中在 `lib/features/dashboard/practice_catalog.dart`，卡片与弹层共用
+同一份地址，新增模式时不会只改到其中一处。
+
+守卫：`test/features/dashboard/practice_card_test.dart` 断言首屏不存在
+「专项练习」「更多趣味训练」两条折叠行、11 项入口都在弹层里、专项入口仍能
+落到 `?mode=SENTENCE_REVIEW`；`test/app/visual_layout_test.dart` 继续守住
+390×844 首屏的两个练习入口。
 
 ### 4.6 动作与确认分级
 
@@ -568,7 +624,7 @@ flutter test --no-pub test/tools/screenshot_tool.dart   # → build/screens/*.pn
 ### 6.2 正文列限宽
 
 见 3.7。要点：限宽在**外壳内容区**与**顶层路由包装**两处，共用
-`contentCapKey`；1440 宽窗口下正文列 1040（沉浸页与单列向导 840），
+`contentCapKey`；1440 宽窗口下正文列 1120（沉浸页与单列向导 840），
 默认 1280 窗口下不受影响。
 
 守卫：`test/app/page_smoke_test.dart` 把 12 条路由 × 4 档宽度（360 / 700 /
@@ -590,6 +646,9 @@ flutter test --no-pub test/tools/screenshot_tool.dart   # → build/screens/*.pn
 | `test/architecture/architecture_test.dart` | 分层边界、函数 ≤40 行、`build()` ≤80 行、构造函数参数 ≤5、无空 catch、不用字符串判错误类型、`lib/domain`+`lib/services` 无裸数字、时间常量自洽、`dart:io` 只在 `*_native.dart` |
 | `test/architecture/design_tokens_test.dart` | 无 `fontSize`（token 文件除外）、无 `circular` 数字字面量、间距落在 `LexiSpace`、无 `withValues(alpha: 数字)`、`LiquidGlass` 只在功能层、音阶严格递增、四级标签对比度单调递减且 ≥4.5:1、信号文字色 ≥4.5:1、主按钮白字 ≥3:1 |
 | `test/ui/surface_test.dart` | `Surface` 自己承载涟漪；三种形态的底色/描边/抬升；增强对比度加重描边 |
+| `test/ui/theme_palette_test.dart` | 12 个主色预设 × 明暗 × 四种文字背景 + 四种分区；白/黑/灰/黄极端色种；按钮文字与次色文字 |
+| `test/features/settings/appearance_section_test.dart` | 点色板/切模式/自定义/恢复默认是否写对键 |
+| `test/app/theme_apply_test.dart` | 设置 → 主题包（浅色/深色/模式）的接线与坏值兜底 |
 | `test/ui/badge_test.dart` | 六色调 × 明暗两套的对比度；六色调几何完全一致；`outline` 只多一条描边 |
 | `test/ui/theme_text_test.dart` | 15 个 `TextTheme` 槽位的字号都在 `LexiType` 里、都带颜色与行高；`focusColor`/`hoverColor` 非空 |
 | `test/ui/accessibility_test.dart` | 纯图标控件有标签；`LexiMotion.of` 的两种行为 |

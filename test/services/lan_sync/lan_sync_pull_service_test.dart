@@ -6,8 +6,8 @@
 library;
 
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
@@ -19,6 +19,7 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_backup.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_discovery_port.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_protocol.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_pull_service.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_state_store.dart';
@@ -133,6 +134,46 @@ void main() {
       expect(result.updatedWords, isZero);
       expect(result.addedLogs, isZero);
       expect(result.wordCount, 3);
+    });
+
+    test('保留本地排队状态，不导入远端任务并归一化远端瞬态词状态', () async {
+      final localWord = await db.select(db.words).getSingle();
+      await db
+          .into(db.initializationJobs)
+          .insert(
+            InitializationJobsCompanion.insert(
+              wordId: localWord.id,
+              mode: InitializationMode.fillMissingFields,
+              requestedFieldsJson: const Value('["pronunciations.phonetic"]'),
+              status: const Value(InitializationStatus.queued),
+              createdAt: 4000,
+              updatedAt: 4000,
+            ),
+          );
+      client.backupResult = _backupWithStatuses(<String, InitializationStatus>{
+        'beta': InitializationStatus.running,
+        'alpha': InitializationStatus.queued,
+        'gamma': InitializationStatus.running,
+      }, includeRemoteQueueData: true);
+
+      await service.pull(
+        host: fakeDiscoveredHost(),
+        pairingCode: '135790',
+        mode: LanSyncPullMode.merge,
+      );
+
+      final wordRows = await db.select(db.words).get();
+      final statuses = <String, InitializationStatus>{
+        for (final word in wordRows) word.term: word.initializationStatus,
+      };
+      expect(statuses['beta'], InitializationStatus.ready);
+      expect(statuses['alpha'], InitializationStatus.pending);
+      expect(statuses['gamma'], InitializationStatus.pending);
+      final jobs = await db.select(db.initializationJobs).get();
+      expect(jobs, hasLength(1));
+      expect(jobs.single.wordId, localWord.id);
+      expect(jobs.single.status, InitializationStatus.queued);
+      expect(await db.select(db.providerAttempts).get(), isEmpty);
     });
 
     test('覆盖模式下整份替换', () async {
@@ -330,14 +371,24 @@ Future<void> _seed(AppDatabase db, List<String> words) async {
 }
 
 /// 造一份含给定词条的最小合法备份。
-LanSyncBackup _backupOf(List<String> words) {
+LanSyncBackup _backupOf(List<String> words) =>
+    _backupWithStatuses(<String, InitializationStatus>{
+      for (final term in words) term: InitializationStatus.ready,
+    });
+
+/// 造一份含指定词条初始化状态的最小合法备份。
+LanSyncBackup _backupWithStatuses(
+  Map<String, InitializationStatus> statuses, {
+  bool includeRemoteQueueData = false,
+}) {
   final now = DateTime.now().millisecondsSinceEpoch;
+  final terms = statuses.keys.toList()..sort();
   final payload = jsonEncode(<String, Object?>{
     'format': backupFormat,
     'version': 3,
     'exportedAt': DateTime.now().toUtc().toIso8601String(),
     'words': <Map<String, Object?>>[
-      for (final (index, term) in words.indexed)
+      for (final (index, term) in terms.indexed)
         <String, Object?>{
           'id': index + 1,
           'term': term,
@@ -346,7 +397,7 @@ LanSyncBackup _backupOf(List<String> words) {
           'target_language': 'zh',
           'entry_type': 'WORD',
           'content_type': 'WORD',
-          'initialization_status': 'READY',
+          'initialization_status': statuses[term]!.wire,
           'mastery_level': 'NEW',
           'mastery_score': 0,
           'is_suspended': 0,
@@ -354,10 +405,32 @@ LanSyncBackup _backupOf(List<String> words) {
           'updated_at': now,
         },
     ],
+    if (includeRemoteQueueData) ...<String, Object?>{
+      'initialization_jobs': <Map<String, Object?>>[
+        <String, Object?>{
+          'id': 1,
+          'word_id': 2,
+          'task_type': 'INITIALIZE',
+          'mode': 'FILL_MISSING_FIELDS',
+          'status': 'QUEUED',
+          'created_at': now,
+          'updated_at': now,
+        },
+      ],
+      'provider_attempts': <Map<String, Object?>>[
+        <String, Object?>{
+          'id': 1,
+          'word_id': 2,
+          'provider_id': 'remote-provider',
+          'status': 'FAILED',
+          'created_at': now,
+        },
+      ],
+    },
   });
   return LanSyncBackup(
     bytes: Uint8List.fromList(utf8.encode(payload)),
     fileName: 'lexiloop-backup-2026-10-16-101500.json',
-    totalRows: words.length,
+    totalRows: terms.length,
   );
 }

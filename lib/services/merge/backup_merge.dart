@@ -19,6 +19,7 @@
 library;
 
 import 'package:lexiloop/data/backup/backup_import.dart';
+import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
@@ -48,9 +49,10 @@ const Set<String> mergeExcludedSettingKeys = <String>{
 
 /// 合并时可以跟着远端走的 `words` 列。
 ///
-/// **刻意排除的三类**：
+/// **刻意排除的四类**：
 /// - 身份列（`normalized_term` / 两个语言列）——它们就是匹配依据；
 /// - 派生列（`mastery_score` / `mastery_level`）——由重放算出，取远端会立刻过期；
+/// - `initialization_status`——已有词的任务队列是设备本地状态，不能由远端覆盖；
 /// - `created_at`——"这条词最早什么时候进来"是本机视角的事实，取更早的那个
 ///   没有意义，取远端的反而会让排序跳变。
 const List<String> _mergeableWordColumns = <String>[
@@ -60,7 +62,6 @@ const List<String> _mergeableWordColumns = <String>[
   'entry_type',
   'content_type',
   'source_created_at',
-  'initialization_status',
   'is_suspended',
   'user_note',
   'updated_at',
@@ -236,7 +237,14 @@ class _MergeRun {
       final existing = byIdentity[wordIdentityOf(incoming)];
       final remoteId = _intOf(incoming['id']);
       if (existing == null) {
-        final row = <String, Object?>{...incoming, 'id': _nextWordId};
+        final row = <String, Object?>{
+          ...incoming,
+          'id': _nextWordId,
+          if (incoming.containsKey('initialization_status'))
+            'initialization_status': _localInitializationStatus(
+              incoming['initialization_status'],
+            ),
+        };
         _nextWordId += 1;
         rows.add(row);
         byIdentity[wordIdentityOf(row)] = row;
@@ -536,3 +544,10 @@ int? _intOf(Object? value) {
 
 /// 宽容地读一个字符串。
 String _stringOf(Object? value) => value is String ? value : '';
+
+/// 远端瞬态任务状态无法在本机恢复，新增词将其回退到可重新初始化的状态。
+Object? _localInitializationStatus(Object? value) =>
+    value == InitializationStatus.queued.wire ||
+        value == InitializationStatus.running.wire
+    ? InitializationStatus.pending.wire
+    : value;

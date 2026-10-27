@@ -223,7 +223,7 @@ JSON 带走——WebDAV 密码需要专门的导出剥离，这里根本不需�
 
 | 表 | 规则 | 冲突时 |
 | --- | --- | --- |
-| `words` | 唯一身份 `(normalized_term, source_language, target_language)` 相同的合成一行 | `updated_at` 更新的一侧赢；**但 `mastery_*` 永远不取对端**（它是派生值） |
+| `words` | 唯一身份 `(normalized_term, source_language, target_language)` 相同的合成一行 | `updated_at` 更新的一侧赢；**但 `mastery_*` 永远不取对端**（它是派生值）；初始化状态保留本机值，新词不继承对端的 `QUEUED/RUNNING` 瞬态状态，因为任务队列是本机专属 |
 | `word_contents` | 按映射后的 `word_id` 对齐 | `updated_at` 更新的一侧整行赢 |
 | `review_logs` | 按 `client_answer_id` 取并集 | 同一条幂等键只留一份 |
 | `study_sessions` | 身份 `(started_at, session_type, source_type)` 相同视为同一场 | 已存在则整场跳过（含题目） |

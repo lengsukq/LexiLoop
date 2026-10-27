@@ -36,6 +36,7 @@ Map<String, Object?> wordRow({
   int updatedAt = now,
   int masteryScore = 0,
   MasteryLevel masteryLevel = MasteryLevel.newWord,
+  InitializationStatus initializationStatus = InitializationStatus.ready,
   String? userNote,
   bool isSuspended = false,
 }) => <String, Object?>{
@@ -46,7 +47,7 @@ Map<String, Object?> wordRow({
   'target_language': 'zh',
   'entry_type': EntryType.word.wire,
   'content_type': LexicalContentType.word.wire,
-  'initialization_status': InitializationStatus.ready.wire,
+  'initialization_status': initializationStatus.wire,
   'mastery_level': masteryLevel.wire,
   'mastery_score': masteryScore,
   'is_suspended': isSuspended ? 1 : 0,
@@ -294,6 +295,56 @@ void main() {
       // 没有新作答 → 不重放 → 熟练度保持本机值，绝不取远端。
       expect(row['mastery_score'], 42);
       expect(row['mastery_level'], MasteryLevel.familiar.wire);
+    });
+
+    test('已有词条保留本机初始化状态，包括排队与已完成状态', () {
+      for (final status in <InitializationStatus>[
+        InitializationStatus.queued,
+        InitializationStatus.ready,
+        InitializationStatus.partial,
+      ]) {
+        final local = emptyTables()
+          ..['words'] = <Map<String, Object?>>[
+            wordRow(id: 7, term: 'apple', initializationStatus: status),
+          ];
+        final remote = emptyTables()
+          ..['words'] = <Map<String, Object?>>[
+            wordRow(
+              id: 1,
+              term: 'apple',
+              updatedAt: now + day,
+              initializationStatus: InitializationStatus.running,
+            ),
+          ];
+
+        final outcome = merge(local, remote);
+
+        expect(
+          outcome.tables['words']!.single['initialization_status'],
+          status.wire,
+          reason: '远端 RUNNING 不应覆盖本机 ${status.wire}',
+        );
+      }
+    });
+
+    test('新远端词条的 QUEUED 与 RUNNING 归一化为 PENDING', () {
+      for (final status in <InitializationStatus>[
+        InitializationStatus.queued,
+        InitializationStatus.running,
+      ]) {
+        final remote = emptyTables()
+          ..['words'] = <Map<String, Object?>>[
+            wordRow(id: 1, term: 'apple', initializationStatus: status),
+          ];
+
+        final outcome = merge(emptyTables(), remote);
+
+        expect(
+          outcome.tables['words']!.single['initialization_status'],
+          InitializationStatus.pending.wire,
+          reason: '远端 ${status.wire} 对应的设备本地任务不会被导入',
+        );
+      }
     });
 
     test('本机更新时不覆盖', () {

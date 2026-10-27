@@ -154,6 +154,89 @@ class AffixView {
   final String? source;
 }
 
+/// 学习揭示时按需读取的助记与构词内容。
+class StudyRevealContent {
+  /// 以词根、词缀与助记信息构造；省略字段时表示空内容。
+  const new({
+    this.roots = const <StudyRevealRoot>[],
+    this.affixes = const <StudyRevealAffix>[],
+    this.mnemonic,
+  });
+
+  /// 词根。
+  final List<StudyRevealRoot> roots;
+
+  /// 词缀。
+  final List<StudyRevealAffix> affixes;
+
+  /// 已保存的助记。
+  final String? mnemonic;
+
+  /// 是否没有可展示的内容。
+  bool get isEmpty => roots.isEmpty && affixes.isEmpty && mnemonic == null;
+}
+
+/// 学习揭示里展示的词根。
+class StudyRevealRoot {
+  /// 以内容构造。
+  const new({required this.root, this.meaning, this.origin});
+
+  /// 词根文本。
+  final String root;
+
+  /// 含义。
+  final String? meaning;
+
+  /// 语源。
+  final String? origin;
+}
+
+/// 学习揭示里展示的词缀。
+class StudyRevealAffix {
+  /// 以内容构造。
+  const new({required this.value, required this.kind, this.meaning});
+
+  /// 词缀文本。
+  final String value;
+
+  /// 前缀或后缀。
+  final AffixKind kind;
+
+  /// 含义。
+  final String? meaning;
+}
+
+/// `word_contents` 中适用于揭示面板的轻量读取结果。
+const String _studyRevealContentSql = '''
+SELECT roots_json, affixes_json, learning_json
+FROM word_contents
+WHERE word_id = ?''';
+
+/// EasyDict CSV 简化词根/词缀的来源标记。
+const String _easydictCsvSource = 'easydict-csv';
+
+/// 从词条 ID 按需取回揭示面板字段。
+Future<StudyRevealContent> loadStudyRevealContent(
+  AppDatabase database,
+  int wordId,
+) async {
+  final row = await database
+      .customSelect(
+        _studyRevealContentSql,
+        variables: <Variable<Object>>[Variable<int>(wordId)],
+      )
+      .getSingleOrNull();
+  if (row == null) return const StudyRevealContent();
+  final rootsJson = row.readNullable<String>('roots_json');
+  final affixesJson = row.readNullable<String>('affixes_json');
+  return StudyRevealContent(
+    roots: _parseStudyRoots(rootsJson),
+    affixes: _parseStudyAffixes(affixesJson),
+    mnemonic: _parseLearning(row.readNullable<String>('learning_json'))
+        .mnemonic,
+  );
+}
+
 /// 词条摘要（`summary_json`）。
 ///
 /// 四个字段都是可选的：初始化到一半的词条可能只有 `translation`。
@@ -838,6 +921,10 @@ class WordDetailDao {
     return row == null ? null : _mapDetail(row);
   }
 
+  /// 只读取当前词条的助记与词根词缀，供学习揭示面板按需展示。
+  Future<StudyRevealContent> studyRevealContent(int wordId) =>
+      loadStudyRevealContent(_db, wordId);
+
   /// 读取复习统计、FSRS 卡片状态与错词状态。
   ///
   /// 词条不存在时返回全默认值而非 `null`：调用方（详情页）已经用
@@ -1260,6 +1347,64 @@ List<AffixView> _parseAffixes(String? raw) {
         meaning: meaning,
         kind: kind,
         source: nullableTextOf(item['source']),
+      ),
+    );
+  }
+  return result;
+}
+
+List<StudyRevealRoot> _parseStudyRoots(String? raw) {
+  final result = <StudyRevealRoot>[
+    for (final root in _parseRoots(raw))
+      StudyRevealRoot(
+        root: root.root,
+        meaning: root.meaning,
+        origin: root.origin,
+      ),
+  ];
+  for (final item in decodeJsonList(raw)) {
+    if (item is! Map ||
+        nullableTextOf(item['source']) != _easydictCsvSource ||
+        nullableTextOf(item['meaning']) != null) {
+      continue;
+    }
+    final root = textOf(item['root']);
+    if (root.isEmpty) continue;
+    result.add(
+      StudyRevealRoot(root: root, origin: nullableTextOf(item['origin'])),
+    );
+  }
+  return result;
+}
+
+List<StudyRevealAffix> _parseStudyAffixes(String? raw) {
+  final result = <StudyRevealAffix>[
+    for (final affix in _parseAffixes(raw))
+      StudyRevealAffix(
+        value: affix.value,
+        meaning: affix.meaning,
+        kind: affix.kind,
+      ),
+  ];
+  for (final item in decodeJsonList(raw)) {
+    if (item is! Map ||
+        nullableTextOf(item['source']) != _easydictCsvSource ||
+        textOf(item['type']).isNotEmpty ||
+        textOf(item['value']).isNotEmpty) {
+      continue;
+    }
+    final value = textOf(item['affix']);
+    final kind = value.endsWith('-') && value.length > 1
+        ? AffixKind.prefix
+        : value.startsWith('-') && value.length > 1
+        ? AffixKind.suffix
+        : null;
+    if (kind == null) continue;
+    result.add(
+      StudyRevealAffix(
+        value: value,
+        meaning: nullableTextOf(item['meaning']),
+        kind: kind,
       ),
     );
   }

@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
@@ -214,6 +215,7 @@ void main() {
     int choiceRevealDelaySeconds = 0,
     bool autoPlay = false,
     bool submitFails = false,
+    StudyRevealContentLoader? studyRevealContentLoader,
     bool settle = true,
     Size size = const Size(520, 1600),
   }) async {
@@ -249,6 +251,10 @@ void main() {
         if (intervalPreviewLoader != null)
           intervalPreviewLoaderProvider.overrideWithValue(
             intervalPreviewLoader,
+          ),
+        if (studyRevealContentLoader != null)
+          studyRevealContentLoaderProvider.overrideWithValue(
+            studyRevealContentLoader,
           ),
       ],
     );
@@ -487,6 +493,83 @@ void main() {
       expect(find.text('apple'), findsOneWidget);
       expect(sessionOf(container).completedCount, 0);
       expect(await db.select(db.reviewLogs).get(), isEmpty);
+    });
+
+    testWidgets('扩展助记内容只在揭示后加载并显示，查询失败不影响自评', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+      var loads = 0;
+      final container = await pumpStudy(
+        tester,
+        studyRevealContentLoader: (id) async {
+          loads += 1;
+          expect(id, wordId);
+          return const StudyRevealContent(
+            roots: <StudyRevealRoot>[
+              StudyRevealRoot(root: 'ap', meaning: '远离'),
+            ],
+            affixes: <StudyRevealAffix>[
+              StudyRevealAffix(
+                value: '-le',
+                meaning: '名词词尾',
+                kind: AffixKind.suffix,
+              ),
+            ],
+            mnemonic: '一个苹果',
+          );
+        },
+      );
+
+      expect(loads, 0);
+      expect(find.text('助记与构词'), findsNothing);
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
+
+      expect(loads, 1);
+      expect(find.text('助记与构词'), findsOneWidget);
+      await tester.tap(find.text('助记与构词'));
+      await tester.pumpAndSettle();
+      expect(find.text('一个苹果'), findsOneWidget);
+      expect(find.text('ap · 远离'), findsOneWidget);
+      expect(find.text('-le · 名词词尾'), findsOneWidget);
+      expect(sessionOf(container).completedCount, 0);
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
+    });
+
+    testWidgets('扩展内容为空时不显示折叠区，且自评不受影响', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+      final container = await pumpStudy(
+        tester,
+        studyRevealContentLoader: (_) async => const StudyRevealContent(),
+      );
+
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
+      expect(find.text('助记与构词'), findsNothing);
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
+    });
+
+    testWidgets('扩展内容查询失败仍可完成揭示和自评', (tester) async {
+      final wordId = await insertWord(term: 'apple', meaning: '苹果');
+      await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
+      final container = await pumpStudy(
+        tester,
+        studyRevealContentLoader: (_) async =>
+            throw StateError('lookup failed'),
+      );
+
+      await tester.tap(find.text('显示答案'));
+      await tester.pumpAndSettle();
+      expect(find.text('苹果'), findsOneWidget);
+      expect(find.text('助记与构词'), findsNothing);
+      await tester.tap(find.text('记得'));
+      await tester.pumpAndSettle();
+      expect(sessionOf(container).completedCount, 1);
     });
 
     testWidgets('看词说义先显示答案再自评', (tester) async {

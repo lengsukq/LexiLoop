@@ -12,6 +12,7 @@ import 'package:lexiloop/data/db/daos/review_dao.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
@@ -34,6 +35,11 @@ import 'package:lexiloop/services/tts_service.dart';
 /// 词条查询。
 final Provider<WordDao> wordDaoProvider = Provider<WordDao>(
   (ref) => WordDao(ref.watch(databaseProvider)),
+);
+
+/// 词条详情只读查询。
+final Provider<WordDetailDao> wordDetailDaoProvider = Provider<WordDetailDao>(
+  (ref) => WordDetailDao(ref.watch(databaseProvider)),
 );
 
 /// 设置读写。

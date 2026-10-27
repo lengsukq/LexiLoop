@@ -300,6 +300,46 @@ void main() {
       expect(detail.affixes.last.kind, AffixKind.suffix);
     });
 
+    test('学习揭示只读取当前词条的助记与词根词缀并兼容简化 CSV 形状', () async {
+      final id = await insertWord(term: 'misunderstanding');
+      await insertContents(
+        id,
+        rootsJson:
+            '[{"root":"under","meaning":"在下面"},'
+            '{"root":"stand","source":"easydict-csv"}]',
+        affixesJson:
+            '[{"value":"mis-","meaning":"错误","type":"PREFIX"},'
+            '{"affix":"un-","source":"easydict-csv"}]',
+        learningJson: '{"mnemonic":"先站在下面再理解"}',
+      );
+      final otherId = await insertWord(term: 'unrelated');
+      await insertContents(
+        otherId,
+        rootsJson: '[{"root":"other","meaning":"别的"}]',
+      );
+
+      final reveal = await dao.studyRevealContent(id);
+
+      expect(reveal.mnemonic, '先站在下面再理解');
+      expect(reveal.roots.map((item) => item.root), <String>['under', 'stand']);
+      expect(reveal.roots.last.meaning, isNull);
+      expect(reveal.affixes.map((item) => item.value), <String>['mis-', 'un-']);
+      expect(reveal.affixes.map((item) => item.kind), <AffixKind>[
+        AffixKind.prefix,
+        AffixKind.prefix,
+      ]);
+      expect(reveal.affixes.last.meaning, isNull);
+    });
+
+    test('缺失或无效的学习揭示内容退化为空', () async {
+      final id = await insertWord(term: 'empty');
+      expect((await dao.studyRevealContent(id)).isEmpty, isTrue);
+      expect((await dao.studyRevealContent(9999)).isEmpty, isTrue);
+
+      await insertContents(id, rootsJson: 'not-json', learningJson: 'not-json');
+      expect((await dao.studyRevealContent(id)).isEmpty, isTrue);
+    });
+
     test('非法 JSON 不抛异常，退化为空内容', () async {
       final id = await insertWord(term: 'broken');
       await insertContents(

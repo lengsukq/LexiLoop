@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
@@ -43,6 +44,20 @@ final Provider<IntervalPreviewLoader> intervalPreviewLoaderProvider =
         wordId,
         now: DateTime.now().millisecondsSinceEpoch,
       );
+    });
+
+/// 读取当前词条已存的助记、词根与词缀。
+///
+/// 单独作为按需 loader：会话 SQL 只加载答题必需字段，不为整场题目读取扩展 JSON。
+typedef StudyRevealContentLoader = Future<StudyRevealContent> Function(
+  int wordId,
+);
+
+/// 学习揭示内容读取入口。
+final Provider<StudyRevealContentLoader> studyRevealContentLoaderProvider =
+    Provider<StudyRevealContentLoader>((ref) {
+      final dao = ref.watch(wordDetailDaoProvider);
+      return dao.studyRevealContent;
     });
 
 /// 学习会话控制器。

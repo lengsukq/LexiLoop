@@ -24,11 +24,6 @@ import 'package:lexiloop/services/related_word_service.dart';
 import 'package:lexiloop/services/word_content_refresh_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
-/// 词条详情查询。
-final Provider<WordDetailDao> wordDetailDaoProvider = Provider<WordDetailDao>(
-  (ref) => WordDetailDao(ref.watch(databaseProvider)),
-);
-
 /// 单个词条的详情；词条不存在时数据为 `null`。
 final FutureProviderFamily<WordDetail?, int> wordDetailProvider =
     FutureProvider.family<WordDetail?, int>(

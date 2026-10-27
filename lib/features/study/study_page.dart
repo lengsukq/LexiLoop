@@ -25,6 +25,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/review_models.dart';
@@ -159,6 +160,9 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
 
   /// 揭示时的本地判定预览（与服务判题同源）。
   AnswerPreview? _preview;
+
+  /// 揭示后按需读取的当前词条助记与构词信息。
+  StudyRevealContent? _revealContent;
 
   /// 当前作答文本。
   String _answer = '';
@@ -366,6 +370,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
         answer: _answer,
         usedHint: _usedHint,
         accent: widget.accent,
+        revealContent: _revealContent,
       ),
     ];
   }
@@ -483,6 +488,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
     });
     _clock.setEnabled(enabled: false);
     unawaited(_loadPreview(item));
+    unawaited(_loadRevealContent(item));
     _scrollRevealIntoView();
   }
 
@@ -500,6 +506,20 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
         ),
       );
     });
+  }
+
+  /// 按需取回当前词条的已存扩展内容。
+  ///
+  /// 失败时静默忽略；助记与构词信息不参与答题或自评流程。
+  Future<void> _loadRevealContent(StudyItemView item) async {
+    StudyRevealContent content;
+    try {
+      content = await ref.read(studyRevealContentLoaderProvider)(item.word.id);
+    } on Object {
+      return;
+    }
+    if (!mounted || _revealItem?.itemId != item.itemId) return;
+    setState(() => _revealContent = content.isEmpty ? null : content);
   }
 
   /// 取回四档评级的间隔预览。
@@ -618,6 +638,7 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   void _clearItemState() {
     _revealItem = null;
     _preview = null;
+    _revealContent = null;
     _answer = '';
     _durationMs = null;
     _pendingRating = null;

@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_evaluator.dart';
@@ -32,6 +33,7 @@ class StudyRevealPanel extends StatelessWidget {
     required this.answer,
     required this.usedHint,
     required this.accent,
+    this.revealContent,
     super.key,
   });
 
@@ -49,6 +51,9 @@ class StudyRevealPanel extends StatelessWidget {
 
   /// 设置中的默认发音口音。
   final Accent accent;
+
+  /// 当前词条已存的助记与构词信息；未加载或为空时不展示。
+  final StudyRevealContent? revealContent;
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +114,14 @@ class StudyRevealPanel extends StatelessWidget {
               child: _ExampleBlock(example: item.word.examples.first),
             ),
           ],
+          if (revealContent case final content?
+              when !content.isEmpty) ...<Widget>[
+            const SizedBox(height: LexiSpace.s8),
+            DisclosureSection(
+              title: '助记与构词',
+              child: _RevealContentBlock(content: content),
+            ),
+          ],
         ],
       ),
     );
@@ -118,6 +131,63 @@ class StudyRevealPanel extends StatelessWidget {
   bool get _showExample =>
       item.word.contentType != LexicalContentType.sentence &&
       item.word.examples.isNotEmpty;
+}
+
+/// 已存助记与构词信息；仅作轻量补充，不参与答题流程。
+class _RevealContentBlock extends StatelessWidget {
+  const new({required this.content});
+
+  final StudyRevealContent content;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final mnemonic = content.mnemonic;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (mnemonic != null) ...<Widget>[
+          Text(
+            '助记',
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+          const SizedBox(height: LexiSpace.s4),
+          Text(mnemonic, style: LexiType.body.copyWith(color: colors.label)),
+        ],
+        if (content.roots.isNotEmpty) ...<Widget>[
+          if (mnemonic != null) const SizedBox(height: LexiSpace.s8),
+          Text(
+            '词根',
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+          const SizedBox(height: LexiSpace.s4),
+          for (final root in content.roots)
+            Text(
+              root.meaning == null
+                  ? root.root
+                  : '${root.root} · ${root.meaning}',
+              style: LexiType.body.copyWith(color: colors.label),
+            ),
+        ],
+        if (content.affixes.isNotEmpty) ...<Widget>[
+          if (mnemonic != null || content.roots.isNotEmpty)
+            const SizedBox(height: LexiSpace.s8),
+          Text(
+            '词缀',
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+          const SizedBox(height: LexiSpace.s4),
+          for (final affix in content.affixes)
+            Text(
+              affix.meaning == null
+                  ? affix.value
+                  : '${affix.value} · ${affix.meaning}',
+              style: LexiType.body.copyWith(color: colors.label),
+            ),
+        ],
+      ],
+    );
+  }
 }
 
 /// 判定行：图标 + 文案。

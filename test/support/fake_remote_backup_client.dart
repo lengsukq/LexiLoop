@@ -32,6 +32,9 @@ final class FakeRemoteBackupClient implements RemoteBackupClient {
   /// 下一次调用要抛出的错误（抛一次后自动清空）。
   AppError? failWith;
 
+  /// PUT 前执行的测试钩子。
+  Future<void> Function()? beforePut;
+
   /// 每个条目的修改时间；缺省为 `null`。
   final Map<String, DateTime> modifiedAt = <String, DateTime>{};
 
@@ -46,6 +49,7 @@ final class FakeRemoteBackupClient implements RemoteBackupClient {
     required String fileName,
     required Uint8List bytes,
   }) async {
+    await beforePut?.call();
     _maybeFail();
     putCalls += 1;
     files[fileName] = bytes;

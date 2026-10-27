@@ -17,6 +17,7 @@ import 'dart:async';
 
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/data/db/daos/backup_checkpoint_dao.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
 import 'package:lexiloop/services/remote_backup/webdav_state_store.dart';
@@ -48,13 +49,12 @@ Duration webdavNextCheckDelay({
 
 /// 自动备份的调度器。
 class WebdavAutoBackup {
-  /// 以上传服务、检查点 DAO 与状态存储构造。
+  /// 以上传服务与状态存储构造。
   ///
   /// `clock` 与 `timerFactory` 是可测性接缝：默认读系统时钟、挂真实 `Timer`；
   /// 测试传入假时钟与假定时器后，整条排期链路不需要等待墙钟。
   new(
     this._uploader,
-    this._checkpoints,
     this._states, [
     int Function()? clock,
     MaintenanceTimerFactory? timerFactory,
@@ -62,7 +62,6 @@ class WebdavAutoBackup {
        _timerFactory = timerFactory ?? createRealMaintenanceTimer;
 
   final WebdavUploadService _uploader;
-  final BackupCheckpointDao _checkpoints;
   final WebdavStateStore _states;
   final int Function() _clock;
   final MaintenanceTimerFactory _timerFactory;
@@ -115,9 +114,16 @@ class WebdavAutoBackup {
     _checking = true;
     try {
       final state = (await _states.load()).state;
-      if (_isDue(state) && await _hasChanged(state)) await _upload();
+      if (!_isDue(state)) return;
+      final exported = await _uploader.exportSnapshot();
+      if (_hasChanged(state, exported)) {
+        await _uploader.uploadExported(exported);
+      }
+    } on AppError catch (error) {
+      await _states.recordFailure(error.code.code);
     } on Object {
-      // 后台行为，任何异常都在各自的分支里落过状态；这里只保证调度不中断。
+      // 非 AppError 的数据库、序列化或远端异常也必须可见，不能静默丢失。
+      await _states.recordFailure(AppErrorCode.webdavUnexpectedFailure.code);
     } finally {
       _checking = false;
     }
@@ -133,21 +139,11 @@ class WebdavAutoBackup {
 
   /// 数据相对上次成功上传是否发生了变化。
   ///
-  /// 第一次上传（没有历史检查点）永远算「变了」——否则用户配好自动备份后
-  /// 要等到第一次数据变动才会有第一份远端备份。
-  Future<bool> _hasChanged(WebdavBackupState state) async {
+  /// 第一次上传与旧版轻量检查点都没有内容摘要，永远算「变了」一次。
+  bool _hasChanged(WebdavBackupState state, BackupExportResult exported) {
     final saved = state.lastCheckpoint;
-    if (saved == null) return true;
-    return checkpointWire(await _checkpoints.current()) != saved;
-  }
-
-  /// 上传一次；失败只写状态，不上抛。
-  Future<void> _upload() async {
-    try {
-      await _uploader.uploadNow();
-    } on AppError catch (error) {
-      await _states.recordFailure(error.code.code);
-    }
+    if (!isFingerprintCheckpoint(saved)) return true;
+    return fingerprintCheckpointWire(exported.fingerprint) != saved;
   }
 
   /// 下一次检查的延迟，按**当前读到的**状态计算。

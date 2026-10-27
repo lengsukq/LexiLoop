@@ -16,6 +16,7 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
@@ -60,8 +61,12 @@ const List<String> tablesExcludedFromExport = <String>[
 
 /// 导出结果。
 class BackupExportResult {
-  /// 以 UTF-8 字节与各表行数构造。
-  const new({required this.bytes, required this.rowCounts});
+  /// 以 UTF-8 字节、各表行数与逻辑数据指纹构造。
+  const new({
+    required this.bytes,
+    required this.rowCounts,
+    this.fingerprint = '',
+  });
 
   /// 备份文件的 UTF-8 字节。
   ///
@@ -71,6 +76,9 @@ class BackupExportResult {
 
   /// 各表导出的行数。
   final Map<String, int> rowCounts;
+
+  /// 导出逻辑数据的稳定 SHA-256；不包含信封导出时间。
+  final String fingerprint;
 
   /// 导出的总行数。
   int get totalRows => rowCounts.values.fold(0, (sum, count) => sum + count);
@@ -94,7 +102,9 @@ class BackupExporter {
   /// 超过 [maxBackupBytes] 时抛 [AppErrorCode.backupTooLarge]，与
   /// [BackupImporter] 的拒绝条件一致——导出器多拒的那部分只是「字节数比字符
   /// 数大」的文件，两边不会各自接受对方产不出的东西。
-  Future<BackupExportResult> exportToJson() async {
+  Future<BackupExportResult> exportToJson({
+    bool includeFingerprint = false,
+  }) async {
     final tables = await readAllTables();
     _stripSecrets(tables);
     final bytes = utf8.encode(jsonEncode(_envelope(tables)));
@@ -104,8 +114,10 @@ class BackupExporter {
         details: '导出结果 ${bytes.length} 字节，上限 $maxBackupBytes',
       );
     }
+    final fingerprint = includeFingerprint ? _fingerprint(tables) : '';
     return BackupExportResult(
       bytes: bytes,
+      fingerprint: fingerprint,
       rowCounts: <String, int>{
         for (final entry in tables.entries) entry.key: entry.value.length,
       },
@@ -120,17 +132,63 @@ class BackupExporter {
   ///
   /// 剥密码是**导出**这一个动作的事，因此挪到了 [exportToJson] 里、
   /// 读表之后，而不是读表的时候。
-  Future<Map<String, List<Map<String, Object?>>>> readAllTables() async {
-    final tables = <String, List<Map<String, Object?>>>{};
-    for (final table in tableOrder) {
-      final rows = await _db.customSelect('SELECT * FROM $table').get();
-      tables[table] = rows
-          .map((row) => _rowToJson(row.data))
-          // **必须是可增长列表**：合并同步会就地往这些列表里追加远端行，
-          // 再整份交给导入事务。固定的列表会让那条路径当场抛异常。
-          .toList();
+  Future<Map<String, List<Map<String, Object?>>>> readAllTables() =>
+      _db.transaction(() async {
+        final tables = <String, List<Map<String, Object?>>>{};
+        for (final table in tableOrder) {
+          final rows = await _db.customSelect('SELECT * FROM $table').get();
+          tables[table] = rows
+              .map((row) => _rowToJson(row.data))
+              // **必须是可增长列表**：合并同步会就地往这些列表里追加远端行，
+              // 再整份交给导入事务。固定的列表会让那条路径当场抛异常。
+              .toList();
+        }
+        return tables;
+      });
+
+  /// 对导出的逻辑数据计算稳定指纹。
+  ///
+  /// 表行与对象键的顺序不影响指纹；`exportedAt` 不参与输入。WebDAV 成功/失败
+  /// 状态以及对应设置行的 `updated_at` 也不属于备份内容的变化。
+  String _fingerprint(Map<String, List<Map<String, Object?>>> tables) {
+    final canonicalTables = <String, Object?>{};
+    final tableNames = tables.keys.toList()..sort();
+    for (final table in tableNames) {
+      final rows = tables[table]!.map((row) {
+        final canonicalRow = Map<String, Object?>.from(row);
+        if (table == 'settings' && canonicalRow['key'] == webdavSettingsKey) {
+          canonicalRow.remove('updated_at');
+          final value = _decodeSettingValue(canonicalRow['value_json']);
+          if (value is Map) {
+            final stableValue = _canonicalize(<String, Object?>{
+              for (final entry in value.entries)
+                if (entry.key is String &&
+                    !const <String>{
+                      'lastSuccessAt',
+                      'lastError',
+                      'lastCheckpoint',
+                    }.contains(entry.key))
+                  entry.key as String: entry.value,
+            });
+            canonicalRow['value_json'] = jsonEncode(stableValue);
+          }
+        }
+        return _canonicalize(canonicalRow);
+      }).toList()..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+      canonicalTables[table] = rows;
     }
-    return tables;
+    return sha256.convert(utf8.encode(jsonEncode(canonicalTables))).toString();
+  }
+
+  Object? _canonicalize(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.whereType<String>().toList()..sort();
+      return <String, Object?>{
+        for (final key in keys) key: _canonicalize(value[key]),
+      };
+    }
+    if (value is List) return value.map(_canonicalize).toList(growable: false);
+    return value;
   }
 
   /// 从导出行里去掉不应外流的凭据。

@@ -14,10 +14,10 @@ library;
 
 import 'package:lexiloop/data/db/database.dart';
 
-/// 学习数据的检查点。
+/// 学习数据的轻量级检查点。
 ///
-/// 用记录类型而不是自定义类：它只是两个数字的临时组合，
-/// 不参与序列化，也不该有行为。
+/// 仅用于兼容旧版的 `timestamp:count` 检查点；自动备份的变化判断使用导出快照
+/// 的内容指纹。
 typedef DataCheckpoint = ({int lastReviewAt, int wordCount});
 
 /// 数据检查点查询。
@@ -51,3 +51,10 @@ class BackupCheckpointDao {
 /// `settings` 表的 JSON 值里，字符串的比较与往返都不会有精度问题。
 String checkpointWire(DataCheckpoint checkpoint) =>
     '${checkpoint.lastReviewAt}:${checkpoint.wordCount}';
+
+/// 把导出快照指纹标记为新格式检查点。
+String fingerprintCheckpointWire(String fingerprint) => 'sha256:$fingerprint';
+
+/// 是否为受支持的快照指纹格式。
+bool isFingerprintCheckpoint(String? checkpoint) =>
+    checkpoint != null && RegExp(r'^sha256:[0-9a-f]{64}$').hasMatch(checkpoint);

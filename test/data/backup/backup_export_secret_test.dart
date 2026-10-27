@@ -81,6 +81,53 @@ void main() {
     expect(map['lastCheckpoint'], '1792069100000:1417');
   });
 
+  test('运行状态变化不改变逻辑指纹，配置变化会改变指纹', () async {
+    await writeWebdav(password: 'app-pass');
+    final exporter = BackupExporter(db);
+    final first = await exporter.exportToJson(includeFingerprint: true);
+
+    await settings.update(<String, Object?>{
+      webdavSettingsKey: webdavSettingsToStorage(
+        WebdavSettings(
+          credential: const WebdavCredential(
+            baseUrl: 'https://dav.example.com/dav',
+            directory: '/LexiLoop/',
+            username: 'leo',
+            password: 'changed-pass',
+          ),
+          state: WebdavBackupState(
+            autoIntervalMinutes: 0,
+            lastSuccessAt: 1792069132999,
+            lastError: 'WEBDAV_UNREACHABLE',
+            lastCheckpoint: 'sha256:${'a' * 64}',
+          ),
+        ),
+      ),
+    }, now: 2);
+    final afterRuntimeState = await exporter.exportToJson(
+      includeFingerprint: true,
+    );
+    expect(afterRuntimeState.fingerprint, first.fingerprint);
+
+    await settings.update(<String, Object?>{
+      webdavSettingsKey: webdavSettingsToStorage(
+        const WebdavSettings(
+          credential: WebdavCredential(
+            baseUrl: 'https://dav.example.com/dav',
+            directory: '/LexiLoop/',
+            username: 'leo',
+            password: '',
+          ),
+          state: WebdavBackupState(autoIntervalMinutes: 1440),
+        ),
+      ),
+    }, now: 3);
+    final afterConfigChange = await exporter.exportToJson(
+      includeFingerprint: true,
+    );
+    expect(afterConfigChange.fingerprint, isNot(first.fingerprint));
+  });
+
   test('导出字节里不出现密码明文', () async {
     await writeWebdav(password: 'TOP-SECRET-PASSWORD');
 

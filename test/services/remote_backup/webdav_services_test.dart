@@ -14,9 +14,9 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
-import 'package:lexiloop/data/db/daos/backup_checkpoint_dao.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/data/remote_backup/remote_backup_client.dart';
 import 'package:lexiloop/data/remote_backup/remote_backup_entry.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
@@ -77,30 +77,23 @@ void main() {
   WebdavStateStore store() =>
       WebdavStateStore(harness.service, clock: () => now);
 
-  WebdavUploadService uploader() => WebdavUploadService(
-    BackupExporter(db),
-    (credential) {
-      expect(credential.username, 'leo');
-      return remote;
-    },
-    store(),
-    BackupCheckpointDao(db),
-  );
+  WebdavUploadService uploader() =>
+      WebdavUploadService(BackupExporter(db), (credential) {
+        expect(credential.username, 'leo');
+        return remote;
+      }, store());
+
+  WebdavUploadService uploaderWithRemote(RemoteBackupClient client) =>
+      WebdavUploadService(BackupExporter(db), (_) => client, store());
 
   WebdavRestoreService restorer() =>
       WebdavRestoreService((credential) => remote, store(), BackupImporter(db));
 
   WebdavAutoBackup auto({required List<Duration> scheduled}) =>
-      WebdavAutoBackup(
-        uploader(),
-        BackupCheckpointDao(db),
-        store(),
-        () => now,
-        (duration, onElapsed) {
-          scheduled.add(duration);
-          return timer;
-        },
-      );
+      WebdavAutoBackup(uploader(), store(), () => now, (duration, onElapsed) {
+        scheduled.add(duration);
+        return timer;
+      });
 
   Future<int> insertWord(String term) async {
     final id = await db
@@ -132,6 +125,17 @@ void main() {
         ),
       );
       expect(remote.ensureDirectoryCalls, 0);
+    });
+
+    test('上传遇到未分类异常也记录失败且不吞掉错误', () async {
+      await configure();
+      remote.beforePut = () async => throw StateError('test only');
+
+      await expectLater(uploader().uploadNow(), throwsStateError);
+
+      final state = (await store().load()).state;
+      expect(state.lastSuccessAt, isNull);
+      expect(state.lastError, AppErrorCode.webdavUnexpectedFailure.code);
     });
 
     test('上传成功后远端有一份内容正确的备份，并记下成功状态', () async {
@@ -291,6 +295,23 @@ void main() {
   });
 
   group('自动备份', () {
+    test('非预期上传异常写入状态，调度器继续排期', () async {
+      await configure(autoIntervalMinutes: 60);
+      await insertWord('serendipity');
+      remote.beforePut = () async => throw StateError('test only');
+      final scheduled = <Duration>[];
+      final backup = auto(scheduled: scheduled);
+
+      await backup.start();
+
+      final state = (await store().load()).state;
+      expect(state.lastSuccessAt, isNull);
+      expect(state.lastError, AppErrorCode.webdavUnexpectedFailure.code);
+      expect(scheduled, hasLength(1));
+      expect(backup.isRunning, isTrue);
+      backup.dispose();
+    });
+
     test('关闭周期时不挂定时器、不发请求', () async {
       await configure();
       final scheduled = <Duration>[];
@@ -341,17 +362,175 @@ void main() {
       backup.dispose();
     });
 
-    test('周期到了但数据没变时跳过', () async {
+    test('周期到了但稳定指纹未变化时跳过', () async {
       await configure(autoIntervalMinutes: 60);
       await insertWord('serendipity');
-      await uploader().uploadNow();
+      final scheduled = <Duration>[];
+      final firstBackup = auto(scheduled: scheduled);
+      await firstBackup.start();
+      firstBackup.dispose();
+
+      now += 61 * minuteMs;
+      final nextBackup = auto(scheduled: scheduled);
+      await nextBackup.start();
+
+      expect(remote.putCalls, 1, reason: '相同导出数据不应再次上传');
+      nextBackup.dispose();
+    });
+
+    test('周期到了但只有备份运行状态变化时跳过', () async {
+      await configure(autoIntervalMinutes: 60);
+      await insertWord('serendipity');
+      final scheduled = <Duration>[];
+      final firstBackup = auto(scheduled: scheduled);
+      await firstBackup.start();
+      firstBackup.dispose();
+      now += 1;
+      await store().recordFailure(AppErrorCode.webdavUnreachable.code);
+
+      now += 61 * minuteMs;
+      final nextBackup = auto(scheduled: scheduled);
+      await nextBackup.start();
+
+      expect(remote.putCalls, 1, reason: '状态字段变化不应再次上传');
+      nextBackup.dispose();
+    });
+
+    test('旧版轻量检查点安全迁移为一次全量指纹上传', () async {
+      await configure(autoIntervalMinutes: 60);
+      await insertWord('serendipity');
+      await store().recordSuccess((lastReviewAt: 0, wordCount: 1));
       final scheduled = <Duration>[];
       final backup = auto(scheduled: scheduled);
 
       now += 61 * minuteMs;
       await backup.start();
 
-      expect(remote.putCalls, 1, reason: '手动那次之后不该再传');
+      expect(remote.putCalls, 1);
+      expect(
+        (await store().load()).state.lastCheckpoint,
+        matches(RegExp(r'^sha256:[0-9a-f]{64}$')),
+      );
+      backup.dispose();
+
+      now += 61 * minuteMs;
+      final nextCycle = auto(scheduled: <Duration>[]);
+      await nextCycle.start();
+      expect(remote.putCalls, 1, reason: '旧格式升级后不应重复上传');
+      nextCycle.dispose();
+    });
+
+    test('word_contents 字段变化会触发自动备份', () async {
+      await configure(autoIntervalMinutes: 60);
+      final wordId = await insertWord('serendipity');
+      await db.customStatement(
+        'INSERT INTO word_contents (word_id, definitions_json, updated_at) '
+        'VALUES (?, ?, ?)',
+        <Object?>[wordId, '[{"meaning":"before"}]', now],
+      );
+      await uploader().uploadNow();
+      final scheduled = <Duration>[];
+      final backup = auto(scheduled: scheduled);
+      now += 61 * minuteMs;
+
+      await db.customStatement(
+        'UPDATE word_contents SET definitions_json = ?, updated_at = ? '
+        'WHERE word_id = ?',
+        <Object?>['[{"meaning":"after"}]', now, wordId],
+      );
+      await backup.start();
+
+      expect(remote.putCalls, 2);
+      backup.dispose();
+    });
+
+    test('同一行数的词条替换、设置与任务变化都会触发上传', () async {
+      await configure(autoIntervalMinutes: 60);
+      final wordId = await insertWord('serendipity');
+      await uploader().uploadNow();
+
+      Future<void> expectChangedUpload(
+        Future<void> Function() mutate,
+        int expectedCalls,
+      ) async {
+        now += 61 * minuteMs;
+        await mutate();
+        final scheduled = <Duration>[];
+        final backup = auto(scheduled: scheduled);
+        await backup.start();
+        expect(remote.putCalls, expectedCalls);
+        backup.dispose();
+      }
+
+      await expectChangedUpload(() async {
+        await db.customStatement(
+          'UPDATE words SET term = ?, normalized_term = ?, updated_at = ? '
+          'WHERE id = ?',
+          <Object?>['changed-term', 'changed-term', now, wordId],
+        );
+      }, 2);
+      await expectChangedUpload(() async {
+        await harness.write(<String, Object?>{
+          'backupFingerprintProbe': <String, Object?>{'value': 'changed'},
+        });
+      }, 3);
+      await expectChangedUpload(() async {
+        await db
+            .into(db.initializationJobs)
+            .insert(
+              InitializationJobsCompanion.insert(
+                wordId: wordId,
+                mode: InitializationMode.fillMissingFields,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+      }, 4);
+    });
+
+    test('PUT 前数据再变化时只记录上传快照的指纹', () async {
+      await configure(autoIntervalMinutes: 60);
+      await insertWord('serendipity');
+      await uploader().uploadNow();
+      await db.customStatement(
+        'UPDATE words SET term = ? WHERE normalized_term = ?',
+        <Object?>['first-change', 'serendipity'],
+      );
+      final scheduled = <Duration>[];
+      final snapshotExporter = BackupExporter(db);
+      now += 61 * minuteMs;
+      final snapshot = await snapshotExporter.exportToJson(
+        includeFingerprint: true,
+      );
+      final lateMutationRemote = FakeRemoteBackupClient()
+        ..beforePut = () async {
+          await db.customStatement(
+            'UPDATE words SET term = ? WHERE normalized_term = ?',
+            <Object?>['changed-after-snapshot', 'serendipity'],
+          );
+        };
+      final uploadService = uploaderWithRemote(lateMutationRemote);
+      final stateStore = store();
+      final backup = WebdavAutoBackup(uploadService, stateStore, () => now, (
+        _,
+        onElapsed,
+      ) {
+        scheduled.add(const Duration(milliseconds: 1));
+        return timer;
+      });
+
+      await backup.start();
+
+      expect(lateMutationRemote.putCalls, 1);
+      expect(
+        (await stateStore.load()).state.lastCheckpoint,
+        'sha256:${snapshot.fingerprint}',
+      );
+      expect(
+        (await snapshotExporter.exportToJson(includeFingerprint: true))
+            .fingerprint,
+        isNot(snapshot.fingerprint),
+      );
       backup.dispose();
     });
 

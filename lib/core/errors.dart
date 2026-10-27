@@ -183,6 +183,12 @@ enum AppErrorCode {
   /// WebDAV 返回了其他非 2xx 状态。
   webdavRequestFailed('WEBDAV_REQUEST_FAILED', 'WebDAV 请求失败，请稍后重试。'),
 
+  /// 自动备份或上传过程中出现未被网络层归类的异常。
+  webdavUnexpectedFailure(
+    'WEBDAV_UNEXPECTED_FAILURE',
+    '备份时发生意外错误，请检查本地数据与远端连接后重试。',
+  ),
+
   /// WebDAV 上的目标不存在（备份文件或目录已被删除 / 改名）。
   webdavNotFound('WEBDAV_NOT_FOUND', '远端目标不存在，可能已被删除或改名。'),
 

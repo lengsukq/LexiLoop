@@ -30,10 +30,17 @@ class WebdavStateStore {
   ///
   /// 同时清掉上次的失败原因：状态行若还挂着「上次失败」，
   /// 用户会以为最新的那次也失败了。
-  Future<void> recordSuccess(DataCheckpoint checkpoint) => _write(
+  Future<void> recordSuccess(DataCheckpoint checkpoint) =>
+      _recordSuccess(checkpointWire(checkpoint));
+
+  /// Record a successful upload using the fingerprint of its exported snapshot.
+  Future<void> recordFingerprintSuccess(String fingerprint) =>
+      _recordSuccess(fingerprintCheckpointWire(fingerprint));
+
+  Future<void> _recordSuccess(String checkpoint) => _write(
     (state) => state.copyWith(
       lastSuccessAt: _clock(),
-      lastCheckpoint: checkpointWire(checkpoint),
+      lastCheckpoint: checkpoint,
       clearError: true,
     ),
   );

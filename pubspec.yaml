@@ -14,6 +14,7 @@ dependencies:
   # drift >= 2.32 配合 sqlite3 3.x 会通过 Dart build hooks 自动打包 SQLite，
   # 因此不再需要 sqlite3_flutter_libs（该包自 0.6.0 起已废弃且不含任何代码）。
   csv: ^8.0.0
+  crypto: ^3.0.7
   drift: ^2.35.2
   path: ^1.9.1
   path_provider: ^2.1.6

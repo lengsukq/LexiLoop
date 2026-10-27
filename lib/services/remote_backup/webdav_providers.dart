@@ -8,7 +8,6 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
-import 'package:lexiloop/data/db/daos/backup_checkpoint_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/data/remote_backup/remote_backup_client.dart';
 import 'package:lexiloop/data/remote_backup/webdav_client.dart';
@@ -17,12 +16,6 @@ import 'package:lexiloop/services/remote_backup/webdav_auto_backup.dart';
 import 'package:lexiloop/services/remote_backup/webdav_restore_service.dart';
 import 'package:lexiloop/services/remote_backup/webdav_state_store.dart';
 import 'package:lexiloop/services/remote_backup/webdav_upload_service.dart';
-
-/// 数据检查点查询。
-final Provider<BackupCheckpointDao> backupCheckpointDaoProvider =
-    Provider<BackupCheckpointDao>(
-      (ref) => BackupCheckpointDao(ref.watch(databaseProvider)),
-    );
 
 /// 远端备份设置的读写。
 final Provider<WebdavStateStore> webdavStateStoreProvider =
@@ -41,7 +34,6 @@ final Provider<WebdavUploadService> webdavUploadServiceProvider =
         ref.watch(backupExporterProvider),
         ref.watch(remoteBackupClientFactoryProvider),
         ref.watch(webdavStateStoreProvider),
-        ref.watch(backupCheckpointDaoProvider),
       ),
     );
 
@@ -63,7 +55,6 @@ final Provider<WebdavAutoBackup> webdavAutoBackupProvider =
     Provider<WebdavAutoBackup>((ref) {
       final backup = WebdavAutoBackup(
         ref.watch(webdavUploadServiceProvider),
-        ref.watch(backupCheckpointDaoProvider),
         ref.watch(webdavStateStoreProvider),
       );
       ref.onDispose(backup.dispose);

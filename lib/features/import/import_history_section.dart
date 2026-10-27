@@ -136,8 +136,11 @@ class _BatchTileState extends ConsumerState<_BatchTile> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('撤销这次导入？'),
         content: Text(
+          '来源文件：${widget.batch.filename}\n'
+          '创建时间：${_formatTimestamp(widget.batch.createdAt)}\n'
           '将删除本批次新增的 ${widget.batch.createdWords} 个词条及其内容。\n'
-          '已经产生学习记录的词条不会被删除，届时会给出提示。',
+          '如果其中任何词条存在学习记录或会话依赖，系统将拒绝整批撤销，'
+          '不会部分删除。',
         ),
         actions: <Widget>[
           TextButton(

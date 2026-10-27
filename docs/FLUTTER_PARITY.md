@@ -1,6 +1,6 @@
 # LexiLoop：Next.js 原版 → Flutter 版功能对照表
 
-> 对照基准：`main` 分支的 Next.js 实现（`src/`）。
+> 对照基准：`main` 分支的 Next.js 实现（`src/`），固定于 `14c3048a2464003980eb8e164f73d408b49c3095`（2026-10-17）。
 > 被对照实现：`flutter` 分支（`lib/`）。
 > 判定方式：逐条读旧版实现，再在 Flutter 侧找对应实现并用文件证据确认；**不以文档自述为准**。
 
@@ -10,11 +10,11 @@
 
 | 项 | 结论 |
 |---|---|
-| 用户可见能力总数（本表逐条列出） | 78 条 |
+| 用户可见能力总数（本表逐条列出，含本版新增） | 114 条 |
 | 已对齐 | 见 §2–§10 各表 |
 | **刻意舍弃**（有明确理由，不算缺口） | 5 条，见 §11 |
 | **已知差异**（能做但选择不做 / 形态不同） | 见 §12 |
-| **刻意偏离旧版视觉**（视觉体系重新设计） | 3 处，见 §13 |
+| **刻意偏离旧版视觉**（视觉体系重新设计） | 8 处，见 §13 |
 
 判定标准是「旧版用户能做的事，Flutter 版也能做」；内部实现形态（服务端 → 本地、PostgreSQL → SQLite、API 路由 → 服务调用）不计入差异。
 
@@ -105,7 +105,7 @@
 | 8 种题型的作答控件 | `study/study-client.tsx` | 已对齐 | `lib/features/study/**` |
 | 先揭示答案、再四档自评 | 同上 | 已对齐 | `study_reveal.dart`、`study_rating.dart` |
 | 四档自评即提交并自动下一题 | 同上 | 已对齐 | `study_page.dart`（`_submitWith` / `_advance`） |
-| 揭示面板（对错 / 答案 / 释义 / 差异 / 例句） | 同上 | 已对齐（不含 AI 助记与词根） | `study_reveal.dart` |
+| 揭示面板（对错 / 答案 / 释义 / 差异 / 例句 / 已有 AI 助记与词根词缀） | 同上 | **部分对齐**（缺少易混词、句子类词条的句型与表达） | `study_reveal.dart`（揭示后按需读取已存扩展内容） |
 | 选择题揭示答案延迟（可设置） | 同上 | **已实现**（此前设置页可调、学习页未读取） | `study_page.dart`（`_startChoiceGate`）、`study_actions.dart` |
 | 选择题点选项即揭示（不写库） | 同上 | 已对齐 | `study_choice_options.dart` |
 | 拼写题「提示」（渐进式揭示） | `study-client.tsx:55-70,588,732` | 已对齐 | `lib/domain/review/hint.dart`、`lib/features/study/study_hint_bar.dart` |
@@ -136,7 +136,7 @@
 | CSV 导入：选择文件 → 预览 → 三种策略 → 提交 | `add/csv-tab.tsx`、`modules/imports/**` | 已对齐 | `lib/services/csv_import_service.dart`、`lib/features/import/**` |
 | CSV：EasyDict 列名别名与宽松匹配 | `modules/imports/normalizer.ts` | 已对齐 | `lib/data/import/**` |
 | CSV：只看问题行过滤 | `add/csv-tab.tsx` | 已对齐 | `lib/features/import/import_preview_table.dart` |
-| CSV：批次历史 + 撤销（含依赖阻断） | `modules/imports/rollback.ts` | 已对齐 | `lib/features/import/import_history_section.dart` |
+| CSV：批次历史 + 撤销（含依赖阻断、确认批次文件名与时间） | `modules/imports/rollback.ts` | 已对齐 | `lib/features/import/import_history_section.dart` |
 | CSV：重置本次已有词条的学习进度 | `api/imports/commit` | 已对齐 | `lib/ui/widgets/reset_progress_option.dart` |
 | 导入完成后的「查看初始化 / 打开单词本 / 继续导入」 | `add/csv-tab.tsx` | 已对齐 | `lib/features/import/import_page.dart`（`_ResultActions`） |
 | CSV 拖拽上传 | `add/csv-tab.tsx` | **已知差异** | 见 §12 |
@@ -216,10 +216,9 @@
 | CSV 拖拽上传 | 旧版支持拖拽到区域，本版只有文件选择器 | 桌面端少一种入口 | 需要引入额外插件（`desktop_drop`），而文件选择器已覆盖同一需求，且移动端没有对应交互；为单一入口引入依赖不划算 |
 | 初始化任务详情的位置 | 旧版在队列页弹窗里看数据源调用记录，本版在词条详情页的「初始化质量」卡里看 | 排查路径不同 | 调用记录属于**词条**的审计信息而不是某个任务的；放在词条上可以从任何入口到达，队列页仍保留任务级的重试次数与失败原因 |
 | 浏览器（Web）端的数据源抓取 | 有道（主/备/发音）、爱词霸在浏览器里被同源策略挡下 | Web 端这几个数据源不可用 | 浏览器不允许网页跨域抓取第三方页面，除非自建代理；本版不搭代理，而是抛出 `BROWSER_CORS_BLOCKED` 并提示改用桌面/移动端。**实测**（Chromium 149 + release 产物）：Merriam-Webster 词典 API 与音频 CDN、MyMemory、LLM 网关均带 CORS 头可用；`dictionaryapi.dev` 因本机网络不可达未能测定 |
-| 同步 AI 助记 | 旧版学习页可 `sync:true` 当场生成助记，本版统一走初始化队列 | 需要等队列推进 | 同步生成会让一次点按占用一次完整 LLM 往返（默认超时 3 分钟）；统一走队列后，界面不必为它维护第二套加载/超时/降级状态 |
+| 学习揭示里的易混词、句子解析与即时助记生成 | 旧版揭示卡显示易混词和句子类词条的「句型与表达」，也可当场生成/更换助记；本版揭示卡目前显示已存助记、词根与词缀，但没有上述区块或即时生成入口 | 学习时少看到易混提醒与句子解析；缺少直接生成/更换助记入口 | 会话继续只按需读取单个词条已存的助记与构词字段，不把整张 `word_contents` 拖进 45 题会话；即时生成入口可单独评估队列/请求状态与失败降级体验 |
 | 单条例句的同步翻译 | 旧版 `translateExample` 直接返回译文，本版入队 `EXAMPLE_TRANSLATIONS` | 需要等队列推进 | 同上；且批量与单条共用同一条翻译路径，避免两套实现给出两种译文 |
 | 学习页题库为空时的行为 | 旧版无选项的题只能「稍后再学」，本版保留同样的限制 | — | 语义一致，仅记录以免被误认为缺陷 |
-| 揭示面板不显示 AI 助记 / 词根词缀 | 旧版揭示后可从 `DictionaryContent.learning` / `roots` / `affixes` 取；本版 `StudyWordView` 不加载这些字段 | 揭示面板只有词条、音标、释义、例句与差异 | 学习会话不应把整张 `word_contents` 拖进内存（一次 45 题）；助记与词根属于词条详情/补全队列，单独排期接入 |
 | 自动朗读的题型范围 | 旧版只跳过三种选择题，导致「根据释义拼写英文」一进题就把答案念出来 | 本版只在 `enToZh` / `enToZhChoice` / `listeningChoice` / `listeningSpelling` 自动播 | 听到发音不会泄露答案才自动播；其余题型仍可手动点朗读 |
 
 ---

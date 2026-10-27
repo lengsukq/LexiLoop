@@ -57,6 +57,7 @@ app.*.map.json
 .vercel/
 .zcode/
 .claude/
+.coding-tools/
 *.tsbuildinfo
 test-results/
 

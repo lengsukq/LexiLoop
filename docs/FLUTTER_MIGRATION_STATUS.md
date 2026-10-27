@@ -117,7 +117,7 @@ flutter build web --release          # Web 目标
 | 设置页（6 个 tab） | `lib/features/settings/**` |
 | 游戏 / 配对 / 音标 | `lib/features/{games,match,phonetics}/**` |
 
-逐条功能对照见 [`FLUTTER_PARITY.md`](FLUTTER_PARITY.md)（78 条能力 + 5 条刻意舍弃 + 已知差异）。
+逐条功能对照见 [`FLUTTER_PARITY.md`](FLUTTER_PARITY.md)（用户可见能力、刻意舍弃项与已知差异详见对照表）。
 
 ---
 

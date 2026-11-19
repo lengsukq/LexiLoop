@@ -203,7 +203,7 @@
 |---|---|---|---|
 | 密码登录门 | `app/login/**` + `api/auth/login` + 服务端会话 | 无 | 单用户纯本地应用没有账号概念；数据就在本机，登录门只增加一次无意义的输入 |
 | 腾讯云 TMT 翻译 provider | `modules/dictionary/providers/tencent-translate.ts` + TC3 签名 | 无 | 需要把 SecretKey 内嵌进客户端，反编译即泄露；翻译交给 AI 兜底 |
-| 服务端 TTS 端点与内存 LRU 语义 | `api/tts/route.ts`（Edge TTS WebSocket） | 系统 TTS（`flutter_tts`）+ 真人录音 + 本地 LRU | 纯本地应用没有服务端进程；macOS 的 `flutter_tts` 不支持 `synthesizeToFile`，双端能力不对等 |
+| 常驻的 Node.js TTS 服务端进程 | `api/tts/route.ts`（服务端 Edge TTS WebSocket） | Flutter 内置 Edge TTS 直连 + 系统 TTS + 词典 MP3 + 可选复用 Next.js `/api/tts`，本地 LRU 缓存 | 纯本地应用不内置 Node.js 服务端；自建 Next.js 地址不是使用 Edge TTS 的前提 |
 | 服务端预览表（`manual_previews` / `import_previews` 的令牌与 TTL） | `modules/manual/storage.ts`、`modules/imports/preview.ts` | 手动批量预览**存内存**（带 TTL，重启即失效）；CSV 预览落 `import_batches` | 单用户单进程没有并发认领问题，令牌与 TTL 是为多请求竞争服务的 |
 | 固定服务端时区 `APP_TIMEZONE=Asia/Shanghai` | `lib/date-key.ts` | 设备本地时区 | 纯本地应用没有服务端时区概念 |
 

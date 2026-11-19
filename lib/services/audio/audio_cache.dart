@@ -36,6 +36,15 @@ class AudioCache {
   /// 当前已缓存的条目数。
   int get length => _entries.length;
 
+  /// 仅取已经下载好的音频，不等待网络中的请求。
+  /// 学习页自动朗读走这条快路径，避免断网时先等十秒才听到系统语音。
+  Uint8List? peek(Uri url) {
+    final key = url.toString();
+    final bytes = _entries.remove(key);
+    if (bytes != null) _entries[key] = bytes;
+    return bytes;
+  }
+
   /// 取音频字节，命中缓存时完全不联网。
   ///
   /// **从不抛异常**：任何失败都返回 `null`。这是 `preloadBatch`

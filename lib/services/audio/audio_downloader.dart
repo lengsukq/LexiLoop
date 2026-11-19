@@ -10,6 +10,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/services/audio/next_tts_auth.dart';
 
 /// 音频字节下载的抽象。
 abstract interface class AudioDownloadPort {
@@ -23,7 +24,7 @@ final class DioAudioDownloader implements AudioDownloadPort {
   ///
   /// 默认配置照抄旧版 `fetchYoudaoAudio` 的请求头与 10 秒超时
   /// （即 [dictionaryProviderTimeoutMs]），少任何一项都会让播放静默失败。
-  new({Dio? client})
+  new({Dio? client, NextTtsAuthenticatedClient? nextTts})
     : _client =
           client ??
           Dio(
@@ -41,12 +42,21 @@ final class DioAudioDownloader implements AudioDownloadPort {
                 'accept': audioAcceptHeader,
               },
             ),
-          );
+          ),
+      _nextTts = nextTts ?? NextTtsAuthenticatedClient();
 
   final Dio _client;
+  final NextTtsAuthenticatedClient _nextTts;
 
   @override
   Future<Uint8List> download(Uri url) async {
+    if (url.path == '/api/tts') {
+      final bytes = await _nextTts.download(url);
+      if (bytes == null || bytes.isEmpty) {
+        throw const ExternalServiceError(AppErrorCode.providerTransientFailure);
+      }
+      return bytes;
+    }
     final response = await _client.get<List<int>>(url.toString());
     final bytes = response.data;
     if (bytes == null || bytes.isEmpty) {

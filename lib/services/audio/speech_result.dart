@@ -24,6 +24,27 @@ sealed class SpeechResult {
   bool get fellBackToSystemVoice => false;
 }
 
+/// Flutter 客户端直接通过 Edge WebSocket 合成、播放成功。
+final class DirectEdgeVoicePlayed extends SpeechResult {
+  /// 无需 Next.js 参与的语音合成结果。
+  const new();
+}
+
+/// 通过用户配置的 Next.js Edge TTS 返回的 MP3 播放成功。
+final class OnlineVoicePlayed extends SpeechResult {
+  /// 在线合成并播放成功。
+  const new();
+}
+
+/// 用户在设置中明确关闭发音，不属于错误。
+final class SpeechDisabled extends SpeechResult {
+  /// 不需要音频的结果。
+  const new();
+
+  @override
+  bool get played => false;
+}
+
 /// 播放的是词典提供的真人录音。
 final class HumanRecordingPlayed extends SpeechResult {
   /// 以固定值构造。

@@ -12,12 +12,12 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/features/settings/ai/bounded_number_field.dart';
 import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
-import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
 
 /// 推理强度的可选项；空串表示「交给模型自己决定」。
 const List<String> reasoningEffortOptions = <String>[

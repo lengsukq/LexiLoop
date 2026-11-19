@@ -10,6 +10,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/answer_evaluator.dart';
 import 'package:lexiloop/features/study/study_choice_options.dart';
@@ -25,6 +26,7 @@ class StudyAnswerArea extends StatelessWidget {
     required this.revealed,
     required this.onAnswer,
     required this.onCheck,
+    this.definitionStyle = ChoiceDefinitionStyle.full,
     super.key,
   });
 
@@ -43,6 +45,9 @@ class StudyAnswerArea extends StatelessWidget {
   /// 文本题回车检查时回调。
   final VoidCallback onCheck;
 
+  /// 仅控制可见释义长度，不改变选项的原始值。
+  final ChoiceDefinitionStyle definitionStyle;
+
   @override
   Widget build(BuildContext context) {
     if (choiceQuestionTypes.contains(item.questionType)) {
@@ -52,6 +57,7 @@ class StudyAnswerArea extends StatelessWidget {
         selected: answer.isEmpty ? null : answer,
         revealed: revealed,
         onSelect: onAnswer,
+        definitionStyle: definitionStyle,
       );
     }
     // 看词说义没有输入控件：先「显示答案」，再用自评表达记得程度。

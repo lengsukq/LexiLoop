@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/games/game_core.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
@@ -17,10 +18,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 /// 游戏类页面的统一外壳：环境光背景 + 安全区 + 居中的内容宽度。
 class GameScaffold extends StatelessWidget {
   /// 以内容构造。
-  const new({required this.child, this.maxWidth = 760, super.key});
+  const new({required this.child, this.onBack, this.maxWidth = 760, super.key});
 
   /// 页面内容。
   final Widget child;
+
+  /// Android 系统返回和桌面后退的处理方式，由当前游戏阶段决定。
+  final VoidCallback? onBack;
 
   /// 内容最大宽度（macOS 宽窗口下避免元素被拉到屏幕两端）。
   final double maxWidth;
@@ -29,20 +33,32 @@ class GameScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     // 背景由顶层路由的包装统一画（`app/router.dart` 的 `_capped`）：
     // 这里再画一层会让小游戏/配对/音标比其他页光斑更浓。
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                LexiSpace.s16,
-                LexiSpace.s12,
-                LexiSpace.s16,
-                LexiSpace.s16,
+    return PopScope<Object?>(
+      // 顶层沉浸路由通常不能 pop。阻止 Android 将返回键解释为退出应用。
+      canPop: GoRouter.maybeOf(context) == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (onBack != null) {
+          onBack!();
+        } else {
+          GoRouter.maybeOf(context)?.go('/');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  LexiSpace.s16,
+                  LexiSpace.s12,
+                  LexiSpace.s16,
+                  LexiSpace.s16,
+                ),
+                child: child,
               ),
-              child: child,
             ),
           ),
         ),

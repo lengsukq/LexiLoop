@@ -24,12 +24,12 @@ import 'package:lexiloop/features/settings/ai/llm_settings_codec.dart';
 import 'package:lexiloop/features/settings/ai/model_picker_dialog.dart';
 import 'package:lexiloop/features/settings/ai/provider_card.dart';
 import 'package:lexiloop/features/settings/ai/provider_editor_dialog.dart';
-import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 「AI 模型」分组。

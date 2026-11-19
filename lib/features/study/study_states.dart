@@ -11,8 +11,8 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -79,7 +79,7 @@ class StudyErrorView extends StatelessWidget {
               children: <Widget>[
                 ConstrainedBox(
                   constraints: const BoxConstraints(
-                    minHeight: studyButtonHeight,
+                    minHeight: LexiLayout.buttonHeight,
                     minWidth: 120,
                   ),
                   child: OutlinedButton(
@@ -90,7 +90,7 @@ class StudyErrorView extends StatelessWidget {
                 const SizedBox(width: LexiSpace.s12),
                 ConstrainedBox(
                   constraints: const BoxConstraints(
-                    minHeight: studyButtonHeight,
+                    minHeight: LexiLayout.buttonHeight,
                     minWidth: 120,
                   ),
                   child: FilledButton(

@@ -9,11 +9,12 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_progress_bar.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -52,7 +53,7 @@ class StudyCheckActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: studyButtonHeight),
+      constraints: const BoxConstraints(minHeight: LexiLayout.buttonHeight),
       child: FilledButton(
         onPressed: canCheck ? onCheck : null,
         child: Text(primaryLabel),
@@ -60,7 +61,7 @@ class StudyCheckActions extends StatelessWidget {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= studyWideMinWidth;
+        final wide = constraints.maxWidth >= LexiLayout.compactBreakpoint;
         final secondary = _secondaryRow(context);
         if (wide) {
           return Row(
@@ -93,7 +94,7 @@ class StudyCheckActions extends StatelessWidget {
     final colors = context.lexiColors;
     return <Widget>[
       ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+        constraints: const BoxConstraints(minHeight: LexiLayout.minTapTarget),
         child: OutlinedButton.icon(
           onPressed: onSkip,
           icon: const Icon(LucideIcons.clock, size: 16),
@@ -103,7 +104,7 @@ class StudyCheckActions extends StatelessWidget {
       if (onForget != null) ...<Widget>[
         const SizedBox(width: LexiSpace.s8),
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+          constraints: const BoxConstraints(minHeight: LexiLayout.minTapTarget),
           child: OutlinedButton.icon(
             onPressed: onForget,
             style: OutlinedButton.styleFrom(
@@ -141,7 +142,7 @@ class StudyChoiceActions extends StatelessWidget {
     return Row(
       children: <Widget>[
         ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+          constraints: const BoxConstraints(minHeight: LexiLayout.minTapTarget),
           child: OutlinedButton.icon(
             onPressed: onSkip,
             icon: const Icon(LucideIcons.clock, size: 16),
@@ -205,18 +206,14 @@ class StudyChoiceGate extends StatelessWidget {
             ],
           ),
           const SizedBox(height: LexiSpace.s10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(LexiRadius.xs),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0, 1),
-              minHeight: LexiSpace.s4,
-            ),
-          ),
+          LexiProgressBar(value: progress, height: LexiSpace.s4),
           const SizedBox(height: LexiSpace.s10),
           Align(
             alignment: Alignment.centerLeft,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+              constraints: const BoxConstraints(
+                minHeight: LexiLayout.minTapTarget,
+              ),
               child: TextButton.icon(
                 onPressed: onRevealNow,
                 icon: const Icon(LucideIcons.eye, size: 16),

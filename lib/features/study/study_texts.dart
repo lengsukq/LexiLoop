@@ -10,6 +10,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 
 /// 一分钟的秒数。
@@ -29,6 +30,25 @@ const String studyHintPendingText = '已使用提示，本题将按「模糊」�
 
 /// 使用提示后的说明文案（已揭示答案时）。
 const String studyHintRevealedText = '已使用提示，建议选择「模糊」';
+
+/// 学习时用的释义摘要；保留原始 option 值进行选择、判题与数据提交。
+/// 只在展示时缩短，不修改词库，也不影响正确项匹配。
+String studyChoicePreview(String original, ChoiceDefinitionStyle style) {
+  if (style == ChoiceDefinitionStyle.full) return original;
+  final count = style == ChoiceDefinitionStyle.compact ? 2 : 4;
+  final maxLength = style == ChoiceDefinitionStyle.compact ? 48 : 96;
+  final pieces = original
+      .split(RegExp('[；;]'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .take(count)
+      .toList();
+  final summary = pieces.isEmpty ? original : pieces.join('；');
+  if (summary.length <= maxLength) {
+    return summary.length < original.trim().length ? '$summary…' : summary;
+  }
+  return '${summary.substring(0, maxLength).trimRight()}…';
+}
 
 /// 把 FSRS 间隔天数格式化为评级按钮下方的短文案。
 ///

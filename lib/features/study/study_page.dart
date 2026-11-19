@@ -36,7 +36,6 @@ import 'package:lexiloop/features/study/study_answer.dart';
 import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_hint_bar.dart';
 import 'package:lexiloop/features/study/study_interval_preview.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_progress_header.dart';
 import 'package:lexiloop/features/study/study_prompt.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
@@ -47,6 +46,7 @@ import 'package:lexiloop/features/study/study_states.dart';
 import 'package:lexiloop/features/study/study_summary.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/fsrs_scheduler.dart';
+import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
@@ -66,9 +66,6 @@ const List<LogicalKeyboardKey> _numberKeys = <LogicalKeyboardKey>[
 /// 选择题倒计时的刷新间隔（毫秒）。
 const int _choiceTickMs = 80;
 
-/// 揭示后把面板滚进视野的时长（毫秒）。
-const int _revealScrollMs = 220;
-
 /// 学习会话页面。
 ///
 /// 学习页在 `immersivePaths` 内，外壳不渲染底部导航，因此返回与进度条都由
@@ -83,26 +80,38 @@ class StudyPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(studySessionProvider);
+    final router = GoRouter.maybeOf(context);
     final accent =
         ref.watch(appSettingsProvider).value?.playback.defaultAccent ??
         Accent.us;
 
-    return session.when(
-      loading: () =>
-          StudySessionBody(mode: mode, session: null, accent: accent),
-      error: (error, _) => PageShell(
-        maxWidth: LexiLayout.immersiveMaxWidth,
-        child: StudyErrorView(
-          message: studyErrorMessage(error),
-          // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
-          // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
-          onRetry: () => ref.invalidate(studySessionProvider),
-          // 沉浸路由上没有导航外壳可以依赖，这一条是唯一的退路。
-          onExit: () => leaveStudyToHome(context),
+    // /study 是 StatefulShellRoute 的分支根，Android 返回键无法 pop，
+    // 会直接走系统退出应用。将系统返回统一解释为离开学习回首页。
+    return PopScope<Object?>(
+      canPop: router == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || router == null) return;
+        if (router.routeInformationProvider.value.uri.path != '/study') return;
+        stopStudySpeech(ref);
+        leaveStudyToHome(context);
+      },
+      child: session.when(
+        loading: () =>
+            StudySessionBody(mode: mode, session: null, accent: accent),
+        error: (error, _) => PageShell(
+          maxWidth: LexiLayout.immersiveMaxWidth,
+          child: StudyErrorView(
+            message: studyErrorMessage(error),
+            // 只失效、不直接 `start`：失效后 `data(null)` 会让主体重建并
+            // 在 initState 里启动，直接再调一次 start 会并发开出两个会话。
+            onRetry: () => ref.invalidate(studySessionProvider),
+            // 沉浸路由上没有导航外壳可以依赖，这一条是唯一的退路。
+            onExit: () => leaveStudyToHome(context),
+          ),
         ),
+        data: (view) =>
+            StudySessionBody(mode: mode, session: view, accent: accent),
       ),
-      data: (view) =>
-          StudySessionBody(mode: mode, session: view, accent: accent),
     );
   }
 }
@@ -176,9 +185,6 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   /// 已按下、尚未落库的档位（提交瞬间的高亮）。
   ReviewRating? _pendingRating;
 
-  /// 揭示面板的 key，用于把答案滚进视野。
-  final GlobalKey _revealKey = GlobalKey();
-
   /// 活跃计时器：只统计「答题中且未揭示答案」的前台时间。
   late final StudyClock _clock;
 
@@ -246,6 +252,13 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // 失焦 / 切后台 / 锁屏一律停止累计：只有真正回到前台才可能继续。
     _clock.setVisible(visible: state == AppLifecycleState.resumed);
+    if (state != AppLifecycleState.resumed) {
+      _autoSpeakTimer?.cancel();
+      _autoSpokenItemId = null;
+      stopStudySpeech(ref);
+    } else if (_revealItem == null && _item != null) {
+      _scheduleAutoSpeak(_item!);
+    }
   }
 
   @override
@@ -354,23 +367,31 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
       revealed: _revealItem != null,
       onAnswer: _onAnswer,
       onCheck: _reveal,
+      definitionStyle: _playback.choiceDefinitionStyle,
     );
   }
 
-  /// 揭示面板；只在揭示后且预览已算好时出现。
+  /// 揭示面板；使用 `AnimatedSize` 原位平滑展开，避免移动端页面生硬跳动。
   List<Widget> _revealSection(StudyItemView item) {
     final preview = _preview;
-    if (_revealItem == null || preview == null) return const <Widget>[];
     return <Widget>[
-      const SizedBox(height: LexiSpace.s16),
-      StudyRevealPanel(
-        key: _revealKey,
-        item: item,
-        preview: preview,
-        answer: _answer,
-        usedHint: _usedHint,
-        accent: widget.accent,
-        revealContent: _revealContent,
+      AnimatedSize(
+        duration: LexiMotion.of(context, LexiMotion.standard),
+        curve: LexiMotion.spring,
+        alignment: Alignment.topCenter,
+        child: (_revealItem == null || preview == null)
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.only(top: LexiSpace.s16),
+                child: StudyRevealPanel(
+                  item: item,
+                  preview: preview,
+                  answer: _answer,
+                  usedHint: _usedHint,
+                  accent: widget.accent,
+                  revealContent: _revealContent,
+                ),
+              ),
       ),
     ];
   }
@@ -404,14 +425,16 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
 
   /// 自评条的提示语。
   String _ratingHint(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= studyWideMinWidth;
+    final wide =
+        MediaQuery.sizeOf(context).width >= LexiLayout.compactBreakpoint;
     return wide ? '按 1–4 记录熟悉度，选完自动进入下一题' : '选一档熟悉度，选完自动进入下一题';
   }
 
   /// 选择题动作条的提示语。
   String _choiceHint(BuildContext context) {
     if (!_choicesVisible) return '选项显示后点击作答';
-    final wide = MediaQuery.sizeOf(context).width >= studyWideMinWidth;
+    final wide =
+        MediaQuery.sizeOf(context).width >= LexiLayout.compactBreakpoint;
     return wide ? '点击选项或按 1–4 作答' : '点击选项作答';
   }
 
@@ -487,25 +510,21 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
       _choiceRevealProgress = 1;
     });
     _clock.setEnabled(enabled: false);
+    // 中文提示、拼写与挖空题不能在作答前读出答案；揭示后补读。
+    if (!studyAutoSpeakAllowed(item.questionType)) {
+      _autoSpeakTimer?.cancel();
+      _autoSpeakTimer = Timer(
+        const Duration(milliseconds: studyAutoSpeakDelayMs),
+        () => unawaited(_playAutoSpeak(item, answerRevealed: true)),
+      );
+    }
+    if (preview.isCorrect == false) {
+      LexiHaptics.medium();
+    } else {
+      LexiHaptics.light();
+    }
     unawaited(_loadPreview(item));
     unawaited(_loadRevealContent(item));
-    _scrollRevealIntoView();
-  }
-
-  /// 把揭示面板滚进视野：窄屏上它通常在折叠线以下。
-  void _scrollRevealIntoView() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final revealContext = _revealKey.currentContext;
-      if (revealContext == null) return;
-      Scrollable.ensureVisible(
-        revealContext,
-        duration: LexiMotion.of(
-          context,
-          const Duration(milliseconds: _revealScrollMs),
-        ),
-      );
-    });
   }
 
   /// 按需取回当前词条的已存扩展内容。
@@ -791,19 +810,58 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
         !studyAutoSpeakAllowed(item.questionType)) {
       return;
     }
-    _autoSpokenItemId = item.itemId;
     _autoSpeakTimer?.cancel();
     _autoSpeakTimer = Timer(
       const Duration(milliseconds: studyAutoSpeakDelayMs),
-      () {
-        if (!mounted) return;
-        studyAutoSpeak(
-          speaker: ref.read(wordSpeakerProvider),
-          playback: playback,
-          accent: widget.accent,
-          item: item,
-        );
-      },
+      () => unawaited(_playAutoSpeak(item)),
+    );
+  }
+
+  Future<void> _playAutoSpeak(
+    StudyItemView item, {
+    bool answerRevealed = false,
+  }) async {
+    if (!mounted) return;
+    // 设置只从与手动朗读一致的响应式 provider 读取。
+    PlaybackSettings latest;
+    try {
+      latest = (await ref.read(appSettingsProvider.future)).playback;
+    } on Object {
+      return;
+    }
+    if (!mounted ||
+        _item?.itemId != item.itemId ||
+        !latest.autoPlayPronunciation ||
+        (_revealItem != null) != answerRevealed ||
+        _autoSpokenItemId == item.itemId) {
+      return;
+    }
+    _autoSpokenItemId = item.itemId;
+    String? warning;
+    try {
+      warning = await studyAutoSpeak(
+        speaker: ref.read(wordSpeakerProvider),
+        playback: latest,
+        accent: widget.accent,
+        item: item,
+        answerRevealed: answerRevealed,
+      );
+    } on Object {
+      warning = '自动朗读失败，请检查发音设置';
+    }
+    if (!mounted || warning == null || _item?.itemId != item.itemId) return;
+    _showAutoSpeakWarning(warning);
+  }
+
+  void _showAutoSpeakWarning(String warning) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(warning),
+        action: SnackBarAction(
+          label: '发音设置',
+          onPressed: () => context.go('/settings'),
+        ),
+      ),
     );
   }
 
@@ -937,5 +995,9 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   ///
   /// 无路由器时（部分 widget 测试直接 `home: StudyPage(...)`）退回出栈，
   /// 保持这些测试的可运行性。
-  void _leaveToHome() => leaveStudyToHome(context);
+  void _leaveToHome() {
+    _autoSpeakTimer?.cancel();
+    stopStudySpeech(ref);
+    leaveStudyToHome(context);
+  }
 }

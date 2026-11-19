@@ -38,12 +38,20 @@ class AddPage extends StatelessWidget {
   const new({super.key});
 
   @override
-  Widget build(BuildContext context) => const PageShell(
+  Widget build(BuildContext context) => PageShell(
     scrollable: true,
     // 表单页收窄到阅读列宽：铺满 1040 时，输入框、分段控件都长到
     // 一眼看不完，而字段内容只有几个字。与设置页同一个宽度。
-    header: PageHeader(title: '添加词条', subtitle: '手动录入，或从已有内容导入。'),
-    child: AdaptiveColumns(
+    header: PageHeader(
+      title: '添加词条',
+      subtitle: '手动录入，或从已有内容导入。',
+      leading: backButton(
+        context,
+        fallbackLocation: wordsPath,
+        tooltip: '返回单词本',
+      ),
+    ),
+    child: const AdaptiveColumns(
       primary: _ManualSection(),
       secondary: _ArticleImportCard(),
     ),
@@ -193,16 +201,23 @@ class _CreatedCard extends StatelessWidget {
           ),
           const SizedBox(height: LexiSpace.s6),
           Text(
-            '词条 ID：$wordId。可以在「词库」里找到它。',
+            '词条已加入单词本，可在「单词本」中查看或补充例句。',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: LexiSpace.s14),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              onPressed: onAddAnother,
-              child: const Text('继续添加'),
-            ),
+          Wrap(
+            spacing: LexiSpace.s10,
+            runSpacing: LexiSpace.s8,
+            children: <Widget>[
+              FilledButton(
+                onPressed: onAddAnother,
+                child: const Text('继续添加'),
+              ),
+              OutlinedButton(
+                onPressed: () => context.go('$wordDetailPathPrefix$wordId'),
+                child: const Text('查看词条'),
+              ),
+            ],
           ),
         ],
       ),

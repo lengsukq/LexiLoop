@@ -15,19 +15,13 @@ import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
 import 'package:lexiloop/ui/widgets/inline_notice.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// 可开局的小游戏（配对与音标不在本页）。
-///
-/// 顺序与旧版 `GAME_MODES` 一致，方便与旧界面逐格对照。
+/// 可开局的小游戏（精选保留核心拼词训练）。
 const List<GameMode> miniGameModes = <GameMode>[
   GameMode.wordBuilder,
-  GameMode.listeningPick,
-  GameMode.meaningBlitz,
-  GameMode.whackAMole,
-  GameMode.wordStack,
-  GameMode.wordTetris,
 ];
 
 /// 每个模式的副标题（旧版 `GAME_CONFIG[mode].subtitle`）。
@@ -83,18 +77,10 @@ class GamesSetupView extends StatelessWidget {
     final loading = state.loadingMode != null;
     return ListView(
       children: <Widget>[
-        Text(
-          '趣味训练',
-          style: LexiType.page.copyWith(
-            color: colors.label,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: LexiSpace.s4),
-        Text(
-          '独立于每日复习队列。错词、近期忘记和模糊的词会优先出现。',
-          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+        PageHeader(
+          title: '趣味训练',
+          subtitle: '独立于每日复习队列。错词、近期忘记和模糊的词会优先出现。',
+          leading: backButton(context, preferPop: false, fallbackLocation: '/'),
         ),
         const SizedBox(height: LexiSpace.s16),
         LayoutBuilder(

@@ -9,8 +9,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_haptics.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -84,17 +85,20 @@ class _LetterBankState extends State<LetterBank> {
   bool _isPicked(LetterTile tile) => _picked.any((item) => item.id == tile.id);
 
   void _pick(LetterTile tile) {
+    LexiHaptics.light();
     setState(() => _picked.add(tile));
     widget.onAnswer(_spelled);
   }
 
   void _backspace() {
     if (_picked.isEmpty) return;
+    LexiHaptics.selection();
     setState(_picked.removeLast);
     widget.onAnswer(_spelled);
   }
 
   void _clear() {
+    LexiHaptics.selection();
     setState(_picked.clear);
     widget.onAnswer(_spelled);
   }
@@ -153,8 +157,8 @@ class _LetterTileButton extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(LexiRadius.sm),
         child: Container(
-          width: studyMinTapTarget,
-          height: studyMinTapTarget,
+          width: LexiLayout.minTapTarget,
+          height: LexiLayout.minTapTarget,
           alignment: Alignment.center,
           child: Text(
             tile.value,
@@ -186,7 +190,7 @@ class _SmallAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+      constraints: const BoxConstraints(minHeight: LexiLayout.minTapTarget),
       child: OutlinedButton.icon(
         onPressed: enabled ? onTap : null,
         icon: Icon(icon, size: 16),

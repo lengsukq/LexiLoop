@@ -12,12 +12,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/enums.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
 
 /// 拿不到间隔预览时的占位符。
 ///
@@ -59,7 +60,8 @@ class StudyRatingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     // 窄屏 2×2：四档挤在一行时标签与间隔都会缩到读不清，拇指也按不准。
-    final columns = MediaQuery.sizeOf(context).width >= studyWideMinWidth
+    final columns =
+        MediaQuery.sizeOf(context).width >= LexiLayout.compactBreakpoint
         ? ReviewRating.values.length
         : 2;
     return Column(
@@ -172,55 +174,45 @@ class _RatingButton extends StatelessWidget {
     // 四档标签是页面上**唯一**的操作指引，而 tertiary 压在 `fill` 上只有
     // 1.74:1，间隔行再乘 0.75 透明度后只剩 1.50:1——最该读清的字反而最浅。
     final dimmed = !enabled && !selected;
-    final foreground = dimmed ? colors.quaternaryLabel : tint;
-    final background = dimmed
-        ? colors.fill
-        : tint.withValues(alpha: selected ? LexiTint.tint : LexiTint.subtle);
+    final foreground = dimmed ? colors.secondaryLabel : colors.label;
+    final background = selected
+        ? tint.withValues(alpha: LexiTint.tint)
+        : colors.card;
 
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 48),
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(LexiRadius.md),
-              border: Border.all(
-                color: foreground.withValues(
-                  alpha: selected ? LexiTint.half : LexiTint.border,
+      child: LexiPressable(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(LexiRadius.lg),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(LexiRadius.lg),
+            border: Border.all(color: selected ? tint : colors.borderSubtle),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                studyRatingLabel(rating),
+                style: LexiType.callout.copyWith(
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  studyRatingLabel(rating),
-                  style: LexiType.callout.copyWith(
-                    color: foreground,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
+              const SizedBox(height: LexiSpace.s2),
+              Text(
+                interval,
+                key: Key('study.rating.interval.${rating.wire}'),
+                style: LexiType.caption.copyWith(
+                  color: selected ? tint : colors.secondaryLabel,
                 ),
-                const SizedBox(height: LexiSpace.s2),
-                // 间隔预览是「这一档会排到什么时候」的唯一线索，也是旧版
-                // 揭示答案时唯一会变的东西——按钮上必须给它留一行。
-                //
-                // 不再乘透明度：它叠在已经压暗的前景色上会掉到 1.5:1 左右，
-                // 而这一行正是用户决定「选哪档」时要看的信息。
-                Text(
-                  interval,
-                  key: Key('study.rating.interval.${rating.wire}'),
-                  style: LexiType.caption.copyWith(color: foreground),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

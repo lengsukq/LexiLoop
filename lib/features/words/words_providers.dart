@@ -9,15 +9,15 @@ import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/backup_service.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
+
+export 'package:lexiloop/ui/navigation/route_paths.dart' show statisticsPath;
 
 /// 手动添加词条页的路径。
 ///
 /// 与 `appDestinations` 里的 `/add` 对应；集中具名是为了让「入口按钮」
 /// 与「路由断言」写的是同一个字符串。
-const String addWordPath = '/add';
-
-/// 统计页的路径。
-const String statisticsPath = '/statistics';
+const String addWordPath = addPath;
 
 /// 备份导入服务。
 final Provider<BackupService> backupServiceProvider = Provider<BackupService>(
@@ -99,14 +99,20 @@ class WordQueryNotifier extends Notifier<WordQuery> {
     ),
   );
 
+  /// 触底或点击加载更多（每次追加一页 `wordListPageSize`）。
+  void loadMore() {
+    state = state.copyWith(limit: state.limit + wordListPageSize);
+  }
+
   /// 翻到指定页（1 起）。
   void goToPage(int page) {
     if (page < 1) return;
     state = state.copyWith(offset: (page - 1) * state.limit);
   }
 
-  /// 改完筛选条件后把页码复位。
-  void _apply(WordQuery next) => state = next.copyWith(offset: 0);
+  /// 改完筛选条件后把偏移量与加载条数复位到首屏。
+  void _apply(WordQuery next) =>
+      state = next.copyWith(offset: 0, limit: wordListPageSize);
 }
 
 /// 查询条件提供者。

@@ -94,43 +94,13 @@ final List<PracticeEntry> _focusedEntries = <PracticeEntry>[
   ),
 ];
 
-/// 趣味训练。
+/// 趣味训练（精选保留高记忆价值的单词拼图，移除街机画布与重复快选）。
 const List<PracticeEntry> _gameEntries = <PracticeEntry>[
   PracticeEntry(
     label: '单词拼图',
     subtitle: '点击字母完成拼写',
     icon: LucideIcons.puzzle,
     location: '/games?mode=WORD_BUILDER',
-  ),
-  PracticeEntry(
-    label: '听音辨词',
-    subtitle: '听发音选择词条',
-    icon: LucideIcons.ear,
-    location: '/games?mode=LISTENING_PICK',
-  ),
-  PracticeEntry(
-    label: '词义冲刺',
-    subtitle: '看英文选择释义',
-    icon: LucideIcons.languages,
-    location: '/games?mode=MEANING_BLITZ',
-  ),
-  PracticeEntry(
-    label: '词汇地鼠',
-    subtitle: '锤出正确单词',
-    icon: LucideIcons.hammer,
-    location: '/games?mode=WHACK_A_MOLE',
-  ),
-  PracticeEntry(
-    label: '单词堆堆乐',
-    subtitle: '点词块搭高塔',
-    icon: LucideIcons.layers,
-    location: '/games?mode=WORD_STACK',
-  ),
-  PracticeEntry(
-    label: '词汇俄罗斯方块',
-    subtitle: '点中下落的正确单词',
-    icon: LucideIcons.blocks,
-    location: '/games?mode=WORD_TETRIS',
   ),
 ];
 

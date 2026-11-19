@@ -9,6 +9,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
@@ -22,6 +23,25 @@ import 'package:lexiloop/services/audio/word_speaker.dart';
 /// 与旧版学习页的自动播放、游戏页的 `gameAutoSpeakDelayMs` 同一量级：
 /// 等首帧动画与路由过渡落定，避免声音抢在画面之前。
 const int studyAutoSpeakDelayMs = 220;
+
+/// 离开学习或切后台时停止发音。两种音源分别使用播放器与系统 TTS，
+/// 只停其中一个会出现退出页面后仍继续读词。停止失败不能阻断导航。
+void stopStudySpeech(WidgetRef ref) {
+  Future<void> stopSafely(Future<void> Function() stop) async {
+    try {
+      await stop();
+    } on Object {
+      // 例如测试环境没有原生 TTS 插件，退出时也必须正常返回。
+    }
+  }
+
+  unawaited(
+    Future.wait(<Future<void>>[
+      stopSafely(() => ref.read(wordSpeakerProvider).stop()),
+      stopSafely(() => ref.read(ttsServiceProvider).stop()),
+    ]),
+  );
+}
 
 /// 自动朗读会直接放出答案的题型。
 ///
@@ -72,9 +92,17 @@ Future<String?> studySpeakTerm({
   final result = await speaker.speak(request);
   return switch (result) {
     HumanRecordingPlayed() => null,
-    // 用户自己关掉真人录音时不必提示：那不是降级，是他选的行为。
-    SystemVoicePlayed() => humanAudioEnabled ? '暂无真人录音，已改用系统朗读' : null,
-    SpeechFailed(:final error) => error.message,
+    OnlineVoicePlayed() => null,
+    DirectEdgeVoicePlayed() => null,
+    SpeechDisabled() => null,
+    SystemVoicePlayed() => switch (request.playback.speechSource) {
+      SpeechSource.edge => 'Edge TTS 暂不可用，已改用系统朗读',
+      SpeechSource.online => 'Next.js TTS 暂不可用，已改用系统朗读',
+      SpeechSource.dictionary => '词典录音暂不可用，已改用系统朗读',
+      SpeechSource.automatic => humanAudioEnabled ? '暂无真人录音，已改用系统朗读' : null,
+      SpeechSource.system || SpeechSource.off => null,
+    },
+    SpeechFailed(:final error) => '发音暂不可用：${error.message}',
   };
 }
 
@@ -107,20 +135,25 @@ bool studyAutoSpeakAllowed(QuestionType type) =>
 /// 自动播放是背景行为，不弹「已改用系统朗读」之类的提示：用户并没有点任何
 /// 东西，每换一题冒一条 SnackBar 会把答题节奏切碎。失败也只是没声音，
 /// 页面上仍有朗读按钮可以重试。
-void studyAutoSpeak({
+Future<String?> studyAutoSpeak({
   required WordSpeaker speaker,
   required PlaybackSettings playback,
   required Accent accent,
   required StudyItemView item,
-}) {
-  if (!playback.autoPlayPronunciation) return;
-  if (!studyAutoSpeakAllowed(item.questionType)) return;
+  bool answerRevealed = false,
+}) async {
+  if (!playback.autoPlayPronunciation) return null;
+  if (!answerRevealed && !studyAutoSpeakAllowed(item.questionType)) {
+    return null;
+  }
   speaker.humanAudioEnabled = playback.humanAudioEnabled;
-  unawaited(
-    speaker.speak(
-      studySpeechRequest(word: item.word, accent: accent, playback: playback),
-    ),
+  final result = await speaker.speakForAutoPlay(
+    studySpeechRequest(word: item.word, accent: accent, playback: playback),
   );
+  return switch (result) {
+    SpeechFailed(:final error) => '自动朗读失败：${error.message}',
+    _ => null,
+  };
 }
 
 /// 朗读一个词条，并把「降级 / 失败」提示给用户。
@@ -143,6 +176,19 @@ Future<void> speakStudyWord(
     request: studySpeechRequest(word: word, accent: accent, playback: playback),
     humanAudioEnabled: playback.humanAudioEnabled,
   );
-  if (message == null) return;
-  messenger.showSnackBar(SnackBar(content: Text(message)));
+  if (message == null || !context.mounted) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(message),
+        action: message.startsWith('发音暂不可用')
+            ? SnackBarAction(
+                label: '发音设置',
+                onPressed: () => GoRouter.maybeOf(context)?.go('/settings'),
+              )
+            : null,
+      ),
+    );
 }

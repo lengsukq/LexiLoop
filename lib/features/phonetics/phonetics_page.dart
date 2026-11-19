@@ -3,10 +3,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/phonetics/phonetics_play_view.dart';
 import 'package:lexiloop/features/phonetics/phonetics_providers.dart';
 import 'package:lexiloop/features/phonetics/phonetics_setup_view.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/widgets/settling_indicator.dart';
 
 /// 音标训练页面。
@@ -20,6 +22,16 @@ class PhoneticsPage extends ConsumerWidget {
     final controller = ref.read(phoneticControllerProvider.notifier);
 
     return GameScaffold(
+      onBack: () {
+        if (state is PhoneticSaving) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('正在保存成绩，保存完成后再返回')));
+        } else if (state is PhoneticSetup) {
+          context.go(gamesPath);
+        } else {
+          controller.exit();
+        }
+      },
       child: switch (state) {
         PhoneticSetup() => PhoneticsSetupView(
           state: state,

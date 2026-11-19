@@ -19,8 +19,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
@@ -98,7 +98,7 @@ class _ProgressRing extends StatelessWidget {
   final int planned;
 
   /// 直径——与可点区域下限同值，视觉重量与旁边的按钮一致。
-  static const double diameter = studyMinTapTarget;
+  static const double diameter = LexiLayout.minTapTarget;
 
   /// 环的线宽。
   static const double strokeWidth = 4;
@@ -293,7 +293,7 @@ class _HeaderAction extends StatelessWidget {
     final colors = context.lexiColors;
     return ConstrainedBox(
       constraints: const BoxConstraints(
-        minHeight: studyMinTapTarget,
+        minHeight: LexiLayout.minTapTarget,
         minWidth: 56,
       ),
       child: TextButton(

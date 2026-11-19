@@ -41,6 +41,11 @@ class WordsHeader extends StatelessWidget {
           icon: LucideIcons.upload,
           onPressed: () => context.go(csvImportPath),
         ),
+        PageHeaderAction(
+          label: '内容补全',
+          icon: LucideIcons.sparkles,
+          onPressed: () => context.go(initializePath),
+        ),
       ],
       // 「导入备份」自带导入中状态（转圈），压不进纯动作，因此走 trailing。
       trailing: const ImportBackupButton(),

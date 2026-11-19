@@ -1,20 +1,14 @@
 /// 小游戏进行中的页面。
 ///
-/// 结构：HUD（倒计时/得分/连击/失误）→ 题干与游戏区 → 退出。
-/// 游戏区按运行态类型分派到四个视图之一，每个视图都是纯渲染 +
-/// 动作派发，规则不在这里。
+/// 结构：HUD（倒计时/得分/连击/失误）→ 题干与拼词交互区 → 退出。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/domain/games/game_runtime.dart';
 import 'package:lexiloop/features/games/games_providers.dart';
-import 'package:lexiloop/features/games/widgets/choice_pick_view.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
-import 'package:lexiloop/features/games/widgets/whack_a_mole_view.dart';
 import 'package:lexiloop/features/games/widgets/word_builder_view.dart';
-import 'package:lexiloop/features/games/widgets/word_stack_view.dart';
-import 'package:lexiloop/features/games/widgets/word_tetris_view.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
@@ -77,26 +71,11 @@ class _GameArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (runtime) {
-      ChoicePickRuntime(:final state) => ChoicePickView(
-        state: state,
-        onAction: onAction,
-      ),
-      WhackAMoleRuntime(:final state) => WhackAMoleView(
-        state: state,
-        onAction: onAction,
-      ),
       WordBuilderRuntime(:final state) => WordBuilderView(
         state: state,
         onAction: onAction,
       ),
-      WordStackRuntime(:final state) => WordStackView(
-        state: state,
-        onAction: onAction,
-      ),
-      WordTetrisRuntime(:final state) => WordTetrisView(
-        state: state,
-        onAction: onAction,
-      ),
+      _ => const SizedBox.shrink(),
     };
   }
 }

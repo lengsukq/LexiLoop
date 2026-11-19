@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/games/game_mode.dart';
 import 'package:lexiloop/features/games/games_play_view.dart';
 import 'package:lexiloop/features/games/games_providers.dart';
@@ -57,6 +58,16 @@ class _GamesPageState extends ConsumerState<GamesPage> {
 
     return GameScaffold(
       maxWidth: state is GamesSetup ? 1040 : 760,
+      onBack: () {
+        if (state is GamesSaving) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('正在保存成绩，保存完成后再返回')));
+        } else if (state is GamesSetup) {
+          context.go('/');
+        } else {
+          controller.exit();
+        }
+      },
       child: switch (state) {
         GamesSetup() => GamesSetupView(
           state: state,

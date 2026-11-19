@@ -23,30 +23,24 @@ import 'package:lexiloop/data/remote_backup/remote_backup_entry.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
 import 'package:lexiloop/features/settings/backup_size_label.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
-import 'package:lexiloop/features/settings/settings_controls.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
-import 'package:lexiloop/features/settings/typed_confirm_dialog.dart';
 import 'package:lexiloop/services/remote_backup/webdav_providers.dart';
 import 'package:lexiloop/services/remote_backup/webdav_state_store.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
+import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// 从远端恢复的二次确认关键词。
-///
-/// 比导出更高的门槛：**恢复是全量替换**，本地现有词条与学习记录会被清掉，
-/// 而导出只是读。
-const String restoreConfirmKeyword = 'RESTORE';
+/// 远端恢复确认按钮的稳定 Key。
+const Key restoreFromWebdavConfirmButtonKey = Key(
+  'restoreFromWebdavConfirmButton',
+);
 
 /// 远端备份选择对话框的宽度（固定尺寸，不是间距——不参与 LexiSpace 音阶）。
 const double webdavPickerWidth = 420;
-
-/// 上传前的二次确认关键词。
-///
-/// 比导出低一档（导出本来就要求 EXPORT）：上传读取本地数据并外发一份副本，
-/// 但**不修改任何本地数据**，风险等级与本地导出相同。
-const String uploadConfirmKeyword = 'UPLOAD';
 
 /// 远程备份分组。
 class RemoteBackupSection extends ConsumerStatefulWidget {
@@ -270,22 +264,7 @@ class _RemoteBackupSectionState extends ConsumerState<RemoteBackupSection> {
   }
 
   Future<void> _uploadNow() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => TypedConfirmDialog(
-        title: '上传一份备份到远端？',
-        body:
-            '将把当前全部词条、词典内容、学习记录、导入历史与设置'
-            '导出并上传到：\n${_currentSettings().credential?.baseUrl}\n\n'
-            '备份文件里不含 WebDAV 密码。\n\n'
-            '请输入 $uploadConfirmKeyword 以确认。',
-        keyword: uploadConfirmKeyword,
-        confirmLabel: '上传',
-        keyPrefix: 'uploadToWebdavConfirm',
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
+    LexiHaptics.light();
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _busy = true);
     try {
@@ -307,11 +286,11 @@ class _RemoteBackupSectionState extends ConsumerState<RemoteBackupSection> {
     }
   }
 
-  /// 「从远端恢复」的完整流程：列目录 → 选一份 → 敲关键字 → 下载并导入。
+  /// 「从远端恢复」的完整流程：列目录 → 选一份 → 底部确认 → 下载并导入。
   Future<void> _restoreFromRemote() async {
     final selected = await _pickRemoteBackup();
     if (selected == null || !mounted) return;
-    if (await _confirmRestore(selected) != true || !mounted) return;
+    if (!await _confirmRestore(selected) || !mounted) return;
     await _runRestore(selected);
   }
 
@@ -338,20 +317,18 @@ class _RemoteBackupSectionState extends ConsumerState<RemoteBackupSection> {
   }
 
   /// 恢复前的确认：明说这是不可撤销的整库替换。
-  Future<bool?> _confirmRestore(RemoteBackupEntry selected) => showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => TypedConfirmDialog(
-      title: '用远端备份覆盖本地？',
-      body:
-          '将下载 ${selected.name} 并整体替换本地全部词条、学习记录、'
-          ' 导入历史与设置。当前数据不会保留，也无法撤销。\n\n'
-          '建议先「立即上传一份备份」留个底。\n\n'
-          '请输入 $restoreConfirmKeyword 以确认。',
-      keyword: restoreConfirmKeyword,
-      confirmLabel: '覆盖恢复',
-      keyPrefix: 'restoreFromWebdavConfirm',
-    ),
-  );
+  Future<bool> _confirmRestore(RemoteBackupEntry selected) =>
+      showLexiConfirmSheet(
+        context,
+        title: '用远端备份覆盖本地？',
+        body:
+            '将下载 ${selected.name} 并整体替换本地全部词条、学习记录、'
+            ' 导入历史与设置。当前数据不会保留，也无法撤销。\n\n'
+            '建议先「立即上传一份备份」留个底。',
+        confirmLabel: '覆盖恢复',
+        destructive: true,
+        confirmButtonKey: restoreFromWebdavConfirmButtonKey,
+      );
 
   /// 真正执行恢复；成功后失效全部读库缓存。
   Future<void> _runRestore(RemoteBackupEntry selected) async {

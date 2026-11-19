@@ -13,11 +13,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/domain/review/hint.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_local_verdict.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -205,7 +205,7 @@ class _HintAction extends StatelessWidget {
     final enabled = onTap != null;
     final foreground = enabled ? colors.accent : colors.tertiaryLabel;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: studyMinTapTarget),
+      constraints: const BoxConstraints(minHeight: LexiLayout.minTapTarget),
       child: TextButton.icon(
         onPressed: onTap,
         icon: Icon(icon, size: 16, color: foreground),

@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
 import 'package:lexiloop/ui/widgets/section_card.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -97,7 +98,7 @@ class _PracticeTile extends StatelessWidget {
       variant: SurfaceVariant.inset,
       padding: EdgeInsets.zero,
       borderRadius: radius,
-      child: InkWell(
+      child: LexiPressable(
         borderRadius: radius,
         onTap: () => context.go(entry.location),
         child: Padding(

@@ -20,6 +20,7 @@ import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
 import 'package:lexiloop/ui/widgets/page_header.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
@@ -186,59 +187,32 @@ class _HeaderActionBar extends ConsumerWidget {
 
   /// 「重新生成」的二次确认。
   ///
-  /// 必须确认：它会覆盖现有内容（虽然保留手动编辑的释义与例句），
-  /// 误点一次就要等一次完整的重新抓取。
+  /// 必须确认：它会覆盖现有内容，误点一次就要等一次完整的重新抓取。
   Future<void> _confirmRegenerate(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('重新生成'),
-        // 文案必须与真正传入的模式一致：这里是 `forceOverwrite`，
-        // 会把已有内容整份替换——包括手动改过的释义与例句。
-        // 此前文案写的是「会保留手动释义和例句」，正好说了反话。
-        content: const Text(
+    final confirmed = await showLexiConfirmSheet(
+      context,
+      title: '重新生成',
+      body:
           '重新生成会再次调用 AI，并用返回结果覆盖这个词条的内容，'
           ' 包括你手动改过的释义与例句。这一步不可撤销，确定继续吗？',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('继续'),
-          ),
-        ],
-      ),
+      confirmLabel: '继续',
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     await _initialize(context, ref, InitializationMode.forceOverwrite);
   }
 
   /// 二次确认后删除词条，并退出详情页。
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('删除词条'),
-        content: Text(
+    final confirmed = await showLexiConfirmSheet(
+      context,
+      title: '删除词条',
+      body:
           '确定删除「${detail.term}」吗？'
           '该词条的释义、例句、复习记录与错词状态都会一并删除，且无法恢复。',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+      confirmLabel: '删除',
+      destructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await ref.read(wordDetailActionsProvider).delete(detail.id);
     if (context.mounted) await Navigator.of(context).maybePop();
   }

@@ -24,10 +24,6 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_discovery_port.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
-import 'package:lexiloop/features/settings/remote_backup_section.dart'
-    show restoreConfirmKeyword;
-import 'package:lexiloop/features/settings/settings_controls.dart';
-import 'package:lexiloop/features/settings/typed_confirm_dialog.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_providers.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_pull_service.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_share_service.dart';
@@ -35,7 +31,12 @@ import 'package:lexiloop/services/lan_sync/lan_sync_state_store.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
+import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+/// 局域网覆盖拉取确认按钮的稳定 Key。
+const Key lanSyncPullConfirmButtonKey = Key('lanSyncPullConfirmButton');
 
 /// 设备发现对话框的宽度（固定尺寸，不是间距——不参与 LexiSpace 音阶）。
 const double lanSyncHostPickerWidth = 420;
@@ -504,13 +505,33 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
   );
 
   /// 拉取前的确认；门槛按模式区分。
-  Future<bool?> _confirmPull(DiscoveredLanHost host, LanSyncPullMode mode) =>
-      showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => mode == LanSyncPullMode.merge
-            ? _MergeConfirmDialog(host: host)
-            : _ReplaceConfirmDialog(host: host),
+  Future<bool?> _confirmPull(DiscoveredLanHost host, LanSyncPullMode mode) {
+    if (mode == LanSyncPullMode.merge) {
+      return showLexiConfirmSheet(
+        context,
+        title: '合并 ${_hostLabel(host)} 的数据？',
+        body:
+            '会把对方的词条、词典内容、作答记录与会话历史并进本机。\n\n'
+            '本机现有的数据全部保留；两边都复习过的词，会按合并后的完整'
+            '历史重新排期。\n\n'
+            '凭据（WebDAV 密码、AI Key）与本机的设备名、端口不会被对方覆盖。',
+        confirmLabel: '合并',
+        confirmButtonKey: const Key('lanSyncMergeConfirm'),
       );
+    }
+    return showLexiConfirmSheet(
+      context,
+      title: '用 ${_hostLabel(host)} 的数据覆盖本地？',
+      body:
+          '将下载对方的完整备份，并整体替换本机全部词条、学习记录、'
+          '导入历史与设置。本机当前的数据不会保留，也无法撤销。\n\n'
+          '建议先在「备份与导入」里导出本机备份留个底。\n\n'
+          '如果只是想汇总两台设备的进度，请改用「合并」。',
+      confirmLabel: '覆盖恢复',
+      destructive: true,
+      confirmButtonKey: lanSyncPullConfirmButtonKey,
+    );
+  }
 
   /// 成功后的汇报文案。
   ///
@@ -650,74 +671,6 @@ class _PairingCodeDialogState extends State<_PairingCodeDialog> {
           child: const Text('下一步'),
         ),
       ],
-    );
-  }
-}
-
-/// 合并前的确认。
-///
-/// **不要求敲关键字**：合并不是破坏性的——本机的词条、作答、会话一条都不会
-/// 被删。给一个和「覆盖」同等强度的门槛只会训练用户无脑敲 `RESTORE`。
-class _MergeConfirmDialog extends StatelessWidget {
-  const new({required this.host});
-
-  final DiscoveredLanHost host;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return AlertDialog(
-      title: Text('合并 ${_hostLabel(host)} 的数据？'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const Text(
-            '会把对方的词条、词典内容、作答记录与会话历史并进本机。\n\n'
-            '本机现有的数据全部保留；两边都复习过的词，会按合并后的完整'
-            '历史重新排期。',
-          ),
-          const SizedBox(height: LexiSpace.s8),
-          Text(
-            '凭据（WebDAV 密码、AI Key）与本机的设备名、端口不会被对方覆盖。',
-            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          key: const Key('lanSyncMergeConfirm'),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('合并'),
-        ),
-      ],
-    );
-  }
-}
-
-/// 覆盖前的确认：说清不可撤销，并指出可以先导出一份留底。
-class _ReplaceConfirmDialog extends StatelessWidget {
-  const new({required this.host});
-
-  final DiscoveredLanHost host;
-
-  @override
-  Widget build(BuildContext context) {
-    return TypedConfirmDialog(
-      title: '用 ${_hostLabel(host)} 的数据覆盖本地？',
-      body:
-          '将下载对方的完整备份，并整体替换本机全部词条、学习记录、'
-          '导入历史与设置。本机当前的数据不会保留，也无法撤销。\n\n'
-          '建议先在「备份与导入」里导出本机备份留个底。\n\n'
-          '如果只是想汇总两台设备的进度，请改用「合并」。\n\n'
-          '请输入 $restoreConfirmKeyword 以确认。',
-      keyword: restoreConfirmKeyword,
-      confirmLabel: '覆盖恢复',
-      keyPrefix: 'lanSyncPullConfirm',
     );
   }
 }

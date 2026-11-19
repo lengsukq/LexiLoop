@@ -19,6 +19,7 @@ import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
 import 'package:lexiloop/ui/widgets/status_badges.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -44,34 +45,31 @@ class WordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(LexiRadius.md),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: LexiSpace.s14,
-            vertical: LexiSpace.s12,
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    _CardHeading(entry: entry),
-                    const SizedBox(height: LexiSpace.s4),
-                    _CardMeaning(meaning: entry.meaning),
-                    const SizedBox(height: LexiSpace.s6),
-                    _CardMeta(entry: entry, isDue: isDue),
-                  ],
-                ),
+    return LexiPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(LexiRadius.md),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s14,
+          vertical: LexiSpace.s12,
+        ),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _CardHeading(entry: entry),
+                  const SizedBox(height: LexiSpace.s4),
+                  _CardMeaning(meaning: entry.meaning),
+                  const SizedBox(height: LexiSpace.s6),
+                  _CardMeta(entry: entry, isDue: isDue),
+                ],
               ),
-              const SizedBox(width: LexiSpace.s10),
-              _CardAside(entry: entry),
-            ],
-          ),
+            ),
+            const SizedBox(width: LexiSpace.s10),
+            _CardAside(entry: entry),
+          ],
         ),
       ),
     );
@@ -102,12 +100,12 @@ class _CardHeading extends StatelessWidget {
         if (entry.wrongWordActive)
           const Padding(
             padding: EdgeInsets.only(left: LexiSpace.s6),
-            child: _CardTag(label: '错词', tone: LexiBadgeTone.danger),
+            child: LexiBadge(label: '错词', tone: LexiBadgeTone.danger),
           ),
         if (entry.isSuspended)
           const Padding(
             padding: EdgeInsets.only(left: LexiSpace.s6),
-            child: _CardTag(label: '已暂停', tone: LexiBadgeTone.neutral),
+            child: LexiBadge(label: '已暂停'),
           ),
       ],
     );
@@ -155,7 +153,7 @@ class _CardMeta extends StatelessWidget {
           '${entry.sourceLanguage} → ${entry.targetLanguage}',
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
         ),
-        if (isDue) const _CardTag(label: '到期', tone: LexiBadgeTone.accent),
+        if (isDue) const LexiBadge(label: '到期', tone: LexiBadgeTone.accent),
         if (dueAt != null)
           Text(
             formatDueDate(dueAt),
@@ -257,15 +255,4 @@ class _EditButton extends StatelessWidget {
       ],
     );
   }
-}
-
-/// 卡片上的小徽标（错词 / 已暂停 / 到期）。
-class _CardTag extends StatelessWidget {
-  const new({required this.label, required this.tone});
-
-  final String label;
-  final LexiBadgeTone tone;
-
-  @override
-  Widget build(BuildContext context) => LexiBadge(label: label, tone: tone);
 }

@@ -9,7 +9,6 @@ import 'package:lexiloop/domain/models/word_content_models.dart';
 import 'package:lexiloop/features/word_detail/cards/definitions_card.dart';
 import 'package:lexiloop/features/word_detail/cards/examples_card.dart';
 import 'package:lexiloop/features/word_detail/cards/forms_card.dart';
-import 'package:lexiloop/features/word_detail/cards/initialization_quality_card.dart';
 import 'package:lexiloop/features/word_detail/cards/learning_snapshot_card.dart';
 import 'package:lexiloop/features/word_detail/cards/mnemonic_card.dart';
 import 'package:lexiloop/features/word_detail/cards/morphology_card.dart';
@@ -104,7 +103,6 @@ class _WordDetailBody extends StatelessWidget {
         title: '复习记录',
         child: ReviewHistoryCard(wordId: detail.id),
       ),
-      InitializationQualityCard(wordId: detail.id),
     ]),
   );
 

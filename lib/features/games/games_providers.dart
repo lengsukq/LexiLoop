@@ -55,7 +55,7 @@ sealed class GamesState {
 final class GamesSetup extends GamesState {
   /// 以各字段构造。
   const new({
-    this.selectedMode = GameMode.whackAMole,
+    this.selectedMode = GameMode.wordBuilder,
     this.loadingMode,
     this.error,
   });

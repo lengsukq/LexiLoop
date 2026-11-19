@@ -3,11 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/features/games/widgets/game_result_panel.dart';
 import 'package:lexiloop/features/games/widgets/game_shell.dart';
 import 'package:lexiloop/features/match/match_board_view.dart';
 import 'package:lexiloop/features/match/match_providers.dart';
 import 'package:lexiloop/features/match/match_setup_view.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/widgets/settling_indicator.dart';
 
 /// 配对页面。
@@ -21,6 +23,16 @@ class MatchPage extends ConsumerWidget {
     final controller = ref.read(matchControllerProvider.notifier);
 
     return GameScaffold(
+      onBack: () {
+        if (state is MatchSaving) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('正在保存成绩，保存完成后再返回')));
+        } else if (state is MatchSetup) {
+          context.go(gamesPath);
+        } else {
+          controller.exit();
+        }
+      },
       child: switch (state) {
         MatchSetup() => MatchSetupView(
           state: state,

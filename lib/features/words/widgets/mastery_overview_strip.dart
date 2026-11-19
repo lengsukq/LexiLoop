@@ -10,9 +10,11 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_progress_bar.dart';
 import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -58,16 +60,16 @@ class _OverviewBody extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) => Row(
             children: <Widget>[
-              if (constraints.maxWidth >= compactStripWidth)
+              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
                 _IconPlate(colors: colors),
-              if (constraints.maxWidth >= compactStripWidth)
+              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
                 const SizedBox(width: LexiSpace.s14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     _OverviewText(overview: overview),
-                    if (constraints.maxWidth < compactStripWidth)
+                    if (constraints.maxWidth < LexiLayout.compactStripWidth)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: _StatsLink(colors: colors),
@@ -75,7 +77,7 @@ class _OverviewBody extends StatelessWidget {
                   ],
                 ),
               ),
-              if (constraints.maxWidth >= compactStripWidth)
+              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
                 _StatsLink(colors: colors),
             ],
           ),
@@ -119,9 +121,6 @@ class _StatsLink extends StatelessWidget {
   );
 }
 
-/// 一行放得下图标 + 文字 + 链接的最小宽度。
-const double compactStripWidth = 480;
-
 /// 标题、计数与进度条。
 class _OverviewText extends StatelessWidget {
   const new({required this.overview});
@@ -162,15 +161,7 @@ class _OverviewText extends StatelessWidget {
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(LexiRadius.sm),
-          child: LinearProgressIndicator(
-            value: percent / percentScale,
-            minHeight: 6,
-            backgroundColor: colors.fill,
-            color: colors.accent,
-          ),
-        ),
+        LexiProgressBar(value: percent / percentScale),
       ],
     );
   }

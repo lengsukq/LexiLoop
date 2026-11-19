@@ -9,13 +9,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 选项在揭示前后的五种外观。
@@ -44,6 +45,7 @@ class ChoiceOptions extends StatelessWidget {
     required this.selected,
     required this.revealed,
     required this.onSelect,
+    this.definitionStyle = ChoiceDefinitionStyle.full,
     super.key,
   });
 
@@ -59,10 +61,12 @@ class ChoiceOptions extends StatelessWidget {
   /// 选中某项时回调。
   final ValueChanged<String> onSelect;
 
+  /// 控制未揭示选项的展示密度，正确答案仍使用完整原文。
+  final ChoiceDefinitionStyle definitionStyle;
+
   @override
   Widget build(BuildContext context) {
     if (item.choices.isEmpty) return const _MissingChoices();
-    final showShortcuts = MediaQuery.sizeOf(context).width >= studyWideMinWidth;
     final correct = studyChoiceAnswer(item);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -72,8 +76,10 @@ class ChoiceOptions extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: LexiSpace.s8),
             child: _ChoiceTile(
               index: index + 1,
-              showShortcut: showShortcuts,
               label: choice,
+              displayLabel: revealed && choice == correct
+                  ? choice
+                  : studyChoicePreview(choice, definitionStyle),
               definition: revealed ? item.choiceDefinitions[choice] : null,
               state: _stateOf(choice, correct),
               onTap: revealed ? null : () => onSelect(choice),
@@ -101,16 +107,16 @@ class ChoiceOptions extends StatelessWidget {
 class _ChoiceTile extends StatelessWidget {
   const new({
     required this.index,
-    required this.showShortcut,
     required this.label,
+    required this.displayLabel,
     required this.definition,
     required this.state,
     required this.onTap,
   });
 
   final int index;
-  final bool showShortcut;
   final String label;
+  final String displayLabel;
   final String? definition;
   final _OptionState state;
   final VoidCallback? onTap;
@@ -130,27 +136,24 @@ class _ChoiceTile extends StatelessWidget {
     return Semantics(
       button: true,
       selected: state == _OptionState.selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(LexiRadius.md),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: minHeight),
-            padding: const EdgeInsets.symmetric(
-              horizontal: LexiSpace.s16,
-              vertical: LexiSpace.s12,
-            ),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(LexiRadius.md),
-              border: Border.all(
-                color: border,
-                width: state == _OptionState.selected ? selectedBorderWidth : 1,
-              ),
-            ),
-            child: _contentRow(context, foreground),
+      child: LexiPressable(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(LexiRadius.lg),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: minHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s16,
+            vertical: LexiSpace.s16,
           ),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(LexiRadius.lg),
+            border: Border.all(
+              color: border,
+              width: state == _OptionState.selected ? selectedBorderWidth : 1,
+            ),
+          ),
+          child: _contentRow(context, foreground),
         ),
       ),
     );
@@ -162,7 +165,7 @@ class _ChoiceTile extends StatelessWidget {
   (Color, Color, Color) _tileColors(BuildContext context) {
     final colors = context.lexiColors;
     return switch (state) {
-      _OptionState.idle => (colors.label, colors.fill, colors.borderDefault),
+      _OptionState.idle => (colors.label, colors.card, colors.borderSubtle),
       _OptionState.selected => (
         colors.accentText,
         colors.accent.withValues(alpha: LexiTint.subtle),
@@ -182,8 +185,8 @@ class _ChoiceTile extends StatelessWidget {
       // 揭示后其余选项仍然要能读清，只是不该抢走注意力。
       _OptionState.muted => (
         colors.quaternaryLabel,
-        colors.fill,
-        colors.borderDefault,
+        colors.card,
+        colors.borderSubtle,
       ),
     };
   }
@@ -193,10 +196,8 @@ class _ChoiceTile extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (showShortcut) ...<Widget>[
-          _ShortcutBadge(number: index, color: foreground),
-          const SizedBox(width: LexiSpace.s10),
-        ],
+        _ShortcutBadge(number: index, color: foreground),
+        const SizedBox(width: LexiSpace.s12),
         // 判定结果额外给一个图标：颜色不能是唯一的信号
         // （HIG `accessibility.md`：不要只靠颜色传达信息）。
         if (_resultIcon case final icon?) ...<Widget>[
@@ -218,11 +219,17 @@ class _ChoiceTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        Text(
-          label,
-          style: LexiType.callout.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w600,
+        Tooltip(
+          message: label,
+          child: Text(
+            displayLabel,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: LexiType.callout.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
           ),
         ),
         if (text != null && text.isNotEmpty) ...<Widget>[
@@ -256,16 +263,16 @@ class _ShortcutBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 20,
-      height: 20,
+      width: 28,
+      height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        border: Border.all(color: color.withValues(alpha: LexiTint.half)),
-        borderRadius: BorderRadius.circular(LexiRadius.xs),
+        color: color.withValues(alpha: LexiTint.subtle),
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
       ),
       child: ExcludeSemantics(
         child: Text(
-          '$number',
+          String.fromCharCode(64 + number),
           style: LexiType.caption.copyWith(
             color: color,
             fontWeight: FontWeight.w700,

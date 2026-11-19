@@ -8,7 +8,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
-import 'package:lexiloop/features/study/study_layout.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
@@ -140,7 +139,9 @@ class _SummaryActions extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: studyButtonHeight),
+              constraints: const BoxConstraints(
+                minHeight: LexiLayout.buttonHeight,
+              ),
               child: FilledButton(
                 onPressed: onRestart,
                 child: const Text('再来一轮'),
@@ -148,7 +149,9 @@ class _SummaryActions extends StatelessWidget {
             ),
             const SizedBox(height: LexiSpace.s10),
             ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: studyButtonHeight),
+              constraints: const BoxConstraints(
+                minHeight: LexiLayout.buttonHeight,
+              ),
               child: OutlinedButton(
                 onPressed: onHome,
                 child: const Text('返回首页'),

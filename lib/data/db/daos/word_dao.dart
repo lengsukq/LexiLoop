@@ -255,6 +255,7 @@ class WordQuery {
     bool? dueOnly,
     bool? suspendedOnly,
     WordSort? sort,
+    int? limit,
     int? offset,
   }) => WordQuery(
     search: search ?? this.search,
@@ -268,7 +269,7 @@ class WordQuery {
     dueOnly: dueOnly ?? this.dueOnly,
     suspendedOnly: suspendedOnly ?? this.suspendedOnly,
     sort: sort ?? this.sort,
-    limit: limit,
+    limit: limit ?? this.limit,
     offset: offset ?? this.offset,
   );
 }

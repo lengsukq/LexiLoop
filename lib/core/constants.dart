@@ -907,6 +907,15 @@ const Set<int> transientHttpStatusCodes = <int>{408, 409, 429};
 /// 瞬时错误的 HTTP 状态码下界（5xx）。
 const int transientServerErrorFloor = 500;
 
+/// Next.js TTS 登录及音频接口使用的 HTTP 状态码。
+const int ttsHttpStatusOk = 200;
+
+/// Next.js TTS 登录过期，需刷新 Cookie。
+const int ttsHttpStatusUnauthorized = 401;
+
+/// Next.js TTS 服务端错误起始值。
+const int ttsHttpServerErrorFloor = 500;
+
 /// AI 重试遍数下限。
 ///
 /// 来源：旧版 `modules/settings/service.ts:77` 的 `.min(0)`。
@@ -951,6 +960,12 @@ const int youdaoRetryJitterMaxMs = 400;
 ///
 /// 旧版服务端内存 LRU 为 200 条；本版落盘缓存，此处保留作为软上限。
 const int ttsCacheMaxEntries = 200;
+
+/// Flutter Edge 直连建立连接的超时（秒）。
+const int directEdgeConnectTimeoutSeconds = 15;
+
+/// Flutter Edge 单次语音合成的整体超时（秒）。
+const int directEdgeRequestTimeoutSeconds = 30;
 
 // ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════

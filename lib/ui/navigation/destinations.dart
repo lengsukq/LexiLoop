@@ -1,52 +1,52 @@
-/// 应用导航结构。
+/// 导航目的地定义：4 个常驻主频道 + 二级功能路由。
 ///
-/// 8 个目的地与旧版 `src/components/app-shell.tsx` 的 `navigation` 数组一致，
-/// 快捷键 `⌘1`–`⌘8` 也沿用同一顺序。
+/// **移动端优先（Mobile-First）的 4-Tab 导航收敛**：
+/// 遵循 Apple HIG `tab-bars.md` *“Avoid overflow tabs”* 准则，移动端底部栏
+/// 不再塞入「更多（`...`）」二级弹窗，而是收敛为 4 个核心常驻频道：
+/// 1. **今日 (`/`)**：每日复习主入口、学习概览与精选专项练习；
+/// 2. **单词本 (`/words`)**：无限滚动词库、搜索筛选、快速加词与后台补全状态；
+/// 3. **统计 (`/statistics`)**：记忆热力图、掌握度漏斗与复习负荷预测；
+/// 4. **设置 (`/settings`)**：复习策略、发音、AI/词典源、备份与同步。
 ///
-/// 移动端只把前 4 项放在底部 Tab Bar，其余进「更多」面板——
-/// 这与旧版的 `mobilePrimary = ["/", "/study", "/words", "/add"]` 相同。
+/// 动作型与沉浸式页面（`复习 /study`、`添加 /add`、`内容补全 /initialize`、
+/// `音标 /phonetics`）作为二级路由保留在导航树中，支持深链与快捷键直达。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// 宽屏侧边栏的根 key。
-///
-/// 导航形态断言（宽屏侧边栏 / 窄屏底部 Tab）需要一个稳定的锚点。侧边栏的
-/// 材质随设计调整过（曾是 `LiquidGlass`，现在是实色 `Material`），
-/// 测试不该把「用了哪种材质」当成识别依据。
+/// 桌面侧边栏容器的稳定 Key（供自适应布局测试定位）。
 const Key appSidebarKey = Key('app-sidebar');
 
-/// 一个导航目的地的分组。
-///
-/// **为什么要分组**：8 个目的地平铺时，侧边栏读起来是 8 条等权重的行——
-/// 「音标」与「设置」一样大，「初始化」夹在「添加」与「统计」之间。
-/// 用户找不到主线，是因为界面没给出主线：今日/复习/单词本是每天用的，
-/// 添加/初始化是准备词库时才用的，音标是训练，统计/设置是查阅。
-///
-/// 分组只改变**呈现**，不改变路由、`⌘1`–`⌘8` 的顺序，也不改变
-/// [mobilePrimaryPaths] —— 深链接、书签与测试都不受影响。
+/// 移动端底部导航栏容器的稳定 Key。
+const Key appBottomBarKey = Key('app-bottom-bar');
+
+/// 目的地所属的导航分组。
 enum DestinationGroup {
-  /// 无组头的日常主线：今日 / 复习 / 单词本。
-  primary(null),
+  /// 核心学习与词库。
+  learning(null),
 
-  /// 准备词库：添加 / 初始化。
-  library('词库准备'),
+  /// 词库扩展与工具。
+  library('词库管理'),
 
-  /// 训练：音标。
-  training('训练'),
-
-  /// 查阅：统计 / 设置（在侧边栏贴底，在「更多」面板里排最后）。
-  reference('查阅');
+  /// 统计与系统设置。
+  reference('数据与偏好');
 
   new(this.label);
 
-  /// 组标题；为 null 时不渲染组头。
+  /// 侧边栏分组小标题；首组为 `null` 不显示标题。
   final String? label;
 }
 
-/// 一个导航目的地。
-@immutable
+/// 侧边栏分组渲染顺序。
+const List<DestinationGroup> sidebarGroupOrder = <DestinationGroup>[
+  DestinationGroup.learning,
+  DestinationGroup.library,
+  DestinationGroup.reference,
+];
+
+/// 单个导航目的地定义。
 class AppDestination {
   /// 创建导航目的地。
   const new({
@@ -55,77 +55,83 @@ class AppDestination {
     required this.icon,
     required this.shortcut,
     required this.group,
+    this.immersive = false,
   });
 
   /// 路由路径。
   final String path;
 
-  /// 显示名称。
+  /// 导航展示名称。
   final String label;
 
-  /// 图标。
+  /// 导航图标。
   final IconData icon;
 
-  /// `⌘N` 快捷键中对应的数字。
+  /// `⌘1`–`⌘8` 快捷键序号（从 1 开始）。
   final int shortcut;
 
-  /// 分组。
+  /// 侧边栏所属分组。
   final DestinationGroup group;
+
+  /// 是否在窄屏下隐藏底部导航栏（沉浸式全屏页面）。
+  final bool immersive;
 }
 
-/// 全部 8 个导航目的地，顺序即快捷键顺序。
+/// 路由分支完整目的地表（保持 `⌘1`–`⌘8` 快捷键序号与分支索引稳定）。
 const List<AppDestination> appDestinations = <AppDestination>[
   AppDestination(
-    path: '/',
+    path: homePath,
     label: '今日',
-    icon: LucideIcons.house,
+    icon: LucideIcons.sparkles,
     shortcut: 1,
-    group: DestinationGroup.primary,
+    group: DestinationGroup.learning,
   ),
   AppDestination(
-    path: '/study',
+    path: studyPath,
     label: '复习',
-    icon: LucideIcons.circlePlay,
+    icon: LucideIcons.graduationCap,
     shortcut: 2,
-    group: DestinationGroup.primary,
+    group: DestinationGroup.learning,
+    immersive: true,
   ),
   AppDestination(
-    path: '/words',
+    path: wordsPath,
     label: '单词本',
-    icon: LucideIcons.bookMarked,
+    icon: LucideIcons.bookOpen,
     shortcut: 3,
-    group: DestinationGroup.primary,
+    group: DestinationGroup.learning,
   ),
   AppDestination(
-    path: '/phonetics',
-    label: '音标',
-    icon: LucideIcons.audioLines,
-    shortcut: 4,
-    group: DestinationGroup.training,
-  ),
-  AppDestination(
-    path: '/add',
+    path: addPath,
     label: '添加',
     icon: LucideIcons.circlePlus,
+    shortcut: 4,
+    group: DestinationGroup.library,
+  ),
+  AppDestination(
+    path: initializePath,
+    label: '内容补全',
+    icon: LucideIcons.wandSparkles,
     shortcut: 5,
     group: DestinationGroup.library,
   ),
   AppDestination(
-    path: '/initialize',
-    label: '内容补全',
-    icon: LucideIcons.refreshCw,
+    path: phoneticsPath,
+    label: '音标',
+    icon: LucideIcons.volume2,
     shortcut: 6,
     group: DestinationGroup.library,
+    immersive: true,
   ),
   AppDestination(
-    path: '/statistics',
+    path: statisticsPath,
     label: '统计',
     icon: LucideIcons.chartColumn,
     shortcut: 7,
     group: DestinationGroup.reference,
   ),
   AppDestination(
-    path: '/settings',
+    path: settingsPath,
     label: '设置',
     icon: LucideIcons.settings,
     shortcut: 8,
@@ -133,49 +139,42 @@ const List<AppDestination> appDestinations = <AppDestination>[
   ),
 ];
 
-/// 侧边栏里按分组切开的顺序。
-///
-/// [DestinationGroup.primary] 不渲染组头，其余按这里的顺序渲染标题。
-const List<DestinationGroup> sidebarGroupOrder = <DestinationGroup>[
-  DestinationGroup.primary,
-  DestinationGroup.library,
-  DestinationGroup.training,
-  DestinationGroup.reference,
+/// 移动端底部 4-Tab 常驻主目的地（今日 / 单词本 / 统计 / 设置）。
+final List<AppDestination> mobilePrimaryDestinations = <AppDestination>[
+  appDestinations[0],
+  appDestinations[2],
+  appDestinations[6],
+  appDestinations[7],
 ];
 
-/// 取出某个分组下的目的地，保持 [appDestinations] 的顺序。
-List<AppDestination> destinationsIn(DestinationGroup group) => appDestinations
-    .where((destination) => destination.group == group)
-    .toList(growable: false);
+/// 取出某个分组下的主导航目的地（用于桌面侧边栏展示 4 个核心频道）。
+List<AppDestination> destinationsIn(DestinationGroup group) =>
+    mobilePrimaryDestinations
+        .where((destination) => destination.group == group)
+        .toList(growable: false);
 
-/// 底部 Tab Bar 上直接展示的目的地路径。
-const Set<String> mobilePrimaryPaths = <String>{
-  '/',
-  '/study',
-  '/words',
-  '/add',
-};
-
-/// 这些路径进入沉浸模式：隐藏侧边栏与底部 Tab Bar。
-///
-/// 与旧版一致——学习、游戏、配对、音标训练时需要全屏专注。
-const Set<String> immersivePaths = <String>{
-  '/study',
-  '/games',
-  '/match',
-  '/phonetics',
-};
-
-/// 判断给定路径是否应进入沉浸模式。
+/// 判断当前路由路径是否为沉浸式窄版心路径（窄屏隐藏底部栏，宽屏使用 `immersiveMaxWidth`）。
 bool isImmersivePath(String location) {
-  if (immersivePaths.contains(location)) return true;
-  // 子路径（如 /study/xxx）同样视为沉浸。
-  return immersivePaths.any((path) => location.startsWith('$path/'));
+  for (final destination in appDestinations) {
+    if (destination.immersive && _matchesPath(destination.path, location)) {
+      return true;
+    }
+  }
+  return location.startsWith(gamesPath) || location.startsWith(matchPath);
 }
 
-/// 判断某个目的地是否匹配当前路径（用于高亮）。
+/// 判断目的地在当前 [location] 下是否处于激活态。
+///
+/// 在「添加 (`/add`)」或「内容补全 (`/initialize`)」子流程中，归属到「单词本 (`/words`)」高亮。
 bool isDestinationActive(AppDestination destination, String location) {
-  if (destination.path == '/') return location == '/';
-  return location == destination.path ||
-      location.startsWith('${destination.path}/');
+  if (destination.path == wordsPath &&
+      (location.startsWith(addPath) || location.startsWith(initializePath))) {
+    return true;
+  }
+  return _matchesPath(destination.path, location);
+}
+
+bool _matchesPath(String base, String location) {
+  if (base == '/') return location == '/';
+  return location == base || location.startsWith('$base/');
 }

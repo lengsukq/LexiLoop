@@ -387,6 +387,71 @@ class StudyPlanSettings {
   };
 }
 
+/// 发音来源：不包含需要账号密钥的云 TTS。
+enum SpeechSource {
+  /// 词典录音优先，系统朗读和在线词典录音兜底。
+  automatic('auto', '自动选择（推荐）'),
+
+  /// Flutter 直连 Edge TTS 合成，无需自己的 Next.js 服务。
+  edge('edge', 'Edge TTS（直连）'),
+
+  /// 使用现有 Next.js 服务生成 Edge TTS 音频。
+  online('online', 'Next.js TTS（自建）'),
+
+  /// 优先使用词典录音（需要网络）。
+  dictionary('dictionary', '有道词典 MP3（直连）'),
+
+  /// 仅使用设备系统的 TTS。
+  system('system', '系统语音合成'),
+
+  /// 不播放语音。
+  off('off', '关闭发音');
+
+  new(this.wire, this.label);
+
+  /// 存储值。
+  final String wire;
+
+  /// 设置界面中的名称。
+  final String label;
+
+  /// 未知值降级为自动选择。
+  static SpeechSource fromWire(String? value) {
+    for (final source in values) {
+      if (source.wire == value) return source;
+    }
+    return SpeechSource.automatic;
+  }
+}
+
+/// 学习选项中的释义密度；不修改判题使用的完整原文。
+enum ChoiceDefinitionStyle {
+  /// 仅展示前两个释义片段。
+  compact('compact', '简洁'),
+
+  /// 展示前四个释义片段。
+  standard('standard', '标准'),
+
+  /// 展示词典中全部释义。
+  full('full', '完整');
+
+  new(this.wire, this.label);
+
+  /// 存储值。
+  final String wire;
+
+  /// 设置界面中的名称。
+  final String label;
+
+  /// 未知值降级为简洁展示。
+  static ChoiceDefinitionStyle fromWire(String? value) {
+    for (final style in values) {
+      if (style.wire == value) return style;
+    }
+    return ChoiceDefinitionStyle.compact;
+  }
+}
+
 /// 播放设置。
 class PlaybackSettings {
   /// 以各字段构造。
@@ -398,6 +463,10 @@ class PlaybackSettings {
     required this.sentenceSpeed,
     required this.autoPlayPronunciation,
     this.humanAudioEnabled = true,
+    this.speechSource = SpeechSource.automatic,
+    this.speechFallbackEnabled = true,
+    this.choiceDefinitionStyle = ChoiceDefinitionStyle.compact,
+    this.onlineTtsBaseUrl = '',
   });
 
   /// 选择题揭示答案前的延迟（秒）。
@@ -425,6 +494,18 @@ class PlaybackSettings {
   /// 默认开启——真人录音相对系统朗读是明确的音质提升。
   final bool humanAudioEnabled;
 
+  /// 当前朗读方案。
+  final SpeechSource speechSource;
+
+  /// 首选方案失败时是否尝试下一种可用方案。
+  final bool speechFallbackEnabled;
+
+  /// 学习选择题显示的释义密度。
+  final ChoiceDefinitionStyle choiceDefinitionStyle;
+
+  /// Next.js TTS 服务的 HTTPS 根地址；为空表示未启用该服务。
+  final String onlineTtsBaseUrl;
+
   /// 默认值。
   static const PlaybackSettings defaults = PlaybackSettings(
     choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
@@ -451,6 +532,10 @@ class PlaybackSettings {
     'sentenceSpeed': sentenceSpeed,
     'autoPlayPronunciation': autoPlayPronunciation,
     'humanAudioEnabled': humanAudioEnabled,
+    'speechSource': speechSource.wire,
+    'speechFallbackEnabled': speechFallbackEnabled,
+    'choiceDefinitionStyle': choiceDefinitionStyle.wire,
+    'onlineTtsBaseUrl': onlineTtsBaseUrl,
   };
 }
 
@@ -640,6 +725,15 @@ PlaybackSettings _parsePlayback(_SettingsReader reader) {
       'humanAudioEnabled',
       fallback: fallback.humanAudioEnabled,
     ),
+    speechSource: SpeechSource.fromWire(reader.stringValue('speechSource')),
+    speechFallbackEnabled: reader.boolValue(
+      'speechFallbackEnabled',
+      fallback: fallback.speechFallbackEnabled,
+    ),
+    choiceDefinitionStyle: ChoiceDefinitionStyle.fromWire(
+      reader.stringValue('choiceDefinitionStyle'),
+    ),
+    onlineTtsBaseUrl: reader.stringValue('onlineTtsBaseUrl') ?? '',
   );
 }
 

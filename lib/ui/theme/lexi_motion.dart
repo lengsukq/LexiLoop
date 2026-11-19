@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 
 /// 动效时长与曲线。
 abstract final class LexiMotion {
@@ -51,4 +52,64 @@ abstract final class LexiMotion {
 
   /// 按压缩放比例；减弱动态效果时调用方应跳过缩放。
   static const double pressScale = 0.98;
+
+  /// 构造移动端平滑层级推进（右进左出 + 渐显）的路由页面。
+  static CustomTransitionPage<T> pushPage<T>({
+    required LocalKey key,
+    required Widget child,
+  }) => CustomTransitionPage<T>(
+    key: key,
+    transitionDuration: emphasized,
+    reverseTransitionDuration: standard,
+    child: child,
+    transitionsBuilder: _buildPushTransition,
+  );
+
+  /// 构造沉浸式模态页（自下微幅上浮 + 渐显）的路由页面。
+  static CustomTransitionPage<T> modalPage<T>({
+    required LocalKey key,
+    required Widget child,
+  }) => CustomTransitionPage<T>(
+    key: key,
+    transitionDuration: emphasized,
+    reverseTransitionDuration: standard,
+    child: child,
+    transitionsBuilder: _buildModalTransition,
+  );
+
+  static Widget _buildPushTransition(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final curved = CurvedAnimation(parent: animation, curve: spring);
+    final offset = Tween<Offset>(
+      begin: const Offset(0.06, 0),
+      end: Offset.zero,
+    ).animate(curved);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(position: offset, child: child),
+    );
+  }
+
+  static Widget _buildModalTransition(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final curved = CurvedAnimation(parent: animation, curve: spring);
+    final offset = Tween<Offset>(
+      begin: const Offset(0, 0.05),
+      end: Offset.zero,
+    ).animate(curved);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(position: offset, child: child),
+    );
+  }
 }

@@ -308,6 +308,12 @@ enum AppErrorCode {
   /// 系统 TTS 引擎不可用或缺少所需语音包。
   ttsUnavailable('TTS_UNAVAILABLE', '系统语音合成不可用，请在系统设置中安装语音包。'),
 
+  /// 用户选中 Next.js 在线语音，但尚未配置有效的 HTTPS 服务地址。
+  ttsOnlineNotConfigured(
+    'TTS_ONLINE_NOT_CONFIGURED',
+    '请先在「播放」设置中填写 Next.js TTS 服务地址。',
+  ),
+
   /// 合成过程出错。
   ttsSynthesisFailed('TTS_SYNTHESIS_FAILED', '语音合成失败。'),
 

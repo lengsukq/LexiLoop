@@ -19,6 +19,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
 import 'package:lexiloop/services/audio/audio_downloader.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
+import 'package:lexiloop/services/audio/direct_edge_tts.dart';
 import 'package:lexiloop/services/audio/just_audio_engine.dart';
 import 'package:lexiloop/services/audio/word_speaker.dart';
 import 'package:lexiloop/services/dictionary/lookup_service.dart';
@@ -102,6 +103,10 @@ final Provider<AudioCache> audioCacheProvider = Provider<AudioCache>(
   (ref) => AudioCache(ref.watch(audioDownloaderProvider)),
 );
 
+/// 直连 Edge TTS 生成器，默认无需账户或 Next.js 后端。
+final Provider<DirectEdgeSpeechPort> directEdgeSpeechProvider =
+    Provider<DirectEdgeSpeechPort>((ref) => DirectEdgeSpeech());
+
 /// 音频播放器。
 ///
 /// [WordSpeaker] 通过它构造，但**不拥有**它的生命周期：谁构造谁释放。
@@ -122,6 +127,7 @@ final Provider<WordSpeaker> wordSpeakerProvider = Provider<WordSpeaker>((ref) {
     ref.watch(audioPlayerPortProvider),
     ref.watch(audioCacheProvider),
     ref.watch(ttsServiceProvider),
+    edge: ref.watch(directEdgeSpeechProvider),
   );
   ref.onDispose(() => unawaited(speaker.stop()));
   return speaker;

@@ -35,6 +35,7 @@ import 'package:lexiloop/ui/glass.dart';
 import 'package:lexiloop/ui/navigation/destinations.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
+import 'package:lexiloop/ui/theme/lexi_motion.dart';
 import 'package:lexiloop/ui/widgets/page_shell.dart';
 
 /// 全局路由实例。
@@ -156,10 +157,12 @@ List<RouteBase> _subRoutesFor(AppDestination destination) {
   return <RouteBase>[
     GoRoute(
       path: ':id',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final id = int.tryParse(state.pathParameters['id'] ?? '');
-        if (id == null) return const _InvalidWordIdPage();
-        return WordDetailPage(wordId: id);
+        final child = id == null
+            ? const _InvalidWordIdPage()
+            : WordDetailPage(wordId: id);
+        return LexiMotion.pushPage<void>(key: state.pageKey, child: child);
       },
     ),
   ];

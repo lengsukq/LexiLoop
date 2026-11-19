@@ -96,6 +96,14 @@ abstract final class LexiLayout {
   /// 主按钮的高度下限。
   static const double buttonHeight = 50;
 
+  /// 紧凑卡片/学习区的宽窄分界（逻辑像素）。
+  ///
+  /// 窄于它时动作条竖排、自评 2×2、选项不显示数字快捷键。
+  static const double compactBreakpoint = 600;
+
+  /// 概览进度横条单行与双行排布的分界宽度（逻辑像素）。
+  static const double compactStripWidth = 480;
+
   /// 页面在宽度受限时的水平栏距。
   static EdgeInsets guttersFor(double width) => EdgeInsets.symmetric(
     horizontal: width >= wideBreakpoint ? pageGutterWide : pageGutter,

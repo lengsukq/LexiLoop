@@ -18,6 +18,7 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/features/dashboard/dashboard_page.dart';
 import 'package:lexiloop/ui/adaptive_shell.dart';
+import 'package:lexiloop/ui/navigation/destinations.dart';
 
 void main() {
   late AppDatabase database;
@@ -60,28 +61,31 @@ void main() {
     expect(find.text('更多'), findsNothing);
   });
 
-  testWidgets('窄屏使用底部 Tab 布局', (tester) async {
+  testWidgets('窄屏使用 4-Tab 底部导航布局', (tester) async {
     await setSize(tester, const Size(390, 844));
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
 
     expect(find.byType(AdaptiveShell), findsOneWidget);
-    // 窄屏把非主项收进「更多」。
-    expect(find.text('更多'), findsOneWidget);
-    expect(find.text('设置'), findsNothing);
-    expect(find.text('复习'), findsOneWidget);
+    expect(find.byKey(appBottomBarKey), findsOneWidget);
+    expect(find.byKey(appSidebarKey), findsNothing);
+    expect(find.text('更多'), findsNothing);
+    expect(find.text('设置'), findsOneWidget);
+    expect(find.text('统计'), findsOneWidget);
   });
 
   testWidgets('断点两侧的布局确实不同', (tester) async {
     await setSize(tester, const Size(sidebarBreakpoint - 1, 900));
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
-    expect(find.text('更多'), findsOneWidget, reason: '断点以下应为底部 Tab');
+    expect(find.byKey(appBottomBarKey), findsOneWidget, reason: '断点以下应为底部 Tab');
+    expect(find.byKey(appSidebarKey), findsNothing);
 
     await setSize(tester, const Size(sidebarBreakpoint + 1, 900));
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
-    expect(find.text('更多'), findsNothing, reason: '断点以上应为侧边栏');
+    expect(find.byKey(appSidebarKey), findsOneWidget, reason: '断点以上应为侧边栏');
+    expect(find.byKey(appBottomBarKey), findsNothing);
   });
 
   testWidgets('无 RenderFlex 溢出', (tester) async {

@@ -23,7 +23,6 @@ import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/words/widgets/word_card.dart';
 import 'package:lexiloop/features/words/widgets/word_filter_bar.dart';
-import 'package:lexiloop/features/words/widgets/word_paginator.dart';
 import 'package:lexiloop/features/words/widgets/words_header.dart';
 import 'package:lexiloop/features/words/words_page.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
@@ -154,60 +153,54 @@ void main() {
         .read(wordQueryProvider);
   }
 
-  group('分页', () {
-    testWidgets('翻到第二页会带着偏移量重查列表', (tester) async {
+  group('无限滚动与加载更多', () {
+    testWidgets('超出首屏条数时显示加载更多，点击后追加加载', (tester) async {
       await insertTwoPages();
       await pumpPage(tester);
 
-      expect(
-        find.text('第 1 / 2 页 · 共 ${wordListPageSize + 1} 个词条'),
-        findsOneWidget,
-      );
-      // 第一页按 id 倒序，最后插入的 w40 在最上面。
+      expect(find.byKey(const Key('wordsLoadMore')), findsOneWidget);
+      // 首屏按 id 倒序，最后插入的 w40 在最上面，最早的 w00 尚未加载。
       expect(
         find.descendant(of: find.byType(WordCard), matching: find.text('w40')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(of: find.byType(WordCard), matching: find.text('w00')),
+        findsNothing,
+      );
 
-      await tester.tap(find.text('下一页'));
+      await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
 
       expect(
-        find.text('第 2 / 2 页 · 共 ${wordListPageSize + 1} 个词条'),
+        find.text('已加载全部 ${wordListPageSize + 1} 个词条'),
         findsOneWidget,
       );
-      // 第二页只剩最早的 w00：看到它就说明页码真的进了 SQL。
+      expect(queryOf(tester).limit, wordListPageSize * 2);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
       expect(
         find.descendant(of: find.byType(WordCard), matching: find.text('w00')),
         findsOneWidget,
       );
-      expect(queryOf(tester).offset, wordListPageSize);
-
-      await tester.tap(find.text('上一页'));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('第 1 / 2 页 · 共 ${wordListPageSize + 1} 个词条'),
-        findsOneWidget,
-      );
-      expect(queryOf(tester).offset, 0);
     });
 
-    testWidgets('改搜索词会回到第一页', (tester) async {
+    testWidgets('改搜索词会重置加载条数到首屏', (tester) async {
       await insertTwoPages();
       await pumpPage(tester);
-      await tester.tap(find.text('下一页'));
+      await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'w00');
       await tester.pumpAndSettle();
 
-      // 只命中一个词条：既钉住了页码复位，也钉住了查询确实重跑了。
-      expect(find.text('第 1 / 1 页 · 共 1 个词条'), findsOneWidget);
-      expect(queryOf(tester).offset, 0);
+      // 只命中一个词条：既钉住了 limit 复位，也钉住了查询确实重跑了。
+      expect(find.text('已加载全部 1 个词条'), findsOneWidget);
+      expect(queryOf(tester).limit, wordListPageSize);
     });
 
-    testWidgets('改筛选会回到第一页', (tester) async {
+    testWidgets('改筛选会重置加载条数到首屏', (tester) async {
       await insertWord(term: 'alpha', mastery: MasteryLevel.mastered);
       for (var i = 0; i <= wordListPageSize; i += 1) {
         await insertWord(
@@ -216,7 +209,7 @@ void main() {
         );
       }
       await pumpPage(tester);
-      await tester.tap(find.text('下一页'));
+      await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -227,8 +220,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(queryOf(tester).offset, 0);
-      expect(find.text('第 1 / 1 页 · 共 1 个词条'), findsOneWidget);
+      expect(queryOf(tester).limit, wordListPageSize);
+      expect(find.text('已加载全部 1 个词条'), findsOneWidget);
     });
   });
 
@@ -253,7 +246,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('第 1 / 1 页 · 共 1 个词条'), findsOneWidget);
+      expect(find.text('已加载全部 1 个词条'), findsOneWidget);
     });
 
     testWidgets('到期芯片只留下已到期的复习卡', (tester) async {
@@ -398,10 +391,10 @@ void main() {
       expect(_cardTerms(tester), <String>['banana']);
     });
 
-    testWidgets('「清除搜索」清空输入框并回到第一页', (tester) async {
+    testWidgets('「清除搜索」清空输入框并回到首屏条数', (tester) async {
       await insertTwoPages();
       await pumpPage(tester);
-      await tester.tap(find.text('下一页'));
+      await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'w01');
       await tester.pumpAndSettle();
@@ -414,10 +407,8 @@ void main() {
         '',
       );
       expect(queryOf(tester).search, '');
-      expect(
-        find.text('第 1 / 2 页 · 共 ${wordListPageSize + 1} 个词条'),
-        findsOneWidget,
-      );
+      expect(queryOf(tester).limit, wordListPageSize);
+      expect(find.byKey(const Key('wordsLoadMore')), findsOneWidget);
     });
   });
 
@@ -628,11 +619,11 @@ void main() {
       expect(find.text('没有匹配的词条'), findsNothing);
     });
 
-    testWidgets('结果为空时不显示分页条', (tester) async {
+    testWidgets('结果为空时不显示加载更多', (tester) async {
       await pumpPage(tester);
 
-      expect(find.byType(WordPaginator), findsOneWidget);
-      expect(find.textContaining('第 1 / 1 页'), findsNothing);
+      expect(find.byKey(const Key('wordsLoadMore')), findsNothing);
+      expect(find.textContaining('已加载全部'), findsNothing);
     });
   });
 
@@ -659,10 +650,10 @@ void main() {
       expect(find.text('alpha'), findsNothing);
     });
 
-    testWidgets('「清除筛选」清掉全部筛选并回到第一页', (tester) async {
+    testWidgets('「清除筛选」清掉全部筛选并回到首屏条数', (tester) async {
       await insertTwoPages();
       await pumpPage(tester, width: 800);
-      await tester.tap(find.text('下一页'));
+      await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('筛选'));
@@ -674,7 +665,7 @@ void main() {
 
       final query = queryOf(tester);
       expect(query.activeFilterCount, 0);
-      expect(query.offset, 0);
+      expect(query.limit, wordListPageSize);
       expect(find.text('筛选'), findsOneWidget);
     });
   });

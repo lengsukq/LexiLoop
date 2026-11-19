@@ -1181,6 +1181,25 @@ void main() {
       expect(engine.spoken, isEmpty);
     });
 
+    testWidgets('拼写题在揭示答案后自动朗读一次，不提前泄题', (tester) async {
+      final wordId = await insertWord(term: 'banana', meaning: '香蕉');
+      final engine = RecordingSpeechEngine();
+      await insertSession(
+        wordId: wordId,
+        questionType: QuestionType.zhToEnSpelling,
+      );
+
+      await pumpStudy(tester, autoPlay: true, speechEngine: engine);
+      expect(engine.spoken, isEmpty);
+      await tester.enterText(find.byType(TextField), 'banana');
+      await tester.pump();
+      await checkAnswer(tester);
+      expect(find.text('回答正确'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      expect(engine.spoken, <String>['banana']);
+    });
+
     testWidgets('关闭自动朗读时不播放', (tester) async {
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       final engine = RecordingSpeechEngine();

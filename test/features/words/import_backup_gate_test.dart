@@ -67,17 +67,12 @@ void main() {
     expect(service.calls, 0);
   });
 
-  testWidgets('输入正确的关键词后才真的调用导入', (tester) async {
+  testWidgets('在底部确认抽屉点「导入并覆盖」后才真的调用导入', (tester) async {
     await pumpButton(tester);
 
     await tester.tap(find.text('导入备份'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('importBackupConfirmField')),
-      importConfirmKeyword,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('导入并覆盖'));
+    await tester.tap(find.byKey(importBackupConfirmButtonKey));
     await tester.pumpAndSettle();
 
     expect(service.calls, 1);

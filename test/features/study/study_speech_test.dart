@@ -148,6 +148,9 @@ void main() {
 
     test('系统朗读也失败时给出错误文案', () async {
       engine.speakError = Exception('引擎炸了');
+      downloader.failing.add(
+        'https://dict.youdao.com/dictvoice?audio=apple&type=2',
+      );
       final request = studySpeechRequest(
         word: _word(term: 'apple'),
         accent: Accent.us,

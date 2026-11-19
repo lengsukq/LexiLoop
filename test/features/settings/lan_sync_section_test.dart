@@ -321,7 +321,7 @@ void main() {
       expect(client.calls, <String>['handshake', 'download']);
     });
 
-    testWidgets('切成覆盖后要敲 RESTORE 才能拉取', (tester) async {
+    testWidgets('切成覆盖后弹出底部危险确认抽屉，确认后才拉取', (tester) async {
       await pumpSection(tester);
       await tester.tap(find.text('覆盖'));
       await tester.pumpAndSettle();
@@ -335,32 +335,21 @@ void main() {
       await tester.tap(find.byKey(const Key('lanSyncCodeConfirm')));
       await tester.pumpAndSettle();
 
-      // 覆盖仍然沿用 v1 的键入确认。
-      expect(find.byKey(const Key('lanSyncPullConfirmField')), findsOneWidget);
-      expect(find.byKey(const Key('lanSyncMergeConfirm')), findsNothing);
       expect(
-        tester
-            .widget<FilledButton>(
-              find.byKey(const Key('lanSyncPullConfirmButton')),
-            )
-            .onPressed,
-        isNull,
+        find.byKey(const Key('lanSyncPullConfirmButton')),
+        findsOneWidget,
       );
+      expect(find.byKey(const Key('lanSyncMergeConfirm')), findsNothing);
       expect(factory.calls, isEmpty);
       expect(
         find.descendant(
-          of: find.byType(AlertDialog),
+          of: find.byType(BottomSheet),
           matching: find.textContaining('无法撤销'),
         ),
         findsOneWidget,
         reason: '正文必须说清这一步不可逆',
       );
 
-      await tester.enterText(
-        find.byKey(const Key('lanSyncPullConfirmField')),
-        'RESTORE',
-      );
-      await tester.pump();
       await tester.tap(find.byKey(const Key('lanSyncPullConfirmButton')));
       await tester.pumpAndSettle();
       expect(client.calls, <String>['handshake', 'download']);

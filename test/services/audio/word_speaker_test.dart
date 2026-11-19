@@ -44,6 +44,37 @@ void main() {
     downloader.openGate();
   });
 
+  group('学习自动朗读快路径', () {
+    test('录音尚未下载时立即用系统发音，绝不等在线请求', () async {
+      final result = await speaker.speakForAutoPlay(
+        speechRequest(pronunciations: <PronunciationView>[_withRecording()]),
+      );
+      expect(result, isA<SystemVoicePlayed>());
+      expect(engine.spoken, <String>['apple']);
+      expect(downloader.downloaded, isEmpty);
+    });
+
+    test('已预缓存的录音自动播放时无需联网，也不重复系统发音', () async {
+      final url = Uri.parse('https://example.com/apple-us.mp3');
+      await cache.resolve(url);
+      downloader.downloaded.clear();
+
+      final result = await speaker.speakForAutoPlay(
+        speechRequest(pronunciations: <PronunciationView>[_withRecording()]),
+      );
+      expect(result, isA<HumanRecordingPlayed>());
+      expect(player.playCount, 1);
+      expect(engine.spoken, isEmpty);
+      expect(downloader.downloaded, isEmpty);
+    });
+
+    test('系统英语语音不可用时上报失败供页面提示', () async {
+      engine.languageAvailable = false;
+      final result = await speaker.speakForAutoPlay(speechRequest());
+      expect(result, isA<SpeechFailed>());
+    });
+  });
+
   group('真人录音优先', () {
     test('有音频地址时播放词典录音且不再朗读', () async {
       final stored = Uri.parse('https://example.com/apple-us.mp3');
@@ -148,6 +179,7 @@ void main() {
 
     test('系统朗读也失败时返回失败而不是抛出', () async {
       engine.speakError = Exception('没有语音包');
+      downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       final result = await speaker.speak(speechRequest());
 
       expect(result, isA<SpeechFailed>());

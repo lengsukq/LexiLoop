@@ -27,12 +27,12 @@ void main() {
   }
 
   group('控制器', () {
-    test('初始为准备态，默认选中词汇地鼠', () {
+    test('初始为准备态，默认选中单词拼图', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final state = container.read(gamesControllerProvider);
       expect(state, isA<GamesSetup>());
-      expect((state as GamesSetup).selectedMode, GameMode.whackAMole);
+      expect((state as GamesSetup).selectedMode, GameMode.wordBuilder);
       expect(state.loadingMode, isNull);
       expect(state.error, isNull);
     });
@@ -42,15 +42,15 @@ void main() {
       addTearDown(container.dispose);
       container
           .read(gamesControllerProvider.notifier)
-          .selectMode(GameMode.wordTetris);
+          .selectMode(GameMode.wordBuilder);
       final state = container.read(gamesControllerProvider) as GamesSetup;
-      expect(state.selectedMode, GameMode.wordTetris);
+      expect(state.selectedMode, GameMode.wordBuilder);
       expect(state.loadingMode, isNull);
     });
   });
 
   group('准备页', () {
-    testWidgets('渲染 6 个游戏（含听音辨词与词义冲刺）与「开始」按钮', (tester) async {
+    testWidgets('渲染精选游戏与「开始」按钮', (tester) async {
       // 6 张卡片在默认的 800×600 测试窗口里放不下，列表会把靠后的卡片
       // 留在视口外不挂载；测试需要一块够高的画布才能断言全部卡片。
       tester.view.physicalSize = const Size(520, 1200);

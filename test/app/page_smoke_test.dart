@@ -148,25 +148,30 @@ void main() {
     expect(find.byType(TextField), findsWidgets);
   });
 
-  testWidgets('窄屏走底部 Tab（带「更多」），宽屏走侧边栏', (tester) async {
-    // 断点两侧的导航形态必须真的不同，否则「自适应」只是没崩而已。
-    // 底部 Tab 把超出 4 个的目的地收进「更多」，侧边栏则全部平铺——
-    // 用「更多」的有无来区分两种形态。
+  testWidgets('窄屏走 4-Tab 底部导航（无「更多」溢出项），宽屏走侧边栏', (tester) async {
     await pumpRoute(tester, '/', 420);
-    expect(find.text('更多'), findsOneWidget);
+    expect(find.byKey(appBottomBarKey), findsOneWidget);
+    expect(find.text('更多'), findsNothing);
+    for (final destination in mobilePrimaryDestinations) {
+      expect(
+        find.descendant(
+          of: find.byKey(appBottomBarKey),
+          matching: find.text(destination.label),
+        ),
+        findsOneWidget,
+      );
+    }
 
     await pumpRoute(tester, '/', 1200);
-    expect(find.text('更多'), findsNothing);
-    // 用侧边栏的稳定 key 把断言限定在导航里：「今日」这类标签在页面正文里
-    // 也会出现，按材质找会随设计调整而失效。
-    for (final destination in appDestinations) {
+    expect(find.byKey(appSidebarKey), findsOneWidget);
+    for (final destination in mobilePrimaryDestinations) {
       expect(
         find.descendant(
           of: find.byKey(appSidebarKey),
           matching: find.text(destination.label),
         ),
         findsWidgets,
-        reason: '宽屏侧边栏应当平铺出全部目的地：${destination.label}',
+        reason: '宽屏侧边栏应当平铺出主导航目的地：${destination.label}',
       );
     }
   });

@@ -206,22 +206,11 @@ void main() {
     );
   });
 
-  testWidgets('上传要先敲 UPLOAD 才真的发生', (tester) async {
+  testWidgets('点击上传立即执行备份并汇报文件名', (tester) async {
     await configure();
     await pumpSection(tester);
 
     await tester.tap(find.byKey(const Key('uploadToWebdav')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('uploadToWebdavConfirmField')), findsOneWidget);
-    expect(remote.putCalls, 0, reason: '没敲关键字之前不许上传');
-
-    await tester.enterText(
-      find.byKey(const Key('uploadToWebdavConfirmField')),
-      uploadConfirmKeyword,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('uploadToWebdavConfirmButton')));
     await tester.pumpAndSettle();
 
     expect(remote.putCalls, 1);
@@ -229,7 +218,7 @@ void main() {
     expect(find.textContaining('已上传'), findsOneWidget);
   });
 
-  testWidgets('恢复的确认门槛是 RESTORE，且空列表给出明确提示', (tester) async {
+  testWidgets('恢复空列表给出明确提示', (tester) async {
     await configure();
     await pumpSection(tester);
 
@@ -243,7 +232,7 @@ void main() {
     );
   });
 
-  testWidgets('恢复时列出远端备份并必须敲 RESTORE', (tester) async {
+  testWidgets('恢复时列出远端备份并弹出底部确认抽屉', (tester) async {
     await configure();
     const name = 'lexiloop-backup-2026-10-16-101500.json';
     remote.files[name] = Uint8List.fromList(
@@ -259,25 +248,15 @@ void main() {
     await tester.tap(find.byKey(const Key('webdavEntry-$name')));
     await tester.pumpAndSettle();
 
+    expect(find.text('用远端备份覆盖本地？'), findsOneWidget);
     expect(
-      find.byKey(const Key('restoreFromWebdavConfirmField')),
+      find.byKey(const Key('restoreFromWebdavConfirmButton')),
       findsOneWidget,
     );
 
-    // 敲错关键字时按钮保持禁用。
-    await tester.enterText(
-      find.byKey(const Key('restoreFromWebdavConfirmField')),
-      'RESTOR',
-    );
+    await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const Key('restoreFromWebdavConfirmButton')),
-          )
-          .onPressed,
-      isNull,
-    );
+    expect(find.text('用远端备份覆盖本地？'), findsNothing);
   });
 
   testWidgets('状态行显示上次失败原因', (tester) async {

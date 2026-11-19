@@ -91,7 +91,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('导出按钮存在且不直接执行', (tester) async {
+  testWidgets('点击导出按钮直接执行一次并汇报行数与字节数', (tester) async {
     await pumpSection(tester);
 
     expect(find.byKey(const Key('exportBackup')), findsOneWidget);
@@ -100,68 +100,9 @@ void main() {
     await tester.tap(find.byKey(const Key('exportBackup')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('exportBackupConfirmField')), findsOneWidget);
-    expect(service.calls, 0, reason: '没敲关键字之前不许导出');
-  });
-
-  testWidgets('没敲对关键字时确认按钮保持禁用', (tester) async {
-    await pumpSection(tester);
-    await tester.tap(find.byKey(const Key('exportBackup')));
-    await tester.pumpAndSettle();
-
-    VoidCallback? confirm() => tester
-        .widget<FilledButton>(
-          find.byKey(const Key('exportBackupConfirmButton')),
-        )
-        .onPressed;
-
-    expect(confirm(), isNull);
-    await tester.enterText(
-      find.byKey(const Key('exportBackupConfirmField')),
-      'export',
-    );
-    await tester.pumpAndSettle();
-    expect(confirm(), isNull, reason: '大小写不匹配');
-
-    await tester.enterText(
-      find.byKey(const Key('exportBackupConfirmField')),
-      'EXPORT',
-    );
-    await tester.pumpAndSettle();
-    expect(confirm(), isNotNull);
-  });
-
-  testWidgets('确认后导出一次并汇报行数与字节数', (tester) async {
-    await pumpSection(tester);
-    await tester.tap(find.byKey(const Key('exportBackup')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('exportBackupConfirmField')),
-      'EXPORT',
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('exportBackupConfirmButton')));
-    await tester.pumpAndSettle();
-
     expect(service.calls, 1);
     expect(find.textContaining('已导出 15 行'), findsOneWidget);
     expect(find.textContaining('1.0 KB'), findsOneWidget);
-  });
-
-  testWidgets('取消后不导出', (tester) async {
-    await pumpSection(tester);
-    await tester.tap(find.byKey(const Key('exportBackup')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('exportBackupConfirmField')),
-      'EXPORT',
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
-    expect(service.calls, 0);
   });
 
   testWidgets('导出失败时把 AppError 文案弹给用户', (tester) async {
@@ -169,46 +110,34 @@ void main() {
     await pumpSection(tester);
     await tester.tap(find.byKey(const Key('exportBackup')));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const Key('exportBackupConfirmField')),
-      'EXPORT',
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('exportBackupConfirmButton')));
-    await tester.pumpAndSettle();
 
     expect(find.text('备份文件过大。'), findsOneWidget);
   });
 
-  testWidgets('清空全部数据的 DELETE 确认仍然生效', (tester) async {
+  testWidgets('清空全部数据弹出底部危险确认抽屉', (tester) async {
     await pumpSection(tester);
     await tester.tap(find.byKey(const Key('clearAllData')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('clearAllDataConfirmField')), findsOneWidget);
+    expect(find.text('清空全部数据？'), findsOneWidget);
+    expect(
+      find.byKey(const Key('clearAllDataConfirmButton')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('导入备份必须先敲 IMPORT——它是三个动作里唯一全量覆盖的', (tester) async {
+  testWidgets('导入备份弹出底部确认抽屉并说明是整体替换', (tester) async {
     await pumpSection(tester);
     await tester.tap(find.text('导入旧版 JSON 备份'));
     await tester.pumpAndSettle();
 
-    // 对话框必须先出现，而不是直接开始导入。
-    expect(find.byKey(const Key('importBackupConfirmField')), findsOneWidget);
-    // 没敲关键字之前确认按钮必须禁用。
     expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const Key('importBackupConfirmButton')),
-          )
-          .onPressed,
-      isNull,
+      find.byKey(const Key('importBackupConfirmButton')),
+      findsOneWidget,
     );
-    // 文案要点明这是「整体替换」而不是合并。**限定在对话框内**：同一页上
-    // 还有别的分组（例如局域网同步）也会说「整体替换」，全局查找会撞车。
     expect(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byType(BottomSheet),
         matching: find.textContaining('整体替换'),
       ),
       findsOneWidget,

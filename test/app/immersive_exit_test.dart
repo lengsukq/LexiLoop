@@ -159,6 +159,46 @@ void main() {
     expect(find.byType(DashboardPage), findsOneWidget);
   });
 
+  testWidgets('从首页「继续学习」进入后按 Android 返回，必须回到今日', (tester) async {
+    await seedSession();
+    final router = await pumpAt(tester, '/', size: const Size(500, 900));
+    expect(find.text('继续学习'), findsOneWidget);
+
+    await tapAndSettle(tester, find.text('继续学习'));
+    expect(locationOf(router), '/study');
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(locationOf(router), '/');
+    expect(find.byType(DashboardPage), findsOneWidget);
+  });
+
+  testWidgets('Android 系统返回：学习进行中应回首页，而不是退出 APP', (tester) async {
+    await seedSession();
+    final router = await pumpAt(tester, '/study', size: const Size(500, 900));
+    expect(find.byType(StudyPage), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(locationOf(router), '/');
+    expect(find.byType(DashboardPage), findsOneWidget);
+  });
+
+  testWidgets('Android 系统返回：学习空队列也回首页', (tester) async {
+    final router = await pumpAt(tester, '/study', size: const Size(500, 900));
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(locationOf(router), '/');
+    expect(find.byType(DashboardPage), findsOneWidget);
+  });
+
   testWidgets('学习页头部的「结束」也回到今日', (tester) async {
     // 有题目时退出按钮在进度条上（`StudyProgressHeader.onExit`），
     // 与结算页的「返回首页」走同一个回调——两条路径都必须是「回首页」。
@@ -198,6 +238,12 @@ void main() {
       final router = await pumpAt(tester, entry.$1, size: const Size(500, 900));
       expect(find.byType(entry.$2), findsOneWidget);
       expect(locationOf(router), entry.$1);
+
+      // 三种训练的准备页都不该在系统后退时直接关掉整个应用。
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(locationOf(router), entry.$1 == '/games' ? '/' : '/games');
     });
   }
 }

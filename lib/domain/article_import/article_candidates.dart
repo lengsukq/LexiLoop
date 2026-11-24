@@ -231,12 +231,24 @@ ArticleCandidate _mergeCandidate(ArticleCandidate a, ArticleCandidate b) {
     status: b.isKnown ? ArticleCandidateStatus.known : a.status,
     entryType: a.entryType,
     sourceSentence: _firstNonEmpty(a.sourceSentence, b.sourceSentence),
+    surfaceForm: _firstNonEmpty(a.surfaceForm, b.surfaceForm),
     aiReason: _firstNonEmpty(a.aiReason, b.aiReason),
     difficulty: stronger ? b.difficulty : a.difficulty,
     cefrLevel: stronger ? (b.cefrLevel ?? a.cefrLevel) : a.cefrLevel,
     frequency: stronger ? (b.frequency ?? a.frequency) : a.frequency,
+    examTags: _mergeTags(a.examTags, b.examTags),
     aiCard: a.aiCard ?? b.aiCard,
   );
+}
+
+List<String> _mergeTags(List<String> first, List<String> second) {
+  if (second.isEmpty) return first;
+  if (first.isEmpty) return second;
+  final out = <String>[...first];
+  for (final tag in second) {
+    if (!out.contains(tag)) out.add(tag);
+  }
+  return List<String>.unmodifiable(out);
 }
 
 String? _firstNonEmpty(String? current, String? candidate) {

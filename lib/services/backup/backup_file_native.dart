@@ -21,6 +21,8 @@ import 'package:share_plus/share_plus.dart';
 Future<String> shareBackupBytes({
   required Uint8List bytes,
   required String fileName,
+  String mimeType = backupMimeType,
+  String subject = 'LexiLoop 备份',
 }) async {
   final directory = await getTemporaryDirectory();
   final file = File(p.join(directory.path, fileName));
@@ -28,8 +30,8 @@ Future<String> shareBackupBytes({
 
   await SharePlus.instance.share(
     ShareParams(
-      subject: 'LexiLoop 备份',
-      files: <XFile>[XFile(file.path, mimeType: backupMimeType)],
+      subject: subject,
+      files: <XFile>[XFile(file.path, mimeType: mimeType)],
       fileNameOverrides: <String>[fileName],
     ),
   );

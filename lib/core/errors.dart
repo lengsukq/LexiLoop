@@ -308,12 +308,6 @@ enum AppErrorCode {
   /// 系统 TTS 引擎不可用或缺少所需语音包。
   ttsUnavailable('TTS_UNAVAILABLE', '系统语音合成不可用，请在系统设置中安装语音包。'),
 
-  /// 用户选中 Next.js 在线语音，但尚未配置有效的 HTTPS 服务地址。
-  ttsOnlineNotConfigured(
-    'TTS_ONLINE_NOT_CONFIGURED',
-    '请先在「播放」设置中填写 Next.js TTS 服务地址。',
-  ),
-
   /// 合成过程出错。
   ttsSynthesisFailed('TTS_SYNTHESIS_FAILED', '语音合成失败。'),
 
@@ -326,7 +320,36 @@ enum AppErrorCode {
   staleLock('STALE_LOCK', '任务锁已失效，已重新排队。'),
 
   /// 维护任务自动重试了失败任务。
-  autoRetry('AUTO_RETRY', '任务自动重试。');
+  autoRetry('AUTO_RETRY', '任务自动重试。'),
+
+  // ── 词书包 ──
+
+  /// 目标词书包不存在。
+  wordPackNotFound('WORD_PACK_NOT_FOUND', '词书包不存在或已被卸载。'),
+
+  /// 词书包下载失败（所有可用通道均未能拉取）。
+  wordPackDownloadFailed(
+    'WORD_PACK_DOWNLOAD_FAILED',
+    '词书包下载失败，请检查网络或切换下载通道后重试。',
+  ),
+
+  /// 词书包 SHA-256 校验不通过。
+  wordPackChecksumMismatch(
+    'WORD_PACK_CHECKSUM_MISMATCH',
+    '词书包文件校验未通过（可能已损坏或被篡改），已拒绝导入。',
+  ),
+
+  /// 词书包格式无效或版本不受支持。
+  wordPackInvalidFormat(
+    'WORD_PACK_INVALID_FORMAT',
+    '词书包格式无效，请选择合法的 .lexipack.json.gz 文件。',
+  ),
+
+  /// 词书包体积超出安全上限。
+  wordPackTooLarge('WORD_PACK_TOO_LARGE', '词书包文件体积超过上限。'),
+
+  /// 用户主动取消了词书包下载。
+  wordPackCancelled('WORD_PACK_CANCELLED', '已取消下载。');
 
   // 枚举构造函数隐式为 const，无需显式标注。
   new(this.code, this.defaultMessage);

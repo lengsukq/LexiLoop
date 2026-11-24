@@ -8,6 +8,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
+import 'package:lexiloop/services/audio/speech_disk_cache.dart';
 
 import 'audio_fakes.dart';
 
@@ -124,5 +125,43 @@ void main() {
     expect(cache.length, 0);
     await cache.resolve(_url('apple'));
     expect(downloader.downloaded, hasLength(2));
+  });
+
+  group('L2 磁盘持久化缓存联动', () {
+    test('清空 L1 内存后仍直接命中 L2 磁盘，不触发网络下载', () async {
+      final disk = InMemorySpeechDiskCache();
+      final tiered = AudioCache(downloader, diskCache: disk);
+      final url = _url('offline-word');
+
+      final first = await tiered.resolve(url);
+      expect(first, isNotNull);
+      expect(downloader.downloaded, hasLength(1));
+
+      // 模拟重启 App：清空内存 LRU，但保留磁盘。
+      tiered.clear();
+      expect(tiered.length, 0);
+
+      final second = await tiered.resolve(url);
+      expect(second, first);
+      expect(downloader.downloaded, hasLength(1), reason: '应从磁盘命中，不得再次联网');
+      expect(tiered.length, 1, reason: '命中磁盘后应回填 L1 内存');
+    });
+
+    test('关闭离线持久化开关时只用内存，不写入磁盘', () async {
+      final disk = InMemorySpeechDiskCache();
+      final memoryOnly = AudioCache(
+        downloader,
+        diskCache: disk,
+        policy: () => const SpeechCachePolicy(enabled: false, maxBytes: 0),
+      );
+      final url = _url('no-disk');
+
+      await memoryOnly.resolve(url);
+      expect((await disk.stats()).totalFiles, 0);
+
+      memoryOnly.clear();
+      await memoryOnly.resolve(url);
+      expect(downloader.downloaded, hasLength(2));
+    });
   });
 }

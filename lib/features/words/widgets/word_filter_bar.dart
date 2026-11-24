@@ -28,22 +28,39 @@ class WordFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final largeText = MediaQuery.textScalerOf(context).scale(13) > 20;
     return Padding(
-      padding: const EdgeInsets.only(top: LexiSpace.s4, bottom: LexiSpace.s8),
+      padding: const EdgeInsets.only(top: LexiSpace.s2, bottom: LexiSpace.s8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const _SearchField(),
           const SizedBox(height: LexiSpace.s8),
-          const WordSortPicker(),
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth < LexiLayout.wideBreakpoint) {
-                return const _FilterButton();
+                if (largeText) {
+                  return const Wrap(
+                    spacing: LexiSpace.s8,
+                    runSpacing: LexiSpace.s8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: <Widget>[WordSortPicker(), _FilterButton()],
+                  );
+                }
+                return const Row(
+                  children: <Widget>[
+                    Expanded(child: WordSortPicker()),
+                    SizedBox(width: LexiSpace.s8),
+                    _FilterButton(),
+                  ],
+                );
               }
-              return const DisclosureSection(
-                title: '高级筛选',
-                child: WordFilterControls(),
+              return const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  WordSortPicker(),
+                  DisclosureSection(title: '高级筛选', child: WordFilterControls()),
+                ],
               );
             },
           ),
@@ -65,23 +82,47 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   /// 自己持有控制器：清除按钮要把输入框本身也清空，
   /// 只改查询状态的话输入框里会留下旧词，看起来像清除失败。
   final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    final delay = ref.read(wordsSearchDebounceProvider);
+    if (delay <= Duration.zero) {
+      ref.read(wordQueryProvider.notifier).setSearch(value);
+      return;
+    }
+    _debounce = Timer(delay, () {
+      if (!mounted) return;
+      ref.read(wordQueryProvider.notifier).setSearch(value);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasText = ref.watch(
-      wordQueryProvider.select((query) => query.search.isNotEmpty),
-    );
+    ref.listen<String>(wordQueryProvider.select((query) => query.search), (
+      _,
+      next,
+    ) {
+      if (next.isEmpty && _controller.text.isNotEmpty) {
+        _debounce?.cancel();
+        _controller.clear();
+      }
+    });
+    final hasText =
+        _controller.text.isNotEmpty ||
+        ref.watch(wordQueryProvider.select((query) => query.search.isNotEmpty));
     return TextField(
       controller: _controller,
-      onChanged: ref.read(wordQueryProvider.notifier).setSearch,
+      onChanged: _onChanged,
       decoration: InputDecoration(
-        hintText: '搜索词条或备注…',
+        hintText: '搜索词条、中文释义、标签或备注…',
         prefixIcon: const Icon(LucideIcons.search, size: 18),
         suffixIcon: hasText
             ? IconButton(
@@ -95,6 +136,7 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   }
 
   void _clear() {
+    _debounce?.cancel();
     _controller.clear();
     ref.read(wordQueryProvider.notifier).setSearch('');
   }

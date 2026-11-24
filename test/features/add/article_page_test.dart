@@ -66,12 +66,17 @@ class _FakeArticleService extends ArticleImportService {
   final ArticleImportPreview? mergeResult;
   final List<ArticleSegmentOutcome> segmentOutcomes;
 
-  /// 最近一次提交的勾选键与模式。
+  /// 最近一次提交的勾选键、模式、重置、保留例句与标签。
   Set<String>? lastSelectedKeys;
   ImportMode? lastMode;
-
-  /// 最近一次提交是否勾选了「重置已有词条的学习进度」。
   bool? lastResetLearningProgress;
+  bool? lastIncludeSourceSentence;
+  List<String>? lastTags;
+
+  /// 最近一次预览传入的考试目标、难度模式与提取范围。
+  List<VocabularyLevel>? lastExamTargets;
+  ArticleDifficultyMode? lastDifficultyMode;
+  ArticleExtractScope? lastExtractScope;
 
   /// 预览调用次数。
   int previewCalls = 0;
@@ -83,8 +88,13 @@ class _FakeArticleService extends ArticleImportService {
     String sourceLanguage = 'en',
     String targetLanguage = 'zh-CN',
     List<VocabularyLevel>? examTargets,
+    ArticleDifficultyMode difficultyMode = ArticleDifficultyMode.atOrAbove,
+    ArticleExtractScope extractScope = ArticleExtractScope.wordsOnly,
   }) async {
     previewCalls += 1;
+    lastExamTargets = examTargets;
+    lastDifficultyMode = difficultyMode;
+    lastExtractScope = extractScope;
     final error = previewError;
     if (error != null) throw error;
     return previewResult!;
@@ -96,7 +106,12 @@ class _FakeArticleService extends ArticleImportService {
     required int segmentsPerBatch,
     required int now,
     List<VocabularyLevel>? examTargets,
+    ArticleDifficultyMode difficultyMode = ArticleDifficultyMode.atOrAbove,
+    ArticleExtractScope extractScope = ArticleExtractScope.wordsOnly,
   }) async* {
+    lastExamTargets = examTargets;
+    lastDifficultyMode = difficultyMode;
+    lastExtractScope = extractScope;
     for (final outcome in segmentOutcomes) {
       yield outcome;
     }
@@ -124,10 +139,14 @@ class _FakeArticleService extends ArticleImportService {
     required ImportMode mode,
     required int now,
     bool resetLearningProgress = false,
+    bool includeSourceSentence = true,
+    List<String> tags = const <String>[],
   }) async {
     lastSelectedKeys = selectedKeys;
     lastMode = mode;
     lastResetLearningProgress = resetLearningProgress;
+    lastIncludeSourceSentence = includeSourceSentence;
+    lastTags = tags;
     final error = commitError;
     if (error != null) throw error;
     return commitResult!;
@@ -382,8 +401,52 @@ void main() {
 
     await analyze(tester);
 
-    expect(find.textContaining('模型服务 → AI'), findsOneWidget);
+    expect(find.textContaining('设置 → AI 模型'), findsOneWidget);
     expect(find.text('未启用 AI · 展示单词与本地切句'), findsOneWidget);
+  });
+
+  testWidgets('清空考试目标后显式传入空列表（自适应），不再静默回落全局设置', (tester) async {
+    await settings.update(<String, Object?>{
+      'examTargets': <String>['CET6'],
+    }, now: 0);
+    final service = _FakeArticleService(
+      deps,
+      previewResult: previewOf(
+        candidates: <ArticleCandidate>[candidate()],
+        recommendedTerms: <String>['apple'],
+        recommendedKeys: <String>['WORD\u0000apple'],
+      ),
+    );
+    await pumpPage(tester, service);
+
+    await tapKey(tester, 'articleClearExamTargets');
+    await tapKey(tester, 'articleModeExactBand');
+    await analyze(tester);
+
+    expect(service.lastExamTargets, isNotNull);
+    expect(service.lastExamTargets, isEmpty);
+    expect(service.lastDifficultyMode, ArticleDifficultyMode.exactBand);
+    expect(service.lastExtractScope, ArticleExtractScope.wordsOnly);
+  });
+
+  testWidgets('预览页点「修改/重选难度」回到输入页且保留原文', (tester) async {
+    final service = _FakeArticleService(
+      deps,
+      previewResult: previewOf(
+        candidates: <ArticleCandidate>[candidate()],
+        recommendedTerms: <String>['apple'],
+        recommendedKeys: <String>['WORD\u0000apple'],
+      ),
+    );
+    await pumpPage(tester, service);
+    await analyze(tester);
+
+    await tapKey(tester, 'articleBackToEdit');
+
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('articleText')),
+    );
+    expect(field.controller?.text, singleParagraphArticle);
   });
 
   testWidgets('分析失败时显示可操作的错误文案', (tester) async {

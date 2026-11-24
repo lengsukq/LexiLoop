@@ -158,29 +158,59 @@ void main() {
   });
 
   group('词汇水平与考试目标', () {
-    test('按存储标识解析档位', () {
+    test('按存储标识解析档位（含新增的高考/专四/专八/GRE）', () {
       expect(
         appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'CET6'})
             .vocabularyLevel,
         VocabularyLevel.cet6,
       );
+      expect(
+        appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'GAOKAO'})
+            .vocabularyLevel,
+        VocabularyLevel.gaokao,
+      );
+      expect(
+        appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'TEM4'})
+            .vocabularyLevel,
+        VocabularyLevel.tem4,
+      );
+      expect(
+        appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'TEM8'})
+            .vocabularyLevel,
+        VocabularyLevel.tem8,
+      );
+      expect(
+        appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'GRE'})
+            .vocabularyLevel,
+        VocabularyLevel.gre,
+      );
     });
 
     test('未知档位退回 AUTO', () {
       expect(
-        appSettingsFromRaw(<String, Object?>{'vocabularyLevel': 'GRE'})
-            .vocabularyLevel,
+        appSettingsFromRaw(<String, Object?>{
+          'vocabularyLevel': 'UNKNOWN_LEVEL',
+        }).vocabularyLevel,
         VocabularyLevel.auto,
       );
     });
 
     test('考试目标过滤 AUTO 与非法值并去重', () {
       final settings = appSettingsFromRaw(<String, Object?>{
-        'examTargets': <Object?>['CET4', 'AUTO', 'CET4', 'IELTS', 42, 'GRE'],
+        'examTargets': <Object?>[
+          'CET4',
+          'AUTO',
+          'CET4',
+          'IELTS',
+          'GRE',
+          42,
+          'UNKNOWN_EXAM',
+        ],
       });
       expect(settings.examTargets, <VocabularyLevel>[
         VocabularyLevel.cet4,
         VocabularyLevel.ielts,
+        VocabularyLevel.gre,
       ]);
     });
 

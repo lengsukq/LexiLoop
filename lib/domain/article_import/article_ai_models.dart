@@ -21,14 +21,19 @@ class ArticleAiWord {
     required this.term,
     required this.reason,
     required this.difficulty,
+    this.surfaceForm,
     this.cefrLevel,
     this.frequency,
+    this.examTags = const <String>[],
   });
 
-  /// 词形。
+  /// 词典原形（lemma）。
   final String term;
 
-  /// 推荐理由。
+  /// 原文中出现的变形词（与原形相同时可为 `null`）。
+  final String? surfaceForm;
+
+  /// 语境提示 / 推荐理由。
   final String reason;
 
   /// 难度（1–5）。
@@ -39,6 +44,9 @@ class ArticleAiWord {
 
   /// 词频档。
   final String? frequency;
+
+  /// 考试标签（如 `CET6`、`IELTS`）。
+  final List<String> examTags;
 }
 
 /// AI 选出的一个短语。

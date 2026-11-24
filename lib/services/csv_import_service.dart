@@ -19,9 +19,11 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/import/content_payload.dart';
 import 'package:lexiloop/data/import/content_type.dart';
+import 'package:lexiloop/data/import/csv_columns.dart';
 import 'package:lexiloop/data/import/csv_parser.dart';
 import 'package:lexiloop/data/import/import_models.dart';
 import 'package:lexiloop/data/import/provider_targets.dart';
+import 'package:lexiloop/data/import/wordlist_parser.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
 import 'package:lexiloop/services/learning_progress_reset.dart';
@@ -35,7 +37,7 @@ class CsvImportService {
   final AppDatabase _db;
   final SettingsService _settings;
 
-  /// 选择文件并解析出预览。
+  /// 选择文件并解析出预览（支持 CSV / TSV / TXT 通用词表）。
   ///
   /// 预览会落 `import_batches` / `import_rows`（**不落词条**），
   /// 有效期 [importPreviewTtlMs]。用户取消选择时抛
@@ -44,6 +46,7 @@ class CsvImportService {
     required String sourceLanguage,
     required String targetLanguage,
     required int now,
+    List<String> extraTags = const <String>[],
   }) async {
     final picked = await _pickCsvFile();
     if (picked == null) {
@@ -57,25 +60,107 @@ class CsvImportService {
       filename: picked.name,
       sourceLanguage: sourceLanguage,
       targetLanguage: targetLanguage,
+      extraTags: extraTags,
       now: now,
     );
   }
 
-  /// 从已读取的文本解析并落预览。
+  /// 从已读取的文本解析并落预览（自动识别 CSV / TSV / TXT 词表）。
   ///
-  /// 与 [preview] 分开是为了让「解析 + 落库」可以脱离文件选择器测试。
+  /// 当 CSV 缺少标准表头但有可映射列时，抛出的 [AppErrorCode.csvMissingHeaders]
+  /// 会在 `details` 中携带 [CsvColumnMappingDraft]，供界面弹出手工列映射。
   Future<ImportPreview> previewFromContent(
     String content, {
     required String filename,
     required String sourceLanguage,
     required String targetLanguage,
     required int now,
+    List<String> extraTags = const <String>[],
   }) async {
-    final parsed = parseEasyDictCsv(
+    final parsed = _parseImportContent(
+      content,
+      filename: filename,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage,
+      extraTags: extraTags,
+    );
+    return await _persistPreview(
+      parsed,
+      filename: filename,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage,
+      now: now,
+    );
+  }
+
+  /// 按用户手工指定的列映射解析 CSV/TSV 并落预览。
+  Future<ImportPreview> previewWithColumnMap(
+    String content, {
+    required String filename,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required Map<CsvField, int> columns,
+    required int now,
+    bool hasHeaderRow = true,
+    String? delimiter,
+    List<String> extraTags = const <String>[],
+  }) async {
+    final parsed = parseDelimitedWithColumnMap(
       content,
       sourceLanguage: sourceLanguage,
       targetLanguage: targetLanguage,
+      columns: columns,
+      hasHeaderRow: hasHeaderRow,
+      delimiter: delimiter,
+      extraTags: extraTags,
     );
+    return await _persistPreview(
+      parsed,
+      filename: filename,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage,
+      now: now,
+    );
+  }
+
+  CsvParseResult _parseImportContent(
+    String content, {
+    required String filename,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required List<String> extraTags,
+  }) {
+    final lower = filename.toLowerCase();
+    if (lower.endsWith('.txt') || lower.endsWith('.tsv')) {
+      return parseWordlistText(
+        content,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage,
+        extraTags: extraTags,
+      );
+    }
+    try {
+      final parsed = parseEasyDictCsv(
+        content,
+        sourceLanguage: sourceLanguage,
+        targetLanguage: targetLanguage,
+      );
+      return appendExtraTags(parsed, extraTags);
+    } on ValidationError catch (error) {
+      if (error.code != AppErrorCode.csvMissingHeaders) rethrow;
+      final draft = inspectCsvForColumnMapping(content, filename: filename);
+      if (draft == null) rethrow;
+      throw ValidationError(AppErrorCode.csvMissingHeaders, details: draft);
+    }
+  }
+
+  Future<ImportPreview> _persistPreview(
+    CsvParseResult parsed, {
+    required String filename,
+    required String sourceLanguage,
+    required String targetLanguage,
+    required int now,
+  }) async {
     final rows = await _annotateExisting(
       parsed.rows,
       sourceLanguage: sourceLanguage,
@@ -83,7 +168,6 @@ class CsvImportService {
     );
     final batchId = await _insertBatch(filename, rows, now);
     await _insertPreviewRows(batchId, rows, now);
-
     return ImportPreview(
       batchId: batchId,
       filename: filename,
@@ -187,19 +271,21 @@ class CsvImportService {
   // ── 预览 ──
 
   Future<_PickedCsv?> _pickCsvFile() async {
+    const allowed = <String>['csv', 'tsv', 'txt'];
     // file_picker 13.x 起直接返回文件列表，空列表即用户取消。
     final files = await FilePickerPlatform.instance.pickFiles(
-      dialogTitle: '选择 EasyDict CSV 文件',
+      dialogTitle: '选择词表文件（CSV / TSV / TXT）',
       type: FileType.custom,
-      allowedExtensions: <String>['csv'],
+      allowedExtensions: allowed,
     );
     if (files.isEmpty) return null;
 
     final picked = files.first;
-    if (picked.extension?.toLowerCase() != 'csv') {
+    final ext = picked.extension?.toLowerCase() ?? '';
+    if (!allowed.contains(ext)) {
       throw const ValidationError(
         AppErrorCode.csvTypeInvalid,
-        details: '仅支持 .csv 文件',
+        details: '仅支持 .csv / .tsv / .txt 词表文件',
       );
     }
     // 用 PlatformFile.readAsBytes 而不是 File(path)：Android 上
@@ -256,18 +342,22 @@ class CsvImportService {
     String sourceLanguage,
     String targetLanguage,
   ) async {
+    final targets = targetLanguage == 'zh-CN'
+        ? const <String>['zh-CN', 'zh']
+        : <String>[targetLanguage];
     final query = _db.select(_db.words)
       ..where(
         (table) =>
             table.sourceLanguage.equals(sourceLanguage) &
-            table.targetLanguage.equals(targetLanguage),
+            table.targetLanguage.isIn(targets),
       );
     final rows = await query.get();
-    return <String, int>{
-      for (final row in rows)
-        identityKey(row.normalizedTerm, row.sourceLanguage, row.targetLanguage):
-            row.id,
-    };
+    final map = <String, int>{};
+    for (final row in rows) {
+      map[identityKey(row.normalizedTerm, row.sourceLanguage, targetLanguage)] =
+          row.id;
+    }
+    return map;
   }
 
   Future<int> _insertBatch(String filename, List<ParsedCsvRow> rows, int now) {
@@ -630,6 +720,13 @@ class CsvImportService {
 
     final resetAt = outcome.resetProgressAt;
     final wordId = outcome.wordId;
+    if (outcome.status == ImportRowStatus.existing && wordId != null) {
+      batch.update(
+        _db.words,
+        const WordsCompanion(isPersonal: Value<bool>(true)),
+        where: (table) => table.id.equals(wordId),
+      );
+    }
     if (resetAt != null && wordId != null) {
       _writeProgressReset(batch, wordId: wordId, now: resetAt);
     }

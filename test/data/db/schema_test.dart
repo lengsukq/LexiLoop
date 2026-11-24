@@ -44,11 +44,13 @@ void main() {
   }
 
   group('schema', () {
-    test('15 张业务表全部建立', () async {
+    test('17 张业务表全部建立', () async {
       const expected = <String>{
         'words',
         'word_contents',
         'word_review_stats',
+        'word_packs',
+        'word_pack_items',
         'study_sessions',
         'study_session_items',
         'review_cards',

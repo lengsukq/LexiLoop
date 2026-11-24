@@ -509,6 +509,7 @@ class InitializationWorker implements InitializationJobRunner {
     final llmConfig = llmConfigFromSettings(settings.raw);
     if (!llmConfig.isUsable) return;
     if (word.contentType == LexicalContentType.sentence) {
+      if (!llmConfig.canAutoTranslate) return;
       if (_hasTargetTranslation(merged, word.targetLanguage)) return;
       await _queries.enqueueWord(
         EnqueueRequest(
@@ -521,6 +522,7 @@ class InitializationWorker implements InitializationJobRunner {
       );
       return;
     }
+    if (!llmConfig.canAutoMnemonic) return;
     final mnemonic = merged.record('learning')['mnemonic'];
     final hasMnemonic = mnemonic is String && mnemonic.trim().isNotEmpty;
     if (word.sourceLanguage.startsWith('en') && !hasMnemonic) {

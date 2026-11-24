@@ -119,6 +119,7 @@ void main() {
     WidgetTester tester, {
     double width = 1400,
     List<Override> overrides = const <Override>[],
+    Duration searchDebounce = Duration.zero,
   }) async {
     tester.view.physicalSize = Size(width, 1800);
     tester.view.devicePixelRatio = 1;
@@ -128,6 +129,7 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           databaseProvider.overrideWithValue(db),
+          wordsSearchDebounceProvider.overrideWithValue(searchDebounce),
           ...overrides,
         ],
         child: MaterialApp.router(
@@ -172,10 +174,7 @@ void main() {
       await tester.tap(find.byKey(const Key('wordsLoadMore')));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('已加载全部 ${wordListPageSize + 1} 个词条'),
-        findsOneWidget,
-      );
+      expect(find.text('已加载全部 ${wordListPageSize + 1} 个词条'), findsOneWidget);
       expect(queryOf(tester).limit, wordListPageSize * 2);
 
       await tester.drag(find.byType(ListView), const Offset(0, -3000));
@@ -517,6 +516,18 @@ void main() {
       expect(find.text('标记：/add'), findsOneWidget);
     });
 
+    testWidgets('「文章分词」跳到 /article', (tester) async {
+      await insertWord(term: 'alpha');
+      await pumpPage(tester);
+
+      await tester.tap(find.byTooltip('更多操作'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('文章分词'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('标记：/article'), findsOneWidget);
+    });
+
     testWidgets('「CSV 导入」跳到 /import', (tester) async {
       await insertWord(term: 'alpha');
       await pumpPage(tester);
@@ -539,6 +550,34 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('有排队查词任务时显示进度条并可跳转队列页', (tester) async {
+      final id = await insertWord(
+        term: 'queued-word',
+        status: InitializationStatus.queued,
+      );
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db
+          .into(db.initializationJobs)
+          .insert(
+            InitializationJobsCompanion.insert(
+              wordId: id,
+              taskType: const Value<JobTaskType>(JobTaskType.initialize),
+              mode: InitializationMode.fillMissingFields,
+              availableAt: Value<int?>(now),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await pumpPage(tester);
+
+      expect(find.byKey(const Key('wordsQueueProgressBanner')), findsOneWidget);
+      expect(find.textContaining('有道查词补全中：队列中 1'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('wordsQueueOpen')));
+      await tester.pumpAndSettle();
+      expect(find.text('标记：/initialize'), findsOneWidget);
     });
   });
 
@@ -669,6 +708,61 @@ void main() {
       expect(find.text('筛选'), findsOneWidget);
     });
   });
+
+  group('防抖搜索、标签专项复习与批量管理', () {
+    testWidgets('搜索框按 300ms 防抖延迟触发查询', (tester) async {
+      await insertWord(term: 'apple');
+      await insertWord(term: 'banana');
+      await pumpPage(
+        tester,
+        searchDebounce: const Duration(milliseconds: wordsSearchDebounceMs),
+      );
+
+      await tester.enterText(find.byType(TextField), 'apple');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(queryOf(tester).search, '');
+
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(queryOf(tester).search, 'apple');
+      expect(_cardTerms(tester), <String>['apple']);
+    });
+
+    testWidgets('批量加标签后可按标签筛选并发起专项复习', (tester) async {
+      await insertWord(term: 'resilient');
+      await insertWord(term: 'ubiquitous');
+      await pumpPage(tester);
+
+      await tester.tap(find.byTooltip('更多操作'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('批量管理'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('wordsBulkBar')), findsOneWidget);
+      await tester.tap(find.text('resilient'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('wordsBulkAddTag')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('wordsBulkTagInput')),
+        'IELTS',
+      );
+      await tester.tap(find.byKey(const Key('wordsBulkTagConfirm')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('wordsBulkExit')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('#IELTS'));
+      await tester.pumpAndSettle();
+      expect(_cardTerms(tester), <String>['resilient']);
+
+      await tester.tap(find.byKey(const Key('wordsStudyCurrentTag')));
+      await tester.pumpAndSettle();
+      expect(find.text('标记：/study?mode=DAILY&tag=IELTS'), findsOneWidget);
+    });
+  });
 }
 
 /// 本组用例专用路由表：只注册本页会跳转到的地址。
@@ -685,12 +779,24 @@ GoRouter _testRouter() => GoRouter(
       builder: (_, _) => const _RouteMarker(addWordPath),
     ),
     GoRoute(
+      path: articlePath,
+      builder: (_, _) => const _RouteMarker(articlePath),
+    ),
+    GoRoute(
       path: csvImportPath,
       builder: (_, _) => const _RouteMarker(csvImportPath),
     ),
     GoRoute(
+      path: initializePath,
+      builder: (_, _) => const _RouteMarker(initializePath),
+    ),
+    GoRoute(
       path: statisticsPath,
       builder: (_, _) => const _RouteMarker(statisticsPath),
+    ),
+    GoRoute(
+      path: studyPath,
+      builder: (_, state) => _RouteMarker(state.uri.toString()),
     ),
   ],
 );

@@ -18,8 +18,11 @@ import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_input_step.dart';
 import 'package:lexiloop/features/add/widgets/article_preview_step.dart';
 import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
+import 'package:lexiloop/features/add/widgets/article_strategy_card.dart';
 import 'package:lexiloop/features/add/widgets/article_success_card.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/adaptive_columns.dart';
 import 'package:lexiloop/ui/widgets/flow_steps.dart';
@@ -62,8 +65,8 @@ class _ArticlePageState extends ConsumerState<ArticlePage> {
     return PageShell(
       scrollable: true,
       header: PageHeader(
-        title: '文章提词',
-        subtitle: '粘贴英文，挑选词汇，预览后导入。',
+        title: '文章智能分词',
+        subtitle: '按难度智能分词并还原词形，导入后自动通过有道词典查词。',
         leading: Builder(
           builder: (backContext) => IconButton(
             key: const Key('articleBack'),
@@ -73,11 +76,14 @@ class _ArticlePageState extends ConsumerState<ArticlePage> {
           ),
         ),
       ),
+      bottomAction: state.analysis.step == ArticleStep.preview
+          ? const _ArticleCommitBar()
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           FlowSteps(
-            labels: const <String>['输入文章', '分析选词', '确认导入', '完成'],
+            labels: const <String>['输入文章', '智能分词', '确认导入', '完成'],
             current: switch (state.analysis.step) {
               ArticleStep.input => 0,
               ArticleStep.analyzing => 1,
@@ -104,4 +110,50 @@ class _ArticlePageState extends ConsumerState<ArticlePage> {
     ArticleStep.committing => const ArticleCommittingStep(),
     ArticleStep.success => ArticleSuccessCard(result: state.result!),
   };
+}
+
+/// 预览步骤的吸底确认导入栏，避免长列表来回滚动寻找主按钮。
+class _ArticleCommitBar extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    final state = ref.watch(articleWizardProvider);
+    final notifier = ref.read(articleWizardProvider.notifier);
+    final count = state.selection.selected.length;
+    final canCommit = count > 0 && state.analysis.finalToken != null;
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '已选 $count 个词条',
+                style: LexiType.body.copyWith(
+                  color: colors.label,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '导入后自动交由有道词典查词与补全音标',
+                style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: LexiSpace.s12),
+        FilledButton.icon(
+          key: const Key('articleCommit'),
+          onPressed: canCommit
+              ? () => commitArticleWithConfirm(context, notifier, state)
+              : null,
+          icon: const Icon(LucideIcons.arrowRight, size: 16),
+          label: Text('确认导入 $count 个'),
+        ),
+      ],
+    );
+  }
 }

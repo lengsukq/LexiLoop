@@ -168,7 +168,9 @@ bool isImmersivePath(String location) {
 /// 在「添加 (`/add`)」或「内容补全 (`/initialize`)」子流程中，归属到「单词本 (`/words`)」高亮。
 bool isDestinationActive(AppDestination destination, String location) {
   if (destination.path == wordsPath &&
-      (location.startsWith(addPath) || location.startsWith(initializePath))) {
+      (location.startsWith(addPath) ||
+          location.startsWith(initializePath) ||
+          location.startsWith(packsPath))) {
     return true;
   }
   return _matchesPath(destination.path, location);

@@ -564,7 +564,7 @@ class SuggestionService {
   Future<SuggestionAiGenerator?> _defaultGenerator() async {
     final settings = await _settings.load();
     final config = llmConfigFromSettings(settings.raw);
-    if (!config.isUsable) return null;
+    if (!config.canDailySuggestion) return null;
     return LlmSuggestionGenerator(DioHttpFetcher(), config);
   }
 

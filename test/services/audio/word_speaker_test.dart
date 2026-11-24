@@ -1,8 +1,6 @@
 /// 词条发音策略的单测。
 ///
-/// 钉的是旧版 Next 应用里最明显的听觉退步：真人 mp3 与系统朗读之间的
-/// 选择、降级与提示信号——它们全部发生在一个界面层看不见的地方，
-/// 少写一条就等于用户永远听到机器音。
+/// 覆盖有道直连发音、自定义引擎优先级、失败自动顺延、口音选择与批量预取。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +23,21 @@ PronunciationView _withRecording() => pronunciation(
   audioUrl: Uri.parse('https://example.com/apple-us.mp3').toString(),
 );
 
+/// 仅启用系统朗读的设置。
+const PlaybackSettings _systemOnlyPlayback = PlaybackSettings(
+  choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
+  defaultAccent: Accent.us,
+  wordSpeed: defaultSpeechRate,
+  phraseSpeed: defaultSpeechRate,
+  sentenceSpeed: defaultSpeechRate,
+  autoPlayPronunciation: true,
+  speechChain: <SpeechSourcePreference>[
+    SpeechSourcePreference(source: SpeechSource.system, enabled: true),
+    SpeechSourcePreference(source: SpeechSource.youdao, enabled: false),
+    SpeechSourcePreference(source: SpeechSource.edge, enabled: false),
+  ],
+);
+
 /// 一个明显慢于默认值的单词语速，用来验证倍率确实传到了播放器。
 const double slowSpeed = 0.6;
 
@@ -44,17 +57,8 @@ void main() {
     downloader.openGate();
   });
 
-  group('学习自动朗读快路径', () {
-    test('录音尚未下载时立即用系统发音，绝不等在线请求', () async {
-      final result = await speaker.speakForAutoPlay(
-        speechRequest(pronunciations: <PronunciationView>[_withRecording()]),
-      );
-      expect(result, isA<SystemVoicePlayed>());
-      expect(engine.spoken, <String>['apple']);
-      expect(downloader.downloaded, isEmpty);
-    });
-
-    test('已预缓存的录音自动播放时无需联网，也不重复系统发音', () async {
+  group('学习自动朗读', () {
+    test('已预缓存的录音自动播放时直接命中内存，不重复下载也不走系统发音', () async {
       final url = Uri.parse('https://example.com/apple-us.mp3');
       await cache.resolve(url);
       downloader.downloaded.clear();
@@ -68,15 +72,23 @@ void main() {
       expect(downloader.downloaded, isEmpty);
     });
 
-    test('系统英语语音不可用时上报失败供页面提示', () async {
+    test('未预缓存时也按优先级播放有道直连发音，不静默退化为系统音', () async {
+      final result = await speaker.speakForAutoPlay(speechRequest());
+      expect(result, isA<HumanRecordingPlayed>());
+      expect(downloader.downloaded, <Uri>[youdaoAudioUri('apple', Accent.us)!]);
+      expect(engine.spoken, isEmpty);
+    });
+
+    test('全部引擎均不可用时上报失败供页面提示', () async {
+      downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       engine.languageAvailable = false;
       final result = await speaker.speakForAutoPlay(speechRequest());
       expect(result, isA<SpeechFailed>());
     });
   });
 
-  group('真人录音优先', () {
-    test('有音频地址时播放词典录音且不再朗读', () async {
+  group('有道与词典真人录音优先', () {
+    test('有预存音频地址时优先播放预存地址且不再朗读', () async {
       final stored = Uri.parse('https://example.com/apple-us.mp3');
       final result = await speaker.speak(
         speechRequest(
@@ -87,21 +99,21 @@ void main() {
       );
 
       expect(result, isA<HumanRecordingPlayed>());
-      expect(result.fellBackToSystemVoice, isFalse);
+      expect(result.fellBack, isFalse);
       expect(downloader.downloaded, <Uri>[stored]);
       expect(player.prepared, hasLength(1));
       expect(player.playCount, 1);
       expect(engine.spoken, isEmpty);
     });
 
-    test('mp3 成功时不触发系统朗读——不得两段一起响', () async {
-      await speaker.speak(
-        speechRequest(pronunciations: <PronunciationView>[_withRecording()]),
-      );
+    test('发音列表为空时也能直接通过有道接口播放单词真人发音', () async {
+      final result = await speaker.speak(speechRequest());
 
+      expect(result, isA<HumanRecordingPlayed>());
+      expect(result.fellBack, isFalse);
+      expect(downloader.downloaded, <Uri>[youdaoAudioUri('apple', Accent.us)!]);
       expect(player.playCount, 1);
       expect(engine.spoken, isEmpty);
-      expect(engine.configureCalls, isEmpty);
     });
 
     test('真人录音按设置里的倍率播放，与系统朗读同一套语速', () async {
@@ -120,35 +132,12 @@ void main() {
         ),
       );
 
-      // 不传倍率时播放器只会用原速，用户调慢的语速在录音上会完全失效。
       expect(player.preparedSpeeds, <double>[slowSpeed]);
     });
   });
 
-  group('回落到系统朗读', () {
-    test('没有音频地址时直接用系统朗读', () async {
-      final result = await speaker.speak(
-        speechRequest(pronunciations: <PronunciationView>[pronunciation()]),
-      );
-
-      expect(result, isA<SystemVoicePlayed>());
-      expect(result.fellBackToSystemVoice, isTrue);
-      expect(downloader.downloaded, isEmpty);
-      expect(engine.spoken, <String>['apple']);
-    });
-
-    test('地址是空白串时视为没有录音', () async {
-      final result = await speaker.speak(
-        speechRequest(
-          pronunciations: <PronunciationView>[pronunciation(audioUrl: '   ')],
-        ),
-      );
-
-      expect(result, isA<SystemVoicePlayed>());
-      expect(downloader.downloaded, isEmpty);
-    });
-
-    test('下载失败时回落且不下结论式地缓存失败', () async {
+  group('自动顺延与关闭引擎', () {
+    test('下载失败时顺延到系统朗读并标记回退来源', () async {
       downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       final result = await speaker.speak(
         speechRequest(
@@ -160,10 +149,11 @@ void main() {
 
       expect(result, isA<SystemVoicePlayed>());
       expect(result.fellBackToSystemVoice, isTrue);
+      expect(result.fellBackFrom, SpeechSource.youdao);
       expect(engine.spoken, <String>['apple']);
     });
 
-    test('播放器装载失败时回落', () async {
+    test('播放器装载失败时自动顺延到系统朗读', () async {
       player.prepareError = Exception('播放器打不开');
       final result = await speaker.speak(
         speechRequest(
@@ -174,10 +164,11 @@ void main() {
       );
 
       expect(result, isA<SystemVoicePlayed>());
+      expect(result.fellBackFrom, SpeechSource.youdao);
       expect(engine.spoken, <String>['apple']);
     });
 
-    test('系统朗读也失败时返回失败而不是抛出', () async {
+    test('有道与系统朗读均失败时返回 SpeechFailed 而不是抛出', () async {
       engine.speakError = Exception('没有语音包');
       downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       final result = await speaker.speak(speechRequest());
@@ -187,10 +178,10 @@ void main() {
       expect(result.fellBackToSystemVoice, isFalse);
     });
 
-    test('功能关闭时连网络请求都不发', () async {
-      speaker.humanAudioEnabled = false;
+    test('仅启用系统朗读时连网络请求都不发，且不算回退', () async {
       final result = await speaker.speak(
         speechRequest(
+          playback: _systemOnlyPlayback,
           pronunciations: <PronunciationView>[
             pronunciation(audioUrl: 'https://example.com/a.mp3'),
           ],
@@ -198,7 +189,7 @@ void main() {
       );
 
       expect(result, isA<SystemVoicePlayed>());
-      expect(result.fellBackToSystemVoice, isTrue);
+      expect(result.fellBack, isFalse);
       expect(downloader.downloaded, isEmpty);
       expect(player.prepared, isEmpty);
     });
@@ -207,32 +198,19 @@ void main() {
       await speaker.speak(
         speechRequest(pronunciations: <PronunciationView>[_withRecording()]),
       );
-      await speaker.speak(speechRequest());
+      downloader.failing.add(youdaoAudioUri('banana', Accent.us)!.toString());
+      await speaker.speak(speechRequest(term: 'banana'));
 
       expect(player.stopCount, 1);
       expect(player.playCount, 1);
-      expect(engine.spoken, <String>['apple']);
+      expect(engine.spoken, <String>['banana']);
     });
   });
 
   group('按口音选择', () {
-    test('美音与英音取到不同的地址', () async {
-      final requests = <SpeechRequest>[
-        speechRequest(
-          pronunciations: <PronunciationView>[
-            pronunciation(source: youdaoAudioSource),
-          ],
-        ),
-        speechRequest(
-          accent: Accent.uk,
-          pronunciations: <PronunciationView>[
-            pronunciation(accent: Accent.uk, source: youdaoAudioSource),
-          ],
-        ),
-      ];
-
-      await speaker.speak(requests[0]);
-      await speaker.speak(requests[1]);
+    test('美音与英音取到不同的有道地址', () async {
+      await speaker.speak(speechRequest());
+      await speaker.speak(speechRequest(accent: Accent.uk));
 
       expect(downloader.downloaded, <Uri>[
         youdaoAudioUri('apple', Accent.us)!,
@@ -242,7 +220,9 @@ void main() {
     });
 
     test('系统朗读也按口音选语言', () async {
-      await speaker.speak(speechRequest(accent: Accent.uk));
+      await speaker.speak(
+        speechRequest(accent: Accent.uk, playback: _systemOnlyPlayback),
+      );
 
       expect(engine.configureCalls.single.$2, 'en-GB');
     });
@@ -277,8 +257,19 @@ void main() {
       expect(downloader.peakConcurrency, 1);
     });
 
+    test('无预存地址的单词也能预取有道直连发音，整句自动跳过', () async {
+      await speaker.preloadBatch(<SpeechRequest>[
+        speechRequest(),
+        speechRequest(
+          term: 'This is a sentence.',
+          contentType: LexicalContentType.sentence,
+        ),
+      ]);
+
+      expect(downloader.downloaded, <Uri>[youdaoAudioUri('apple', Accent.us)!]);
+    });
+
     test('并发数不超过上限', () async {
-      // 用一个还没放行的下载器，才能在挂起状态下观察到并发峰值。
       final slow = FakeAudioDownloader();
       final slowSpeaker = WordSpeaker(
         FakeAudioPlayer(),
@@ -322,16 +313,10 @@ void main() {
       expect(cache.length, 3);
     });
 
-    test('没有真人录音的词不参与预取', () async {
-      await speaker.preloadBatch(<SpeechRequest>[speechRequest()]);
-
-      expect(downloader.downloaded, isEmpty);
-    });
-
-    test('功能关闭时整批跳过', () async {
-      speaker.humanAudioEnabled = false;
+    test('仅启用系统朗读时整批跳过预取', () async {
       final requests = <SpeechRequest>[
         speechRequest(
+          playback: _systemOnlyPlayback,
           pronunciations: <PronunciationView>[
             pronunciation(audioUrl: 'https://example.com/a.mp3'),
           ],

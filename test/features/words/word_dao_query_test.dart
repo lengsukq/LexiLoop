@@ -13,6 +13,7 @@ import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/words/word_csv_export.dart';
 
 void main() {
   late AppDatabase db;
@@ -424,6 +425,109 @@ void main() {
 
     test('普通文本原样返回', () {
       expect(escapeLikePattern('plain text'), 'plain text');
+    });
+  });
+
+  group('中文释义搜索、类型/标签筛选与导出', () {
+    Future<int> insertWithContent({
+      required String term,
+      LexicalContentType contentType = LexicalContentType.word,
+      String definitionsJson = '[]',
+      String tagsJson = '[]',
+      String examplesJson = '[]',
+    }) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final id = await db
+          .into(db.words)
+          .insert(
+            WordsCompanion.insert(
+              term: term,
+              normalizedTerm: term.toLowerCase(),
+              sourceLanguage: 'en',
+              targetLanguage: 'zh-CN',
+              entryType: contentType == LexicalContentType.word
+                  ? EntryType.word
+                  : EntryType.phrase,
+              contentType: Value<LexicalContentType>(contentType),
+              initializationStatus: const Value<InitializationStatus>(
+                InitializationStatus.ready,
+              ),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db
+          .into(db.wordContents)
+          .insert(
+            WordContentsCompanion.insert(
+              wordId: Value<int>(id),
+              definitionsJson: Value<String>(definitionsJson),
+              tagsJson: Value<String>(tagsJson),
+              examplesJson: Value<String>(examplesJson),
+              updatedAt: now,
+            ),
+          );
+      return id;
+    }
+
+    test('搜索关键词能命中中文释义与标签，且 count 与 list 一致', () async {
+      await insertWithContent(
+        term: 'resilient',
+        definitionsJson: '[{"language":"zh-CN","text":"有弹性的；适应力强的"}]',
+        tagsJson: '["IELTS","阅读"]',
+      );
+      await insertWithContent(
+        term: 'apple',
+        definitionsJson: '[{"language":"zh-CN","text":"苹果"}]',
+        tagsJson: '["日常"]',
+      );
+
+      expect(await terms(const WordQuery(search: '适应力')), <String>[
+        'resilient',
+      ]);
+      expect(await countOf(const WordQuery(search: '适应力')), 1);
+      expect(await terms(const WordQuery(search: 'IELTS')), <String>[
+        'resilient',
+      ]);
+    });
+
+    test('按内容类型与标签精确筛选，distinctTags 返回去重排序列表', () async {
+      await insertWithContent(term: 'apple', tagsJson: '["IELTS","高频"]');
+      await insertWithContent(
+        term: 'take off',
+        contentType: LexicalContentType.phrase,
+        tagsJson: '["CET4","高频"]',
+      );
+      await insertWithContent(term: 'IEL', tagsJson: '["IELTS-2026"]');
+
+      expect(
+        await terms(const WordQuery(contentType: LexicalContentType.phrase)),
+        <String>['take off'],
+      );
+      expect(await terms(const WordQuery(tag: 'IELTS')), <String>['apple']);
+      expect(await dao.distinctTags(), <String>[
+        'CET4',
+        'IELTS',
+        'IELTS-2026',
+        '高频',
+      ]);
+    });
+
+    test('exportRows 与 encodeWordsCsv 输出带 UTF-8 BOM 的标准表头 CSV', () async {
+      await insertWithContent(
+        term: 'resilient',
+        definitionsJson: '[{"language":"zh-CN","text":"有韧性的, 适应力强"}]',
+        tagsJson: '["IELTS","阅读"]',
+        examplesJson: '[{"sentence":"Cities are resilient."}]',
+      );
+      final rows = await dao.exportRows(const WordQuery(tag: 'IELTS'));
+      expect(rows, hasLength(1));
+      final csv = encodeWordsCsv(rows);
+      expect(csv.startsWith('\uFEFF单词,音标,释义,例句,标签,备注'), isTrue);
+      expect(
+        csv,
+        contains('resilient,,"有韧性的, 适应力强",Cities are resilient.,IELTS;阅读,'),
+      );
     });
   });
 }

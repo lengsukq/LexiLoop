@@ -299,6 +299,9 @@ class _TermBlock extends StatelessWidget {
               InitializationBadge(status: detail.initializationStatus),
             if (detail.isSuspended)
               const DetailChip(text: '已暂停', tone: LexiBadgeTone.danger),
+            if (detail.isPersonal && detail.packNames.isNotEmpty)
+              const DetailChip(text: '个人词库', tone: LexiBadgeTone.accent),
+            for (final packName in detail.packNames) DetailChip(text: packName),
           ],
         ),
       ],
@@ -537,6 +540,12 @@ class _HeaderActions extends ConsumerWidget {
     final colors = context.lexiColors;
     return Row(
       children: <Widget>[
+        if (!detail.isPersonal)
+          OutlinedButton.icon(
+            onPressed: () => unawaited(_promoteToPersonal(context, ref)),
+            icon: const Icon(LucideIcons.bookmarkPlus, size: 15),
+            label: const Text('收入个人词库'),
+          ),
         const Spacer(),
         Text(
           detail.isSuspended ? '已暂停' : '学习中',
@@ -550,6 +559,12 @@ class _HeaderActions extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _promoteToPersonal(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(wordDetailActionsProvider).promoteToPersonal(detail.id);
+    messenger.showSnackBar(const SnackBar(content: Text('已收入个人词库')));
   }
 }
 

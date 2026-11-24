@@ -816,9 +816,9 @@ const int maintenanceIntervalMs = 10 * minuteMs;
 /// 上一批有产出时的维护间隔。
 ///
 /// 有活就尽快推完，10 分钟只适用于「没有待处理任务」的保活。
-/// 取 30s 而非旧版的 3s：本地一次 tick 要真联网查词典，
-/// 按 3s 节奏排期会持续占着数据通道，对耗电没有好处。
-const int maintenanceBusyIntervalMs = 30 * secondMs;
+/// 取 5s：导入文章分词后的 30–50 个词可在 ~1 分钟内由有道补全完毕；
+/// 应用切后台时由 `MaintenanceBootstrap` 暂停调度，不产生后台耗电。
+const int maintenanceBusyIntervalMs = 5 * secondMs;
 
 /// AI 内容质量分低于此值时整份丢弃。
 ///
@@ -907,14 +907,17 @@ const Set<int> transientHttpStatusCodes = <int>{408, 409, 429};
 /// 瞬时错误的 HTTP 状态码下界（5xx）。
 const int transientServerErrorFloor = 500;
 
-/// Next.js TTS 登录及音频接口使用的 HTTP 状态码。
-const int ttsHttpStatusOk = 200;
+/// 有道直连发音接口允许的最大英文词数。
+///
+/// 实测 `dict.youdao.com/dictvoice` 对单词和常见 2–5 词短语返回 200 MP3，
+/// 对任意完整长句返回 500 JSON；超过该词数直接跳过有道，交给后续引擎。
+const int youdaoDirectMaxWords = 6;
 
-/// Next.js TTS 登录过期，需刷新 Cookie。
-const int ttsHttpStatusUnauthorized = 401;
-
-/// Next.js TTS 服务端错误起始值。
-const int ttsHttpServerErrorFloor = 500;
+/// 学习自动朗读时，若后续还有离线兜底引擎，允许等待在线语音的上限（毫秒）。
+///
+/// 有道常规耗时约 200ms，该上限既能让首题在正常网络下稳定听到在线真人发音，
+/// 又能防止弱网或断网假死时长时间阻塞刷题节奏。
+const int autoPlayOnlineTimeoutMs = 2500;
 
 /// AI 重试遍数下限。
 ///
@@ -958,8 +961,39 @@ const int youdaoRetryJitterMaxMs = 400;
 
 /// 音频缓存条目上限。
 ///
-/// 旧版服务端内存 LRU 为 200 条；本版落盘缓存，此处保留作为软上限。
+/// 旧版服务端内存 LRU 为 200 条；本版升级为 L1 内存 + L2 磁盘二级缓存，
+/// 此处控制进程内热缓存容量。
 const int ttsCacheMaxEntries = 200;
+
+/// 离线语音磁盘缓存默认容量上限（MB）；`0` 表示不限制。
+const int defaultAudioCacheMaxSizeMb = 200;
+
+/// 离线语音磁盘缓存可配置的最大上限（MB）。
+const int maxAudioCacheMaxSizeMb = 4096;
+
+/// 设置页提供的离线语音缓存容量上限档位（MB，`0` 表示不限制）。
+const List<int> audioCacheMaxSizeOptionsMb = <int>[100, 200, 500, 1024, 0];
+
+/// 每 MB 对应的字节数（用于将设置上限换算为字节）。
+const int audioCacheBytesPerMb = 1024 * 1024;
+
+/// 磁盘缓存超限执行 LRU 淘汰时的目标水位比例（回落至 85% 避免频繁扫盘）。
+const double audioCacheEvictTargetRatio = 0.85;
+
+/// 普通播报写入磁盘时，每累计写入多少条才检查一次容量上限。
+const int audioCacheEvictWriteStride = 20;
+
+/// 词库离线语音批量预缓存的并发连接数。
+const int audioPrecacheConcurrency = 3;
+
+/// 批量预缓存两次请求之间的最小抖动间隔（毫秒），对公共发音接口更友好。
+const int audioPrecacheJitterMinMs = 60;
+
+/// 批量预缓存两次请求之间的最大抖动间隔（毫秒）。
+const int audioPrecacheJitterMaxMs = 140;
+
+/// 预缓存容量预估使用的单条单词音频估算字节数（实测有道 MP3 约 10–12 KB）。
+const int audioEstimatedBytesPerWord = 12 * 1024;
 
 /// Flutter Edge 直连建立连接的超时（秒）。
 const int directEdgeConnectTimeoutSeconds = 15;
@@ -1532,6 +1566,36 @@ const int articleAiDifficultyMax = 5;
 /// 难度无法解析时的兜底值（旧版 `lenientDifficulty` 的 `return 3`）。
 const int articleAiDifficultyFallback = 3;
 
+/// 文章 AI 分词「原文变形词（surface）」字符上限。
+const int articleAiSurfaceMaxChars = 60;
+
+/// 文章 AI 分词单个考试标签字符上限。
+const int articleAiExamTagMaxChars = 16;
+
+/// 文章 AI 分词单个单词附带的考试标签条数上限。
+const int articleAiExamTagsMaxItems = 4;
+
+/// 仅分词模式（不含短语与难句卡片）的输出 token 下限。
+const int articleAiWordOnlyMaxOutputTokens = 2400;
+
+/// 网页文章抓取提取正文的最小有效字符数（低于此值回退到整页提取）。
+const int articleHtmlMainMinChars = 80;
+
+/// 网页 / 本地文章文件读取的最大字节数（2 MB，防止误选超大文件卡死内存）。
+const int maxArticleFileBytes = 2 * 1024 * 1024;
+
+/// 自定义列映射向导预览展示的样本行数。
+const int csvColumnMappingSampleRows = 5;
+
+/// HTML 实体十六进制解析基数。
+const int hexRadix = 16;
+
+/// HTML 实体十进制解析基数。
+const int decimalRadix = 10;
+
+/// 合法 Unicode 码点上限。
+const int maxUnicodeCodePoint = 0x10FFFF;
+
 // ── 本模块的字符串常量（无数字，无需豁免） ──
 
 /// 默认源语言。
@@ -2044,3 +2108,82 @@ const String audioAcceptHeader = 'audio/mpeg,*/*';
 
 /// 缓存中音频字节的内容类型，供播放器构造数据源时使用。
 const String audioContentType = 'audio/mpeg';
+
+/// HTTP 2xx 成功状态码下界（含）。
+const int httpStatusOkMin = 200;
+
+/// HTTP 2xx 成功状态码上界（不含）。
+const int httpStatusOkMax = 300;
+
+/// 词库搜索输入防抖时长（毫秒）。
+const int wordsSearchDebounceMs = 300;
+
+// ═══════════════════════════════════════════════════════════════
+// 词书包（云端下载、多通道加速与按需有道补全）
+// ═══════════════════════════════════════════════════════════════
+
+/// 默认词书包托管仓库（`owner/repo`）。
+const String wordPackDefaultRepo = 'lengsukq/LexiLoop-packs';
+
+/// 默认词书包仓库标签/分支。
+const String wordPackDefaultRef = 'v1.0.0';
+
+/// 远端词书目录清单的相对路径。
+const String wordPackCatalogRelativePath = 'catalog.json';
+
+/// 应用内置的离线词书目录资源路径。
+const String wordPackBundledCatalogAsset = 'assets/wordbooks/catalog.json';
+
+/// 词书包格式标识。
+const String wordPackFormatId = 'lexiloop-wordbook-pack';
+
+/// 词书包格式版本号。
+const int wordPackFormatVersion = 1;
+
+/// 词书包下载通道设置的持久化键（存于 `settings` 表）。
+const String wordPackDownloadSettingsKey = 'wordPackDownloadConfig';
+
+/// 词书包通道连通性探测超时（毫秒）。
+const int wordPackChannelProbeTimeoutMs = 5 * secondMs;
+
+/// 词书包文件下载超时（毫秒）。
+const int wordPackDownloadTimeoutMs = 2 * minuteMs;
+
+/// 词书包压缩文件安全大小上限（32 MiB）。
+const int wordPackMaxCompressedBytes = 32 * 1024 * 1024;
+
+/// 词书包解压后 JSON 安全大小上限（128 MiB）。
+const int wordPackMaxDecompressedBytes = 128 * 1024 * 1024;
+
+/// 词书包入库时每批事务写入的词条数。
+const int wordPackImportBatchSize = 500;
+
+/// 词书包字节超过该阈值时转入后台 Isolate 解压与解析（64 KiB）。
+const int wordPackIsolateThresholdBytes = 64 * 1024;
+
+/// 按需懒加载有道补全的默认前瞻词数（优先补全即将学习的词条）。
+const int wordPackLazyEnrichBatchSize = 30;
+
+/// 按需懒加载有道补全的任务优先级（低于手动点击刷新，高于普通后台任务）。
+const int wordPackLazyEnrichPriority = 80;
+
+/// 词书包全量后台有道补全的任务优先级。
+const int wordPackFullEnrichPriority = 40;
+
+/// 词书专项学习会话的 `source_type` 前缀。
+const String wordPackSessionSourcePrefix = 'PACK:';
+
+/// 词书包标签前缀分隔时每张词条卡片最多展示的词书徽章数。
+const int wordCardMaxPackBadges = 2;
+
+/// 字节换算 KiB 的基数。
+const int bytesPerKiB = 1024;
+
+/// 字节换算 MiB 的基数。
+const int bytesPerMiB = 1024 * 1024;
+
+/// 词书包测速延迟的展示上限毫秒数（超时哨兵）。
+const int wordPackLatencyTimeoutMs = 9999;
+
+/// 词书包来源数据标识：ECDICT MIT 基础预填充。
+const String ecdictDictionarySource = 'ecdict';

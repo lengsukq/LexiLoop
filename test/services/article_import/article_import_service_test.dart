@@ -1059,5 +1059,80 @@ void main() {
 
       expect(await allJobs(), isEmpty);
     });
+
+    test('LLM 返回词形还原（implemented → implement）时按原形建候选并重判词库', () async {
+      await insertWord(term: 'reshape');
+      final service = serviceWith(
+        _FakeSelector(
+          (_) async => const ArticleAiSelection.success(
+            words: <ArticleAiWord>[
+              ArticleAiWord(
+                term: 'reshape',
+                surfaceForm: 'reshaped',
+                reason: '重塑',
+                difficulty: 3,
+                cefrLevel: 'B2',
+                examTags: <String>['CET6'],
+              ),
+              ArticleAiWord(
+                term: 'yield',
+                surfaceForm: 'yields',
+                reason: '产生、带来',
+                difficulty: 4,
+                cefrLevel: 'C1',
+                examTags: <String>['IELTS'],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final preview = await service.preview(
+        articleText: sampleArticle,
+        now: now,
+      );
+
+      // reshape 已在词库中：还原后识别为 KNOWN 且不自动推荐。
+      final reshaped = candidateOf(preview, 'reshape');
+      expect(reshaped.status, ArticleCandidateStatus.known);
+      expect(reshaped.surfaceForm, 'reshaped');
+      // yield 不在词库中：还原为原形 yield，保留原文变形 yields 与出处句。
+      final yielded = candidateOf(preview, 'yield');
+      expect(yielded.status, ArticleCandidateStatus.candidate);
+      expect(yielded.surfaceForm, 'yields');
+      expect(yielded.examTags, <String>['IELTS']);
+      expect(yielded.sourceSentence, contains('yields'));
+      expect(preview.recommendedTerms, <String>['yield']);
+    });
+
+    test('提交保留原文出处例句、批次标签，且队列显式走词典源（有道优先、不含 AI）', () async {
+      final service = serviceWith(_noneSelector());
+      final preview = await service.preview(
+        articleText: sampleArticle,
+        now: now,
+      );
+      final targetKey = articleCandidateKey(
+        LexicalContentType.word,
+        'knowledge',
+      );
+
+      final result = await service.commit(
+        previewToken: preview.previewToken,
+        selectedKeys: <String>{targetKey},
+        mode: ImportMode.skipExisting,
+        tags: const <String>['经济学人', '阅读精读'],
+        now: now,
+      );
+
+      expect(result.createdWordIds, hasLength(1));
+      expect(result.affectedWordIds, result.createdWordIds);
+      final content = await db.select(db.wordContents).getSingle();
+      expect(content.examplesJson, contains('acquire knowledge'));
+      expect(content.tagsJson, contains('经济学人'));
+      expect(content.tagsJson, contains('阅读精读'));
+      final job = (await allJobs()).single;
+      expect(job.requestedProvidersJson, contains('"youdao"'));
+      expect(job.requestedProvidersJson, isNot(contains('"ai"')));
+    });
   });
 }

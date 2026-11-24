@@ -65,7 +65,14 @@ Map<String, Object?> aiToMap(LlmAiConfig ai) => <String, Object?>{
   'thinkingEnabled': ai.thinkingEnabled,
   'thinkingBudgetTokens': ai.thinkingBudgetTokens,
   'reasoningEffort': ai.reasoningEffort,
+  'features': ai.features.toJson(),
 };
+
+/// 切换 `ai.features` 中的单个用途开关。
+LlmConfig withAiFeature(LlmConfig config, String key, {required bool value}) =>
+    withAiFields(config, <String, Object?>{
+      'features': <String, Object?>{...config.ai.features.toJson(), key: value},
+    });
 
 /// 替换整份 provider 列表。
 LlmConfig withProviders(LlmConfig config, List<LlmProviderConfig> providers) =>

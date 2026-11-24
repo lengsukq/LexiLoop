@@ -36,10 +36,10 @@ const List<String> articleFrequencies = <String>[
 /// `["string","null"]` 类型声明。
 const List<String> _nullableString = <String>['string', 'null'];
 
-/// AI 选词的结构化输出 Schema。
+/// AI 选词的完整结构化输出 Schema（单词 + 短语 + 难句）。
 ///
 /// 兼容 OpenAI 的 strict 模式：`properties` 里的每个键都必须出现在
-/// `required` 中，可选字段用 `null` 联合类型表示（与旧版逐字段一致）。
+/// `required` 中，可选字段用 `null` 联合类型表示。
 Map<String, Object?> get articleAiSelectionJsonSchema => <String, Object?>{
   'type': 'object',
   'additionalProperties': false,
@@ -49,6 +49,16 @@ Map<String, Object?> get articleAiSelectionJsonSchema => <String, Object?>{
     'phrases': _phrasesSchema(),
     'sentences': _sentencesSchema(),
   },
+};
+
+/// 仅分词模式的轻量结构化输出 Schema（只返回单词，查词交由有道完成）。
+///
+/// 同样满足 OpenAI strict 模式要求：体积更小、输出更快、不易截断。
+Map<String, Object?> get articleAiWordOnlyJsonSchema => <String, Object?>{
+  'type': 'object',
+  'additionalProperties': false,
+  'required': <String>['words'],
+  'properties': <String, Object?>{'words': _wordsSchema()},
 };
 
 /// 容错解析 AI 返回的 JSON。
@@ -88,13 +98,16 @@ Map<String, Object?> _wordsSchema() => <String, Object?>{
     'additionalProperties': false,
     'required': <String>[
       'term',
+      'surface',
       'reason',
       'difficulty',
       'cefrLevel',
       'frequency',
+      'examTags',
     ],
     'properties': <String, Object?>{
       'term': <String, Object?>{'type': 'string'},
+      'surface': <String, Object?>{'type': _nullableString},
       'reason': <String, Object?>{'type': 'string'},
       'difficulty': _difficultySchema(),
       'cefrLevel': <String, Object?>{
@@ -104,6 +117,11 @@ Map<String, Object?> _wordsSchema() => <String, Object?>{
       'frequency': <String, Object?>{
         'type': _nullableString,
         'enum': <Object?>[...articleFrequencies, null],
+      },
+      'examTags': <String, Object?>{
+        'type': 'array',
+        'maxItems': articleAiExamTagsMaxItems,
+        'items': <String, Object?>{'type': 'string'},
       },
     },
   },
@@ -300,17 +318,46 @@ _ArticleGrammar _lenientGrammar(Object? value) {
 
 ArticleAiWord? _lenientWord(Object? item) {
   if (item is! Map) return null;
-  final term = _lenientText(item['term'], articleAiTermMaxChars);
+  final term = _lenientText(
+    item['term'] ?? item['lemma'],
+    articleAiTermMaxChars,
+  );
   if (term == null) return null;
+  final rawSurface = _lenientText(
+    item['surface'] ?? item['surfaceForm'],
+    articleAiSurfaceMaxChars,
+  );
+  final surface =
+      rawSurface != null && rawSurface.toLowerCase() != term.toLowerCase()
+      ? rawSurface
+      : null;
   return ArticleAiWord(
     term: term,
+    surfaceForm: surface,
     reason:
-        _lenientText(item['reason'], articleAiReasonMaxChars) ??
+        _lenientText(
+          item['reason'] ?? item['contextHint'],
+          articleAiReasonMaxChars,
+        ) ??
         articleDefaultReason,
     difficulty: _lenientDifficulty(item['difficulty']),
     cefrLevel: _lenientEnum(item['cefrLevel'], articleCefrLevels),
     frequency: _lenientEnum(item['frequency'], articleFrequencies),
+    examTags: _lenientExamTags(item['examTags']),
   );
+}
+
+List<String> _lenientExamTags(Object? value) {
+  if (value is! List) return const <String>[];
+  final out = <String>[];
+  for (final entry in value) {
+    final text = _lenientText(entry, articleAiExamTagMaxChars);
+    if (text == null) continue;
+    final upper = text.toUpperCase();
+    if (!out.contains(upper)) out.add(upper);
+    if (out.length >= articleAiExamTagsMaxItems) break;
+  }
+  return List<String>.unmodifiable(out);
 }
 
 ArticleAiPhrase? _lenientPhrase(Object? item) {

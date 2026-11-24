@@ -46,6 +46,7 @@ import 'package:lexiloop/features/study/study_states.dart';
 import 'package:lexiloop/features/study/study_summary.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
 import 'package:lexiloop/services/fsrs_scheduler.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_layout.dart';
 import 'package:lexiloop/ui/theme/lexi_motion.dart';
@@ -71,11 +72,17 @@ const int _choiceTickMs = 80;
 /// 学习页在 `immersivePaths` 内，外壳不渲染底部导航，因此返回与进度条都由
 /// 页面自己提供。
 class StudyPage extends ConsumerWidget {
-  /// 以学习模式创建页面。
-  const new({required this.mode, super.key});
+  /// 以学习模式、可选标签或词书 ID 筛选创建页面。
+  const new({required this.mode, this.tag, this.packId, super.key});
 
   /// 本次学习模式。
   final StudyMode mode;
+
+  /// 可选标签专项复习筛选。
+  final String? tag;
+
+  /// 可选词书专项学习 ID。
+  final String? packId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -96,8 +103,13 @@ class StudyPage extends ConsumerWidget {
         leaveStudyToHome(context);
       },
       child: session.when(
-        loading: () =>
-            StudySessionBody(mode: mode, session: null, accent: accent),
+        loading: () => StudySessionBody(
+          mode: mode,
+          tag: tag,
+          packId: packId,
+          session: null,
+          accent: accent,
+        ),
         error: (error, _) => PageShell(
           maxWidth: LexiLayout.immersiveMaxWidth,
           child: StudyErrorView(
@@ -109,8 +121,13 @@ class StudyPage extends ConsumerWidget {
             onExit: () => leaveStudyToHome(context),
           ),
         ),
-        data: (view) =>
-            StudySessionBody(mode: mode, session: view, accent: accent),
+        data: (view) => StudySessionBody(
+          mode: mode,
+          tag: tag,
+          packId: packId,
+          session: view,
+          accent: accent,
+        ),
       ),
     );
   }
@@ -143,11 +160,19 @@ class StudySessionBody extends ConsumerStatefulWidget {
     required this.mode,
     required this.session,
     required this.accent,
+    this.tag,
+    this.packId,
     super.key,
   });
 
   /// 本次学习模式（重试与「再来一轮」要用）。
   final StudyMode mode;
+
+  /// 可选标签专项复习筛选。
+  final String? tag;
+
+  /// 可选词书专项学习 ID。
+  final String? packId;
 
   /// 当前会话；尚未加载时为 `null`。
   final StudySessionView? session;
@@ -264,6 +289,10 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
   @override
   void didUpdateWidget(covariant StudySessionBody oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.tag != oldWidget.tag || widget.packId != oldWidget.packId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _restart());
+      return;
+    }
     if (widget.session?.id != oldWidget.session?.id) {
       _resetRound();
       _seedChoiceVisibility(widget.session?.currentItem);
@@ -390,6 +419,11 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
                   usedHint: _usedHint,
                   accent: widget.accent,
                   revealContent: _revealContent,
+                  onOpenDetail: GoRouter.maybeOf(context) == null
+                      ? null
+                      : () => unawaited(
+                          context.push('$wordDetailPathPrefix${item.word.id}'),
+                        ),
                 ),
               ),
       ),
@@ -673,7 +707,11 @@ class _StudySessionBodyState extends ConsumerState<StudySessionBody>
 
   void _start() {
     if (!mounted) return;
-    unawaited(ref.read(studySessionProvider.notifier).start(widget.mode));
+    unawaited(
+      ref
+          .read(studySessionProvider.notifier)
+          .start(widget.mode, tag: widget.tag, packId: widget.packId),
+    );
   }
 
   void _restart() {

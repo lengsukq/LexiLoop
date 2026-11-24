@@ -25,6 +25,7 @@ final class JustAudioEngine implements AudioPlayerPort {
     await file.writeAsBytes(audio, flush: true);
     final previous = _currentFile;
     try {
+      await _player.stop();
       await _player.setFilePath(file.path);
       await _player.setSpeed(speed);
       _currentFile = file;

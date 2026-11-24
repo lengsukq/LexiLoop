@@ -461,10 +461,11 @@ String? _configurationReason(AppSettings settings, String providerId) {
   }
   if (!isAiProviderId(providerId)) return null;
   final config = llmConfigFromSettings(settings.raw);
-  if (config.isUsable) return null;
+  if (config.canDictionaryFallback) return null;
   if (!config.ai.enabled) return aiDisabledReason;
   if (config.primaryProvider == null) return aiProviderMissingReason;
-  return aiIncompleteReason;
+  if (!config.isUsable) return aiIncompleteReason;
+  return aiDictionaryFallbackDisabledReason;
 }
 
 String _rawText(AppSettings settings, String key) {
@@ -492,3 +493,7 @@ const String aiProviderMissingReason = 'AI Provider 不存在';
 
 /// AI 配置缺项时的原因。
 const String aiIncompleteReason = 'AI 配置不完整（缺少 API Key、Base URL 或模型名）';
+
+/// AI 词典兜底开关未开启时的原因。
+const String aiDictionaryFallbackDisabledReason =
+    'AI 兜底查词未开启（可在「设置 → AI 模型 → 功能范围」中开启）';

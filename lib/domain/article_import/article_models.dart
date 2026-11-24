@@ -30,6 +30,46 @@ enum ArticleCandidateStatus {
   final String wire;
 }
 
+/// 文章分词的难度筛选模式。
+enum ArticleDifficultyMode {
+  /// 目标级别及以上（排除更低级基础词，保留目标级与更难词汇）。
+  atOrAbove('AT_OR_ABOVE'),
+
+  /// 精准匹配所选级别的核心词段（排除明显过简与超纲生僻词）。
+  exactBand('EXACT_BAND');
+
+  new(this.wire);
+
+  /// 存储 / 传输标识。
+  final String wire;
+}
+
+/// 文章提取范围。
+enum ArticleExtractScope {
+  /// 仅分词提取单词（轻量快速，推荐；释义/音标/例句后续交由有道查词）。
+  wordsOnly('WORDS_ONLY'),
+
+  /// 同时提取短语搭配与难句分析。
+  withPhrasesAndSentences('WITH_PHRASES_AND_SENTENCES');
+
+  new(this.wire);
+
+  /// 存储 / 传输标识。
+  final String wire;
+}
+
+/// 预览页单词列表的排序方式。
+enum ArticleCandidateSort {
+  /// 按难度/推荐优先。
+  difficulty,
+
+  /// 按文章出现频次降序。
+  occurrences,
+
+  /// 按原文顺序（列表原序）。
+  appearance,
+}
+
 /// AI 卡片的重点词汇。
 class ArticleAiKeyVocab {
   /// 以各字段构造。
@@ -99,14 +139,16 @@ class ArticleCandidate {
     required this.status,
     required this.entryType,
     this.sourceSentence,
+    this.surfaceForm,
     this.aiReason,
     this.difficulty,
     this.cefrLevel,
     this.frequency,
+    this.examTags = const <String>[],
     this.aiCard,
   });
 
-  /// 展示用词形（保留原文大小写）。
+  /// 展示用词形（LLM 词形还原后的标准词典原形，或本地提取的原词）。
   final String term;
 
   /// 归一化词形。
@@ -121,10 +163,13 @@ class ArticleCandidate {
   /// 词条类型（单词 / 短语 / 句子）。
   final LexicalContentType entryType;
 
-  /// 出处句（本地切句里第一条包含该词形的句子）。
+  /// 出处句（本地切句里第一条包含该词形或变形词的句子）。
   final String? sourceSentence;
 
-  /// AI 给出的推荐理由。
+  /// 文章中出现的原始变形词（例如原形 `implement` 对应原文 `implemented`）。
+  final String? surfaceForm;
+
+  /// AI 给出的语境提示 / 推荐理由。
   final String? aiReason;
 
   /// AI 给出的难度（1–5）。
@@ -135,6 +180,9 @@ class ArticleCandidate {
 
   /// AI 给出的词频档。
   final String? frequency;
+
+  /// AI 给出的考试标签（如 `CET6`、`IELTS`）。
+  final List<String> examTags;
 
   /// AI 给出的讲解卡片（短语 / 句子才有）。
   final ArticleAiCard? aiCard;
@@ -157,10 +205,12 @@ class ArticleCandidate {
     status: next,
     entryType: entryType,
     sourceSentence: sourceSentence,
+    surfaceForm: surfaceForm,
     aiReason: aiReason,
     difficulty: difficulty,
     cefrLevel: cefrLevel,
     frequency: frequency,
+    examTags: examTags,
     aiCard: aiCard,
   );
 }
@@ -293,6 +343,8 @@ class ArticleCommitResult {
     required this.createdWords,
     required this.existingWords,
     required this.queuedInitializations,
+    this.createdWordIds = const <int>[],
+    this.affectedWordIds = const <int>[],
   });
 
   /// 新建词条数。
@@ -303,6 +355,12 @@ class ArticleCommitResult {
 
   /// 入队初始化任务数。
   final int queuedInitializations;
+
+  /// 本次新建的词条 ID 列表。
+  final List<int> createdWordIds;
+
+  /// 本次进入有道查词补全的词条 ID 列表（含新建与触发补全的已有词条）。
+  final List<int> affectedWordIds;
 }
 
 /// 一个文章分段。

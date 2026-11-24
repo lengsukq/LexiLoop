@@ -23,6 +23,9 @@ enum VocabularyLevel {
   /// 不限定。
   auto('AUTO'),
 
+  /// 高考。
+  gaokao('GAOKAO'),
+
   /// 大学英语四级。
   cet4('CET4'),
 
@@ -32,11 +35,20 @@ enum VocabularyLevel {
   /// 考研。
   ky('KY'),
 
+  /// 英语专业四级。
+  tem4('TEM4'),
+
+  /// 英语专业八级。
+  tem8('TEM8'),
+
   /// 雅思。
   ielts('IELTS'),
 
   /// 托福。
-  toefl('TOEFL');
+  toefl('TOEFL'),
+
+  /// GRE。
+  gre('GRE');
 
   new(this.wire);
 
@@ -387,27 +399,21 @@ class StudyPlanSettings {
   };
 }
 
-/// 发音来源：不包含需要账号密钥的云 TTS。
+/// 可选发音引擎。
+///
+/// 用户可多选启用任意组合，并按拖动后的顺序决定优先级：
+/// 排在前面的不可用或不适用（如长句跳过有道）时，自动顺延到下一个已启用引擎。
 enum SpeechSource {
-  /// 词典录音优先，系统朗读和在线词典录音兜底。
-  automatic('auto', '自动选择（推荐）'),
+  /// 有道词典真人 MP3（直连 `dict.youdao.com/dictvoice` 或词典自带录音）。
+  youdao('youdao', '有道词典发音', '在线真人 MP3，响应快；适合单词与常见短语'),
 
-  /// Flutter 直连 Edge TTS 合成，无需自己的 Next.js 服务。
-  edge('edge', 'Edge TTS（直连）'),
+  /// Flutter 直连微软 Edge 神经网络语音。
+  edge('edge', '微软 Edge 语音', '直连神经网络语音，单词与整句都自然流畅'),
 
-  /// 使用现有 Next.js 服务生成 Edge TTS 音频。
-  online('online', 'Next.js TTS（自建）'),
+  /// 设备本地系统 TTS。
+  system('system', '设备系统朗读', '本地离线语音合成，断网也能兜底发音');
 
-  /// 优先使用词典录音（需要网络）。
-  dictionary('dictionary', '有道词典 MP3（直连）'),
-
-  /// 仅使用设备系统的 TTS。
-  system('system', '系统语音合成'),
-
-  /// 不播放语音。
-  off('off', '关闭发音');
-
-  new(this.wire, this.label);
+  new(this.wire, this.label, this.description);
 
   /// 存储值。
   final String wire;
@@ -415,14 +421,47 @@ enum SpeechSource {
   /// 设置界面中的名称。
   final String label;
 
-  /// 未知值降级为自动选择。
-  static SpeechSource fromWire(String? value) {
-    for (final source in values) {
-      if (source.wire == value) return source;
-    }
-    return SpeechSource.automatic;
-  }
+  /// 设置界面中的一句说明。
+  final String description;
+
+  /// 解析存储值；兼容旧版 `dictionary` 写法，未知值返回 `null`。
+  static SpeechSource? tryFromWire(String? value) => switch (value) {
+    'youdao' || 'dictionary' => SpeechSource.youdao,
+    'edge' => SpeechSource.edge,
+    'system' => SpeechSource.system,
+    _ => null,
+  };
 }
+
+/// 发音优先级链中的单项配置。
+class SpeechSourcePreference {
+  /// 以引擎与启用状态构造。
+  const new({required this.source, required this.enabled});
+
+  /// 对应的发音引擎。
+  final SpeechSource source;
+
+  /// 是否启用该引擎。
+  final bool enabled;
+
+  /// 返回修改后的副本。
+  SpeechSourcePreference copyWith({bool? enabled}) =>
+      SpeechSourcePreference(source: source, enabled: enabled ?? this.enabled);
+
+  /// 转为可写入设置表的 JSON Map。
+  Map<String, Object?> toJson() => <String, Object?>{
+    'source': source.wire,
+    'enabled': enabled,
+  };
+}
+
+/// 默认发音优先级链：有道真人 MP3 → 微软 Edge 语音 → 设备系统朗读。
+const List<SpeechSourcePreference> defaultSpeechChain =
+    <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.system, enabled: true),
+    ];
 
 /// 学习选项中的释义密度；不修改判题使用的完整原文。
 enum ChoiceDefinitionStyle {
@@ -462,11 +501,10 @@ class PlaybackSettings {
     required this.phraseSpeed,
     required this.sentenceSpeed,
     required this.autoPlayPronunciation,
-    this.humanAudioEnabled = true,
-    this.speechSource = SpeechSource.automatic,
-    this.speechFallbackEnabled = true,
+    this.speechChain = defaultSpeechChain,
     this.choiceDefinitionStyle = ChoiceDefinitionStyle.compact,
-    this.onlineTtsBaseUrl = '',
+    this.offlineAudioCacheEnabled = true,
+    this.audioCacheMaxSizeMb = defaultAudioCacheMaxSizeMb,
   });
 
   /// 选择题揭示答案前的延迟（秒）。
@@ -487,24 +525,17 @@ class PlaybackSettings {
   /// 是否自动朗读发音。
   final bool autoPlayPronunciation;
 
-  /// 是否优先播放词典的真人录音（mp3）。
-  ///
-  /// 关掉它即「只用系统朗读」：真人录音依赖联网与第三方站点，站点不可用
-  /// 或用户不愿为一次点按付一次请求时，需要有一个不必改代码的开关。
-  /// 默认开启——真人录音相对系统朗读是明确的音质提升。
-  final bool humanAudioEnabled;
-
-  /// 当前朗读方案。
-  final SpeechSource speechSource;
-
-  /// 首选方案失败时是否尝试下一种可用方案。
-  final bool speechFallbackEnabled;
+  /// 按优先级排列的发音引擎列表（列表顺序即回退顺序，每项可独立开关）。
+  final List<SpeechSourcePreference> speechChain;
 
   /// 学习选择题显示的释义密度。
   final ChoiceDefinitionStyle choiceDefinitionStyle;
 
-  /// Next.js TTS 服务的 HTTPS 根地址；为空表示未启用该服务。
-  final String onlineTtsBaseUrl;
+  /// 是否将在线获取的发音持久化保存到本机磁盘。
+  final bool offlineAudioCacheEnabled;
+
+  /// 离线语音磁盘缓存上限（MB）；`0` 表示不限制。
+  final int audioCacheMaxSizeMb;
 
   /// 默认值。
   static const PlaybackSettings defaults = PlaybackSettings(
@@ -515,6 +546,28 @@ class PlaybackSettings {
     sentenceSpeed: defaultSpeechRate,
     autoPlayPronunciation: true,
   );
+
+  /// 离线语音缓存上限换算为字节；`0` 表示不限制。
+  int get audioCacheMaxBytes =>
+      audioCacheMaxSizeMb <= 0 ? 0 : audioCacheMaxSizeMb * audioCacheBytesPerMb;
+
+  /// 已启用的发音引擎，严格按用户排列的优先级返回。
+  List<SpeechSource> get enabledSpeechSources => <SpeechSource>[
+    for (final item in speechChain)
+      if (item.enabled) item.source,
+  ];
+
+  /// 是否至少启用了一个发音引擎；全部关闭表示静音模式。
+  bool get speechEnabled => speechChain.any((item) => item.enabled);
+
+  /// 指定引擎当前是否启用。
+  bool isSourceEnabled(SpeechSource source) =>
+      speechChain.any((item) => item.source == source && item.enabled);
+
+  /// 序列化发音优先级链供写入设置表。
+  static List<Map<String, Object?>> serializeSpeechChain(
+    List<SpeechSourcePreference> chain,
+  ) => <Map<String, Object?>>[for (final item in chain) item.toJson()];
 
   /// 按词条类型取语速。
   double speedFor(LexicalContentType? type) => switch (type) {
@@ -531,11 +584,10 @@ class PlaybackSettings {
     'phraseSpeed': phraseSpeed,
     'sentenceSpeed': sentenceSpeed,
     'autoPlayPronunciation': autoPlayPronunciation,
-    'humanAudioEnabled': humanAudioEnabled,
-    'speechSource': speechSource.wire,
-    'speechFallbackEnabled': speechFallbackEnabled,
+    'speechChain': serializeSpeechChain(speechChain),
     'choiceDefinitionStyle': choiceDefinitionStyle.wire,
-    'onlineTtsBaseUrl': onlineTtsBaseUrl,
+    'offlineAudioCacheEnabled': offlineAudioCacheEnabled,
+    'audioCacheMaxSizeMb': audioCacheMaxSizeMb,
   };
 }
 
@@ -721,21 +773,108 @@ PlaybackSettings _parsePlayback(_SettingsReader reader) {
       'autoPlayPronunciation',
       fallback: fallback.autoPlayPronunciation,
     ),
-    humanAudioEnabled: reader.boolValue(
-      'humanAudioEnabled',
-      fallback: fallback.humanAudioEnabled,
-    ),
-    speechSource: SpeechSource.fromWire(reader.stringValue('speechSource')),
-    speechFallbackEnabled: reader.boolValue(
-      'speechFallbackEnabled',
-      fallback: fallback.speechFallbackEnabled,
-    ),
+    speechChain: _parseSpeechChain(reader),
     choiceDefinitionStyle: ChoiceDefinitionStyle.fromWire(
       reader.stringValue('choiceDefinitionStyle'),
     ),
-    onlineTtsBaseUrl: reader.stringValue('onlineTtsBaseUrl') ?? '',
+    offlineAudioCacheEnabled: reader.boolValue(
+      'offlineAudioCacheEnabled',
+      fallback: fallback.offlineAudioCacheEnabled,
+    ),
+    audioCacheMaxSizeMb: reader.intValue(
+      'audioCacheMaxSizeMb',
+      fallback.audioCacheMaxSizeMb,
+      min: 0,
+      max: maxAudioCacheMaxSizeMb,
+    ),
   );
 }
+
+List<SpeechSourcePreference> _parseSpeechChain(_SettingsReader reader) {
+  final rawChain = reader._raw['speechChain'];
+  if (rawChain is List<Object?>) {
+    final parsed = _normalizeSpeechChain(rawChain);
+    if (parsed.isNotEmpty) return parsed;
+  }
+  return _migrateLegacySpeechChain(reader);
+}
+
+List<SpeechSourcePreference> _normalizeSpeechChain(List<Object?> rawChain) {
+  final seen = <SpeechSource>{};
+  final result = <SpeechSourcePreference>[];
+  for (final item in rawChain) {
+    if (item is! Map<Object?, Object?>) continue;
+    final wire = item['source'];
+    final source = SpeechSource.tryFromWire(wire is String ? wire : null);
+    if (source == null || !seen.add(source)) continue;
+    final enabledRaw = item['enabled'];
+    result.add(
+      SpeechSourcePreference(
+        source: source,
+        enabled: enabledRaw is bool && enabledRaw,
+      ),
+    );
+  }
+  if (result.isEmpty) return result;
+  for (final fallback in defaultSpeechChain) {
+    if (seen.add(fallback.source)) {
+      result.add(
+        SpeechSourcePreference(source: fallback.source, enabled: false),
+      );
+    }
+  }
+  return List<SpeechSourcePreference>.unmodifiable(result);
+}
+
+/// 兼容升级前只存了 `speechSource` / `humanAudioEnabled` / `speechFallbackEnabled`
+/// 的老设置，平滑映射为等价的优先级链。
+List<SpeechSourcePreference> _migrateLegacySpeechChain(_SettingsReader reader) {
+  final legacySource = reader.stringValue('speechSource');
+  final humanAudio = reader.boolValue('humanAudioEnabled', fallback: true);
+  final fallback = reader.boolValue('speechFallbackEnabled', fallback: true);
+  return switch (legacySource) {
+    'off' => _chain((SpeechSource.youdao, false), (SpeechSource.edge, false), (
+      SpeechSource.system,
+      false,
+    )),
+    'edge' || 'online' => _chain(
+      (SpeechSource.edge, true),
+      (SpeechSource.youdao, fallback),
+      (SpeechSource.system, fallback),
+    ),
+    'dictionary' => _chain(
+      (SpeechSource.youdao, true),
+      (SpeechSource.edge, fallback),
+      (SpeechSource.system, fallback),
+    ),
+    'system' => _chain(
+      (SpeechSource.system, true),
+      (SpeechSource.youdao, fallback && humanAudio),
+      (SpeechSource.edge, fallback),
+    ),
+    _ when !humanAudio => _chain(
+      (SpeechSource.system, true),
+      (SpeechSource.youdao, false),
+      (SpeechSource.edge, false),
+    ),
+    _ when !fallback => _chain(
+      (SpeechSource.youdao, true),
+      (SpeechSource.edge, false),
+      (SpeechSource.system, false),
+    ),
+    _ => defaultSpeechChain,
+  };
+}
+
+List<SpeechSourcePreference> _chain(
+  (SpeechSource, bool) first,
+  (SpeechSource, bool) second,
+  (SpeechSource, bool) third,
+) => List<SpeechSourcePreference>.unmodifiable(<SpeechSourcePreference>[
+  SpeechSourcePreference(source: first.$1, enabled: first.$2),
+  SpeechSourcePreference(source: second.$1, enabled: second.$2),
+  SpeechSourcePreference(source: third.$1, enabled: third.$2),
+]);
 
 ProviderSettings _parseProviders(_SettingsReader reader) {
   const fallback = ProviderSettings.defaults;

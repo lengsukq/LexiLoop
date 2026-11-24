@@ -207,6 +207,8 @@ class BackupImporter {
     'initialization_jobs',
     'provider_attempts',
     'settings',
+    'word_packs',
+    'word_pack_items',
   ];
 
   /// 解析并导入备份，返回各表行数。

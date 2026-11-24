@@ -115,10 +115,7 @@ class _SheetHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                title,
-                style: LexiType.title.copyWith(color: colors.label),
-              ),
+              Text(title, style: LexiType.title.copyWith(color: colors.label)),
               if (sub != null && sub.isNotEmpty) ...<Widget>[
                 const SizedBox(height: LexiSpace.s2),
                 Text(

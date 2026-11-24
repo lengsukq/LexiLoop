@@ -76,6 +76,8 @@ const String _cardsTable = 'review_cards';
 const String _logsTable = 'review_logs';
 const String _wrongTable = 'wrong_word_states';
 const String _settingsTable = 'settings';
+const String _packsTable = 'word_packs';
+const String _packItemsTable = 'word_pack_items';
 
 /// 一次合并新增/更新了多少东西。
 class MergeCounts {
@@ -213,6 +215,8 @@ class _MergeRun {
     _mergeLogs();
     _rebuildDerived();
     _mergeSettings();
+    _mergeWordPacks();
+    _mergeWordPackItems();
 
     return MergeOutcome(
       tables: _tables,
@@ -240,6 +244,7 @@ class _MergeRun {
         final row = <String, Object?>{
           ...incoming,
           'id': _nextWordId,
+          'is_personal': _isPersonalTruthy(incoming['is_personal']) ? 1 : 0,
           if (incoming.containsKey('initialization_status'))
             'initialization_status': _localInitializationStatus(
               incoming['initialization_status'],
@@ -253,6 +258,10 @@ class _MergeRun {
         continue;
       }
       if (remoteId != null) _wordIdMap[remoteId] = _intOf(existing['id'])!;
+      if (_isPersonalTruthy(existing['is_personal']) ||
+          _isPersonalTruthy(incoming['is_personal'])) {
+        existing['is_personal'] = 1;
+      }
       if (_isNewerThan(incoming, existing)) {
         for (final column in _mergeableWordColumns) {
           if (incoming.containsKey(column)) existing[column] = incoming[column];
@@ -455,6 +464,56 @@ class _MergeRun {
     }
   }
 
+  /// 词书包元信息：按 ID 合并并取较新更新时间。
+  void _mergeWordPacks() {
+    final rows = _rows(_packsTable);
+    final byId = <String, Map<String, Object?>>{
+      for (final row in rows) _stringOf(row['id']): row,
+    };
+    for (final incoming in _incoming(_packsTable)) {
+      final id = _stringOf(incoming['id']);
+      if (id.isEmpty) continue;
+      final existing = byId[id];
+      if (existing == null) {
+        final row = <String, Object?>{...incoming};
+        rows.add(row);
+        byId[id] = row;
+        continue;
+      }
+      if (_isNewerThan(incoming, existing)) {
+        existing
+          ..clear()
+          ..addAll(incoming);
+      }
+    }
+  }
+
+  /// 词书包词条关联：按 `(pack_id, mapped_word_id)` 取并集。
+  void _mergeWordPackItems() {
+    final rows = _rows(_packItemsTable);
+    final validPacks = <String>{
+      for (final row in _rows(_packsTable)) _stringOf(row['id']),
+    };
+    final seen = <String>{
+      for (final row in rows)
+        '${_stringOf(row['pack_id'])}\u0000${_intOf(row['word_id'])}',
+    };
+    for (final incoming in _incoming(_packItemsTable)) {
+      final packId = _stringOf(incoming['pack_id']);
+      final wordId = _wordIdMap[_intOf(incoming['word_id'])];
+      if (packId.isEmpty || wordId == null || !validPacks.contains(packId)) {
+        continue;
+      }
+      final key = '$packId\u0000$wordId';
+      if (!seen.add(key)) continue;
+      rows.add(<String, Object?>{
+        ...incoming,
+        'pack_id': packId,
+        'word_id': wordId,
+      });
+    }
+  }
+
   /// 是否属于本次被重建的词。
   bool _isTouched(Map<String, Object?> row) =>
       _touchedWordIds.contains(_intOf(row['word_id']));
@@ -544,6 +603,14 @@ int? _intOf(Object? value) {
 
 /// 宽容地读一个字符串。
 String _stringOf(Object? value) => value is String ? value : '';
+
+/// 判断 `words.is_personal` 是否为真（旧备份缺列默认视作个人词条）。
+bool _isPersonalTruthy(Object? value) {
+  if (value == null) return true;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  return true;
+}
 
 /// 远端瞬态任务状态无法在本机恢复，新增词将其回退到可重新初始化的状态。
 Object? _localInitializationStatus(Object? value) =>

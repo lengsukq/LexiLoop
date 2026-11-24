@@ -1,6 +1,6 @@
 /// 播放设置分组。
 ///
-/// 口音、真人录音来源、三种粒度的语速、自动朗读与选择题揭示延迟。
+/// 口音、多选与拖拽排序的发音优先级链、三种粒度的语速、自动朗读与选择题揭示延迟。
 library;
 
 import 'dart:async';
@@ -12,15 +12,20 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
+import 'package:lexiloop/features/settings/audio_cache_section.dart';
 import 'package:lexiloop/features/settings/settings_providers.dart';
 import 'package:lexiloop/services/audio/direct_edge_tts.dart';
-import 'package:lexiloop/services/audio/next_tts_auth.dart';
 import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/audio/speech_request.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';
 import 'package:lexiloop/services/audio/tts_settings_link.dart';
+import 'package:lexiloop/services/audio/word_speaker.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 播放分组。
 class PlaybackSection extends ConsumerWidget {
@@ -43,6 +48,8 @@ class PlaybackSection extends ConsumerWidget {
       ),
       children: <Widget>[
         _PronunciationGroup(playback: playback),
+        const SizedBox(height: LexiSpace.s12),
+        AudioCacheSection(playback: playback),
         const SizedBox(height: LexiSpace.s12),
         _ChoiceStyleGroup(playback: playback),
         const SizedBox(height: LexiSpace.s12),
@@ -131,8 +138,8 @@ class _SpeechSpeedGroup extends ConsumerWidget {
         ),
         SettingsSwitchRow(
           label: '自动朗读',
-          description: playback.speechSource == SpeechSource.off
-              ? '当前发音来源已设为「关闭发音」，请先在上方启用发音。'
+          description: !playback.speechEnabled
+              ? '当前所有发音引擎均已关闭，请先在上方启用至少一项。'
               : '英文题进入时自动朗读；拼写、中文提示等题型揭示答案后朗读。',
           value: playback.autoPlayPronunciation,
           onChanged: (value) => saveSettings(ref, <String, Object?>{
@@ -144,140 +151,10 @@ class _SpeechSpeedGroup extends ConsumerWidget {
   );
 }
 
-/// 用户自行部署的 Next.js 服务地址，按按钮才落库，避免输入过程中逐字写库。
-class _OnlineTtsAddressField extends ConsumerStatefulWidget {
-  const new({required this.value});
-
-  final String value;
-
-  @override
-  ConsumerState<_OnlineTtsAddressField> createState() =>
-      _OnlineTtsAddressFieldState();
-}
-
-class _OnlineTtsAddressFieldState
-    extends ConsumerState<_OnlineTtsAddressField> {
-  late final TextEditingController _controller;
-  final TextEditingController _password = TextEditingController();
-  bool _obscurePassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.value);
-  }
-
-  @override
-  void didUpdateWidget(_OnlineTtsAddressField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.value != oldWidget.value &&
-        _controller.text == oldWidget.value) {
-      _controller.text = widget.value;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final input = _controller.text.trim().replaceAll(
-      RegExp(
-        '/'
-        r'$',
-      ),
-      '',
-    );
-    final valid =
-        input.isEmpty ||
-        onlineTtsAudioUri(baseUrl: input, term: 'hello', accent: Accent.us) !=
-            null;
-    if (!valid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入 Next.js 的 HTTPS 根地址，例如 https://example.com'),
-        ),
-      );
-      return;
-    }
-    await saveSettings(ref, <String, Object?>{'onlineTtsBaseUrl': input});
-    if (_password.text.isNotEmpty) {
-      await NextTtsCredentials().save(_password.text);
-      _password.clear();
-    }
-    if (mounted) FocusManager.instance.primaryFocus?.unfocus();
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: <Widget>[
-      TextField(
-        key: const Key('playbackOnlineTtsUrl'),
-        controller: _controller,
-        keyboardType: TextInputType.url,
-        autocorrect: false,
-        onSubmitted: (_) => unawaited(_save()),
-        decoration: const InputDecoration(
-          labelText: 'Next.js 在线语音服务地址（可选）',
-          hintText: 'https://your-lexiloop.example.com',
-          helperText: '复用 /api/tts 接口；单词文本会发送到该服务。',
-          helperMaxLines: 2,
-        ),
-      ),
-      const SizedBox(height: LexiSpace.s12),
-      TextField(
-        key: const Key('playbackOnlineTtsPassword'),
-        controller: _password,
-        obscureText: _obscurePassword,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: InputDecoration(
-          labelText: 'Next.js 登录密码',
-          helperText: '保存在设备安全存储中；留空表示不修改已保存密码。',
-          helperMaxLines: 2,
-          suffixIcon: IconButton(
-            tooltip: _obscurePassword ? '显示密码' : '隐藏密码',
-            icon: Icon(
-              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-            ),
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
-          ),
-        ),
-      ),
-      Align(
-        alignment: Alignment.centerRight,
-        child: TextButton(
-          onPressed: () => unawaited(_save()),
-          child: const Text('保存地址和密码'),
-        ),
-      ),
-    ],
-  );
-}
-
-/// 发音来源分组：来源、失败降级、测试以及 Android 语音服务入口。
-///
-/// 两项放在同一个私有组件里，因为它们回答的是同一个问题——「这个声音从哪来」：
-/// 口音决定用美音还是英音，真人录音开关决定优先用词典的录音还是系统朗读。
-/// 拆成组件还有一个硬性理由：`PlaybackSection.build()` 已接近架构守卫的
-/// 80 行上限，再往列表里塞一张卡片就会越线。
-///
-/// **「优先使用词典真人发音」是相对旧版新增的开关**：旧版
-/// `src/app/(main)/settings/` 下的播放设置只有口音、语速与自动朗读，
-/// 发音链路固定为「真人录音优先」，用户无从选择。本版把它做成运行时开关，
-/// 理由是这条链路依赖第三方词典站点：站点不可用时要能一键回到系统朗读，
-/// 用户不想为每次点按付一次网络请求时也不该被迫改代码。
-/// 写入的键就是 [PlaybackSettings.humanAudioEnabled]（`humanAudioEnabled`），
-/// 消费方是 `services/audio/word_speaker.dart` 的运行时开关字段。
+/// 口音与发音引擎优先级链配置。
 class _PronunciationGroup extends ConsumerWidget {
   const new({required this.playback});
 
-  /// 当前播放设置。
   final PlaybackSettings playback;
 
   @override
@@ -303,115 +180,133 @@ class _PronunciationGroup extends ConsumerWidget {
       ),
       const SizedBox(height: LexiSpace.s12),
       SettingsSectionCard(
-        title: '发音方式',
-        subtitle: '可使用系统语音、词典录音或无需自建服务器的 Edge TTS。在线方式会把待朗读文本发送给对应服务。',
+        title: '发音引擎与优先级',
+        subtitle: '可多选启用，拖动右侧手柄调整顺序；排在前面的不可用时，自动顺延到下一项。',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            DropdownButtonFormField<SpeechSource>(
-              key: const Key('playbackSpeechSource'),
-              initialValue: playback.speechSource,
-              decoration: const InputDecoration(labelText: '发音来源'),
-              items: <DropdownMenuItem<SpeechSource>>[
-                for (final source in SpeechSource.values)
-                  DropdownMenuItem(value: source, child: Text(source.label)),
-              ],
-              onChanged: (source) {
-                if (source == null) return;
-                unawaited(
-                  saveSettings(ref, <String, Object?>{
-                    'speechSource': source.wire,
-                  }),
-                );
-              },
-            ),
+            _SpeechChainEditor(playback: playback),
             const SizedBox(height: LexiSpace.s12),
-            if (playback.speechSource == SpeechSource.online)
-              _OnlineTtsAddressField(value: playback.onlineTtsBaseUrl),
-            SettingsSwitchRow(
-              label: '失败时自动尝试备用方式',
-              description: '系统缺少英文语音包时可改用 Edge TTS 或在线词典；离线时仍能正常学习。',
-              value: playback.speechFallbackEnabled,
-              onChanged: (value) => saveSettings(ref, <String, Object?>{
-                'speechFallbackEnabled': value,
-              }),
-            ),
             Wrap(
               spacing: LexiSpace.s8,
+              runSpacing: LexiSpace.s8,
               children: <Widget>[
                 OutlinedButton.icon(
+                  key: const Key('playbackTestSpeech'),
                   onPressed: () => unawaited(_testSpeech(context, ref)),
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  icon: const Icon(LucideIcons.play, size: 16),
                   label: const Text('试听发音'),
                 ),
                 TextButton.icon(
-                  onPressed: () => unawaited(openSystemSpeechSettings(context)),
-                  icon: const Icon(Icons.settings_outlined, size: 18),
-                  label: const Text('系统语音设置'),
+                  key: const Key('playbackDiagnoseSpeech'),
+                  onPressed: () => unawaited(_diagnoseAll(context, ref)),
+                  icon: const Icon(LucideIcons.activity, size: 16),
+                  label: const Text('引擎检测'),
                 ),
                 TextButton.icon(
-                  onPressed: () => unawaited(_diagnoseEdge(context, ref)),
-                  icon: const Icon(Icons.bug_report_outlined, size: 18),
-                  label: const Text('Edge 诊断'),
+                  onPressed: () => unawaited(openSystemSpeechSettings(context)),
+                  icon: const Icon(LucideIcons.settings, size: 16),
+                  label: const Text('系统语音设置'),
                 ),
               ],
             ),
           ],
         ),
       ),
-      const SizedBox(height: LexiSpace.s12),
-      SettingsSectionCard(
-        title: '真人录音',
-        subtitle: '词典站点提供的是真人朗读 MP3，音质明显好于系统合成音；首次获取需要联网。',
-        child: SettingsSwitchRow(
-          switchKey: const Key('playbackHumanAudio'),
-          label: '优先使用词典真人发音',
-          description:
-              '在「自动选择」模式开启时，词典录音失效会自动回落系统朗读；关闭后只用系统朗读，完全不联网（手动选 Edge TTS 除外）。',
-          value: playback.humanAudioEnabled,
-          onChanged: (value) =>
-              saveSettings(ref, <String, Object?>{'humanAudioEnabled': value}),
-        ),
-      ),
     ],
   );
 
-  Future<void> _diagnoseEdge(BuildContext context, WidgetRef ref) async {
-    final lines = await _collectEdgeDiagnostics(ref);
+  Future<void> _testSpeech(BuildContext context, WidgetRef ref) async {
+    final latest = await ref.read(settingsServiceProvider).load();
     if (!context.mounted) return;
-    await _showEdgeDiagnostics(context, lines.join('\n'));
+    final selected = latest.playback;
+    final result = await ref
+        .read(wordSpeakerProvider)
+        .speak(
+          SpeechRequest(
+            term: 'hello',
+            accent: selected.defaultAccent,
+            playback: selected,
+          ),
+        );
+    if (!context.mounted) return;
+    final message = switch (result) {
+      SpeechDisabled() => '当前已关闭所有发音引擎，请先开启至少一项',
+      SpeechFailed(:final error) => '试听失败：${error.message}。请检查网络或系统语音包。',
+      _ when result.fellBack =>
+        '${result.fellBackFrom!.label}暂不可用，已自动切换为${result.playedSource!.label}',
+      _ => '试听成功：${result.playedSource!.label}',
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<List<String>> _collectEdgeDiagnostics(WidgetRef ref) async {
-    final lines = <String>['Edge TTS 诊断 · hello'];
+  Future<void> _diagnoseAll(BuildContext context, WidgetRef ref) async {
+    final report = await _collectDiagnostics(ref);
+    if (!context.mounted) return;
+    await _showDiagnosticsDialog(context, report);
+  }
+
+  Future<String> _collectDiagnostics(WidgetRef ref) async {
     final playback = (await ref.read(settingsServiceProvider).load()).playback;
+    final accent = playback.defaultAccent;
+    final results = await Future.wait<String>(<Future<String>>[
+      _probeYoudao(ref, accent),
+      _probeEdge(accent),
+      _probeSystem(ref, accent),
+    ]);
+    return <String>['发音引擎检测 · hello（${accent.wire}）', ...results].join('\n');
+  }
+
+  Future<String> _probeYoudao(WidgetRef ref, Accent accent) async {
+    final watch = Stopwatch()..start();
     try {
-      lines.add('1. 正在连接 Edge 并合成 MP3…');
+      final url = youdaoAudioUri('hello', accent)!;
+      final bytes = await ref.read(audioDownloaderProvider).download(url);
+      watch.stop();
+      return '• 有道词典发音：正常（${bytes.length} 字节，${watch.elapsedMilliseconds}ms）';
+    } on Object catch (error) {
+      watch.stop();
+      return '• 有道词典发音：失败（${watch.elapsedMilliseconds}ms，${error.runtimeType}）';
+    }
+  }
+
+  Future<String> _probeEdge(Accent accent) async {
+    final watch = Stopwatch()..start();
+    try {
       final bytes = await DirectEdgeSpeech().diagnose(
         text: 'hello',
-        accent: playback.defaultAccent,
+        accent: accent,
       );
-      lines.add('2. 合成成功：${bytes.length} 字节');
-      try {
-        final player = ref.read(audioPlayerPortProvider);
-        await player.prepare(bytes, speed: 1);
-        lines.add('3. Android 音频解码成功');
-        await player.play();
-        lines.add('4. 播放调用成功（请确认扬声器有声音）');
-      } on Object catch (error) {
-        lines.add('3. 播放失败：${error.runtimeType}: $error');
-      }
+      watch.stop();
+      final ms = watch.elapsedMilliseconds;
+      return '• 微软 Edge 语音：正常（${bytes.length} 字节，${ms}ms）';
     } on Object catch (error) {
-      lines.add('2. 连接/合成失败：${error.runtimeType}: $error');
+      watch.stop();
+      final ms = watch.elapsedMilliseconds;
+      return '• 微软 Edge 语音：失败（${ms}ms，${error.runtimeType}）';
     }
-    return lines;
   }
 
-  Future<void> _showEdgeDiagnostics(BuildContext context, String report) =>
+  Future<String> _probeSystem(WidgetRef ref, Accent accent) async {
+    try {
+      final language = speechLanguageOf(accent);
+      final available = await ref
+          .read(ttsServiceProvider)
+          .isLanguageAvailable(language);
+      return available
+          ? '• 设备系统朗读：正常（已安装 $language 语音包）'
+          : '• 设备系统朗读：缺少 $language 语音包，请在系统语音设置中安装';
+    } on Object catch (error) {
+      return '• 设备系统朗读：检测失败（${error.runtimeType}）';
+    }
+  }
+
+  Future<void> _showDiagnosticsDialog(BuildContext context, String report) =>
       showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Edge TTS 诊断结果'),
+          title: const Text('发音引擎检测结果'),
           content: SelectableText(report),
           actions: <Widget>[
             TextButton(
@@ -428,32 +323,215 @@ class _PronunciationGroup extends ConsumerWidget {
           ],
         ),
       );
+}
 
-  Future<void> _testSpeech(BuildContext context, WidgetRef ref) async {
-    // 不使用构建时的 playback 快照：用户刚切换来源后，必须试听已落库的设置。
-    final latest = await ref.read(settingsServiceProvider).load();
-    if (!context.mounted) return;
-    final selected = latest.playback;
-    final speaker = ref.read(wordSpeakerProvider)
-      ..humanAudioEnabled = selected.humanAudioEnabled;
-    final result = await speaker.speak(
-      SpeechRequest(
-        term: 'hello',
-        accent: selected.defaultAccent,
-        playback: selected,
+/// 可多选且可拖动排序的发音引擎列表。
+class _SpeechChainEditor extends ConsumerWidget {
+  const new({required this.playback});
+
+  final PlaybackSettings playback;
+
+  Future<void> _saveChain(WidgetRef ref, List<SpeechSourcePreference> next) =>
+      saveSettings(ref, <String, Object?>{
+        'speechChain': PlaybackSettings.serializeSpeechChain(next),
+      });
+
+  void _toggle(WidgetRef ref, SpeechSource source, bool enabled) {
+    LexiHaptics.selection();
+    final next = <SpeechSourcePreference>[
+      for (final item in playback.speechChain)
+        if (item.source == source) item.copyWith(enabled: enabled) else item,
+    ];
+    unawaited(_saveChain(ref, next));
+  }
+
+  void _reorder(WidgetRef ref, int oldIndex, int newIndex) {
+    if (newIndex == oldIndex) return;
+    LexiHaptics.selection();
+    final next = List<SpeechSourcePreference>.of(playback.speechChain);
+    final moved = next.removeAt(oldIndex);
+    next.insert(newIndex, moved);
+    unawaited(_saveChain(ref, next));
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chain = playback.speechChain;
+    final colors = context.lexiColors;
+    var activeRank = 0;
+    final ranks = <int?>[
+      for (final item in chain)
+        if (item.enabled) ++activeRank else null,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        ReorderableListView.builder(
+          key: const Key('playbackSpeechChain'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          proxyDecorator: _dragProxyDecorator,
+          itemCount: chain.length,
+          onReorderItem: (oldIndex, newIndex) =>
+              _reorder(ref, oldIndex, newIndex),
+          itemBuilder: (context, index) {
+            final entry = chain[index];
+            return _SpeechSourceTile(
+              key: ValueKey<SpeechSource>(entry.source),
+              entry: entry,
+              index: index,
+              rank: ranks[index],
+              onToggle: (value) => _toggle(ref, entry.source, value),
+            );
+          },
+        ),
+        if (!playback.speechEnabled)
+          Padding(
+            padding: const EdgeInsets.only(top: LexiSpace.s6),
+            child: Text(
+              '所有发音引擎均已关闭（当前为静音模式）。',
+              style: LexiType.footnote.copyWith(color: colors.warningText),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _dragProxyDecorator(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) => Material(
+    color: Colors.transparent,
+    elevation: LexiSpace.s4,
+    borderRadius: BorderRadius.circular(LexiRadius.md),
+    child: child,
+  );
+}
+
+/// 优先级链中的单条发音引擎行。
+class _SpeechSourceTile extends StatelessWidget {
+  const new({
+    required this.entry,
+    required this.index,
+    required this.rank,
+    required this.onToggle,
+    super.key,
+  });
+
+  final SpeechSourcePreference entry;
+  final int index;
+  final int? rank;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final enabled = entry.enabled;
+    final borderColor = enabled ? colors.borderDefault : colors.borderSubtle;
+    final fillColor = enabled ? colors.card : colors.fill;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: LexiSpace.s8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: fillColor,
+          borderRadius: BorderRadius.circular(LexiRadius.md),
+          border: Border.all(color: borderColor),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LexiSpace.s12,
+            vertical: LexiSpace.s10,
+          ),
+          child: Row(
+            children: <Widget>[
+              _RankBadge(rank: rank),
+              const SizedBox(width: LexiSpace.s10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      entry.source.label,
+                      style: LexiType.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: enabled ? colors.label : colors.tertiaryLabel,
+                      ),
+                    ),
+                    const SizedBox(height: LexiSpace.s2),
+                    Text(
+                      entry.source.description,
+                      style: LexiType.footnote.copyWith(
+                        color: enabled
+                            ? colors.secondaryLabel
+                            : colors.tertiaryLabel,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: LexiSpace.s8),
+              Switch(
+                key: Key('speechSourceToggle_${entry.source.wire}'),
+                value: enabled,
+                onChanged: onToggle,
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: Tooltip(
+                  message: '拖动调整优先级',
+                  child: Padding(
+                    padding: const EdgeInsets.all(LexiSpace.s8),
+                    child: Icon(
+                      LucideIcons.gripVertical,
+                      key: Key('speechSourceDrag_${entry.source.wire}'),
+                      size: 18,
+                      color: colors.tertiaryLabel,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-    if (!context.mounted) return;
-    final message = switch (result) {
-      HumanRecordingPlayed() => '试听成功：词典录音',
-      OnlineVoicePlayed() => '试听成功：Next.js 在线 TTS',
-      DirectEdgeVoicePlayed() => '试听成功：Edge TTS 直连',
-      SystemVoicePlayed() => '试听成功：系统朗读',
-      SpeechDisabled() => '当前已关闭发音，请先选择其他发音方式',
-      SpeechFailed(:final error) => '试听失败：${error.message}。可切换发音方式或安装系统语音包。',
-    };
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// 优先级顺位徽章（已启用显示 1 / 2 / 3，关闭显示 —）。
+class _RankBadge extends StatelessWidget {
+  const new({required this.rank});
+
+  final int? rank;
+
+  static const double _size = 24;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final active = rank != null;
+    return Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: active ? colors.accent : colors.fill,
+        borderRadius: BorderRadius.circular(LexiRadius.pill),
+      ),
+      child: Text(
+        active ? '$rank' : '—',
+        style: LexiType.caption.copyWith(
+          fontWeight: FontWeight.w700,
+          color: active
+              ? Theme.of(context).colorScheme.onPrimary
+              : colors.tertiaryLabel,
+        ),
+      ),
+    );
   }
 }
 

@@ -69,6 +69,18 @@ void main() {
           reason: 'OpenAI strict 模式要求 properties 里的每个键都在 required 中',
         );
       }
+      for (final node in _objectSchemas(articleAiWordOnlyJsonSchema)) {
+        expect(
+          node['required'],
+          node['properties'],
+          reason: '仅分词轻量 Schema 也必须满足 OpenAI strict 模式',
+        );
+      }
+    });
+
+    test('仅分词 Schema 只要求 words 数组', () {
+      expect(articleAiWordOnlyJsonSchema['required'], <String>['words']);
+      expect(articleAiWordOnlyJsonSchema['additionalProperties'], isFalse);
     });
 
     test('难度区间引用常量', () {
@@ -291,6 +303,32 @@ void main() {
       expect(result.words, hasLength(1));
       expect(result.phrases, hasLength(1));
       expect(result.sentences, hasLength(1));
+    });
+
+    test('支持词形还原字段（lemma / surface / examTags / contextHint）', () {
+      final result = normalizeAiSelectionResponse(<String, Object?>{
+        'words': <Object?>[
+          <String, Object?>{
+            'lemma': 'implement',
+            'surface': 'implemented',
+            'contextHint': '意为实施、落实',
+            'difficulty': 3,
+            'cefrLevel': 'B2',
+            'examTags': <Object?>['cet6', 'ielts', 'CET6'],
+          },
+          <String, Object?>{
+            'term': 'durable',
+            'surface': 'Durable',
+            'reason': '持久的',
+          },
+        ],
+      })!;
+      expect(result.words[0].term, 'implement');
+      expect(result.words[0].surfaceForm, 'implemented');
+      expect(result.words[0].reason, '意为实施、落实');
+      expect(result.words[0].examTags, <String>['CET6', 'IELTS']);
+      // surface 与 term 仅大小写不同时置为 null，避免界面显示 `durable ← Durable`。
+      expect(result.words[1].surfaceForm, isNull);
     });
   });
 }

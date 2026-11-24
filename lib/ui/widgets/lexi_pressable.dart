@@ -59,8 +59,7 @@ class _LexiPressableState extends State<LexiPressable> {
     final scale = (enabled && _pressed && !disableMotion)
         ? LexiMotion.pressScale
         : 1.0;
-    final radius =
-        widget.borderRadius ?? BorderRadius.circular(LexiRadius.lg);
+    final radius = widget.borderRadius ?? BorderRadius.circular(LexiRadius.lg);
 
     return AnimatedScale(
       scale: scale,

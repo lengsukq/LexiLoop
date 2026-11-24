@@ -54,33 +54,24 @@ class _OverviewBody extends StatelessWidget {
           horizontal: LexiSpace.s16,
           vertical: LexiSpace.s8,
         ),
-        // **窄屏换排**：360 宽下「图标 + 文字 + 详细统计」三样挤在一行，
-        // 文字被压成三行、右侧链接贴着边缘，卡片高度涨到一百多像素。
-        // 窄屏改成「图标 + 文字」一行、链接单独一行右对齐。
+        // 窄屏收紧纵向高度：把「详细统计」并入标题行右侧，为下方词表留出更多首屏空间。
         child: LayoutBuilder(
-          builder: (context, constraints) => Row(
-            children: <Widget>[
-              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
-                _IconPlate(colors: colors),
-              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
-                const SizedBox(width: LexiSpace.s14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    _OverviewText(overview: overview),
-                    if (constraints.maxWidth < LexiLayout.compactStripWidth)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _StatsLink(colors: colors),
-                      ),
-                  ],
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= LexiLayout.compactStripWidth;
+            return Row(
+              children: <Widget>[
+                if (wide) _IconPlate(colors: colors),
+                if (wide) const SizedBox(width: LexiSpace.s14),
+                Expanded(
+                  child: _OverviewText(
+                    overview: overview,
+                    showInlineStatsLink: !wide,
+                  ),
                 ),
-              ),
-              if (constraints.maxWidth >= LexiLayout.compactStripWidth)
-                _StatsLink(colors: colors),
-            ],
-          ),
+                if (wide) _StatsLink(colors: colors),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -110,22 +101,43 @@ class _IconPlate extends StatelessWidget {
 
 /// 「详细统计」入口。
 class _StatsLink extends StatelessWidget {
-  const new({required this.colors});
+  const new({required this.colors, this.compact = false});
 
   final LexiColors colors;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => TextButton(
+    style: compact
+        ? TextButton.styleFrom(
+            minimumSize: Size.zero,
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s6,
+              vertical: LexiSpace.s2,
+            ),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          )
+        : null,
     onPressed: () => context.go(statisticsPath),
-    child: const Text('详细统计'),
+    child: Text(
+      '详细统计',
+      style: compact
+          ? LexiType.footnote.copyWith(
+              color: colors.accentText,
+              fontWeight: FontWeight.w600,
+            )
+          : null,
+    ),
   );
 }
 
 /// 标题、计数与进度条。
 class _OverviewText extends StatelessWidget {
-  const new({required this.overview});
+  const new({required this.overview, this.showInlineStatsLink = false});
 
   final MasteryOverview overview;
+  final bool showInlineStatsLink;
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +165,10 @@ class _OverviewText extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (showInlineStatsLink) ...<Widget>[
+              const SizedBox(width: LexiSpace.s6),
+              _StatsLink(colors: colors, compact: true),
+            ],
           ],
         ),
         const SizedBox(height: LexiSpace.s4),
@@ -160,7 +176,7 @@ class _OverviewText extends StatelessWidget {
           '已掌握 ${overview.mastered} · 待学习 ${overview.remaining}',
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
-        const SizedBox(height: LexiSpace.s8),
+        const SizedBox(height: LexiSpace.s6),
         LexiProgressBar(value: percent / percentScale),
       ],
     );

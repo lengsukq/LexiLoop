@@ -5,10 +5,13 @@ library;
 
 import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/data/db/daos/word_pack_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/dictionary/content_parse.dart';
+import 'package:lexiloop/domain/dictionary/definitions.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/domain/models/word_pack_models.dart';
 
 /// 列表查询的 SQL。
 ///
@@ -22,7 +25,7 @@ const String _listSql = r'''
 SELECT
   w.id, w.term, w.source_language, w.target_language, w.content_type,
   w.initialization_status, w.mastery_level, w.mastery_score,
-  w.is_suspended, w.created_at, w.source_created_at,
+  w.is_suspended, w.is_personal, w.created_at, w.source_created_at,
   rc.due_at, COALESCE(ws.active, 0) AS wrong_active,
   wc.pronunciations_json,
   (
@@ -39,31 +42,51 @@ LEFT JOIN wrong_word_states ws ON ws.word_id = w.id
 
 /// 总数查询的 SQL：与 [_listSql] 共用同一组 JOIN 与 WHERE 片段。
 ///
-/// 缺 `word_contents` 的 JOIN——`count(*)` 不需要释义摘要，
-/// 而 `LEFT JOIN` 一张 TEXT 大表对纯计数毫无帮助。
+/// 包含 `word_contents` 的 LEFT JOIN，以便关键词命中释义/标签以及按标签筛选时
+/// `count()` 与 `list()` 共享完全同一组 WHERE 条件。
 const String _countSql = '''
 SELECT count(*) AS c
 FROM words w
+LEFT JOIN word_contents wc ON wc.word_id = w.id
 LEFT JOIN review_cards rc ON rc.word_id = w.id
 LEFT JOIN wrong_word_states ws ON ws.word_id = w.id
 ''';
 
-/// 关键词命中的列数（`term` / `normalized_term` / `user_note`）。
-///
-/// 三个列共用同一个转义后的模式串，因此占位符个数必须与模式串个数一致；
-/// 写成常量是为了让「加一列搜索」时编译期就暴露忘了补的占位符。
-const int _searchColumnCount = 3;
+/// 导出 CSV 用的查询 SQL（一次取回释义、音标、例句、标签与备注）。
+const String _exportSql = '''
+SELECT
+  w.id, w.term, w.source_language, w.target_language, w.user_note,
+  wc.definitions_json, wc.pronunciations_json, wc.examples_json, wc.tags_json
+FROM words w
+LEFT JOIN word_contents wc ON wc.word_id = w.id
+LEFT JOIN review_cards rc ON rc.word_id = w.id
+LEFT JOIN wrong_word_states ws ON ws.word_id = w.id
+''';
 
-/// 关键词条件：匹配词条文本、归一化文本与用户备注。
+/// 关键词命中的列数（`term` / `normalized_term` / `user_note` / 释义 / 标签）。
+///
+/// 五列共用同一个转义后的模式串，因此占位符个数必须与模式串个数一致；
+/// 写成常量是为了让「加一列搜索」时编译期就暴露忘了补的占位符。
+const int _searchColumnCount = 5;
+
+/// 关键词条件：匹配词条文本、归一化文本、用户备注、中英释义与标签。
 ///
 /// 用 `LIKE ... ESCAPE '\'` 而不是 `ILIKE`：SQLite 的 `LIKE` 本身对 ASCII
 /// 大小写不敏感，少一层方言依赖，也少一个需要单独测试的大小写分支。
-/// `user_note` 外面套 `COALESCE`：备注可空，直接比较会把整行变成 NULL。
 const String _searchCondition = r"""
 (w.term LIKE ? ESCAPE '\'
  OR w.normalized_term LIKE ? ESCAPE '\'
- OR COALESCE(w.user_note, '') LIKE ? ESCAPE '\')
+ OR COALESCE(w.user_note, '') LIKE ? ESCAPE '\'
+ OR COALESCE(wc.definitions_json, '') LIKE ? ESCAPE '\'
+ OR COALESCE(wc.tags_json, '') LIKE ? ESCAPE '\')
 """;
+
+/// 标签精确命中条件：要求 `tags_json` 为合法数组且包含目标标签。
+const String _tagCondition = '''
+(json_valid(wc.tags_json)
+ AND json_type(wc.tags_json) = 'array'
+ AND EXISTS (SELECT 1 FROM json_each(wc.tags_json) t WHERE t.value = ?))
+''';
 
 /// 转义 `LIKE` 模式里的通配符。
 ///
@@ -72,6 +95,25 @@ const String _searchCondition = r"""
 /// 反斜杠必须第一个替换：它自己补出来的 `\%` 会被后续替换再转义一次。
 String escapeLikePattern(String value) =>
     value.replaceAllMapped(RegExp(r'[\\%_]'), (match) => '\\${match[0]}');
+
+/// 离线语音预缓存用的精简词条目标。
+class AudioPrecacheWordTarget {
+  /// 以词条文本、内容类型与发音列表构造。
+  const new({
+    required this.term,
+    required this.contentType,
+    required this.pronunciations,
+  });
+
+  /// 词条文本。
+  final String term;
+
+  /// 内容类型（用于过滤整句或走 Edge 补全）。
+  final LexicalContentType contentType;
+
+  /// 已存的词典发音条目。
+  final List<PronunciationView> pronunciations;
+}
 
 /// 词条列表的排序方式。
 enum WordSort {
@@ -133,6 +175,8 @@ class WordListEntry {
     required this.wrongWordActive,
     required this.meaning,
     required this.pronunciations,
+    this.isPersonal = true,
+    this.packNames = const <String>[],
   });
 
   /// 词条 ID。
@@ -183,6 +227,12 @@ class WordListEntry {
   /// 提供的 mp3，拿不到才回落到系统朗读。逐条再查一次 `word_contents`
   /// 会让一页 40 张卡片多 40 次往返，因此随列表一次取回。
   final List<PronunciationView> pronunciations;
+
+  /// 是否属于个人词库（`words.is_personal`）。
+  final bool isPersonal;
+
+  /// 所属已安装词书的名称列表（可为空）。
+  final List<String> packNames;
 }
 
 /// 列表查询条件。
@@ -192,6 +242,10 @@ class WordQuery {
     this.search = '',
     this.masteryLevel,
     this.initializationStatus,
+    this.contentType,
+    this.tag,
+    this.sourceScope = WordSourceScope.all,
+    this.packId,
     this.wrongOnly = false,
     this.dueOnly = false,
     this.suspendedOnly = false,
@@ -200,7 +254,7 @@ class WordQuery {
     this.offset = 0,
   });
 
-  /// 关键词（匹配词条文本、归一化文本与用户备注，大小写不敏感）。
+  /// 关键词（匹配词条文本、归一化文本、备注、释义与标签，大小写不敏感）。
   final String search;
 
   /// 按掌握等级筛选。
@@ -208,6 +262,18 @@ class WordQuery {
 
   /// 按初始化状态筛选。
   final InitializationStatus? initializationStatus;
+
+  /// 按内容类型筛选（单词 / 短语 / 句子）。
+  final LexicalContentType? contentType;
+
+  /// 按标签精确筛选；`null` 或空串表示不筛标签。
+  final String? tag;
+
+  /// 来源作用域（全部 / 个人词库 / 词书包）。
+  final WordSourceScope sourceScope;
+
+  /// 按指定已安装词书筛选；`null` 表示不限定单本词书。
+  final String? packId;
 
   /// 只看活跃错词（`wrong_word_states.active`）。
   final bool wrongOnly;
@@ -237,6 +303,8 @@ class WordQuery {
   int get activeFilterCount =>
       (masteryLevel != null ? 1 : 0) +
       (initializationStatus != null ? 1 : 0) +
+      (contentType != null ? 1 : 0) +
+      ((tag?.trim().isNotEmpty ?? false) ? 1 : 0) +
       (wrongOnly ? 1 : 0) +
       (dueOnly ? 1 : 0) +
       (suspendedOnly ? 1 : 0);
@@ -251,6 +319,13 @@ class WordQuery {
     bool clearMasteryLevel = false,
     InitializationStatus? initializationStatus,
     bool clearInitializationStatus = false,
+    LexicalContentType? contentType,
+    bool clearContentType = false,
+    String? tag,
+    bool clearTag = false,
+    WordSourceScope? sourceScope,
+    String? packId,
+    bool clearPackId = false,
     bool? wrongOnly,
     bool? dueOnly,
     bool? suspendedOnly,
@@ -265,6 +340,10 @@ class WordQuery {
     initializationStatus: clearInitializationStatus
         ? null
         : (initializationStatus ?? this.initializationStatus),
+    contentType: clearContentType ? null : (contentType ?? this.contentType),
+    tag: clearTag ? null : (tag ?? this.tag),
+    sourceScope: sourceScope ?? this.sourceScope,
+    packId: clearPackId ? null : (packId ?? this.packId),
     wrongOnly: wrongOnly ?? this.wrongOnly,
     dueOnly: dueOnly ?? this.dueOnly,
     suspendedOnly: suspendedOnly ?? this.suspendedOnly,
@@ -272,6 +351,49 @@ class WordQuery {
     limit: limit ?? this.limit,
     offset: offset ?? this.offset,
   );
+}
+
+/// 导出 CSV 的单行结构。
+class WordExportRow {
+  /// 以各字段构造。
+  const new({
+    required this.id,
+    required this.term,
+    required this.sourceLanguage,
+    required this.targetLanguage,
+    required this.definitions,
+    required this.phonetic,
+    required this.examples,
+    required this.tags,
+    required this.note,
+  });
+
+  /// 词条 ID。
+  final int id;
+
+  /// 词条文本。
+  final String term;
+
+  /// 源语言。
+  final String sourceLanguage;
+
+  /// 目标语言。
+  final String targetLanguage;
+
+  /// 释义文本列表。
+  final List<String> definitions;
+
+  /// 首个音标（无则为空）。
+  final String phonetic;
+
+  /// 例句文本列表。
+  final List<String> examples;
+
+  /// 标签列表。
+  final List<String> tags;
+
+  /// 用户备注。
+  final String note;
 }
 
 /// 组装后的筛选片段。
@@ -288,15 +410,37 @@ class _Filter {
 _Filter _buildFilter(WordQuery query) {
   final conditions = <String>[];
   final variables = <Variable<Object>>[];
-
-  final search = query.search.trim();
-  if (search.isNotEmpty) {
-    final pattern = '%${escapeLikePattern(search)}%';
-    conditions.add(_searchCondition);
-    variables.addAll(<Variable<Object>>[
-      for (var i = 0; i < _searchColumnCount; i += 1) Variable<String>(pattern),
-    ]);
+  _addSearchFilter(query.search, conditions, variables);
+  _addExactFilters(query, conditions, variables);
+  if (query.wrongOnly) conditions.add('COALESCE(ws.active, 0) = 1');
+  if (query.suspendedOnly) conditions.add('w.is_suspended = 1');
+  if (query.dueOnly) {
+    conditions.add('rc.due_at <= ?');
+    variables.add(Variable<int>(DateTime.now().millisecondsSinceEpoch));
   }
+  final clause = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
+  return _Filter(clause, variables);
+}
+
+void _addSearchFilter(
+  String rawSearch,
+  List<String> conditions,
+  List<Variable<Object>> variables,
+) {
+  final search = rawSearch.trim();
+  if (search.isEmpty) return;
+  final pattern = '%${escapeLikePattern(search)}%';
+  conditions.add(_searchCondition);
+  variables.addAll(<Variable<Object>>[
+    for (var i = 0; i < _searchColumnCount; i += 1) Variable<String>(pattern),
+  ]);
+}
+
+void _addExactFilters(
+  WordQuery query,
+  List<String> conditions,
+  List<Variable<Object>> variables,
+) {
   if (query.masteryLevel != null) {
     conditions.add('w.mastery_level = ?');
     variables.add(Variable<String>(query.masteryLevel!.wire));
@@ -305,17 +449,39 @@ _Filter _buildFilter(WordQuery query) {
     conditions.add('w.initialization_status = ?');
     variables.add(Variable<String>(query.initializationStatus!.wire));
   }
-  // 错词是 LEFT JOIN 来的，没有对应行时 COALESCE 才能把它排除掉；
-  // 写成 `ws.active = 1` 会让 LEFT JOIN 退化成 INNER JOIN 的效果。
-  if (query.wrongOnly) conditions.add('COALESCE(ws.active, 0) = 1');
-  if (query.suspendedOnly) conditions.add('w.is_suspended = 1');
-  if (query.dueOnly) {
-    conditions.add('rc.due_at <= ?');
-    variables.add(Variable<int>(DateTime.now().millisecondsSinceEpoch));
+  if (query.contentType != null) {
+    conditions.add('w.content_type = ?');
+    variables.add(Variable<String>(query.contentType!.wire));
   }
+  final tag = query.tag?.trim();
+  if (tag != null && tag.isNotEmpty) {
+    conditions.add(_tagCondition);
+    variables.add(Variable<String>(tag));
+  }
+  _addSourceScopeFilters(query, conditions, variables);
+}
 
-  final clause = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
-  return _Filter(clause, variables);
+void _addSourceScopeFilters(
+  WordQuery query,
+  List<String> conditions,
+  List<Variable<Object>> variables,
+) {
+  final packId = query.packId?.trim();
+  final hasPackId = packId != null && packId.isNotEmpty;
+  if (query.sourceScope == WordSourceScope.personal) {
+    conditions.add('w.is_personal = 1');
+  } else if (query.sourceScope == WordSourceScope.packs && !hasPackId) {
+    conditions.add(
+      'EXISTS (SELECT 1 FROM word_pack_items pi WHERE pi.word_id = w.id)',
+    );
+  }
+  if (hasPackId) {
+    conditions.add(
+      'EXISTS (SELECT 1 FROM word_pack_items pi '
+      'WHERE pi.word_id = w.id AND pi.pack_id = ?)',
+    );
+    variables.add(Variable<String>(packId));
+  }
 }
 
 /// 词条查询入口。
@@ -340,7 +506,16 @@ class WordDao {
         )
         .get();
 
-    return rows.map(_mapRow).toList(growable: false);
+    final ids = <int>[for (final row in rows) row.read<int>('id')];
+    final packsByWord = await WordPackDao(_db).packNamesByWordIds(ids);
+    return rows
+        .map(
+          (row) => _mapRow(
+            row,
+            packsByWord[row.read<int>('id')] ?? const <String>[],
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// 统计符合条件的词条总数。
@@ -355,12 +530,24 @@ class WordDao {
     return row.read<int>('c');
   }
 
-  /// 按掌握等级统计词条数，用于概览。
-  Future<Map<MasteryLevel, int>> countByMastery() async {
+  /// 按掌握等级统计词条数，用于概览（可按来源作用域/词书过滤）。
+  Future<Map<MasteryLevel, int>> countByMastery({
+    WordSourceScope sourceScope = WordSourceScope.all,
+    String? packId,
+  }) async {
+    final conditions = <String>[];
+    final variables = <Variable<Object>>[];
+    _addSourceScopeFilters(
+      WordQuery(sourceScope: sourceScope, packId: packId),
+      conditions,
+      variables,
+    );
+    final where = conditions.isEmpty ? '' : 'WHERE ${conditions.join(' AND ')}';
     final rows = await _db
         .customSelect(
-          'SELECT mastery_level, count(*) AS c FROM words '
-          'GROUP BY mastery_level',
+          'SELECT w.mastery_level, count(*) AS c FROM words w $where '
+          'GROUP BY w.mastery_level',
+          variables: variables,
         )
         .get();
 
@@ -375,7 +562,118 @@ class WordDao {
     return result;
   }
 
-  WordListEntry _mapRow(QueryRow row) {
+  /// 读取词库中出现过的全部去重标签（按字典序）。
+  Future<List<String>> distinctTags() async {
+    final rows = await _db.customSelect('''
+SELECT DISTINCT trim(t.value) AS tag
+FROM word_contents wc, json_each(wc.tags_json) t
+WHERE json_valid(wc.tags_json)
+  AND json_type(wc.tags_json) = 'array'
+  AND trim(t.value) <> ''
+ORDER BY tag ASC''').get();
+    return <String>[for (final row in rows) row.read<String>('tag')];
+  }
+
+  /// 读取离线语音批量预缓存所需的精简词条目标（不加载释义/例句大字段）。
+  Future<List<AudioPrecacheWordTarget>> listAudioPrecacheTargets({
+    bool personalOnly = false,
+    String? packId,
+  }) async {
+    final variables = <Variable<Object>>[];
+    final joinPack = packId != null && packId.isNotEmpty
+        ? 'INNER JOIN word_pack_items pi ON pi.word_id = w.id '
+        : '';
+    final filters = <String>[];
+    if (packId != null && packId.isNotEmpty) {
+      filters.add('pi.pack_id = ?');
+      variables.add(Variable<String>(packId));
+    } else if (personalOnly) {
+      filters.add('w.is_personal = 1');
+    }
+    final where = filters.isEmpty ? '' : 'WHERE ${filters.join(' AND ')} ';
+    final rows = await _db
+        .customSelect(
+          'SELECT w.term, w.content_type, wc.pronunciations_json '
+          'FROM words w '
+          '$joinPack'
+          'LEFT JOIN word_contents wc ON wc.word_id = w.id '
+          '$where'
+          'ORDER BY w.id ASC',
+          variables: variables,
+        )
+        .get();
+    return <AudioPrecacheWordTarget>[
+      for (final row in rows)
+        AudioPrecacheWordTarget(
+          term: row.read<String>('term'),
+          contentType:
+              wireLookup(
+                LexicalContentType.values,
+                row.read<String>('content_type'),
+              ) ??
+              LexicalContentType.word,
+          pronunciations: parsePronunciations(
+            row.readNullable<String>('pronunciations_json'),
+          ),
+        ),
+    ];
+  }
+
+  /// 导出符合筛选条件（或指定 ID 集合）的词条明细，供生成 CSV。
+  Future<List<WordExportRow>> exportRows(
+    WordQuery query, {
+    Set<int>? onlyIds,
+  }) async {
+    final filter = _buildFilter(query);
+    final rows = await _db
+        .customSelect(
+          '$_exportSql ${filter.whereClause} '
+          'ORDER BY ${query.sort.orderBy} LIMIT ?',
+          variables: <Variable<Object>>[
+            ...filter.variables,
+            const Variable<int>(maxCsvRows),
+          ],
+        )
+        .get();
+    final out = <WordExportRow>[];
+    for (final row in rows) {
+      final id = row.read<int>('id');
+      if (onlyIds != null && onlyIds.isNotEmpty && !onlyIds.contains(id)) {
+        continue;
+      }
+      out.add(_mapExportRow(row));
+    }
+    return out;
+  }
+
+  WordExportRow _mapExportRow(QueryRow row) {
+    final definitions = parseDefinitionsJson(
+      row.readNullable<String>('definitions_json'),
+    ).map((d) => d.text).where((t) => t.isNotEmpty).toList(growable: false);
+    final pronunciations = parsePronunciations(
+      row.readNullable<String>('pronunciations_json'),
+    );
+    final examples = parseExamples(row.readNullable<String>('examples_json'))
+        .map((e) => e.sentence)
+        .where((s) => s.isNotEmpty)
+        .toList(growable: false);
+    final tags = parseTextList(
+      decodeJsonList(row.readNullable<String>('tags_json')),
+    );
+    return WordExportRow(
+      id: row.read<int>('id'),
+      term: row.read<String>('term'),
+      sourceLanguage: row.read<String>('source_language'),
+      targetLanguage: row.read<String>('target_language'),
+      definitions: definitions,
+      phonetic: pronunciations.isEmpty ? '' : pronunciations.first.phonetic,
+      examples: examples,
+      tags: tags,
+      note: row.readNullable<String>('user_note') ?? '',
+    );
+  }
+
+  WordListEntry _mapRow(QueryRow row, List<String> packNames) {
     return WordListEntry(
       id: row.read<int>('id'),
       term: row.read<String>('term'),
@@ -398,6 +696,8 @@ class WordDao {
           MasteryLevel.newWord,
       masteryScore: row.read<int>('mastery_score'),
       isSuspended: row.read<int>('is_suspended') != 0,
+      isPersonal: row.read<int>('is_personal') != 0,
+      packNames: packNames,
       createdAt: row.read<int>('created_at'),
       sourceCreatedAt: row.read<int?>('source_created_at'),
       dueAt: row.read<int?>('due_at'),

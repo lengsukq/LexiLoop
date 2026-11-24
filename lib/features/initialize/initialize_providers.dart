@@ -180,6 +180,7 @@ class QueueActions {
   Future<void> retry(int jobId) async {
     await _ref.read(initializationQueriesProvider).retryJob(jobId, now: _now());
     _invalidate();
+    _ref.read(initializationMaintenanceProvider).kick();
   }
 
   /// 重试一个词条下的全部可重试任务，返回真正重排的任务数。
@@ -194,6 +195,7 @@ class QueueActions {
         .read(initializationQueriesProvider)
         .retryWordJobs(wordIds, now: _now());
     _invalidate();
+    if (retried > 0) _ref.read(initializationMaintenanceProvider).kick();
     return retried;
   }
 
@@ -222,6 +224,7 @@ class QueueActions {
       now: _now(),
     );
     _invalidate();
+    if (ids.isNotEmpty) _ref.read(initializationMaintenanceProvider).kick();
     return ids.length;
   }
 
@@ -244,6 +247,9 @@ class QueueActions {
         .read(initializationQueriesProvider)
         .enqueueBulkReport(requests, now: _now());
     _invalidate();
+    if (report.created.isNotEmpty || report.merged.isNotEmpty) {
+      _ref.read(initializationMaintenanceProvider).kick();
+    }
     return report;
   }
 

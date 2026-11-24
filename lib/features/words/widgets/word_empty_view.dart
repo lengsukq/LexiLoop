@@ -60,7 +60,9 @@ class WordEmptyView extends ConsumerWidget {
           ),
           const SizedBox(height: LexiSpace.s6),
           Text(
-            filtered ? '调整筛选条件或清空搜索词后再试。' : '可以导入旧版备份，也可以直接用 CSV 导入建立词库。',
+            filtered
+                ? '调整筛选条件或清空搜索词后再试。'
+                : '可以粘贴文章按考试难度智能分词，也可以导入 CSV/TXT 词表或旧版备份。',
             textAlign: TextAlign.center,
             style: LexiType.body.copyWith(
               color: context.lexiColors.secondaryLabel,
@@ -115,6 +117,11 @@ class _EmptyActions extends ConsumerWidget {
             onPressed: () => context.go(addWordPath),
             icon: const Icon(LucideIcons.plus, size: 17),
             label: const Text('手动添加'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => context.go(articlePath),
+            icon: const Icon(LucideIcons.fileText, size: 17),
+            label: const Text('文章分词'),
           ),
           OutlinedButton.icon(
             onPressed: () => context.go(csvImportPath),

@@ -36,6 +36,9 @@ const String csvImportPath = '/import';
 /// 粘贴文章页。
 const String articlePath = '/article';
 
+/// 词书包中心页。
+const String packsPath = '/packs';
+
 /// 小游戏页。
 const String gamesPath = '/games';
 

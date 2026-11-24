@@ -35,8 +35,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 设置页。
 class SettingsPage extends ConsumerWidget {
-  /// 创建设置页。
-  const new({super.key});
+  /// 创建设置页；[initialTab] 支持从深链直达指定分组（例如 `ai`）。
+  const new({this.initialTab, super.key});
+
+  /// 初始聚焦的分组标识（例如 `'ai'`、`'providers'`、`'vocabulary'`）。
+  final String? initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -51,7 +54,8 @@ class SettingsPage extends ConsumerWidget {
             message: error is AppError ? error.message : '读取设置失败：$error',
             onRetry: () => ref.invalidate(appSettingsProvider),
           ),
-          data: (value) => _SettingsBody(settings: value),
+          data: (value) =>
+              _SettingsBody(settings: value, initialTab: initialTab),
         ),
       ),
     );
@@ -60,18 +64,37 @@ class SettingsPage extends ConsumerWidget {
 
 /// 分类切换只影响展示，已打开分组保持表单与滚动状态。
 class _SettingsBody extends StatefulWidget {
-  const new({required this.settings});
+  const new({required this.settings, this.initialTab});
 
   final AppSettings settings;
+  final String? initialTab;
 
   @override
   State<_SettingsBody> createState() => _SettingsBodyState();
 }
 
 class _SettingsBodyState extends State<_SettingsBody> {
-  int _selected = 0;
-  bool _detail = false;
-  final Set<int> _visited = <int>{0};
+  late int _selected;
+  late bool _detail;
+  late final Set<int> _visited;
+
+  @override
+  void initState() {
+    super.initState();
+    final target = _tabIndexFor(widget.initialTab);
+    _selected = target ?? 0;
+    _detail = target != null;
+    _visited = <int>{_selected};
+  }
+
+  @override
+  void didUpdateWidget(covariant _SettingsBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTab != oldWidget.initialTab) {
+      final target = _tabIndexFor(widget.initialTab);
+      if (target != null) _open(target);
+    }
+  }
 
   void _open(int index) => setState(() {
     _selected = index;
@@ -228,3 +251,15 @@ const List<String> _tabLabels = <String>[
 ];
 
 const double _categoryWidth = 190;
+
+int? _tabIndexFor(String? tab) => switch (tab?.trim().toLowerCase()) {
+  'appearance' => 0,
+  'plan' => 1,
+  'questions' => 2,
+  'playback' => 3,
+  'providers' => 4,
+  'vocabulary' => 5,
+  'ai' => 6,
+  'data' => 7,
+  _ => null,
+};

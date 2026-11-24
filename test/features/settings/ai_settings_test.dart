@@ -619,6 +619,27 @@ void main() {
       expect(config.ai.model, 'm2');
     });
 
+    testWidgets('功能范围开关默认值符合「只分词、查词走有道」且切换可落库', (tester) async {
+      await seedEnabledAi();
+      await pumpSettings(tester);
+
+      final initial = await currentConfig();
+      expect(initial.ai.features.articleTokenize, isTrue);
+      expect(initial.ai.features.dailySuggestion, isTrue);
+      expect(initial.ai.features.autoMnemonic, isFalse);
+      expect(initial.ai.features.autoTranslate, isFalse);
+      expect(initial.ai.features.dictionaryFallback, isFalse);
+
+      await tester.tap(find.byKey(const Key('aiFeatureAutoMnemonic')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('aiFeatureDictionaryFallback')));
+      await tester.pumpAndSettle();
+
+      final updated = await currentConfig();
+      expect(updated.ai.features.autoMnemonic, isTrue);
+      expect(updated.ai.features.dictionaryFallback, isTrue);
+    });
+
     testWidgets('关闭总开关会落库', (tester) async {
       await seedEnabledAi();
       await pumpSettings(tester);

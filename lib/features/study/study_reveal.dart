@@ -34,6 +34,7 @@ class StudyRevealPanel extends StatelessWidget {
     required this.usedHint,
     required this.accent,
     this.revealContent,
+    this.onOpenDetail,
     super.key,
   });
 
@@ -52,8 +53,11 @@ class StudyRevealPanel extends StatelessWidget {
   /// 设置中的默认发音口音。
   final Accent accent;
 
-  /// 当前词条已存的助记与构词信息；未加载或为空时不展示。
+  /// 当前词条已存的助记、构词、易混词与句法信息；未加载或为空时不展示。
   final StudyRevealContent? revealContent;
+
+  /// 跳转词条详情页的回调；无路由上下文时为空。
+  final VoidCallback? onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +89,11 @@ class StudyRevealPanel extends StatelessWidget {
         children: <Widget>[
           _VerdictRow(correct: correct, icon: icon, tone: tone),
           const SizedBox(height: LexiSpace.s12),
-          _TermLine(word: item.word, accent: accent),
+          _TermLine(
+            word: item.word,
+            accent: accent,
+            onOpenDetail: onOpenDetail,
+          ),
           if (studyMeaningText(item.word) case final meaning
               when meaning.isNotEmpty) ...<Widget>[
             const SizedBox(height: LexiSpace.s8),
@@ -114,14 +122,8 @@ class StudyRevealPanel extends StatelessWidget {
               child: _ExampleBlock(example: item.word.examples.first),
             ),
           ],
-          if (revealContent case final content?
-              when !content.isEmpty) ...<Widget>[
-            const SizedBox(height: LexiSpace.s8),
-            DisclosureSection(
-              title: '助记与构词',
-              child: _RevealContentBlock(content: content),
-            ),
-          ],
+          if (revealContent case final content? when !content.isEmpty)
+            _RevealExtras(content: content),
         ],
       ),
     );
@@ -131,6 +133,122 @@ class StudyRevealPanel extends StatelessWidget {
   bool get _showExample =>
       item.word.contentType != LexicalContentType.sentence &&
       item.word.examples.isNotEmpty;
+}
+
+/// 扩展揭示区：助记与构词、易混词辨析、句法解析（按需折叠展示）。
+class _RevealExtras extends StatelessWidget {
+  const new({required this.content});
+
+  final StudyRevealContent content;
+
+  bool get _hasMorphology =>
+      content.mnemonic != null ||
+      content.roots.isNotEmpty ||
+      content.affixes.isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (_hasMorphology) ...<Widget>[
+          const SizedBox(height: LexiSpace.s8),
+          DisclosureSection(
+            title: '助记与构词',
+            child: _RevealContentBlock(content: content),
+          ),
+        ],
+        if (content.confusedWords.isNotEmpty) ...<Widget>[
+          const SizedBox(height: LexiSpace.s8),
+          DisclosureSection(
+            title: '易混词辨析',
+            child: _ConfusedWordsBlock(items: content.confusedWords),
+          ),
+        ],
+        if (!content.sentenceAnalysis.isEmpty) ...<Widget>[
+          const SizedBox(height: LexiSpace.s8),
+          DisclosureSection(
+            title: '句法解析',
+            child: _SentenceAnalysisBlock(analysis: content.sentenceAnalysis),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 易混词列表。
+class _ConfusedWordsBlock extends StatelessWidget {
+  const new({required this.items});
+
+  final List<RelatedWordView> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (var i = 0; i < items.length; i += 1) ...<Widget>[
+          if (i > 0) const SizedBox(height: LexiSpace.s6),
+          Text(
+            items[i].translation == null
+                ? items[i].word
+                : '${items[i].word} · ${items[i].translation}',
+            style: LexiType.body.copyWith(
+              color: colors.label,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (items[i].difference case final diff? when diff.isNotEmpty)
+            Text(
+              diff,
+              style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 句子语法结构与要点。
+class _SentenceAnalysisBlock extends StatelessWidget {
+  const new({required this.analysis});
+
+  final SentenceAnalysisView analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        if (analysis.grammarPattern case final pattern? when pattern.isNotEmpty)
+          Text(
+            '句型：$pattern',
+            style: LexiType.body.copyWith(
+              color: colors.label,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        if (analysis.grammarExplanation case final exp?
+            when exp.isNotEmpty) ...<Widget>[
+          const SizedBox(height: LexiSpace.s4),
+          Text(
+            exp,
+            style: LexiType.body.copyWith(color: colors.secondaryLabel),
+          ),
+        ],
+        for (final note in analysis.grammarNotes) ...<Widget>[
+          const SizedBox(height: LexiSpace.s4),
+          Text(
+            '• $note',
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 /// 已存助记与构词信息；仅作轻量补充，不参与答题流程。
@@ -216,12 +334,13 @@ class _VerdictRow extends StatelessWidget {
   }
 }
 
-/// 词条 + 音标 + 朗读。
+/// 词条 + 音标 + 朗读 + 可选详情入口。
 class _TermLine extends StatelessWidget {
-  const new({required this.word, required this.accent});
+  const new({required this.word, required this.accent, this.onOpenDetail});
 
   final StudyWordView word;
   final Accent accent;
+  final VoidCallback? onOpenDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -253,6 +372,17 @@ class _TermLine extends StatelessWidget {
             ],
           ),
         ),
+        if (onOpenDetail != null)
+          IconButton(
+            key: const Key('study.openWordDetail'),
+            tooltip: '查看词条详情',
+            onPressed: onOpenDetail,
+            icon: Icon(
+              LucideIcons.externalLink,
+              size: 17,
+              color: colors.secondaryLabel,
+            ),
+          ),
         SpeakButton(word: word, accent: accent),
       ],
     );

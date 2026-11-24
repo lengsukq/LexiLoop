@@ -14,6 +14,7 @@ import 'package:drift/drift.dart';
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/date_key.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
+import 'package:lexiloop/data/db/daos/word_pack_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/dictionary/content_parse.dart';
 import 'package:lexiloop/domain/dictionary/definitions.dart';
@@ -154,13 +155,15 @@ class AffixView {
   final String? source;
 }
 
-/// 学习揭示时按需读取的助记与构词内容。
+/// 学习揭示时按需读取的助记、构词、易混词与句法解析内容。
 class StudyRevealContent {
-  /// 以词根、词缀与助记信息构造；省略字段时表示空内容。
+  /// 以词根、词缀、助记、易混词与句子分析构造；省略字段时表示空内容。
   const new({
     this.roots = const <StudyRevealRoot>[],
     this.affixes = const <StudyRevealAffix>[],
     this.mnemonic,
+    this.confusedWords = const <RelatedWordView>[],
+    this.sentenceAnalysis = const SentenceAnalysisView(),
   });
 
   /// 词根。
@@ -172,8 +175,19 @@ class StudyRevealContent {
   /// 已保存的助记。
   final String? mnemonic;
 
+  /// 易混词辨析。
+  final List<RelatedWordView> confusedWords;
+
+  /// 句子语法解析（句型与要点）。
+  final SentenceAnalysisView sentenceAnalysis;
+
   /// 是否没有可展示的内容。
-  bool get isEmpty => roots.isEmpty && affixes.isEmpty && mnemonic == null;
+  bool get isEmpty =>
+      roots.isEmpty &&
+      affixes.isEmpty &&
+      mnemonic == null &&
+      confusedWords.isEmpty &&
+      sentenceAnalysis.isEmpty;
 }
 
 /// 学习揭示里展示的词根。
@@ -208,7 +222,8 @@ class StudyRevealAffix {
 
 /// `word_contents` 中适用于揭示面板的轻量读取结果。
 const String _studyRevealContentSql = '''
-SELECT roots_json, affixes_json, learning_json
+SELECT roots_json, affixes_json, learning_json,
+       confused_words_json, sentence_analysis_json
 FROM word_contents
 WHERE word_id = ?''';
 
@@ -234,6 +249,12 @@ Future<StudyRevealContent> loadStudyRevealContent(
     affixes: _parseStudyAffixes(affixesJson),
     mnemonic: _parseLearning(row.readNullable<String>('learning_json'))
         .mnemonic,
+    confusedWords: _parseRelated(
+      row.readNullable<String>('confused_words_json'),
+    ),
+    sentenceAnalysis: _parseSentenceAnalysis(
+      row.readNullable<String>('sentence_analysis_json'),
+    ),
   );
 }
 
@@ -409,6 +430,8 @@ class WordDetail {
     this.initializedAt,
     this.sourceCreatedAt,
     this.updatedAt,
+    this.isPersonal = true,
+    this.packNames = const <String>[],
   });
 
   /// 词条 ID。
@@ -443,6 +466,12 @@ class WordDetail {
 
   /// 是否已暂停学习。
   final bool isSuspended;
+
+  /// 是否属于个人词库（`words.is_personal`）。
+  final bool isPersonal;
+
+  /// 所属词书包名称列表。
+  final List<String> packNames;
 
   /// 用户笔记；未写过时为 `null`。
   final String? userNote;
@@ -798,7 +827,7 @@ const String _detailSql = '''
 SELECT
   w.id, w.term, w.normalized_term, w.source_language, w.target_language,
   w.content_type, w.entry_type, w.initialization_status, w.mastery_level,
-  w.mastery_score, w.is_suspended, w.user_note, w.created_at,
+  w.mastery_score, w.is_suspended, w.is_personal, w.user_note, w.created_at,
   w.source_created_at, w.updated_at,
   c.definitions_json, c.pronunciations_json, c.examples_json,
   c.phrases_json, c.forms_json, c.synonyms_json, c.antonyms_json,
@@ -918,7 +947,9 @@ class WordDetailDao {
           variables: <Variable<Object>>[Variable<int>(wordId)],
         )
         .getSingleOrNull();
-    return row == null ? null : _mapDetail(row);
+    if (row == null) return null;
+    final packs = await WordPackDao(_db).packNamesByWordIds(<int>[wordId]);
+    return _mapDetail(row, packs[wordId] ?? const <String>[]);
   }
 
   /// 只读取当前词条的助记与词根词缀，供学习揭示面板按需展示。
@@ -1083,7 +1114,7 @@ class WordDetailDao {
     return streak;
   }
 
-  WordDetail _mapDetail(QueryRow row) => WordDetail(
+  WordDetail _mapDetail(QueryRow row, List<String> packNames) => WordDetail(
     id: row.read<int>('id'),
     term: row.read<String>('term'),
     normalizedTerm: row.read<String>('normalized_term'),
@@ -1109,6 +1140,8 @@ class WordDetailDao {
         MasteryLevel.newWord,
     masteryScore: row.read<int>('mastery_score'),
     isSuspended: row.read<bool>('is_suspended'),
+    isPersonal: row.read<int>('is_personal') != 0,
+    packNames: packNames,
     userNote: row.readNullable<String>('user_note'),
     createdAt: row.read<int>('created_at'),
     sourceCreatedAt: row.readNullable<int>('source_created_at'),

@@ -10,8 +10,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/packs/word_packs_providers.dart';
 import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
 import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
 import 'package:lexiloop/features/words/words_format.dart';
@@ -25,14 +27,26 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 词条卡片。
 class WordCard extends StatelessWidget {
-  /// 以词条与点击回调构造。
-  const new({required this.entry, required this.onTap, super.key});
+  /// 以词条与点击回调构造；多选模式下传入 [selectable] 与 [selected]。
+  const new({
+    required this.entry,
+    required this.onTap,
+    this.selectable = false,
+    this.selected = false,
+    super.key,
+  });
 
   /// 卡片对应的词条行。
   final WordListEntry entry;
 
-  /// 进入词条详情。
+  /// 进入词条详情（或多选模式下切换勾选）。
   final VoidCallback onTap;
+
+  /// 是否显示多选复选框。
+  final bool selectable;
+
+  /// 多选模式下是否已选中。
+  final bool selected;
 
   /// 复习卡是否已到期。
   ///
@@ -55,6 +69,14 @@ class WordCard extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
+            if (selectable) ...<Widget>[
+              Checkbox(
+                value: selected,
+                onChanged: (_) => onTap(),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: LexiSpace.s6),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,6 +171,10 @@ class _CardMeta extends StatelessWidget {
         if (entry.initializationStatus != InitializationStatus.ready)
           InitializationBadge(status: entry.initializationStatus),
         MasteryBadge(level: entry.masteryLevel),
+        if (entry.isPersonal && entry.packNames.isNotEmpty)
+          const LexiBadge(label: '个人', tone: LexiBadgeTone.accent),
+        for (final packName in entry.packNames.take(wordCardMaxPackBadges))
+          LexiBadge(label: packName),
         Text(
           '${entry.sourceLanguage} → ${entry.targetLanguage}',
           style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
@@ -228,31 +254,47 @@ class _SpeakerButton extends ConsumerWidget {
 /// 与详情页头部用的是同一个弹窗：列表页改完文本后由
 /// `WordDetailActions.applyYoudao` 统一失效 `wordListProvider`，
 /// 卡片会自己刷新成新词形。
-class _EditButton extends StatelessWidget {
+class _EditButton extends ConsumerWidget {
   const new({required this.entry});
 
   final WordListEntry entry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
       tooltip: '词条操作',
       icon: const Icon(LucideIcons.ellipsis),
-      onSelected: (_) => unawaited(
-        EditWordDialog.show(
-          context,
-          target: EditWordTarget(
-            wordId: entry.id,
-            term: entry.term,
-            sourceLanguage: entry.sourceLanguage,
-            targetLanguage: entry.targetLanguage,
-            contentType: entry.contentType,
+      onSelected: (value) {
+        if (value == 'promote') {
+          unawaited(_promote(context, ref));
+          return;
+        }
+        unawaited(
+          EditWordDialog.show(
+            context,
+            target: EditWordTarget(
+              wordId: entry.id,
+              term: entry.term,
+              sourceLanguage: entry.sourceLanguage,
+              targetLanguage: entry.targetLanguage,
+              contentType: entry.contentType,
+            ),
           ),
-        ),
-      ),
-      itemBuilder: (context) => const <PopupMenuEntry<String>>[
-        PopupMenuItem(value: 'edit', child: Text('编辑词条')),
+        );
+      },
+      itemBuilder: (context) => <PopupMenuEntry<String>>[
+        if (!entry.isPersonal)
+          const PopupMenuItem<String>(value: 'promote', child: Text('收入个人词库')),
+        const PopupMenuItem<String>(value: 'edit', child: Text('编辑词条')),
       ],
     );
+  }
+
+  Future<void> _promote(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await ref
+        .read(wordPackTransferProvider.notifier)
+        .promoteWordToPersonal(entry.id);
+    messenger?.showSnackBar(SnackBar(content: Text('已将「${entry.term}」收入个人词库')));
   }
 }

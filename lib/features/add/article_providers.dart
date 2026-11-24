@@ -10,19 +10,28 @@
 /// `copyWith` 都在十几行内，且读者一眼能看出「哪一步改了哪一块」。
 library;
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show FutureProviderFamily;
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/data/dictionary/provider.dart';
+import 'package:lexiloop/data/dictionary/providers/youdao_fields.dart';
 import 'package:lexiloop/domain/article_import/article_candidates.dart';
 import 'package:lexiloop/domain/article_import/article_extract.dart';
 import 'package:lexiloop/domain/article_import/article_models.dart';
+import 'package:lexiloop/domain/article_import/article_source_parser.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/add/add_providers.dart';
+import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/article_import/article_ai_selector.dart';
 import 'package:lexiloop/services/article_import/article_import_service.dart';
+import 'package:lexiloop/services/article_import/article_source_loader.dart';
+import 'package:lexiloop/services/dictionary/lookup_service.dart';
+import 'package:lexiloop/services/dictionary/pipeline.dart';
 
 /// 向导步骤。
 enum ArticleStep {
@@ -79,6 +88,12 @@ final Provider<ArticleAiSelector> articleAiSelectorProvider =
         ref.watch(settingsServiceProvider),
         ref.watch(httpFetcherProvider),
       ),
+    );
+
+/// 多源文章加载服务（本地文件 / 网页正文抓取）。
+final Provider<ArticleSourceLoader> articleSourceLoaderProvider =
+    Provider<ArticleSourceLoader>(
+      (ref) => ArticleSourceLoader(ref.watch(httpFetcherProvider)),
     );
 
 /// 文章导入服务。
@@ -174,7 +189,12 @@ class ArticleDraftState {
     this.text = '',
     this.examTargets = const <VocabularyLevel>[],
     this.examTargetsLoaded = false,
+    this.examTargetsCustomized = false,
+    this.difficultyMode = ArticleDifficultyMode.atOrAbove,
+    this.extractScope = ArticleExtractScope.wordsOnly,
     this.segmentsPerBatch = 1,
+    this.loadingSource = false,
+    this.sourceLabel,
     this.plan,
   });
 
@@ -187,13 +207,25 @@ class ArticleDraftState {
   /// 是否已从设置读过考试目标。
   final bool examTargetsLoaded;
 
+  /// 用户是否在本页手动改动过考试目标（含主动清空为自适应）。
+  final bool examTargetsCustomized;
+
+  /// 难度筛选模式（该级别及以上 / 精准匹配）。
+  final ArticleDifficultyMode difficultyMode;
+
+  /// 提取范围（仅分词 / 含短语与难句）。
+  final ArticleExtractScope extractScope;
+
   /// 每批段数。
   final int segmentsPerBatch;
 
+  /// 是否正在读取文件或抓取网页正文。
+  final bool loadingSource;
+
+  /// 当前导入来源说明（例如文件名或网页标题）。
+  final String? sourceLabel;
+
   /// 分段方案（正文或每批段数变化时重算）。
-  ///
-  /// **必须缓存**：分段要跑正则与多次 `sublist`，五万字的文章逐键重算会卡住
-  /// 输入框；旧版用 `useMemo` 解决同一问题。
   final ArticleSegmentPlan? plan;
 
   /// 复制并改写。
@@ -201,14 +233,25 @@ class ArticleDraftState {
     String? text,
     List<VocabularyLevel>? examTargets,
     bool? examTargetsLoaded,
+    bool? examTargetsCustomized,
+    ArticleDifficultyMode? difficultyMode,
+    ArticleExtractScope? extractScope,
     int? segmentsPerBatch,
+    bool? loadingSource,
+    String? sourceLabel,
+    bool clearSourceLabel = false,
     ArticleSegmentPlan? plan,
     bool clearPlan = false,
   }) => ArticleDraftState(
     text: text ?? this.text,
     examTargets: examTargets ?? this.examTargets,
     examTargetsLoaded: examTargetsLoaded ?? this.examTargetsLoaded,
+    examTargetsCustomized: examTargetsCustomized ?? this.examTargetsCustomized,
+    difficultyMode: difficultyMode ?? this.difficultyMode,
+    extractScope: extractScope ?? this.extractScope,
     segmentsPerBatch: segmentsPerBatch ?? this.segmentsPerBatch,
+    loadingSource: loadingSource ?? this.loadingSource,
+    sourceLabel: clearSourceLabel ? null : (sourceLabel ?? this.sourceLabel),
     plan: clearPlan ? null : (plan ?? this.plan),
   );
 }
@@ -273,6 +316,11 @@ class ArticleSelectionState {
     this.filter = ArticleCandidateFilter.all,
     this.showRecommendedOnly = false,
     this.resetLearningProgress = false,
+    this.cefrFilter,
+    this.sort = ArticleCandidateSort.difficulty,
+    this.searchQuery = '',
+    this.includeSourceSentence = true,
+    this.batchTagsText = '',
   });
 
   /// 已勾选的候选键（小写）。
@@ -288,10 +336,22 @@ class ArticleSelectionState {
   final bool showRecommendedOnly;
 
   /// 是否重置本次命中已有词条的学习进度。
-  ///
-  /// 对应旧版 `components/add/article-tab.tsx:475,526`。缺省关闭：它是本页
-  /// 唯一一个会删除既有学习数据的开关，不该默认打开。
   final bool resetLearningProgress;
+
+  /// 按 CEFR 等级筛选（例如 `'B2'`；`null` 表示全部）。
+  final String? cefrFilter;
+
+  /// 单词列表排序方式。
+  final ArticleCandidateSort sort;
+
+  /// 预览列表关键词过滤。
+  final String searchQuery;
+
+  /// 是否将文章原文出处句写入新词条例句（默认开启）。
+  final bool includeSourceSentence;
+
+  /// 本批导入附加标签（逗号/空格分隔）。
+  final String batchTagsText;
 
   /// 复制并改写。
   ArticleSelectionState copyWith({
@@ -300,12 +360,23 @@ class ArticleSelectionState {
     ArticleCandidateFilter? filter,
     bool? showRecommendedOnly,
     bool? resetLearningProgress,
+    String? cefrFilter,
+    bool clearCefrFilter = false,
+    ArticleCandidateSort? sort,
+    String? searchQuery,
+    bool? includeSourceSentence,
+    String? batchTagsText,
   }) => ArticleSelectionState(
     selected: selected ?? this.selected,
     mode: mode ?? this.mode,
     filter: filter ?? this.filter,
     showRecommendedOnly: showRecommendedOnly ?? this.showRecommendedOnly,
     resetLearningProgress: resetLearningProgress ?? this.resetLearningProgress,
+    cefrFilter: clearCefrFilter ? null : (cefrFilter ?? this.cefrFilter),
+    sort: sort ?? this.sort,
+    searchQuery: searchQuery ?? this.searchQuery,
+    includeSourceSentence: includeSourceSentence ?? this.includeSourceSentence,
+    batchTagsText: batchTagsText ?? this.batchTagsText,
   );
 }
 
@@ -368,21 +439,16 @@ class ArticleWizardState {
       key.toLowerCase(),
   };
 
-  /// 当前筛选下可见的候选。
+  /// 当前筛选下可见的候选（已应用类型、推荐、CEFR、搜索与排序）。
   List<ArticleCandidate> get visibleCandidates {
     final current = preview;
     if (current == null) return const <ArticleCandidate>[];
-    return <ArticleCandidate>[
+    final query = selection.searchQuery.trim().toLowerCase();
+    final filtered = <ArticleCandidate>[
       for (final candidate in current.candidates)
-        if (_matchesFilter(candidate) &&
-            (!selection.showRecommendedOnly ||
-                candidate.isKnown ||
-                recommendedKeys.contains(articleSelectionKey(candidate)) ||
-                recommendedKeys.contains(
-                  candidate.normalizedTerm.toLowerCase(),
-                )))
-          candidate,
+        if (_isVisible(candidate, query)) candidate,
     ];
+    return _sortedCandidates(filtered);
   }
 
   /// 按类型分组的候选（分组不看筛选）。
@@ -394,6 +460,51 @@ class ArticleWizardState {
         if (_filterOf(candidate) == filter) candidate,
     ];
   }
+
+  bool _isVisible(ArticleCandidate candidate, String query) {
+    if (!_matchesFilter(candidate)) return false;
+    if (selection.showRecommendedOnly &&
+        !candidate.isKnown &&
+        !recommendedKeys.contains(articleSelectionKey(candidate)) &&
+        !recommendedKeys.contains(candidate.normalizedTerm.toLowerCase())) {
+      return false;
+    }
+    final cefr = selection.cefrFilter;
+    if (cefr != null &&
+        candidate.entryType == LexicalContentType.word &&
+        candidate.cefrLevel != cefr) {
+      return false;
+    }
+    if (query.isEmpty) return true;
+    return candidate.term.toLowerCase().contains(query) ||
+        (candidate.surfaceForm?.toLowerCase().contains(query) ?? false) ||
+        (candidate.aiReason?.toLowerCase().contains(query) ?? false) ||
+        (candidate.sourceSentence?.toLowerCase().contains(query) ?? false);
+  }
+
+  List<ArticleCandidate> _sortedCandidates(List<ArticleCandidate> items) {
+    if (selection.sort == ArticleCandidateSort.appearance) return items;
+    final copy = List<ArticleCandidate>.of(items)
+      ..sort((a, b) {
+        if (a.entryType != b.entryType) return 0;
+        if (selection.sort == ArticleCandidateSort.occurrences) {
+          final byCount = b.occurrences.compareTo(a.occurrences);
+          return byCount != 0
+              ? byCount
+              : (b.difficulty ?? 0).compareTo(a.difficulty ?? 0);
+        }
+        final aRec = _isRecommended(a) ? 1 : 0;
+        final bRec = _isRecommended(b) ? 1 : 0;
+        if (aRec != bRec) return bRec - aRec;
+        final byDiff = (b.difficulty ?? 0).compareTo(a.difficulty ?? 0);
+        return byDiff != 0 ? byDiff : b.occurrences.compareTo(a.occurrences);
+      });
+    return copy;
+  }
+
+  bool _isRecommended(ArticleCandidate candidate) =>
+      recommendedKeys.contains(articleSelectionKey(candidate)) ||
+      recommendedKeys.contains(candidate.normalizedTerm.toLowerCase());
 
   /// 待学候选总数。
   int get candidateCount => preview?.candidateCount ?? 0;
@@ -442,17 +553,96 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
 
   int _now() => DateTime.now().millisecondsSinceEpoch;
 
-  /// 送入服务的考试目标：一个都没勾时传 `null`，由服务回退到设置。
-  ///
-  /// 与旧版 `examTargets: examTargets.length ? examTargets : undefined` 一致。
+  /// 送入服务的考试目标：加载过或手动改过即显式传入（空列表表示自适应，不再回落到全局设置）。
   List<VocabularyLevel>? get _examTargets =>
-      state.draft.examTargets.isEmpty ? null : state.draft.examTargets;
+      state.draft.examTargetsCustomized || state.draft.examTargetsLoaded
+      ? state.draft.examTargets
+      : null;
 
   /// 覆盖正文，并按需重算分段方案。
-  void setArticleText(String text) {
+  void setArticleText(String text, {String? sourceLabel}) {
     state = state.copyWith(
       draft: state.draft.copyWith(
         text: text,
+        sourceLabel: sourceLabel,
+        clearSourceLabel: sourceLabel == null && text.isEmpty,
+        plan: _planFor(text, state.draft.segmentsPerBatch),
+      ),
+      clearError: true,
+    );
+  }
+
+  /// 从本地文件（TXT / MD / SRT / VTT / HTML）导入正文。
+  Future<void> importLocalFile() async {
+    state = state.copyWith(
+      draft: state.draft.copyWith(loadingSource: true),
+      clearError: true,
+    );
+    try {
+      final parsed = await ref
+          .read(articleSourceLoaderProvider)
+          .pickLocalFile();
+      if (parsed == null) {
+        state = state.copyWith(
+          draft: state.draft.copyWith(loadingSource: false),
+        );
+        return;
+      }
+      _applyLoadedSource(parsed);
+    } on AppError catch (error) {
+      state = state.copyWith(
+        draft: state.draft.copyWith(loadingSource: false),
+        error: error.details is String
+            ? error.details! as String
+            : error.message,
+      );
+    }
+  }
+
+  /// 抓取网页链接正文（或处理系统分享进来的 URL）。
+  Future<void> fetchWebUrl(String url) async {
+    state = state.copyWith(
+      draft: state.draft.copyWith(loadingSource: true),
+      clearError: true,
+    );
+    try {
+      final parsed = await ref
+          .read(articleSourceLoaderProvider)
+          .fetchWebArticle(url);
+      _applyLoadedSource(parsed);
+    } on AppError catch (error) {
+      state = state.copyWith(
+        draft: state.draft.copyWith(loadingSource: false),
+        error: error.details is String
+            ? error.details! as String
+            : error.message,
+      );
+    }
+  }
+
+  /// 接收外部文本或 URL（例如剪贴板或 Android 系统分享）。
+  Future<void> ingestExternalText(String raw) async {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return;
+    if (looksLikeHttpUrl(trimmed)) {
+      await fetchWebUrl(trimmed);
+      return;
+    }
+    final parsed = parseArticleSource(trimmed);
+    _applyLoadedSource(parsed, fallbackLabel: '来自粘贴/分享');
+  }
+
+  void _applyLoadedSource(ParsedArticleSource parsed, {String? fallbackLabel}) {
+    final text = parsed.text.length > maxArticleChars
+        ? parsed.text.substring(0, maxArticleChars)
+        : parsed.text;
+    final label = parsed.title ?? fallbackLabel;
+    state = state.copyWith(
+      analysis: state.analysis.copyWith(step: ArticleStep.input),
+      draft: state.draft.copyWith(
+        text: text,
+        loadingSource: false,
+        sourceLabel: label,
         plan: _planFor(text, state.draft.segmentsPerBatch),
       ),
       clearError: true,
@@ -470,9 +660,15 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
     );
   }
 
-  /// 从设置读入考试目标（进入页面时调用一次）。
+  /// 从设置读入考试目标（进入页面时调用一次；若用户已手工改动则不覆盖）。
   Future<void> loadExamTargets() async {
     final settings = await ref.read(settingsServiceProvider).load();
+    if (state.draft.examTargetsCustomized) {
+      state = state.copyWith(
+        draft: state.draft.copyWith(examTargetsLoaded: true),
+      );
+      return;
+    }
     state = state.copyWith(
       draft: state.draft.copyWith(
         examTargets: settings.examTargets,
@@ -490,13 +686,29 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
               if (item != target) item,
           ]
         : <VocabularyLevel>[...current, target];
-    state = state.copyWith(draft: state.draft.copyWith(examTargets: next));
+    state = state.copyWith(
+      draft: state.draft.copyWith(
+        examTargets: next,
+        examTargetsCustomized: true,
+      ),
+    );
   }
 
-  /// 清空考试目标（回到自适应）。
+  /// 清空考试目标（回到自适应，不再隐式回落到全局考试目标）。
   void clearExamTargets() => state = state.copyWith(
-    draft: state.draft.copyWith(examTargets: const <VocabularyLevel>[]),
+    draft: state.draft.copyWith(
+      examTargets: const <VocabularyLevel>[],
+      examTargetsCustomized: true,
+    ),
   );
+
+  /// 切换难度筛选模式（该级别及以上 / 精准匹配）。
+  void setDifficultyMode(ArticleDifficultyMode mode) =>
+      state = state.copyWith(draft: state.draft.copyWith(difficultyMode: mode));
+
+  /// 切换提取范围（仅分词 / 含短语与难句）。
+  void setExtractScope(ArticleExtractScope scope) =>
+      state = state.copyWith(draft: state.draft.copyWith(extractScope: scope));
 
   /// 切换导入模式。
   void setMode(ImportMode mode) =>
@@ -508,9 +720,36 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
         selection: state.selection.copyWith(resetLearningProgress: value),
       );
 
+  /// 切换「保留原文出处作为例句」。
+  void setIncludeSourceSentence({required bool value}) =>
+      state = state.copyWith(
+        selection: state.selection.copyWith(includeSourceSentence: value),
+      );
+
+  /// 设置本批标签文本。
+  void setBatchTagsText(String value) => state = state.copyWith(
+    selection: state.selection.copyWith(batchTagsText: value),
+  );
+
   /// 切换类型筛选。
   void setFilter(ArticleCandidateFilter filter) => state = state.copyWith(
     selection: state.selection.copyWith(filter: filter),
+  );
+
+  /// 切换 CEFR 等级筛选（传 `null` 显示全部）。
+  void setCefrFilter(String? cefr) => state = state.copyWith(
+    selection: cefr == null
+        ? state.selection.copyWith(clearCefrFilter: true)
+        : state.selection.copyWith(cefrFilter: cefr),
+  );
+
+  /// 切换候选列表排序方式。
+  void setSort(ArticleCandidateSort sort) =>
+      state = state.copyWith(selection: state.selection.copyWith(sort: sort));
+
+  /// 设置候选列表搜索关键词。
+  void setSearchQuery(String query) => state = state.copyWith(
+    selection: state.selection.copyWith(searchQuery: query),
   );
 
   /// 切换「仅看 AI 推荐」。
@@ -570,6 +809,8 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
       final preview = await _service.preview(
         articleText: state.draft.text,
         examTargets: _examTargets,
+        difficultyMode: state.draft.difficultyMode,
+        extractScope: state.draft.extractScope,
         now: _now(),
       );
       _applySinglePreview(preview);
@@ -589,6 +830,8 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
       articleText: state.draft.text,
       segmentsPerBatch: state.draft.segmentsPerBatch,
       examTargets: _examTargets,
+      difficultyMode: state.draft.difficultyMode,
+      extractScope: state.draft.extractScope,
       now: _now(),
     )) {
       _recordOutcome(outcome, plan, results, failures);
@@ -622,6 +865,8 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
       final preview = await _service.preview(
         articleText: _batchText(plan, batch),
         examTargets: _examTargets,
+        difficultyMode: state.draft.difficultyMode,
+        extractScope: state.draft.extractScope,
         now: _now(),
       );
       state = state.copyWith(
@@ -653,7 +898,7 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
     }
   }
 
-  /// 提交勾选的词条。
+  /// 提交勾选的词条，并立刻唤醒后台有道查词队列。
   Future<void> commit() async {
     final token = state.analysis.finalToken;
     if (token == null) return;
@@ -672,6 +917,8 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
         mode: state.selection.mode,
         now: _now(),
         resetLearningProgress: state.selection.resetLearningProgress,
+        includeSourceSentence: state.selection.includeSourceSentence,
+        tags: splitTags(state.selection.batchTagsText),
       );
       state = state.copyWith(
         analysis: state.analysis.copyWith(
@@ -680,6 +927,8 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
         ),
         result: result,
       );
+      ref.read(initializationMaintenanceProvider).kick();
+      ref.invalidate(queueProgressProvider);
     } on AppError catch (error) {
       state = state.copyWith(
         analysis: state.analysis.copyWith(step: ArticleStep.preview),
@@ -688,7 +937,37 @@ class ArticleWizardNotifier extends Notifier<ArticleWizardState> {
     }
   }
 
-  /// 回到「粘贴」步骤，保留语言与考试目标。
+  /// 即时用有道词典查询单个候选词（仅预览，不写入词库）。
+  Future<DictionaryLookupResult> previewWordWithYoudao(String term) async {
+    final settings = await ref.read(settingsServiceProvider).load();
+    final lookup = DictionaryLookupService(ref.read(httpFetcherProvider));
+    return await lookup.lookup(
+      settings: settings,
+      request: ProviderRequest(
+        term: term.trim(),
+        contentType: LexicalContentType.word,
+        sourceLanguage: articleDefaultSourceLanguage,
+        targetLanguage: articleDefaultTargetLanguage,
+        wantedFields: const <String>{},
+      ),
+      selectedProviders: const <String>[youdaoDictionarySource],
+    );
+  }
+
+  /// 返回输入步骤继续编辑正文或切换难度（保留正文与难度配置）。
+  void backToEdit() {
+    state = ArticleWizardState(
+      draft: state.draft,
+      selection: state.selection.copyWith(
+        selected: const <String>{},
+        filter: ArticleCandidateFilter.all,
+        clearCefrFilter: true,
+        searchQuery: '',
+      ),
+    );
+  }
+
+  /// 回到「粘贴」步骤并清空正文，保留语言与考试目标。
   void restart() {
     state = ArticleWizardState(
       draft: state.draft.copyWith(text: '', clearPlan: true),
@@ -975,3 +1254,83 @@ ArticleCandidateFilter _filterOf(ArticleCandidate candidate) =>
       LexicalContentType.phrase => ArticleCandidateFilter.phrase,
       LexicalContentType.sentence => ArticleCandidateFilter.sentence,
     };
+
+/// 本批导入词条的实时有道查词进度。
+class ArticleBatchLookupProgress {
+  /// 以各状态计数构造。
+  const new({
+    required this.total,
+    required this.ready,
+    required this.queuedOrRunning,
+    required this.failed,
+  });
+
+  /// 本批词条总数。
+  final int total;
+
+  /// 已完成（READY / PARTIAL）。
+  final int ready;
+
+  /// 排队中 / 查词中（PENDING / QUEUED / RUNNING）。
+  final int queuedOrRunning;
+
+  /// 失败数。
+  final int failed;
+
+  /// 完成比例（0–1）。
+  double get ratio => total <= 0 ? 1 : (ready / total).clamp(0, 1);
+
+  /// 空进度。
+  static const ArticleBatchLookupProgress empty = ArticleBatchLookupProgress(
+    total: 0,
+    ready: 0,
+    queuedOrRunning: 0,
+    failed: 0,
+  );
+}
+
+/// 按逗号分隔的词条 ID 列表查询本批实时查词进度。
+final FutureProviderFamily<ArticleBatchLookupProgress, String>
+articleBatchProgressProvider =
+    FutureProvider.family<ArticleBatchLookupProgress, String>((
+      ref,
+      idsKey,
+    ) async {
+      ref.watch(backgroundTickProvider);
+      final ids = <int>[
+        for (final part in idsKey.split(','))
+          if (int.tryParse(part) case final int id) id,
+      ];
+      if (ids.isEmpty) return ArticleBatchLookupProgress.empty;
+      final db = ref.watch(databaseProvider);
+      final placeholders = List<String>.filled(ids.length, '?').join(',');
+      final rows = await db
+          .customSelect(
+            'SELECT initialization_status AS s FROM words '
+            'WHERE id IN ($placeholders)',
+            variables: <Variable<Object>>[
+              for (final id in ids) Variable<int>(id),
+            ],
+          )
+          .get();
+      var ready = 0;
+      var queued = 0;
+      var failed = 0;
+      for (final row in rows) {
+        final status = row.read<String>('s');
+        if (status == InitializationStatus.ready.wire ||
+            status == InitializationStatus.partial.wire) {
+          ready += 1;
+        } else if (status == InitializationStatus.failed.wire) {
+          failed += 1;
+        } else {
+          queued += 1;
+        }
+      }
+      return ArticleBatchLookupProgress(
+        total: rows.length,
+        ready: ready,
+        queuedOrRunning: queued,
+        failed: failed,
+      );
+    });

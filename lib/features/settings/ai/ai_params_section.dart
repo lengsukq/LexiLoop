@@ -47,7 +47,7 @@ class AiParamsSection extends StatelessWidget {
     final ai = config.ai;
     return SettingsSectionCard(
       title: 'AI 参数',
-      subtitle: '一份配置供词条内容补全、翻译与建议共用；发音由系统 TTS 独立负责。',
+      subtitle: '配置好模型后，默认仅用于文章智能分词与每日建议；词条查词与发音由有道词典等独立完成。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -63,6 +63,8 @@ class AiParamsSection extends StatelessWidget {
           if (ai.enabled) ...<Widget>[
             const SizedBox(height: LexiSpace.s8),
             _TargetPickers(config: config, onChanged: onChanged),
+            const SizedBox(height: LexiSpace.s12),
+            _FeatureTogglesSection(config: config, onChanged: onChanged),
             const SizedBox(height: LexiSpace.s8),
             DisclosureSection(
               title: '高级模型参数',
@@ -80,6 +82,74 @@ class AiParamsSection extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// AI 功能用途范围：明确区分「分词」与「查词/后台补全」。
+class _FeatureTogglesSection extends StatelessWidget {
+  const new({required this.config, required this.onChanged});
+
+  final LlmConfig config;
+  final ValueChanged<LlmConfig> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final features = config.ai.features;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '功能范围',
+          style: LexiType.footnote.copyWith(
+            color: colors.secondaryLabel,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: LexiSpace.s4),
+        SettingsSwitchRow(
+          switchKey: const Key('aiFeatureArticleTokenize'),
+          label: '文章智能分词',
+          description: '按高考/四六级/雅思/托福等难度自动分词并还原词形，查词仍走有道接口。',
+          value: features.articleTokenize,
+          onChanged: (value) =>
+              onChanged(withAiFeature(config, 'articleTokenize', value: value)),
+        ),
+        SettingsSwitchRow(
+          switchKey: const Key('aiFeatureDailySuggestion'),
+          label: '每日学习建议',
+          description: '由 AI 润色首页每日复盘与建议；关闭时使用本地规则生成。',
+          value: features.dailySuggestion,
+          onChanged: (value) =>
+              onChanged(withAiFeature(config, 'dailySuggestion', value: value)),
+        ),
+        SettingsSwitchRow(
+          switchKey: const Key('aiFeatureAutoMnemonic'),
+          label: '后台自动生成助记',
+          description: '关闭时，有道查词完成后不会自动调用 AI 生成助记（详情页仍可按需手动触发）。',
+          value: features.autoMnemonic,
+          onChanged: (value) =>
+              onChanged(withAiFeature(config, 'autoMnemonic', value: value)),
+        ),
+        SettingsSwitchRow(
+          switchKey: const Key('aiFeatureAutoTranslate'),
+          label: '后台自动补全句子翻译',
+          description: '关闭时，句子类词条缺中文翻译不会自动调用 AI 补全。',
+          value: features.autoTranslate,
+          onChanged: (value) =>
+              onChanged(withAiFeature(config, 'autoTranslate', value: value)),
+        ),
+        SettingsSwitchRow(
+          switchKey: const Key('aiFeatureDictionaryFallback'),
+          label: '允许 AI 兜底查词',
+          description: '默认关闭，查词仅走有道等词典源；开启后允许词典无结果或手动选源时调用 AI。',
+          value: features.dictionaryFallback,
+          onChanged: (value) => onChanged(
+            withAiFeature(config, 'dictionaryFallback', value: value),
+          ),
+        ),
+      ],
     );
   }
 }

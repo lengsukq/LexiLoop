@@ -20,9 +20,7 @@ import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 可开局的小游戏（精选保留核心拼词训练）。
-const List<GameMode> miniGameModes = <GameMode>[
-  GameMode.wordBuilder,
-];
+const List<GameMode> miniGameModes = <GameMode>[GameMode.wordBuilder];
 
 /// 每个模式的副标题（旧版 `GAME_CONFIG[mode].subtitle`）。
 String gameModeSubtitle(GameMode mode) => switch (mode) {

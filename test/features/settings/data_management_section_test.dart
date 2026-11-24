@@ -120,10 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('清空全部数据？'), findsOneWidget);
-    expect(
-      find.byKey(const Key('clearAllDataConfirmButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('clearAllDataConfirmButton')), findsOneWidget);
   });
 
   testWidgets('导入备份弹出底部确认抽屉并说明是整体替换', (tester) async {
@@ -131,10 +128,7 @@ void main() {
     await tester.tap(find.text('导入旧版 JSON 备份'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('importBackupConfirmButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('importBackupConfirmButton')), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(BottomSheet),

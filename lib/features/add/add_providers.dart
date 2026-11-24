@@ -2,9 +2,13 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/data/import/provider_targets.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/manual_preview_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
@@ -60,6 +64,7 @@ class ManualEntryState {
     this.submitting = false,
     this.error,
     this.createdWordId,
+    this.queuedForLookup = false,
   });
 
   /// 词条文本。
@@ -98,6 +103,9 @@ class ManualEntryState {
   /// 创建成功后的词条 ID。
   final int? createdWordId;
 
+  /// 未填释义时是否已自动排入有道查词补全队列。
+  final bool queuedForLookup;
+
   /// 是否已成功创建。
   bool get isCreated => createdWordId != null;
 
@@ -120,6 +128,7 @@ class ManualEntryState {
     bool clearError = false,
     int? createdWordId,
     bool clearCreated = false,
+    bool? queuedForLookup,
   }) => ManualEntryState(
     term: term ?? this.term,
     contentType: contentType ?? this.contentType,
@@ -133,6 +142,7 @@ class ManualEntryState {
     submitting: submitting ?? this.submitting,
     error: clearError ? null : (error ?? this.error),
     createdWordId: clearCreated ? null : (createdWordId ?? this.createdWordId),
+    queuedForLookup: !clearCreated && (queuedForLookup ?? this.queuedForLookup),
   );
 
   /// 把释义文本切成条目列表。
@@ -158,32 +168,61 @@ class ManualEntryController extends Notifier<ManualEntryState> {
     state = next.copyWith(clearError: true, clearCreated: true);
   }
 
-  /// 提交表单。
+  /// 提交表单；未填释义时自动入队有道查词补全。
   Future<void> submit({required int now}) async {
     if (!state.canSubmit) return;
     state = state.copyWith(submitting: true, clearError: true);
 
     try {
-      final wordId = await ref
-          .read(wordEditServiceProvider)
-          .create(
-            draft: WordDraft(
-              term: state.term,
-              contentType: state.contentType,
-              sourceLanguage: state.sourceLanguage,
-              targetLanguage: state.targetLanguage,
-              definitions: state.definitions,
-              phonetic: state.phonetic,
-              examples: state.examples,
-              tags: state.tags,
-              note: state.note,
-            ),
-            now: now,
-          );
-      state = state.copyWith(submitting: false, createdWordId: wordId);
+      final words = ref.read(wordEditServiceProvider);
+      final wordId = await words.create(
+        draft: WordDraft(
+          term: state.term,
+          contentType: state.contentType,
+          sourceLanguage: state.sourceLanguage,
+          targetLanguage: state.targetLanguage,
+          definitions: state.definitions,
+          phonetic: state.phonetic,
+          examples: state.examples,
+          tags: state.tags,
+          note: state.note,
+        ),
+        now: now,
+      );
+      final queued = state.definitions.isEmpty;
+      if (queued) {
+        await _enqueueLookup(words, wordId, now);
+      }
+      state = state.copyWith(
+        submitting: false,
+        createdWordId: wordId,
+        queuedForLookup: queued,
+      );
     } on AppError catch (error) {
       state = state.copyWith(submitting: false, error: error.message);
     }
+  }
+
+  Future<void> _enqueueLookup(
+    WordEditService words,
+    int wordId,
+    int now,
+  ) async {
+    final settings = await ref.read(settingsServiceProvider).load();
+    final providers = enabledProviderIds(settings.providers);
+    await words.enqueueInitialization(
+      wordId: wordId,
+      now: now,
+      mode: InitializationMode.skipInitialized,
+      priority: jobPriorityNewWord,
+      requestedProviders: providers.isEmpty ? null : providers,
+    );
+    await words.markInitializationQueuedIfNoDefinition(
+      wordId: wordId,
+      now: now,
+    );
+    ref.read(initializationMaintenanceProvider).kick();
+    ref.invalidate(queueProgressProvider);
   }
 
   /// 回到空白表单，准备添加下一个。

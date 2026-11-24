@@ -1,8 +1,7 @@
 /// 学习页发音编排的单测。
 ///
-/// 对应旧版 `lib/tts-client.ts` 的 `playCachedTts` / `preloadTtsBatch`。
-/// 这里钉的是**策略**而不是播放器：真人录音优先、设置开关生效、降级与失败
-/// 都有可观测的信号、预取只预热「即将被点到的词」。
+/// 钉住策略：按用户排定的多选优先级链发音、失败自动顺延并给出提示、
+/// 仅启用系统朗读时静默直走系统 TTS、预取只预热即将到来的题。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,23 +12,32 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
 import 'package:lexiloop/features/study/study_speech.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
+import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/audio/word_speaker.dart';
 import 'package:lexiloop/services/tts_service.dart';
 
 import '../../services/audio/audio_fakes.dart';
 
-/// 播放设置；[humanAudioEnabled] 决定是否允许走真人录音。
-PlaybackSettings _playback({bool humanAudioEnabled = true}) => PlaybackSettings(
+const List<SpeechSourcePreference> _systemOnlyChain = <SpeechSourcePreference>[
+  SpeechSourcePreference(source: SpeechSource.system, enabled: true),
+  SpeechSourcePreference(source: SpeechSource.youdao, enabled: false),
+  SpeechSourcePreference(source: SpeechSource.edge, enabled: false),
+];
+
+/// 播放设置；[speechChain] 决定发音引擎启用与顺延顺序。
+PlaybackSettings _playback({
+  List<SpeechSourcePreference> speechChain = defaultSpeechChain,
+}) => PlaybackSettings(
   choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
   defaultAccent: Accent.us,
   wordSpeed: defaultSpeechRate,
   phraseSpeed: defaultSpeechRate,
   sentenceSpeed: defaultSpeechRate,
   autoPlayPronunciation: true,
-  humanAudioEnabled: humanAudioEnabled,
+  speechChain: speechChain,
 );
 
-/// 一个词条视图；[audioUrl] 为空表示词典没给真人录音。
+/// 一个词条视图；[audioUrl] 为空表示词典没存固定地址。
 StudyWordView _word({required String term, String? audioUrl}) => StudyWordView(
   id: 1,
   term: term,
@@ -98,11 +106,7 @@ void main() {
         playback: _playback(),
       );
 
-      final message = await studySpeakTerm(
-        speaker: speaker,
-        request: request,
-        humanAudioEnabled: true,
-      );
+      final message = await studySpeakTerm(speaker: speaker, request: request);
 
       expect(downloader.downloaded.map((uri) => uri.toString()), <String>[url]);
       expect(player.playCount, 1);
@@ -110,68 +114,54 @@ void main() {
       expect(message, isNull);
     });
 
-    test('没有真人录音时回落到系统朗读并给出提示', () async {
+    test('有道不可用时顺延到系统朗读并给出准确提示', () async {
+      downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       final request = studySpeechRequest(
         word: _word(term: 'apple'),
         accent: Accent.us,
         playback: _playback(),
       );
 
-      final message = await studySpeakTerm(
-        speaker: speaker,
-        request: request,
-        humanAudioEnabled: true,
-      );
+      final message = await studySpeakTerm(speaker: speaker, request: request);
 
-      expect(downloader.downloaded, isEmpty);
       expect(engine.spoken, <String>['apple']);
-      expect(message, '暂无真人录音，已改用系统朗读');
+      expect(message, '有道词典发音暂不可用，已自动切换为设备系统朗读');
     });
 
-    test('关掉真人录音后直接走系统朗读，不发起下载也不提示', () async {
+    test('仅启用系统朗读时直接走系统朗读，不发起下载也不提示降级', () async {
       final request = studySpeechRequest(
         word: _word(term: 'apple', audioUrl: 'https://example.com/a.mp3'),
         accent: Accent.us,
-        playback: _playback(humanAudioEnabled: false),
+        playback: _playback(speechChain: _systemOnlyChain),
       );
 
-      final message = await studySpeakTerm(
-        speaker: speaker,
-        request: request,
-        humanAudioEnabled: false,
-      );
+      final message = await studySpeakTerm(speaker: speaker, request: request);
 
       expect(downloader.downloaded, isEmpty);
       expect(engine.spoken, <String>['apple']);
-      expect(message, isNull, reason: '用户自己关的开关，不该再提示「已降级」');
+      expect(message, isNull, reason: '用户自己选择了仅系统朗读，不该再提示降级');
     });
 
-    test('系统朗读也失败时给出错误文案', () async {
+    test('全部引擎均失败时给出错误文案', () async {
       engine.speakError = Exception('引擎炸了');
-      downloader.failing.add(
-        'https://dict.youdao.com/dictvoice?audio=apple&type=2',
-      );
+      downloader.failing.add(youdaoAudioUri('apple', Accent.us)!.toString());
       final request = studySpeechRequest(
         word: _word(term: 'apple'),
         accent: Accent.us,
         playback: _playback(),
       );
 
-      final message = await studySpeakTerm(
-        speaker: speaker,
-        request: request,
-        humanAudioEnabled: true,
-      );
+      final message = await studySpeakTerm(speaker: speaker, request: request);
 
       expect(message, isNotNull);
-      expect(message, isNotEmpty);
+      expect(message, startsWith('发音暂不可用：'));
     });
 
-    test('英音请求按英音解析地址', () async {
+    test('英音请求即使词条仅存美音，也能通过有道直连英音播报', () async {
       final request = studySpeechRequest(
         word: _word(
           term: 'apple',
-          audioUrl: 'https://example.com/apple-uk.mp3',
+          audioUrl: 'https://example.com/apple-us.mp3',
         ),
         accent: Accent.uk,
         playback: _playback(),
@@ -179,23 +169,15 @@ void main() {
 
       final result = await speaker.speak(request);
 
-      expect(
-        result.fellBackToSystemVoice,
-        isTrue,
-        reason: '该词条只有美音录音，英音请求应回落到系统朗读',
-      );
-      expect(downloader.downloaded, isEmpty);
-      expect(engine.spoken, <String>['apple']);
+      expect(result.fellBack, isFalse);
+      expect(downloader.downloaded, <Uri>[youdaoAudioUri('apple', Accent.uk)!]);
+      expect(engine.spoken, isEmpty);
     });
   });
 
   group('预取', () {
     test('向前看 5 题（含当前题）', () {
-      expect(
-        studyPreloadAheadCount,
-        5,
-        reason: '旧版是 preloadTtsBatch(items.slice(index, index + 5))',
-      );
+      expect(studyPreloadAheadCount, 5);
     });
 
     test('只请求前 5 题的去重地址', () async {
@@ -225,33 +207,18 @@ void main() {
       expect(player.playCount, 0, reason: '预取只下载，不播放');
     });
 
-    test('关掉真人录音时不预取', () async {
+    test('仅启用系统朗读时不预取网络音频', () async {
       studyPreloadAhead(
         speaker: speaker,
         items: <StudyItemView>[
           _item(0, 'apple', 'https://example.com/apple.mp3'),
         ],
         accent: Accent.us,
-        playback: _playback(humanAudioEnabled: false),
+        playback: _playback(speechChain: _systemOnlyChain),
       );
       await settle(5);
 
       expect(downloader.downloaded, isEmpty);
-    });
-
-    test('预取会把设置里的开关同步到发音服务上', () {
-      expect(speaker.humanAudioEnabled, isTrue);
-
-      studyPreloadAhead(
-        speaker: speaker,
-        items: <StudyItemView>[
-          _item(0, 'apple', 'https://example.com/apple.mp3'),
-        ],
-        accent: Accent.us,
-        playback: _playback(humanAudioEnabled: false),
-      );
-
-      expect(speaker.humanAudioEnabled, isFalse);
     });
   });
 }

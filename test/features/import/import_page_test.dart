@@ -57,6 +57,7 @@ class _FakeImportService extends CsvImportService {
     required String sourceLanguage,
     required String targetLanguage,
     required int now,
+    List<String> extraTags = const <String>[],
   }) async {
     final error = previewError;
     if (error != null) throw error;

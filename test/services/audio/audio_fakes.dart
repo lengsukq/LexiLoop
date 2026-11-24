@@ -11,6 +11,7 @@ import 'dart:typed_data';
 
 import 'package:lexiloop/services/audio/audio_downloader.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
+import 'package:lexiloop/services/audio/speech_disk_cache.dart';
 import 'package:lexiloop/services/tts_service.dart';
 
 /// 记录调用轨迹的假播放器。
@@ -95,7 +96,7 @@ class FakeAudioDownloader implements AudioDownloadPort {
     _active += 1;
     _peak = max(_peak, _active);
     try {
-      await _gate.future;
+      if (!_gate.isCompleted) await _gate.future;
       if (failing.contains(key)) {
         throw StateError('模拟下载失败：$key');
       }
@@ -149,4 +150,99 @@ Future<void> settle(int rounds) async {
   for (var round = 0; round < rounds; round += 1) {
     await Future<void>.delayed(Duration.zero);
   }
+}
+
+/// 内存态的离线语音磁盘缓存假实现（支持分桶统计、LRU 裁剪与清空验证）。
+class InMemorySpeechDiskCache implements SpeechDiskCachePort {
+  /// 以是否支持持久化构造。
+  new({this.isSupported = true});
+
+  @override
+  final bool isSupported;
+
+  final Map<SpeechCacheBucket, Map<String, _MemoryDiskEntry>> _buckets =
+      <SpeechCacheBucket, Map<String, _MemoryDiskEntry>>{
+        SpeechCacheBucket.youdao: <String, _MemoryDiskEntry>{},
+        SpeechCacheBucket.edge: <String, _MemoryDiskEntry>{},
+      };
+
+  int _clock = 0;
+
+  /// 记录调用过的 `enforceLimit` 上限值。
+  final List<int> enforcedLimits = <int>[];
+
+  @override
+  Future<Uint8List?> read(SpeechCacheBucket bucket, String key) async {
+    final entry = _buckets[bucket]![key];
+    if (entry == null) return null;
+    entry.lastUsed = ++_clock;
+    return entry.bytes;
+  }
+
+  @override
+  Future<void> write(
+    SpeechCacheBucket bucket,
+    String key,
+    Uint8List bytes,
+  ) async {
+    if (bytes.isEmpty) return;
+    _buckets[bucket]![key] = _MemoryDiskEntry(bytes, ++_clock);
+  }
+
+  @override
+  Future<bool> contains(SpeechCacheBucket bucket, String key) async =>
+      _buckets[bucket]!.containsKey(key);
+
+  @override
+  Future<SpeechCacheStats> stats() async {
+    final y = _buckets[SpeechCacheBucket.youdao]!.values;
+    final e = _buckets[SpeechCacheBucket.edge]!.values;
+    return SpeechCacheStats(
+      youdaoFiles: y.length,
+      youdaoBytes: y.fold<int>(0, (sum, entry) => sum + entry.bytes.length),
+      edgeFiles: e.length,
+      edgeBytes: e.fold<int>(0, (sum, entry) => sum + entry.bytes.length),
+    );
+  }
+
+  @override
+  Future<void> clear({SpeechCacheBucket? bucket}) async {
+    if (bucket == null) {
+      for (final map in _buckets.values) {
+        map.clear();
+      }
+      return;
+    }
+    _buckets[bucket]!.clear();
+  }
+
+  @override
+  Future<int> enforceLimit(int maxBytes) async {
+    enforcedLimits.add(maxBytes);
+    if (maxBytes <= 0) return 0;
+    final all = <(SpeechCacheBucket, String, _MemoryDiskEntry)>[
+      for (final entry in _buckets.entries)
+        for (final item in entry.value.entries)
+          (entry.key, item.key, item.value),
+    ];
+    var total = all.fold<int>(0, (sum, e) => sum + e.$3.bytes.length);
+    if (total <= maxBytes) return 0;
+    all.sort((a, b) => a.$3.lastUsed.compareTo(b.$3.lastUsed));
+    final target = (maxBytes * 0.85).floor();
+    var removed = 0;
+    for (final item in all) {
+      if (total <= target) break;
+      _buckets[item.$1]!.remove(item.$2);
+      total -= item.$3.bytes.length;
+      removed += 1;
+    }
+    return removed;
+  }
+}
+
+class _MemoryDiskEntry {
+  new(this.bytes, this.lastUsed);
+
+  final Uint8List bytes;
+  int lastUsed;
 }

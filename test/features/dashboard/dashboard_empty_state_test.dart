@@ -57,6 +57,13 @@ void main() {
             return const Scaffold(body: Center(child: Text('导入页')));
           },
         ),
+        GoRoute(
+          path: articlePath,
+          builder: (context, state) {
+            landedPath = state.uri.path;
+            return const Scaffold(body: Center(child: Text('文章分词页')));
+          },
+        ),
       ],
     );
     return ProviderScope(
@@ -135,6 +142,17 @@ void main() {
 
     expect(landedPath, csvImportPath);
     expect(find.text('导入页'), findsOneWidget);
+  });
+
+  testWidgets('空库引导的「文章智能分词」入口跳到 /article', (tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dashboard-empty-article')));
+    await tester.pumpAndSettle();
+
+    expect(landedPath, articlePath);
+    expect(find.text('文章分词页'), findsOneWidget);
   });
 
   testWidgets('空库引导不溢出', (tester) async {

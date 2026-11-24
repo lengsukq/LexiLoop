@@ -8,10 +8,17 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/domain/models/word_pack_models.dart';
+import 'package:lexiloop/features/initialize/initialize_providers.dart';
 import 'package:lexiloop/services/backup_service.dart';
 import 'package:lexiloop/ui/navigation/route_paths.dart';
 
 export 'package:lexiloop/ui/navigation/route_paths.dart' show statisticsPath;
+
+/// 词库搜索防抖时长（测试可覆写为 `Duration.zero` 以同步验证查询结果）。
+final Provider<Duration> wordsSearchDebounceProvider = Provider<Duration>(
+  (ref) => const Duration(milliseconds: wordsSearchDebounceMs),
+);
 
 /// 手动添加词条页的路径。
 ///
@@ -49,6 +56,37 @@ class WordQueryNotifier extends Notifier<WordQuery> {
     ),
   );
 
+  /// 切换内容类型筛选（单词 / 短语 / 句子；传 `null` 表示全部）。
+  void setContentType(LexicalContentType? type) =>
+      _apply(state.copyWith(contentType: type, clearContentType: type == null));
+
+  /// 按标签筛选（传 `null` 或空白表示清除标签筛选）。
+  void setTag(String? tag) {
+    final clean = tag?.trim();
+    final empty = clean == null || clean.isEmpty;
+    _apply(state.copyWith(tag: empty ? null : clean, clearTag: empty));
+  }
+
+  /// 切换来源作用域（全部 / 个人词库 / 词书包），可选同时指定词书 ID。
+  void setSourceScope(WordSourceScope scope, {String? packId}) {
+    final cleanPack = scope == WordSourceScope.personal ? null : packId?.trim();
+    final clearPack = cleanPack == null || cleanPack.isEmpty;
+    _apply(
+      state.copyWith(
+        sourceScope: scope,
+        packId: clearPack ? null : cleanPack,
+        clearPackId: clearPack,
+      ),
+    );
+  }
+
+  /// 按指定词书筛选（传 `null` 表示不限定单本词书）。
+  void setPackId(String? packId) {
+    final clean = packId?.trim();
+    final empty = clean == null || clean.isEmpty;
+    _apply(state.copyWith(packId: empty ? null : clean, clearPackId: empty));
+  }
+
   /// 只看 / 不看活跃错词。
   void setWrongOnly({required bool enabled}) =>
       _apply(state.copyWith(wrongOnly: enabled));
@@ -72,6 +110,8 @@ class WordQueryNotifier extends Notifier<WordQuery> {
     state.copyWith(
       clearMasteryLevel: true,
       clearInitializationStatus: true,
+      clearContentType: true,
+      clearTag: true,
       wrongOnly: false,
       dueOnly: false,
       suspendedOnly: false,
@@ -92,6 +132,8 @@ class WordQueryNotifier extends Notifier<WordQuery> {
       search: '',
       clearMasteryLevel: true,
       clearInitializationStatus: true,
+      clearContentType: true,
+      clearTag: true,
       wrongOnly: false,
       dueOnly: false,
       suspendedOnly: false,
@@ -119,24 +161,96 @@ class WordQueryNotifier extends Notifier<WordQuery> {
 final NotifierProvider<WordQueryNotifier, WordQuery> wordQueryProvider =
     NotifierProvider<WordQueryNotifier, WordQuery>(WordQueryNotifier.new);
 
-/// 当前页的词条列表。
+/// 当前页的词条列表（后台查词完成后自动刷新）。
 final FutureProvider<List<WordListEntry>> wordListProvider =
     FutureProvider<List<WordListEntry>>((ref) {
+      ref.watch(backgroundTickProvider);
       final query = ref.watch(wordQueryProvider);
       return ref.watch(wordDaoProvider).list(query);
     });
 
 /// 符合当前筛选条件的词条总数。
 final FutureProvider<int> wordCountProvider = FutureProvider<int>((ref) {
+  ref.watch(backgroundTickProvider);
   final query = ref.watch(wordQueryProvider);
   return ref.watch(wordDaoProvider).count(query);
 });
 
-/// 按掌握等级的词条分布。
-final FutureProvider<Map<MasteryLevel, int>> masterySummaryProvider =
-    FutureProvider<Map<MasteryLevel, int>>(
-      (ref) => ref.watch(wordDaoProvider).countByMastery(),
+/// 词库中全部去重标签列表。
+final FutureProvider<List<String>> wordTagsProvider =
+    FutureProvider<List<String>>(
+      (ref) => ref.watch(wordDaoProvider).distinctTags(),
     );
+
+/// 批量多选模式的状态。
+class WordSelectionState {
+  /// 以是否开启多选与已选词条 ID 集合构造。
+  const new({this.enabled = false, this.selectedIds = const <int>{}});
+
+  /// 是否处于批量选择模式。
+  final bool enabled;
+
+  /// 已选中的词条 ID。
+  final Set<int> selectedIds;
+}
+
+/// 单词本批量多选控制器。
+class WordSelectionNotifier extends Notifier<WordSelectionState> {
+  @override
+  WordSelectionState build() => const WordSelectionState();
+
+  /// 进入批量选择模式（可选同时选中某个词条）。
+  void enter({int? initialId}) {
+    state = WordSelectionState(
+      enabled: true,
+      selectedIds: initialId == null ? const <int>{} : <int>{initialId},
+    );
+  }
+
+  /// 退出批量选择模式并清空已选集合。
+  void exit() => state = const WordSelectionState();
+
+  /// 勾选 / 取消勾选一个词条。
+  void toggle(int wordId) {
+    final next = <int>{...state.selectedIds};
+    if (!next.remove(wordId)) next.add(wordId);
+    state = WordSelectionState(enabled: true, selectedIds: next);
+  }
+
+  /// 批量选中给定 ID 集合。
+  void selectAll(Iterable<int> wordIds) {
+    state = WordSelectionState(
+      enabled: true,
+      selectedIds: <int>{...state.selectedIds, ...wordIds},
+    );
+  }
+
+  /// 清空当前已选（保持多选模式）。
+  void clearSelected() {
+    state = const WordSelectionState(enabled: true);
+  }
+}
+
+/// 单词本批量多选提供者。
+final NotifierProvider<WordSelectionNotifier, WordSelectionState>
+wordSelectionProvider =
+    NotifierProvider<WordSelectionNotifier, WordSelectionState>(
+      WordSelectionNotifier.new,
+    );
+
+/// 按掌握等级的词条分布（跟随当前来源作用域 / 词书筛选）。
+final FutureProvider<Map<MasteryLevel, int>> masterySummaryProvider =
+    FutureProvider<Map<MasteryLevel, int>>((ref) {
+      final scope = ref.watch(
+        wordQueryProvider.select((query) => query.sourceScope),
+      );
+      final packId = ref.watch(
+        wordQueryProvider.select((query) => query.packId),
+      );
+      return ref
+          .watch(wordDaoProvider)
+          .countByMastery(sourceScope: scope, packId: packId);
+    });
 
 /// 词库整体的掌握概览，供页首那条进度带使用。
 class MasteryOverview {

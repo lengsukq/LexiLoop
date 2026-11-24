@@ -150,16 +150,33 @@ class _EmptyLibraryState extends StatelessWidget {
   Widget build(BuildContext context) => PageShell(
     scrollable: true,
     header: const PageHeader(title: '今日', subtitle: '词库还是空的——先导入，再开始复习。'),
-    child: PageEmptyState(
-      key: emptyStateTitleKey,
-      icon: LucideIcons.bookOpen,
-      title: '从 EasyDict 收藏开始',
-      message:
-          '导入 EasyDict Favorites CSV。LexiLoop 只为你收藏的词条补全内容，'
-          ' 不会导入整本词典。',
-      primaryLabel: '导入 CSV',
-      primaryKey: emptyStateImportButtonKey,
-      onPrimary: () => context.go(csvImportPath),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        PageEmptyState(
+          key: emptyStateTitleKey,
+          icon: LucideIcons.bookOpen,
+          title: '从 EasyDict 收藏开始',
+          message:
+              '导入 EasyDict / 通用词表（CSV / TSV / TXT）、粘贴英文文章按考试难度智能分词， '
+              '或直接下载内置四六级 / 雅思 / 托福词书包开背。',
+          primaryLabel: '导入 CSV',
+          primaryKey: emptyStateImportButtonKey,
+          onPrimary: () => context.go(csvImportPath),
+          secondaryLabel: '浏览词书包',
+          secondaryKey: const Key('dashboard-empty-packs'),
+          onSecondary: () => context.go(packsPath),
+        ),
+        const SizedBox(height: LexiSpace.s12),
+        Center(
+          child: TextButton.icon(
+            key: const Key('dashboard-empty-article'),
+            onPressed: () => context.go(articlePath),
+            icon: const Icon(LucideIcons.fileText, size: 16),
+            label: const Text('粘贴英文文章智能分词'),
+          ),
+        ),
+      ],
     ),
   );
 }

@@ -165,6 +165,21 @@ class $WordsTable extends Words with TableInfo<$WordsTable, WordRow> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isPersonalMeta = const VerificationMeta(
+    'isPersonal',
+  );
+  @override
+  late final GeneratedColumn<bool> isPersonal = GeneratedColumn<bool>(
+    'is_personal',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_personal" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _userNoteMeta = const VerificationMeta(
     'userNote',
   );
@@ -214,6 +229,7 @@ class $WordsTable extends Words with TableInfo<$WordsTable, WordRow> {
     masteryLevel,
     masteryScore,
     isSuspended,
+    isPersonal,
     userNote,
     createdAt,
     updatedAt,
@@ -319,6 +335,12 @@ class $WordsTable extends Words with TableInfo<$WordsTable, WordRow> {
         ),
       );
     }
+    if (data.containsKey('is_personal')) {
+      context.handle(
+        _isPersonalMeta,
+        isPersonal.isAcceptableOrUnknown(data['is_personal']!, _isPersonalMeta),
+      );
+    }
     if (data.containsKey('user_note')) {
       context.handle(
         _userNoteMeta,
@@ -418,6 +440,10 @@ class $WordsTable extends Words with TableInfo<$WordsTable, WordRow> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_suspended'],
       )!,
+      isPersonal: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_personal'],
+      )!,
       userNote: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}user_note'],
@@ -466,6 +492,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
   final MasteryLevel masteryLevel;
   final int masteryScore;
   final bool isSuspended;
+  final bool isPersonal;
   final String? userNote;
   final int createdAt;
   final int updatedAt;
@@ -484,6 +511,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
     required this.masteryLevel,
     required this.masteryScore,
     required this.isSuspended,
+    required this.isPersonal,
     this.userNote,
     required this.createdAt,
     required this.updatedAt,
@@ -527,6 +555,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
     }
     map['mastery_score'] = Variable<int>(masteryScore);
     map['is_suspended'] = Variable<bool>(isSuspended);
+    map['is_personal'] = Variable<bool>(isPersonal);
     if (!nullToAbsent || userNote != null) {
       map['user_note'] = Variable<String>(userNote);
     }
@@ -557,6 +586,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
       masteryLevel: Value(masteryLevel),
       masteryScore: Value(masteryScore),
       isSuspended: Value(isSuspended),
+      isPersonal: Value(isPersonal),
       userNote: userNote == null && nullToAbsent
           ? const Value.absent()
           : Value(userNote),
@@ -591,6 +621,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
       masteryLevel: serializer.fromJson<MasteryLevel>(json['masteryLevel']),
       masteryScore: serializer.fromJson<int>(json['masteryScore']),
       isSuspended: serializer.fromJson<bool>(json['isSuspended']),
+      isPersonal: serializer.fromJson<bool>(json['isPersonal']),
       userNote: serializer.fromJson<String?>(json['userNote']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
@@ -616,6 +647,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
       'masteryLevel': serializer.toJson<MasteryLevel>(masteryLevel),
       'masteryScore': serializer.toJson<int>(masteryScore),
       'isSuspended': serializer.toJson<bool>(isSuspended),
+      'isPersonal': serializer.toJson<bool>(isPersonal),
       'userNote': serializer.toJson<String?>(userNote),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
@@ -637,6 +669,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
     MasteryLevel? masteryLevel,
     int? masteryScore,
     bool? isSuspended,
+    bool? isPersonal,
     Value<String?> userNote = const Value.absent(),
     int? createdAt,
     int? updatedAt,
@@ -661,6 +694,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
     masteryLevel: masteryLevel ?? this.masteryLevel,
     masteryScore: masteryScore ?? this.masteryScore,
     isSuspended: isSuspended ?? this.isSuspended,
+    isPersonal: isPersonal ?? this.isPersonal,
     userNote: userNote.present ? userNote.value : this.userNote,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -703,6 +737,9 @@ class WordRow extends DataClass implements Insertable<WordRow> {
       isSuspended: data.isSuspended.present
           ? data.isSuspended.value
           : this.isSuspended,
+      isPersonal: data.isPersonal.present
+          ? data.isPersonal.value
+          : this.isPersonal,
       userNote: data.userNote.present ? data.userNote.value : this.userNote,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -726,6 +763,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
           ..write('masteryLevel: $masteryLevel, ')
           ..write('masteryScore: $masteryScore, ')
           ..write('isSuspended: $isSuspended, ')
+          ..write('isPersonal: $isPersonal, ')
           ..write('userNote: $userNote, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -749,6 +787,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
     masteryLevel,
     masteryScore,
     isSuspended,
+    isPersonal,
     userNote,
     createdAt,
     updatedAt,
@@ -771,6 +810,7 @@ class WordRow extends DataClass implements Insertable<WordRow> {
           other.masteryLevel == this.masteryLevel &&
           other.masteryScore == this.masteryScore &&
           other.isSuspended == this.isSuspended &&
+          other.isPersonal == this.isPersonal &&
           other.userNote == this.userNote &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -791,6 +831,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
   final Value<MasteryLevel> masteryLevel;
   final Value<int> masteryScore;
   final Value<bool> isSuspended;
+  final Value<bool> isPersonal;
   final Value<String?> userNote;
   final Value<int> createdAt;
   final Value<int> updatedAt;
@@ -809,6 +850,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
     this.masteryLevel = const Value.absent(),
     this.masteryScore = const Value.absent(),
     this.isSuspended = const Value.absent(),
+    this.isPersonal = const Value.absent(),
     this.userNote = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -828,6 +870,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
     this.masteryLevel = const Value.absent(),
     this.masteryScore = const Value.absent(),
     this.isSuspended = const Value.absent(),
+    this.isPersonal = const Value.absent(),
     this.userNote = const Value.absent(),
     required int createdAt,
     required int updatedAt,
@@ -853,6 +896,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
     Expression<String>? masteryLevel,
     Expression<int>? masteryScore,
     Expression<bool>? isSuspended,
+    Expression<bool>? isPersonal,
     Expression<String>? userNote,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
@@ -875,6 +919,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
       if (masteryLevel != null) 'mastery_level': masteryLevel,
       if (masteryScore != null) 'mastery_score': masteryScore,
       if (isSuspended != null) 'is_suspended': isSuspended,
+      if (isPersonal != null) 'is_personal': isPersonal,
       if (userNote != null) 'user_note': userNote,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -896,6 +941,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
     Value<MasteryLevel>? masteryLevel,
     Value<int>? masteryScore,
     Value<bool>? isSuspended,
+    Value<bool>? isPersonal,
     Value<String?>? userNote,
     Value<int>? createdAt,
     Value<int>? updatedAt,
@@ -915,6 +961,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
       masteryLevel: masteryLevel ?? this.masteryLevel,
       masteryScore: masteryScore ?? this.masteryScore,
       isSuspended: isSuspended ?? this.isSuspended,
+      isPersonal: isPersonal ?? this.isPersonal,
       userNote: userNote ?? this.userNote,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -976,6 +1023,9 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
     if (isSuspended.present) {
       map['is_suspended'] = Variable<bool>(isSuspended.value);
     }
+    if (isPersonal.present) {
+      map['is_personal'] = Variable<bool>(isPersonal.value);
+    }
     if (userNote.present) {
       map['user_note'] = Variable<String>(userNote.value);
     }
@@ -1005,6 +1055,7 @@ class WordsCompanion extends UpdateCompanion<WordRow> {
           ..write('masteryLevel: $masteryLevel, ')
           ..write('masteryScore: $masteryScore, ')
           ..write('isSuspended: $isSuspended, ')
+          ..write('isPersonal: $isPersonal, ')
           ..write('userNote: $userNote, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -2884,6 +2935,1061 @@ class WordReviewStatsCompanion extends UpdateCompanion<WordReviewStatRow> {
           ..write('durationCount: $durationCount, ')
           ..write('lastReviewedAt: $lastReviewedAt, ')
           ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $WordPacksTable extends WordPacks
+    with TableInfo<$WordPacksTable, WordPackRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WordPacksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _slugMeta = const VerificationMeta('slug');
+  @override
+  late final GeneratedColumn<String> slug = GeneratedColumn<String>(
+    'slug',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('CUSTOM'),
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<String> version = GeneratedColumn<String>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contentModeMeta = const VerificationMeta(
+    'contentMode',
+  );
+  @override
+  late final GeneratedColumn<String> contentMode = GeneratedColumn<String>(
+    'content_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('ECDICT_BASE'),
+  );
+  static const VerificationMeta _wordCountMeta = const VerificationMeta(
+    'wordCount',
+  );
+  @override
+  late final GeneratedColumn<int> wordCount = GeneratedColumn<int>(
+    'word_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _includeInDailyStudyMeta =
+      const VerificationMeta('includeInDailyStudy');
+  @override
+  late final GeneratedColumn<bool> includeInDailyStudy = GeneratedColumn<bool>(
+    'include_in_daily_study',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("include_in_daily_study" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sha256Meta = const VerificationMeta('sha256');
+  @override
+  late final GeneratedColumn<String> sha256 = GeneratedColumn<String>(
+    'sha256',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _sourceUrlMeta = const VerificationMeta(
+    'sourceUrl',
+  );
+  @override
+  late final GeneratedColumn<String> sourceUrl = GeneratedColumn<String>(
+    'source_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _installedAtMeta = const VerificationMeta(
+    'installedAt',
+  );
+  @override
+  late final GeneratedColumn<int> installedAt = GeneratedColumn<int>(
+    'installed_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    slug,
+    name,
+    category,
+    description,
+    version,
+    contentMode,
+    wordCount,
+    includeInDailyStudy,
+    sha256,
+    sourceUrl,
+    installedAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'word_packs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WordPackRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('slug')) {
+      context.handle(
+        _slugMeta,
+        slug.isAcceptableOrUnknown(data['slug']!, _slugMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_slugMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('content_mode')) {
+      context.handle(
+        _contentModeMeta,
+        contentMode.isAcceptableOrUnknown(
+          data['content_mode']!,
+          _contentModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('word_count')) {
+      context.handle(
+        _wordCountMeta,
+        wordCount.isAcceptableOrUnknown(data['word_count']!, _wordCountMeta),
+      );
+    }
+    if (data.containsKey('include_in_daily_study')) {
+      context.handle(
+        _includeInDailyStudyMeta,
+        includeInDailyStudy.isAcceptableOrUnknown(
+          data['include_in_daily_study']!,
+          _includeInDailyStudyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sha256')) {
+      context.handle(
+        _sha256Meta,
+        sha256.isAcceptableOrUnknown(data['sha256']!, _sha256Meta),
+      );
+    }
+    if (data.containsKey('source_url')) {
+      context.handle(
+        _sourceUrlMeta,
+        sourceUrl.isAcceptableOrUnknown(data['source_url']!, _sourceUrlMeta),
+      );
+    }
+    if (data.containsKey('installed_at')) {
+      context.handle(
+        _installedAtMeta,
+        installedAt.isAcceptableOrUnknown(
+          data['installed_at']!,
+          _installedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_installedAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WordPackRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WordPackRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      slug: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slug'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}version'],
+      )!,
+      contentMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_mode'],
+      )!,
+      wordCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}word_count'],
+      )!,
+      includeInDailyStudy: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}include_in_daily_study'],
+      )!,
+      sha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sha256'],
+      )!,
+      sourceUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_url'],
+      ),
+      installedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}installed_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $WordPacksTable createAlias(String alias) {
+    return $WordPacksTable(attachedDatabase, alias);
+  }
+}
+
+class WordPackRow extends DataClass implements Insertable<WordPackRow> {
+  /// 稳定词书 ID（如 `cet4`、`ielts`、`oxford-3000`）。
+  final String id;
+
+  /// URL/路由友好的唯一短名。
+  final String slug;
+
+  /// 面向用户展示的词书名称。
+  final String name;
+
+  /// 词书分类（`FOUNDATION` / `EXAM_CN` / `EXAM_INTL` / `CUSTOM`）。
+  final String category;
+
+  /// 简介。
+  final String description;
+
+  /// 词书数据版本号（如 `2026.1`）。
+  final String version;
+
+  /// 载荷预初始化等级（`FULL_YOUDAO` / `ECDICT_BASE` / `WORDLIST_ONLY`）。
+  final String contentMode;
+
+  /// 词书声明的词条数量。
+  final int wordCount;
+
+  /// 是否纳入「今日每日学习计划」。默认关闭，不打扰个人生词节奏。
+  final bool includeInDailyStudy;
+
+  /// 词书包原始文件的 SHA-256 校验值。
+  final String sha256;
+
+  /// 下载来源地址（本地导入时为 `null`）。
+  final String? sourceUrl;
+
+  /// 安装时间戳（epoch 毫秒）。
+  final int installedAt;
+
+  /// 最近更新时间戳（epoch 毫秒）。
+  final int updatedAt;
+  const WordPackRow({
+    required this.id,
+    required this.slug,
+    required this.name,
+    required this.category,
+    required this.description,
+    required this.version,
+    required this.contentMode,
+    required this.wordCount,
+    required this.includeInDailyStudy,
+    required this.sha256,
+    this.sourceUrl,
+    required this.installedAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['slug'] = Variable<String>(slug);
+    map['name'] = Variable<String>(name);
+    map['category'] = Variable<String>(category);
+    map['description'] = Variable<String>(description);
+    map['version'] = Variable<String>(version);
+    map['content_mode'] = Variable<String>(contentMode);
+    map['word_count'] = Variable<int>(wordCount);
+    map['include_in_daily_study'] = Variable<bool>(includeInDailyStudy);
+    map['sha256'] = Variable<String>(sha256);
+    if (!nullToAbsent || sourceUrl != null) {
+      map['source_url'] = Variable<String>(sourceUrl);
+    }
+    map['installed_at'] = Variable<int>(installedAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  WordPacksCompanion toCompanion(bool nullToAbsent) {
+    return WordPacksCompanion(
+      id: Value(id),
+      slug: Value(slug),
+      name: Value(name),
+      category: Value(category),
+      description: Value(description),
+      version: Value(version),
+      contentMode: Value(contentMode),
+      wordCount: Value(wordCount),
+      includeInDailyStudy: Value(includeInDailyStudy),
+      sha256: Value(sha256),
+      sourceUrl: sourceUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceUrl),
+      installedAt: Value(installedAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory WordPackRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WordPackRow(
+      id: serializer.fromJson<String>(json['id']),
+      slug: serializer.fromJson<String>(json['slug']),
+      name: serializer.fromJson<String>(json['name']),
+      category: serializer.fromJson<String>(json['category']),
+      description: serializer.fromJson<String>(json['description']),
+      version: serializer.fromJson<String>(json['version']),
+      contentMode: serializer.fromJson<String>(json['contentMode']),
+      wordCount: serializer.fromJson<int>(json['wordCount']),
+      includeInDailyStudy: serializer.fromJson<bool>(
+        json['includeInDailyStudy'],
+      ),
+      sha256: serializer.fromJson<String>(json['sha256']),
+      sourceUrl: serializer.fromJson<String?>(json['sourceUrl']),
+      installedAt: serializer.fromJson<int>(json['installedAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'slug': serializer.toJson<String>(slug),
+      'name': serializer.toJson<String>(name),
+      'category': serializer.toJson<String>(category),
+      'description': serializer.toJson<String>(description),
+      'version': serializer.toJson<String>(version),
+      'contentMode': serializer.toJson<String>(contentMode),
+      'wordCount': serializer.toJson<int>(wordCount),
+      'includeInDailyStudy': serializer.toJson<bool>(includeInDailyStudy),
+      'sha256': serializer.toJson<String>(sha256),
+      'sourceUrl': serializer.toJson<String?>(sourceUrl),
+      'installedAt': serializer.toJson<int>(installedAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  WordPackRow copyWith({
+    String? id,
+    String? slug,
+    String? name,
+    String? category,
+    String? description,
+    String? version,
+    String? contentMode,
+    int? wordCount,
+    bool? includeInDailyStudy,
+    String? sha256,
+    Value<String?> sourceUrl = const Value.absent(),
+    int? installedAt,
+    int? updatedAt,
+  }) => WordPackRow(
+    id: id ?? this.id,
+    slug: slug ?? this.slug,
+    name: name ?? this.name,
+    category: category ?? this.category,
+    description: description ?? this.description,
+    version: version ?? this.version,
+    contentMode: contentMode ?? this.contentMode,
+    wordCount: wordCount ?? this.wordCount,
+    includeInDailyStudy: includeInDailyStudy ?? this.includeInDailyStudy,
+    sha256: sha256 ?? this.sha256,
+    sourceUrl: sourceUrl.present ? sourceUrl.value : this.sourceUrl,
+    installedAt: installedAt ?? this.installedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  WordPackRow copyWithCompanion(WordPacksCompanion data) {
+    return WordPackRow(
+      id: data.id.present ? data.id.value : this.id,
+      slug: data.slug.present ? data.slug.value : this.slug,
+      name: data.name.present ? data.name.value : this.name,
+      category: data.category.present ? data.category.value : this.category,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      version: data.version.present ? data.version.value : this.version,
+      contentMode: data.contentMode.present
+          ? data.contentMode.value
+          : this.contentMode,
+      wordCount: data.wordCount.present ? data.wordCount.value : this.wordCount,
+      includeInDailyStudy: data.includeInDailyStudy.present
+          ? data.includeInDailyStudy.value
+          : this.includeInDailyStudy,
+      sha256: data.sha256.present ? data.sha256.value : this.sha256,
+      sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
+      installedAt: data.installedAt.present
+          ? data.installedAt.value
+          : this.installedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordPackRow(')
+          ..write('id: $id, ')
+          ..write('slug: $slug, ')
+          ..write('name: $name, ')
+          ..write('category: $category, ')
+          ..write('description: $description, ')
+          ..write('version: $version, ')
+          ..write('contentMode: $contentMode, ')
+          ..write('wordCount: $wordCount, ')
+          ..write('includeInDailyStudy: $includeInDailyStudy, ')
+          ..write('sha256: $sha256, ')
+          ..write('sourceUrl: $sourceUrl, ')
+          ..write('installedAt: $installedAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    slug,
+    name,
+    category,
+    description,
+    version,
+    contentMode,
+    wordCount,
+    includeInDailyStudy,
+    sha256,
+    sourceUrl,
+    installedAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WordPackRow &&
+          other.id == this.id &&
+          other.slug == this.slug &&
+          other.name == this.name &&
+          other.category == this.category &&
+          other.description == this.description &&
+          other.version == this.version &&
+          other.contentMode == this.contentMode &&
+          other.wordCount == this.wordCount &&
+          other.includeInDailyStudy == this.includeInDailyStudy &&
+          other.sha256 == this.sha256 &&
+          other.sourceUrl == this.sourceUrl &&
+          other.installedAt == this.installedAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class WordPacksCompanion extends UpdateCompanion<WordPackRow> {
+  final Value<String> id;
+  final Value<String> slug;
+  final Value<String> name;
+  final Value<String> category;
+  final Value<String> description;
+  final Value<String> version;
+  final Value<String> contentMode;
+  final Value<int> wordCount;
+  final Value<bool> includeInDailyStudy;
+  final Value<String> sha256;
+  final Value<String?> sourceUrl;
+  final Value<int> installedAt;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const WordPacksCompanion({
+    this.id = const Value.absent(),
+    this.slug = const Value.absent(),
+    this.name = const Value.absent(),
+    this.category = const Value.absent(),
+    this.description = const Value.absent(),
+    this.version = const Value.absent(),
+    this.contentMode = const Value.absent(),
+    this.wordCount = const Value.absent(),
+    this.includeInDailyStudy = const Value.absent(),
+    this.sha256 = const Value.absent(),
+    this.sourceUrl = const Value.absent(),
+    this.installedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WordPacksCompanion.insert({
+    required String id,
+    required String slug,
+    required String name,
+    this.category = const Value.absent(),
+    this.description = const Value.absent(),
+    required String version,
+    this.contentMode = const Value.absent(),
+    this.wordCount = const Value.absent(),
+    this.includeInDailyStudy = const Value.absent(),
+    this.sha256 = const Value.absent(),
+    this.sourceUrl = const Value.absent(),
+    required int installedAt,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       slug = Value(slug),
+       name = Value(name),
+       version = Value(version),
+       installedAt = Value(installedAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<WordPackRow> custom({
+    Expression<String>? id,
+    Expression<String>? slug,
+    Expression<String>? name,
+    Expression<String>? category,
+    Expression<String>? description,
+    Expression<String>? version,
+    Expression<String>? contentMode,
+    Expression<int>? wordCount,
+    Expression<bool>? includeInDailyStudy,
+    Expression<String>? sha256,
+    Expression<String>? sourceUrl,
+    Expression<int>? installedAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (slug != null) 'slug': slug,
+      if (name != null) 'name': name,
+      if (category != null) 'category': category,
+      if (description != null) 'description': description,
+      if (version != null) 'version': version,
+      if (contentMode != null) 'content_mode': contentMode,
+      if (wordCount != null) 'word_count': wordCount,
+      if (includeInDailyStudy != null)
+        'include_in_daily_study': includeInDailyStudy,
+      if (sha256 != null) 'sha256': sha256,
+      if (sourceUrl != null) 'source_url': sourceUrl,
+      if (installedAt != null) 'installed_at': installedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WordPacksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? slug,
+    Value<String>? name,
+    Value<String>? category,
+    Value<String>? description,
+    Value<String>? version,
+    Value<String>? contentMode,
+    Value<int>? wordCount,
+    Value<bool>? includeInDailyStudy,
+    Value<String>? sha256,
+    Value<String?>? sourceUrl,
+    Value<int>? installedAt,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return WordPacksCompanion(
+      id: id ?? this.id,
+      slug: slug ?? this.slug,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      version: version ?? this.version,
+      contentMode: contentMode ?? this.contentMode,
+      wordCount: wordCount ?? this.wordCount,
+      includeInDailyStudy: includeInDailyStudy ?? this.includeInDailyStudy,
+      sha256: sha256 ?? this.sha256,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
+      installedAt: installedAt ?? this.installedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (slug.present) {
+      map['slug'] = Variable<String>(slug.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<String>(version.value);
+    }
+    if (contentMode.present) {
+      map['content_mode'] = Variable<String>(contentMode.value);
+    }
+    if (wordCount.present) {
+      map['word_count'] = Variable<int>(wordCount.value);
+    }
+    if (includeInDailyStudy.present) {
+      map['include_in_daily_study'] = Variable<bool>(includeInDailyStudy.value);
+    }
+    if (sha256.present) {
+      map['sha256'] = Variable<String>(sha256.value);
+    }
+    if (sourceUrl.present) {
+      map['source_url'] = Variable<String>(sourceUrl.value);
+    }
+    if (installedAt.present) {
+      map['installed_at'] = Variable<int>(installedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordPacksCompanion(')
+          ..write('id: $id, ')
+          ..write('slug: $slug, ')
+          ..write('name: $name, ')
+          ..write('category: $category, ')
+          ..write('description: $description, ')
+          ..write('version: $version, ')
+          ..write('contentMode: $contentMode, ')
+          ..write('wordCount: $wordCount, ')
+          ..write('includeInDailyStudy: $includeInDailyStudy, ')
+          ..write('sha256: $sha256, ')
+          ..write('sourceUrl: $sourceUrl, ')
+          ..write('installedAt: $installedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $WordPackItemsTable extends WordPackItems
+    with TableInfo<$WordPackItemsTable, WordPackItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WordPackItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _packIdMeta = const VerificationMeta('packId');
+  @override
+  late final GeneratedColumn<String> packId = GeneratedColumn<String>(
+    'pack_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES word_packs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _wordIdMeta = const VerificationMeta('wordId');
+  @override
+  late final GeneratedColumn<int> wordId = GeneratedColumn<int>(
+    'word_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES words (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _rankMeta = const VerificationMeta('rank');
+  @override
+  late final GeneratedColumn<int> rank = GeneratedColumn<int>(
+    'rank',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [packId, wordId, rank];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'word_pack_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WordPackItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('pack_id')) {
+      context.handle(
+        _packIdMeta,
+        packId.isAcceptableOrUnknown(data['pack_id']!, _packIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_packIdMeta);
+    }
+    if (data.containsKey('word_id')) {
+      context.handle(
+        _wordIdMeta,
+        wordId.isAcceptableOrUnknown(data['word_id']!, _wordIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_wordIdMeta);
+    }
+    if (data.containsKey('rank')) {
+      context.handle(
+        _rankMeta,
+        rank.isAcceptableOrUnknown(data['rank']!, _rankMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {packId, wordId};
+  @override
+  WordPackItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WordPackItemRow(
+      packId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pack_id'],
+      )!,
+      wordId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}word_id'],
+      )!,
+      rank: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rank'],
+      )!,
+    );
+  }
+
+  @override
+  $WordPackItemsTable createAlias(String alias) {
+    return $WordPackItemsTable(attachedDatabase, alias);
+  }
+}
+
+class WordPackItemRow extends DataClass implements Insertable<WordPackItemRow> {
+  /// 所属词书 ID（删除词书时级联清理归属关系）。
+  final String packId;
+
+  /// 词条 ID（删除词条时级联清理归属关系）。
+  final int wordId;
+
+  /// 词书内部排序号（按词频或官方考纲顺序，从 1 起）。
+  final int rank;
+  const WordPackItemRow({
+    required this.packId,
+    required this.wordId,
+    required this.rank,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['pack_id'] = Variable<String>(packId);
+    map['word_id'] = Variable<int>(wordId);
+    map['rank'] = Variable<int>(rank);
+    return map;
+  }
+
+  WordPackItemsCompanion toCompanion(bool nullToAbsent) {
+    return WordPackItemsCompanion(
+      packId: Value(packId),
+      wordId: Value(wordId),
+      rank: Value(rank),
+    );
+  }
+
+  factory WordPackItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WordPackItemRow(
+      packId: serializer.fromJson<String>(json['packId']),
+      wordId: serializer.fromJson<int>(json['wordId']),
+      rank: serializer.fromJson<int>(json['rank']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'packId': serializer.toJson<String>(packId),
+      'wordId': serializer.toJson<int>(wordId),
+      'rank': serializer.toJson<int>(rank),
+    };
+  }
+
+  WordPackItemRow copyWith({String? packId, int? wordId, int? rank}) =>
+      WordPackItemRow(
+        packId: packId ?? this.packId,
+        wordId: wordId ?? this.wordId,
+        rank: rank ?? this.rank,
+      );
+  WordPackItemRow copyWithCompanion(WordPackItemsCompanion data) {
+    return WordPackItemRow(
+      packId: data.packId.present ? data.packId.value : this.packId,
+      wordId: data.wordId.present ? data.wordId.value : this.wordId,
+      rank: data.rank.present ? data.rank.value : this.rank,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordPackItemRow(')
+          ..write('packId: $packId, ')
+          ..write('wordId: $wordId, ')
+          ..write('rank: $rank')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(packId, wordId, rank);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WordPackItemRow &&
+          other.packId == this.packId &&
+          other.wordId == this.wordId &&
+          other.rank == this.rank);
+}
+
+class WordPackItemsCompanion extends UpdateCompanion<WordPackItemRow> {
+  final Value<String> packId;
+  final Value<int> wordId;
+  final Value<int> rank;
+  final Value<int> rowid;
+  const WordPackItemsCompanion({
+    this.packId = const Value.absent(),
+    this.wordId = const Value.absent(),
+    this.rank = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WordPackItemsCompanion.insert({
+    required String packId,
+    required int wordId,
+    this.rank = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : packId = Value(packId),
+       wordId = Value(wordId);
+  static Insertable<WordPackItemRow> custom({
+    Expression<String>? packId,
+    Expression<int>? wordId,
+    Expression<int>? rank,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (packId != null) 'pack_id': packId,
+      if (wordId != null) 'word_id': wordId,
+      if (rank != null) 'rank': rank,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WordPackItemsCompanion copyWith({
+    Value<String>? packId,
+    Value<int>? wordId,
+    Value<int>? rank,
+    Value<int>? rowid,
+  }) {
+    return WordPackItemsCompanion(
+      packId: packId ?? this.packId,
+      wordId: wordId ?? this.wordId,
+      rank: rank ?? this.rank,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (packId.present) {
+      map['pack_id'] = Variable<String>(packId.value);
+    }
+    if (wordId.present) {
+      map['word_id'] = Variable<int>(wordId.value);
+    }
+    if (rank.present) {
+      map['rank'] = Variable<int>(rank.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WordPackItemsCompanion(')
+          ..write('packId: $packId, ')
+          ..write('wordId: $wordId, ')
+          ..write('rank: $rank, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -11470,6 +12576,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WordReviewStatsTable wordReviewStats = $WordReviewStatsTable(
     this,
   );
+  late final $WordPacksTable wordPacks = $WordPacksTable(this);
+  late final $WordPackItemsTable wordPackItems = $WordPackItemsTable(this);
   late final $StudySessionsTable studySessions = $StudySessionsTable(this);
   late final $StudySessionItemsTable studySessionItems =
       $StudySessionItemsTable(this);
@@ -11497,6 +12605,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     words,
     wordContents,
     wordReviewStats,
+    wordPacks,
+    wordPackItems,
     studySessions,
     studySessionItems,
     reviewCards,
@@ -11525,6 +12635,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('word_review_stats', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'word_packs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('word_pack_items', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'words',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('word_pack_items', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -11628,6 +12752,7 @@ typedef $$WordsTableCreateCompanionBuilder = WordsCompanion Function({
   Value<MasteryLevel> masteryLevel,
   Value<int> masteryScore,
   Value<bool> isSuspended,
+  Value<bool> isPersonal,
   Value<String?> userNote,
   required int createdAt,
   required int updatedAt,
@@ -11647,6 +12772,7 @@ typedef $$WordsTableUpdateCompanionBuilder = WordsCompanion Function({
   Value<MasteryLevel> masteryLevel,
   Value<int> masteryScore,
   Value<bool> isSuspended,
+  Value<bool> isPersonal,
   Value<String?> userNote,
   Value<int> createdAt,
   Value<int> updatedAt,
@@ -11689,6 +12815,24 @@ final class $$WordsTableReferences
     final cache = $_typedResult.readTableOrNull(
       _wordReviewStatsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$WordPackItemsTable, List<WordPackItemRow>>
+  _wordPackItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.wordPackItems,
+    aliasName: 'words__id__word_pack_items__word_id',
+  );
+
+  $$WordPackItemsTableProcessedTableManager get wordPackItemsRefs {
+    final manager = $$WordPackItemsTableTableManager(
+      $_db,
+      $_db.wordPackItems,
+    ).filter((f) => f.wordId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_wordPackItemsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -11920,6 +13064,11 @@ class $$WordsTableFilterComposer extends Composer<_$AppDatabase, $WordsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get userNote => $composableBuilder(
     column: $table.userNote,
     builder: (column) => ColumnFilters(column),
@@ -11976,6 +13125,31 @@ class $$WordsTableFilterComposer extends Composer<_$AppDatabase, $WordsTable> {
           }) => $$WordReviewStatsTableFilterComposer(
             $db: $db,
             $table: $db.wordReviewStats,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> wordPackItemsRefs(
+    Expression<bool> Function($$WordPackItemsTableFilterComposer f) f,
+  ) {
+    final $$WordPackItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.wordPackItems,
+      getReferencedColumn: (t) => t.wordId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPackItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.wordPackItems,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -12240,6 +13414,11 @@ class $$WordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get userNote => $composableBuilder(
     column: $table.userNote,
     builder: (column) => ColumnOrderings(column),
@@ -12332,6 +13511,11 @@ class $$WordsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get isPersonal => $composableBuilder(
+    column: $table.isPersonal,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get userNote =>
       $composableBuilder(column: $table.userNote, builder: (column) => column);
 
@@ -12382,6 +13566,31 @@ class $$WordsTableAnnotationComposer
           }) => $$WordReviewStatsTableAnnotationComposer(
             $db: $db,
             $table: $db.wordReviewStats,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> wordPackItemsRefs<T extends Object>(
+    Expression<T> Function($$WordPackItemsTableAnnotationComposer a) f,
+  ) {
+    final $$WordPackItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.wordPackItems,
+      getReferencedColumn: (t) => t.wordId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPackItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.wordPackItems,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -12585,6 +13794,7 @@ class $$WordsTableTableManager
           PrefetchHooks Function({
             bool wordContentsRefs,
             bool wordReviewStatsRefs,
+            bool wordPackItemsRefs,
             bool studySessionItemsRefs,
             bool reviewCardsRefs,
             bool reviewLogsRefs,
@@ -12622,6 +13832,7 @@ class $$WordsTableTableManager
                 Value<MasteryLevel> masteryLevel = const Value.absent(),
                 Value<int> masteryScore = const Value.absent(),
                 Value<bool> isSuspended = const Value.absent(),
+                Value<bool> isPersonal = const Value.absent(),
                 Value<String?> userNote = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
@@ -12640,6 +13851,7 @@ class $$WordsTableTableManager
                 masteryLevel: masteryLevel,
                 masteryScore: masteryScore,
                 isSuspended: isSuspended,
+                isPersonal: isPersonal,
                 userNote: userNote,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -12661,6 +13873,7 @@ class $$WordsTableTableManager
                 Value<MasteryLevel> masteryLevel = const Value.absent(),
                 Value<int> masteryScore = const Value.absent(),
                 Value<bool> isSuspended = const Value.absent(),
+                Value<bool> isPersonal = const Value.absent(),
                 Value<String?> userNote = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
@@ -12679,6 +13892,7 @@ class $$WordsTableTableManager
                 masteryLevel: masteryLevel,
                 masteryScore: masteryScore,
                 isSuspended: isSuspended,
+                isPersonal: isPersonal,
                 userNote: userNote,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -12695,6 +13909,7 @@ class $$WordsTableTableManager
               ({
                 wordContentsRefs = false,
                 wordReviewStatsRefs = false,
+                wordPackItemsRefs = false,
                 studySessionItemsRefs = false,
                 reviewCardsRefs = false,
                 reviewLogsRefs = false,
@@ -12708,6 +13923,7 @@ class $$WordsTableTableManager
                   explicitlyWatchedTables: [
                     if (wordContentsRefs) db.wordContents,
                     if (wordReviewStatsRefs) db.wordReviewStats,
+                    if (wordPackItemsRefs) db.wordPackItems,
                     if (studySessionItemsRefs) db.studySessionItems,
                     if (reviewCardsRefs) db.reviewCards,
                     if (reviewLogsRefs) db.reviewLogs,
@@ -12755,6 +13971,27 @@ class $$WordsTableTableManager
                                 table,
                                 p0,
                               ).wordReviewStatsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.wordId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (wordPackItemsRefs)
+                        await $_getPrefetchedData<
+                          WordRow,
+                          $WordsTable,
+                          WordPackItemRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$WordsTableReferences
+                              ._wordPackItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$WordsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).wordPackItemsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.wordId == item.id,
@@ -12931,6 +14168,7 @@ typedef $$WordsTableProcessedTableManager =
       PrefetchHooks Function({
         bool wordContentsRefs,
         bool wordReviewStatsRefs,
+        bool wordPackItemsRefs,
         bool studySessionItemsRefs,
         bool reviewCardsRefs,
         bool reviewLogsRefs,
@@ -14038,6 +15276,833 @@ typedef $$WordReviewStatsTableProcessedTableManager =
       (WordReviewStatRow, $$WordReviewStatsTableReferences),
       WordReviewStatRow,
       PrefetchHooks Function({bool wordId})
+    >;
+typedef $$WordPacksTableCreateCompanionBuilder = WordPacksCompanion Function({
+  required String id,
+  required String slug,
+  required String name,
+  Value<String> category,
+  Value<String> description,
+  required String version,
+  Value<String> contentMode,
+  Value<int> wordCount,
+  Value<bool> includeInDailyStudy,
+  Value<String> sha256,
+  Value<String?> sourceUrl,
+  required int installedAt,
+  required int updatedAt,
+  Value<int> rowid,
+});
+typedef $$WordPacksTableUpdateCompanionBuilder = WordPacksCompanion Function({
+  Value<String> id,
+  Value<String> slug,
+  Value<String> name,
+  Value<String> category,
+  Value<String> description,
+  Value<String> version,
+  Value<String> contentMode,
+  Value<int> wordCount,
+  Value<bool> includeInDailyStudy,
+  Value<String> sha256,
+  Value<String?> sourceUrl,
+  Value<int> installedAt,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+final class $$WordPacksTableReferences
+    extends BaseReferences<_$AppDatabase, $WordPacksTable, WordPackRow> {
+  $$WordPacksTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$WordPackItemsTable, List<WordPackItemRow>>
+  _wordPackItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.wordPackItems,
+    aliasName: 'word_packs__id__word_pack_items__pack_id',
+  );
+
+  $$WordPackItemsTableProcessedTableManager get wordPackItemsRefs {
+    final manager = $$WordPackItemsTableTableManager(
+      $_db,
+      $_db.wordPackItems,
+    ).filter((f) => f.packId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_wordPackItemsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$WordPacksTableFilterComposer
+    extends Composer<_$AppDatabase, $WordPacksTable> {
+  $$WordPacksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentMode => $composableBuilder(
+    column: $table.contentMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get wordCount => $composableBuilder(
+    column: $table.wordCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get includeInDailyStudy => $composableBuilder(
+    column: $table.includeInDailyStudy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceUrl => $composableBuilder(
+    column: $table.sourceUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get installedAt => $composableBuilder(
+    column: $table.installedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> wordPackItemsRefs(
+    Expression<bool> Function($$WordPackItemsTableFilterComposer f) f,
+  ) {
+    final $$WordPackItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.wordPackItems,
+      getReferencedColumn: (t) => t.packId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPackItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.wordPackItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$WordPacksTableOrderingComposer
+    extends Composer<_$AppDatabase, $WordPacksTable> {
+  $$WordPacksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentMode => $composableBuilder(
+    column: $table.contentMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get wordCount => $composableBuilder(
+    column: $table.wordCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get includeInDailyStudy => $composableBuilder(
+    column: $table.includeInDailyStudy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sha256 => $composableBuilder(
+    column: $table.sha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceUrl => $composableBuilder(
+    column: $table.sourceUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get installedAt => $composableBuilder(
+    column: $table.installedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$WordPacksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WordPacksTable> {
+  $$WordPacksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get slug =>
+      $composableBuilder(column: $table.slug, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get contentMode => $composableBuilder(
+    column: $table.contentMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get wordCount =>
+      $composableBuilder(column: $table.wordCount, builder: (column) => column);
+
+  GeneratedColumn<bool> get includeInDailyStudy => $composableBuilder(
+    column: $table.includeInDailyStudy,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sha256 =>
+      $composableBuilder(column: $table.sha256, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceUrl =>
+      $composableBuilder(column: $table.sourceUrl, builder: (column) => column);
+
+  GeneratedColumn<int> get installedAt => $composableBuilder(
+    column: $table.installedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> wordPackItemsRefs<T extends Object>(
+    Expression<T> Function($$WordPackItemsTableAnnotationComposer a) f,
+  ) {
+    final $$WordPackItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.wordPackItems,
+      getReferencedColumn: (t) => t.packId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPackItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.wordPackItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$WordPacksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WordPacksTable,
+          WordPackRow,
+          $$WordPacksTableFilterComposer,
+          $$WordPacksTableOrderingComposer,
+          $$WordPacksTableAnnotationComposer,
+          $$WordPacksTableCreateCompanionBuilder,
+          $$WordPacksTableUpdateCompanionBuilder,
+          (WordPackRow, $$WordPacksTableReferences),
+          WordPackRow,
+          PrefetchHooks Function({bool wordPackItemsRefs})
+        > {
+  $$WordPacksTableTableManager(_$AppDatabase db, $WordPacksTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WordPacksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WordPacksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WordPacksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> slug = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<String> version = const Value.absent(),
+                Value<String> contentMode = const Value.absent(),
+                Value<int> wordCount = const Value.absent(),
+                Value<bool> includeInDailyStudy = const Value.absent(),
+                Value<String> sha256 = const Value.absent(),
+                Value<String?> sourceUrl = const Value.absent(),
+                Value<int> installedAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WordPacksCompanion(
+                id: id,
+                slug: slug,
+                name: name,
+                category: category,
+                description: description,
+                version: version,
+                contentMode: contentMode,
+                wordCount: wordCount,
+                includeInDailyStudy: includeInDailyStudy,
+                sha256: sha256,
+                sourceUrl: sourceUrl,
+                installedAt: installedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String slug,
+                required String name,
+                Value<String> category = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                required String version,
+                Value<String> contentMode = const Value.absent(),
+                Value<int> wordCount = const Value.absent(),
+                Value<bool> includeInDailyStudy = const Value.absent(),
+                Value<String> sha256 = const Value.absent(),
+                Value<String?> sourceUrl = const Value.absent(),
+                required int installedAt,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => WordPacksCompanion.insert(
+                id: id,
+                slug: slug,
+                name: name,
+                category: category,
+                description: description,
+                version: version,
+                contentMode: contentMode,
+                wordCount: wordCount,
+                includeInDailyStudy: includeInDailyStudy,
+                sha256: sha256,
+                sourceUrl: sourceUrl,
+                installedAt: installedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$WordPacksTable, WordPackRow>(table),
+                  $$WordPacksTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({wordPackItemsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (wordPackItemsRefs) db.wordPackItems,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (wordPackItemsRefs)
+                    await $_getPrefetchedData<
+                      WordPackRow,
+                      $WordPacksTable,
+                      WordPackItemRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$WordPacksTableReferences
+                          ._wordPackItemsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$WordPacksTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).wordPackItemsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.packId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$WordPacksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WordPacksTable,
+      WordPackRow,
+      $$WordPacksTableFilterComposer,
+      $$WordPacksTableOrderingComposer,
+      $$WordPacksTableAnnotationComposer,
+      $$WordPacksTableCreateCompanionBuilder,
+      $$WordPacksTableUpdateCompanionBuilder,
+      (WordPackRow, $$WordPacksTableReferences),
+      WordPackRow,
+      PrefetchHooks Function({bool wordPackItemsRefs})
+    >;
+typedef $$WordPackItemsTableCreateCompanionBuilder =
+    WordPackItemsCompanion Function({
+      required String packId,
+      required int wordId,
+      Value<int> rank,
+      Value<int> rowid,
+    });
+typedef $$WordPackItemsTableUpdateCompanionBuilder =
+    WordPackItemsCompanion Function({
+      Value<String> packId,
+      Value<int> wordId,
+      Value<int> rank,
+      Value<int> rowid,
+    });
+
+final class $$WordPackItemsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $WordPackItemsTable, WordPackItemRow> {
+  $$WordPackItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $WordPacksTable _packIdTable(_$AppDatabase db) =>
+      db.wordPacks.createAlias('word_pack_items__pack_id__word_packs__id');
+
+  $$WordPacksTableProcessedTableManager get packId {
+    final $_column = $_itemColumn<String>('pack_id')!;
+
+    final manager = $$WordPacksTableTableManager(
+      $_db,
+      $_db.wordPacks,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_packIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $WordsTable _wordIdTable(_$AppDatabase db) =>
+      db.words.createAlias('word_pack_items__word_id__words__id');
+
+  $$WordsTableProcessedTableManager get wordId {
+    final $_column = $_itemColumn<int>('word_id')!;
+
+    final manager = $$WordsTableTableManager(
+      $_db,
+      $_db.words,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_wordIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$WordPackItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $WordPackItemsTable> {
+  $$WordPackItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get rank => $composableBuilder(
+    column: $table.rank,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$WordPacksTableFilterComposer get packId {
+    final $$WordPacksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.packId,
+      referencedTable: $db.wordPacks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPacksTableFilterComposer(
+            $db: $db,
+            $table: $db.wordPacks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$WordsTableFilterComposer get wordId {
+    final $$WordsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wordId,
+      referencedTable: $db.words,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordsTableFilterComposer(
+            $db: $db,
+            $table: $db.words,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WordPackItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $WordPackItemsTable> {
+  $$WordPackItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get rank => $composableBuilder(
+    column: $table.rank,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$WordPacksTableOrderingComposer get packId {
+    final $$WordPacksTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.packId,
+      referencedTable: $db.wordPacks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPacksTableOrderingComposer(
+            $db: $db,
+            $table: $db.wordPacks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$WordsTableOrderingComposer get wordId {
+    final $$WordsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wordId,
+      referencedTable: $db.words,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordsTableOrderingComposer(
+            $db: $db,
+            $table: $db.words,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WordPackItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WordPackItemsTable> {
+  $$WordPackItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get rank =>
+      $composableBuilder(column: $table.rank, builder: (column) => column);
+
+  $$WordPacksTableAnnotationComposer get packId {
+    final $$WordPacksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.packId,
+      referencedTable: $db.wordPacks,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordPacksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.wordPacks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$WordsTableAnnotationComposer get wordId {
+    final $$WordsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wordId,
+      referencedTable: $db.words,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WordsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.words,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$WordPackItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WordPackItemsTable,
+          WordPackItemRow,
+          $$WordPackItemsTableFilterComposer,
+          $$WordPackItemsTableOrderingComposer,
+          $$WordPackItemsTableAnnotationComposer,
+          $$WordPackItemsTableCreateCompanionBuilder,
+          $$WordPackItemsTableUpdateCompanionBuilder,
+          (WordPackItemRow, $$WordPackItemsTableReferences),
+          WordPackItemRow,
+          PrefetchHooks Function({bool packId, bool wordId})
+        > {
+  $$WordPackItemsTableTableManager(_$AppDatabase db, $WordPackItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WordPackItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WordPackItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WordPackItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> packId = const Value.absent(),
+                Value<int> wordId = const Value.absent(),
+                Value<int> rank = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WordPackItemsCompanion(
+                packId: packId,
+                wordId: wordId,
+                rank: rank,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String packId,
+                required int wordId,
+                Value<int> rank = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WordPackItemsCompanion.insert(
+                packId: packId,
+                wordId: wordId,
+                rank: rank,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$WordPackItemsTable, WordPackItemRow>(table),
+                  $$WordPackItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({packId = false, wordId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (packId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.packId,
+                        referencedTable: $$WordPackItemsTableReferences
+                            ._packIdTable(db),
+                        referencedColumn: $$WordPackItemsTableReferences
+                            ._packIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (wordId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.wordId,
+                        referencedTable: $$WordPackItemsTableReferences
+                            ._wordIdTable(db),
+                        referencedColumn: $$WordPackItemsTableReferences
+                            ._wordIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$WordPackItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WordPackItemsTable,
+      WordPackItemRow,
+      $$WordPackItemsTableFilterComposer,
+      $$WordPackItemsTableOrderingComposer,
+      $$WordPackItemsTableAnnotationComposer,
+      $$WordPackItemsTableCreateCompanionBuilder,
+      $$WordPackItemsTableUpdateCompanionBuilder,
+      (WordPackItemRow, $$WordPackItemsTableReferences),
+      WordPackItemRow,
+      PrefetchHooks Function({bool packId, bool wordId})
     >;
 typedef $$StudySessionsTableCreateCompanionBuilder =
     StudySessionsCompanion Function({
@@ -19926,6 +21991,10 @@ class $AppDatabaseManager {
       $$WordContentsTableTableManager(_db, _db.wordContents);
   $$WordReviewStatsTableTableManager get wordReviewStats =>
       $$WordReviewStatsTableTableManager(_db, _db.wordReviewStats);
+  $$WordPacksTableTableManager get wordPacks =>
+      $$WordPacksTableTableManager(_db, _db.wordPacks);
+  $$WordPackItemsTableTableManager get wordPackItems =>
+      $$WordPackItemsTableTableManager(_db, _db.wordPackItems);
   $$StudySessionsTableTableManager get studySessions =>
       $$StudySessionsTableTableManager(_db, _db.studySessions);
   $$StudySessionItemsTableTableManager get studySessionItems =>

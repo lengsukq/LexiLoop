@@ -19,6 +19,7 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
 import 'package:lexiloop/domain/article_import/article_ai_models.dart';
 import 'package:lexiloop/domain/article_import/article_ai_schema.dart';
+import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/domain/article_import/article_prompt.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/llm/llm_client.dart';
@@ -35,6 +36,8 @@ class ArticleAiSelectInput {
     required this.knownSample,
     required this.totalKnown,
     this.examTargets = const <VocabularyLevel>[],
+    this.difficultyMode = ArticleDifficultyMode.atOrAbove,
+    this.extractScope = ArticleExtractScope.wordsOnly,
   });
 
   /// 文章正文（含句子片段）。
@@ -51,6 +54,12 @@ class ArticleAiSelectInput {
 
   /// 考试目标。
   final List<VocabularyLevel> examTargets;
+
+  /// 难度筛选模式。
+  final ArticleDifficultyMode difficultyMode;
+
+  /// 提取范围。
+  final ArticleExtractScope extractScope;
 }
 
 /// AI 选词器。
@@ -79,13 +88,19 @@ class SettingsArticleAiSelector implements ArticleAiSelector {
     if (!config.ai.enabled) {
       return const ArticleAiSelection.failure(
         errorCode: AppErrorCode.aiDisabled,
-        error: 'AI 未启用，请到设置页开启 AI。',
+        error: 'AI 未启用，请到「设置 → AI 模型」开启 AI。',
+      );
+    }
+    if (!config.ai.features.articleTokenize) {
+      return const ArticleAiSelection.failure(
+        errorCode: AppErrorCode.aiDisabled,
+        error: '文章智能分词开关已关闭，请到「设置 → AI 模型」开启。',
       );
     }
     if (!config.isUsable) {
       return const ArticleAiSelection.failure(
         errorCode: AppErrorCode.aiConfigIncomplete,
-        error: 'AI 服务配置不完整，请到设置页补全。',
+        error: 'AI 服务配置不完整，请到「设置 → AI 模型」补全。',
       );
     }
     return await LlmArticleAiSelector(_fetcher, config).select(input);
@@ -109,21 +124,23 @@ class LlmArticleAiSelector implements ArticleAiSelector {
         knownSample: input.knownSample,
         totalKnown: input.totalKnown,
         examTargets: input.examTargets,
+        difficultyMode: input.difficultyMode,
+        extractScope: input.extractScope,
       ),
     );
+    final wordsOnly = input.extractScope == ArticleExtractScope.wordsOnly;
+    final tokenFloor = wordsOnly
+        ? articleAiWordOnlyMaxOutputTokens
+        : articleAiMaxOutputTokens;
     try {
       final completion = await LlmClient(_fetcher, _config).complete(
         LlmCallOptions(
           system: prompt.systemPrompt,
           user: prompt.userPrompt,
-          schema: articleAiSelectionJsonSchema,
-          // 旧版 `Math.max(purpose.maxOutputTokens ?? 3000, 4500)`：
-          // 选词结果可能同时包含 100 个单词与 15 个短语卡片，
-          // 沿用设置里的 2000 token 会让结构化输出被截断。
-          maxOutputTokens: math.max(
-            _config.ai.maxOutputTokens,
-            articleAiMaxOutputTokens,
-          ),
+          schema: wordsOnly
+              ? articleAiWordOnlyJsonSchema
+              : articleAiSelectionJsonSchema,
+          maxOutputTokens: math.max(_config.ai.maxOutputTokens, tokenFloor),
           temperature: _config.ai.temperature,
           thinkingEnabled: _config.ai.thinkingEnabled,
           thinkingBudgetTokens: _config.ai.thinkingBudgetTokens,

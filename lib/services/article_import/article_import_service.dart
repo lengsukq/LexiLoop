@@ -34,6 +34,7 @@ import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
 import 'package:lexiloop/services/article_import/article_ai_selector.dart';
+import 'package:lexiloop/services/dictionary/selection.dart';
 import 'package:lexiloop/services/learning_progress_reset.dart';
 import 'package:lexiloop/services/settings_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
@@ -66,6 +67,8 @@ class ArticleImportService {
     String sourceLanguage = articleDefaultSourceLanguage,
     String targetLanguage = articleDefaultTargetLanguage,
     List<VocabularyLevel>? examTargets,
+    ArticleDifficultyMode difficultyMode = ArticleDifficultyMode.atOrAbove,
+    ArticleExtractScope extractScope = ArticleExtractScope.wordsOnly,
   }) async {
     final rawText = _clampArticleText(articleText);
     final extraction = extractArticleTerms(
@@ -84,6 +87,8 @@ class ArticleImportService {
       targetLanguage: targetLanguage,
       cleaned: extraction.cleaned,
       examTargets: examTargets,
+      difficultyMode: difficultyMode,
+      extractScope: extractScope,
     );
     final outcome = await _applyAiSelection(
       context: context,
@@ -111,6 +116,8 @@ class ArticleImportService {
     required int segmentsPerBatch,
     required int now,
     List<VocabularyLevel>? examTargets,
+    ArticleDifficultyMode difficultyMode = ArticleDifficultyMode.atOrAbove,
+    ArticleExtractScope extractScope = ArticleExtractScope.wordsOnly,
   }) {
     final plan = buildArticleSegmentPlan(
       articleText,
@@ -121,8 +128,12 @@ class ArticleImportService {
       _driveBatches(
         controller: controller,
         plan: plan,
-        examTargets: examTargets,
-        now: now,
+        options: _SegmentOptions(
+          examTargets: examTargets,
+          difficultyMode: difficultyMode,
+          extractScope: extractScope,
+          now: now,
+        ),
       ),
     );
     return controller.stream;
@@ -189,6 +200,8 @@ class ArticleImportService {
     required ImportMode mode,
     required int now,
     bool resetLearningProgress = false,
+    bool includeSourceSentence = true,
+    List<String> tags = const <String>[],
   }) async {
     _purgeExpired(now);
     final preview = _previews.remove(previewToken);
@@ -205,19 +218,26 @@ class ArticleImportService {
         details: '请至少选择一个词条再导入。',
       );
     }
-    final resetAt = resetAtFor(
-      mode,
-      requested: resetLearningProgress,
+    final settings = await _settings.load();
+    final options = _CommitOptions(
+      preview: preview,
+      mode: mode,
       now: now,
+      resetAt: resetAtFor(mode, requested: resetLearningProgress, now: now),
+      includeSourceSentence: includeSourceSentence,
+      tags: _cleanTags(tags),
+      dictionaryProviders: _dictionaryProvidersFor(settings),
     );
     final counters = _CommitCounters();
     for (final candidate in selected) {
-      await _commitCandidate(candidate, preview, mode, counters, now, resetAt);
+      await _commitCandidate(candidate, options, counters);
     }
     return ArticleCommitResult(
       createdWords: counters.created,
       existingWords: counters.existing,
       queuedInitializations: counters.queued,
+      createdWordIds: List<int>.unmodifiable(counters.createdWordIds),
+      affectedWordIds: List<int>.unmodifiable(counters.affectedWordIds),
     );
   }
 
@@ -245,6 +265,8 @@ class ArticleImportService {
     required String targetLanguage,
     required String cleaned,
     required List<VocabularyLevel>? examTargets,
+    required ArticleDifficultyMode difficultyMode,
+    required ArticleExtractScope extractScope,
   }) async {
     final settings = await _settings.load();
     return _PreviewContext(
@@ -252,25 +274,28 @@ class ArticleImportService {
       targetLanguage: targetLanguage,
       existing: await _existingTerms(sourceLanguage, targetLanguage),
       sentences: _candidateSentences(cleaned),
-      // 旧版 `settings.examTargets ?? (vocabularyLevel !== AUTO ? [level] : [])`
-      // 的回退分支不可达：设置层保证 `examTargets` 恒为数组。
       examTargets: examTargets ?? settings.examTargets,
+      difficultyMode: difficultyMode,
+      extractScope: extractScope,
     );
   }
 
   /// 该语言方向下的全部已有词条（归一化词形 + 内容类型）。
   ///
-  /// 一次读回而不是逐词查：旧版 `createArticlePreview` 也是整表读一次，
-  /// 逐词查会让 200 个候选产生 200 次查询。
+  /// 兼容历史 CSV 导入写成 `'zh'` 的旧数据：目标语言为 `'zh-CN'` 时一并
+  /// 纳入判重，避免已导入的词在文章分词里重复显示为生词。
   Future<List<_ExistingTerm>> _existingTerms(
     String sourceLanguage,
     String targetLanguage,
   ) async {
+    final targets = targetLanguage == 'zh-CN'
+        ? const <String>['zh-CN', 'zh']
+        : <String>[targetLanguage];
     final query = _db.select(_db.words)
       ..where(
         (table) =>
             table.sourceLanguage.equals(sourceLanguage) &
-            table.targetLanguage.equals(targetLanguage),
+            table.targetLanguage.isIn(targets),
       );
     final rows = await query.get();
     return <_ExistingTerm>[
@@ -349,6 +374,8 @@ class ArticleImportService {
         ],
         totalKnown: context.existing.length,
         examTargets: context.examTargets,
+        difficultyMode: context.difficultyMode,
+        extractScope: context.extractScope,
       ),
     );
     if (!result.applied) {
@@ -363,6 +390,7 @@ class ArticleImportService {
       candidates: candidates,
       result: result,
       context: context,
+      cleanedArticle: extraction.cleaned,
       fallbackTerms: fallbackTerms,
     );
   }
@@ -371,35 +399,39 @@ class ArticleImportService {
     required List<ArticleCandidate> candidates,
     required ArticleAiSelection result,
     required _PreviewContext context,
+    required String cleanedArticle,
     required List<String> fallbackTerms,
   }) {
-    final byTerm = <String, ArticleAiWord>{
-      for (final word in result.words)
-        articleNormalizedLookupKey(word.term): word,
-    };
-    final withMeta = <ArticleCandidate>[
-      for (final candidate in candidates)
-        _withAiMeta(
-          candidate,
-          byTerm[articleNormalizedLookupKey(candidate.term)],
-        ),
-    ];
+    final knownWords = _knownWordKeys(context.existing);
+    final matchedAi = <String>{};
+    final words = _mergeAiWords(
+      candidates: candidates,
+      aiWords: result.words,
+      context: context,
+      cleanedLower: cleanedArticle.toLowerCase(),
+      knownWords: knownWords,
+      matchedAi: matchedAi,
+    );
     final selected = <String>{
-      for (final word in result.words) articleNormalizedLookupKey(word.term),
+      for (final word in result.words)
+        articleNormalizedLookupKey(
+          normalizeTerm(word.term, context.sourceLanguage),
+        ),
     };
     final recommended = result.words.isEmpty
         ? fallbackTerms
         : <String>[
-            for (final candidate in withMeta)
-              if (selected.contains(
-                articleNormalizedLookupKey(candidate.normalizedTerm),
-              ))
+            for (final candidate in words)
+              if (candidate.isCandidate &&
+                  selected.contains(
+                    articleNormalizedLookupKey(candidate.normalizedTerm),
+                  ))
                 candidate.normalizedTerm.toLowerCase(),
           ];
     final merged = <ArticleCandidate>[
-      ...withMeta,
-      ..._aiPhraseCandidates(result, context, withMeta),
-      ..._aiSentenceCandidates(result, context, withMeta),
+      ...words,
+      ..._aiPhraseCandidates(result, context, words),
+      ..._aiSentenceCandidates(result, context, words),
     ];
     return _AiOutcome(
       candidates: merged,
@@ -409,11 +441,133 @@ class ArticleImportService {
     );
   }
 
-  /// 把 AI 的单词元数据（理由 / 难度 / CEFR / 词频）写回候选。
-  ///
-  /// 旧版先按 `term.toLowerCase()` 匹配，再按 NFKC 归一化后的词形匹配——
-  /// 两套键都要试，否则「AI 返回 `Apple`、候选是 `apple`」这类大小写差异
-  /// 会让元数据整体丢失。
+  /// 合并 LLM 分词结果与本地词形：支持词形还原（surface → lemma）与
+  /// 正文直接抽取（不被 top-200 词频截断丢弃）。
+  List<ArticleCandidate> _mergeAiWords({
+    required List<ArticleCandidate> candidates,
+    required List<ArticleAiWord> aiWords,
+    required _PreviewContext context,
+    required String cleanedLower,
+    required Set<String> knownWords,
+    required Set<String> matchedAi,
+  }) {
+    final byTerm = <String, ArticleAiWord>{};
+    final bySurface = <String, ArticleAiWord>{};
+    for (final word in aiWords) {
+      byTerm[articleNormalizedLookupKey(word.term)] = word;
+      final surface = word.surfaceForm;
+      if (surface != null && surface.isNotEmpty) {
+        bySurface[articleNormalizedLookupKey(surface)] = word;
+      }
+    }
+    final mapped = <ArticleCandidate>[
+      for (final candidate in candidates)
+        _mapWordCandidate(
+          candidate: candidate,
+          byTerm: byTerm,
+          bySurface: bySurface,
+          context: context,
+          knownWords: knownWords,
+          matchedAi: matchedAi,
+        ),
+    ];
+    for (final word in aiWords) {
+      final key = articleNormalizedLookupKey(word.term);
+      if (matchedAi.contains(key)) continue;
+      if (!_wordAppearsInArticle(word, cleanedLower)) continue;
+      mapped.add(_newAiWordCandidate(word, context, knownWords));
+    }
+    return mergeArticleCandidates(mapped);
+  }
+
+  ArticleCandidate _mapWordCandidate({
+    required ArticleCandidate candidate,
+    required Map<String, ArticleAiWord> byTerm,
+    required Map<String, ArticleAiWord> bySurface,
+    required _PreviewContext context,
+    required Set<String> knownWords,
+    required Set<String> matchedAi,
+  }) {
+    final key = articleNormalizedLookupKey(candidate.term);
+    final direct = byTerm[key];
+    if (direct != null) {
+      matchedAi.add(articleNormalizedLookupKey(direct.term));
+      return _withAiMeta(candidate, direct);
+    }
+    final lemmatized = bySurface[key];
+    if (lemmatized == null) return candidate;
+    matchedAi.add(articleNormalizedLookupKey(lemmatized.term));
+    final normalized = normalizeTerm(lemmatized.term, context.sourceLanguage);
+    final isKnown = knownWords.contains(articleNormalizedLookupKey(normalized));
+    return ArticleCandidate(
+      term: lemmatized.term,
+      normalizedTerm: normalized,
+      occurrences: candidate.occurrences,
+      status: isKnown
+          ? ArticleCandidateStatus.known
+          : ArticleCandidateStatus.candidate,
+      entryType: LexicalContentType.word,
+      sourceSentence:
+          candidate.sourceSentence ??
+          _sentenceForWord(lemmatized, context.sentences),
+      surfaceForm: lemmatized.surfaceForm ?? candidate.term,
+      aiReason: lemmatized.reason,
+      difficulty: lemmatized.difficulty,
+      cefrLevel: lemmatized.cefrLevel,
+      frequency: lemmatized.frequency,
+      examTags: lemmatized.examTags,
+    );
+  }
+
+  ArticleCandidate _newAiWordCandidate(
+    ArticleAiWord word,
+    _PreviewContext context,
+    Set<String> knownWords,
+  ) {
+    final normalized = normalizeTerm(word.term, context.sourceLanguage);
+    final isKnown = knownWords.contains(articleNormalizedLookupKey(normalized));
+    return ArticleCandidate(
+      term: word.term,
+      normalizedTerm: normalized,
+      occurrences: 1,
+      status: isKnown
+          ? ArticleCandidateStatus.known
+          : ArticleCandidateStatus.candidate,
+      entryType: LexicalContentType.word,
+      sourceSentence: _sentenceForWord(word, context.sentences),
+      surfaceForm: word.surfaceForm,
+      aiReason: word.reason,
+      difficulty: word.difficulty,
+      cefrLevel: word.cefrLevel,
+      frequency: word.frequency,
+      examTags: word.examTags,
+    );
+  }
+
+  bool _wordAppearsInArticle(ArticleAiWord word, String cleanedLower) {
+    if (cleanedLower.contains(word.term.toLowerCase())) return true;
+    final surface = word.surfaceForm;
+    return surface != null &&
+        surface.isNotEmpty &&
+        cleanedLower.contains(surface.toLowerCase());
+  }
+
+  String? _sentenceForWord(ArticleAiWord word, List<String> sentences) {
+    final surface = word.surfaceForm;
+    if (surface != null && surface.isNotEmpty) {
+      final hit = _sentenceFor(surface, sentences);
+      if (hit != null) return hit;
+    }
+    return _sentenceFor(word.term, sentences);
+  }
+
+  Set<String> _knownWordKeys(List<_ExistingTerm> existing) => <String>{
+    for (final term in existing)
+      if (term.contentType == LexicalContentType.word)
+        articleNormalizedLookupKey(term.normalizedTerm),
+  };
+
+  /// 把 AI 的单词元数据（理由 / 难度 / CEFR / 词频 / 变形 / 考试标签）写回候选。
   ArticleCandidate _withAiMeta(
     ArticleCandidate candidate,
     ArticleAiWord? meta,
@@ -426,10 +580,12 @@ class ArticleImportService {
       status: candidate.status,
       entryType: candidate.entryType,
       sourceSentence: candidate.sourceSentence,
+      surfaceForm: meta.surfaceForm ?? candidate.surfaceForm,
       aiReason: meta.reason,
       difficulty: meta.difficulty,
       cefrLevel: meta.cefrLevel,
       frequency: meta.frequency,
+      examTags: meta.examTags.isEmpty ? candidate.examTags : meta.examTags,
       aiCard: candidate.aiCard,
     );
   }
@@ -557,8 +713,7 @@ class ArticleImportService {
   Future<void> _driveBatches({
     required StreamController<ArticleSegmentOutcome> controller,
     required ArticleSegmentPlan plan,
-    required List<VocabularyLevel>? examTargets,
-    required int now,
+    required _SegmentOptions options,
   }) async {
     final texts = <String, String>{
       for (final segment in plan.segments) segment.id: segment.text,
@@ -569,9 +724,7 @@ class ArticleImportService {
         final index = next;
         next += 1;
         if (index >= plan.batches.length) return;
-        controller.add(
-          await _runBatch(plan.batches[index], texts, examTargets, now),
-        );
+        controller.add(await _runBatch(plan.batches[index], texts, options));
       }
     }
 
@@ -589,8 +742,7 @@ class ArticleImportService {
   Future<ArticleSegmentOutcome> _runBatch(
     ArticleBatch batch,
     Map<String, String> texts,
-    List<VocabularyLevel>? examTargets,
-    int now,
+    _SegmentOptions options,
   ) async {
     try {
       final combined = <String>[
@@ -600,8 +752,10 @@ class ArticleImportService {
         batchIndex: batch.batchIndex,
         preview: await preview(
           articleText: combined,
-          examTargets: examTargets,
-          now: now,
+          examTargets: options.examTargets,
+          difficultyMode: options.difficultyMode,
+          extractScope: options.extractScope,
+          now: options.now,
         ),
       );
     } on AppError catch (error) {
@@ -803,107 +957,127 @@ class ArticleImportService {
 
   Future<void> _commitCandidate(
     ArticleCandidate candidate,
-    ArticleImportPreview preview,
-    ImportMode mode,
+    _CommitOptions options,
     _CommitCounters counters,
-    int now,
-    int? resetAt,
   ) async {
     try {
       final wordId = await _words.create(
-        draft: _draftFor(candidate, preview),
-        now: now,
+        draft: _draftFor(candidate, options),
+        now: options.now,
       );
       counters.created += 1;
+      counters.createdWordIds.add(wordId);
+      counters.affectedWordIds.add(wordId);
       await _words.enqueueInitialization(
         wordId: wordId,
-        now: now,
-        // 旧版新词条用 `SKIP_INITIALIZED` + 优先级 10：新建词条通常没有内容，
-        // 「已有内容则跳过」等价于「全部补全」，而优先级要压过其他自动任务。
+        now: options.now,
         mode: InitializationMode.skipInitialized,
         priority: jobPriorityNewWord,
+        requestedProviders: options.dictionaryProviders,
       );
-      // 旧版 `commitImport` 入队后还会 `markWordInitializationQueued`：
-      // 新词条的初始状态是 `PENDING`（还没排队），入队成功却不改状态的话，
-      // 词库页按状态筛选时这批词条会一直显示成「待初始化」。
       await _words.markInitializationQueuedIfNoDefinition(
         wordId: wordId,
-        now: now,
+        now: options.now,
       );
       counters.queued += 1;
     } on ConflictError catch (error) {
       if (error.code != AppErrorCode.termAlreadyExists) rethrow;
       counters.existing += 1;
-      await _enqueueExisting(candidate, preview, mode, now, resetAt);
+      await _enqueueExisting(candidate, options, counters);
     }
   }
 
   /// 已有词条按导入模式入队。
-  ///
-  /// 语义与旧版 `commitImport` 一致：活跃任务按强弱升级、优先级只升不降
-  /// （`WordEditService.enqueueInitialization` 负责），入队后把无释义词条
-  /// 标成 `QUEUED`（`markInitializationQueuedIfNoDefinition`）。
-  ///
-  /// **这里的入队不计入 `queuedInitializations`**：插入是否真的发生不可观测，
-  /// 而对已有词条来说「已存在活跃任务」是常态，计进去只会让界面报出一个
-  /// 并不存在的数字。旧版是拿 `enqueueJob` 的返回值计数的，本版没有等价
-  /// 返回值——宁可少报，也不报一个假的。
   Future<void> _enqueueExisting(
     ArticleCandidate candidate,
-    ArticleImportPreview preview,
-    ImportMode mode,
-    int now,
-    int? resetAt,
+    _CommitOptions options,
+    _CommitCounters counters,
   ) async {
-    final initializationMode = switch (mode) {
+    final initializationMode = switch (options.mode) {
       ImportMode.skipExisting => null,
       ImportMode.fillMissing => InitializationMode.fillMissingFields,
       ImportMode.forceDictionaryRefresh => InitializationMode.forceOverwrite,
     };
     final wordId = await _words.findByTerm(
       term: candidate.term,
-      sourceLanguage: preview.sourceLanguage,
-      targetLanguage: preview.targetLanguage,
+      sourceLanguage: options.preview.sourceLanguage,
+      targetLanguage: options.preview.targetLanguage,
     );
     if (wordId == null) return;
-    // 重置学习进度与「是否入队」无关：旧版在 `SKIP_EXISTING` 之外的任何
-    // 模式、以及任何命中已有词条的行上都会执行它。所以这一步必须放在
-    // `initializationMode == null` 的提前返回**之前**。
-    if (resetAt != null) {
-      await resetLearningProgressNow(db: _db, wordId: wordId, now: resetAt);
+    if (options.resetAt != null) {
+      await resetLearningProgressNow(
+        db: _db,
+        wordId: wordId,
+        now: options.resetAt!,
+      );
     }
     if (initializationMode == null) return;
+    counters.affectedWordIds.add(wordId);
     await _words.enqueueInitialization(
       wordId: wordId,
-      now: now,
+      now: options.now,
       mode: initializationMode,
-      priority: mode == ImportMode.forceDictionaryRefresh
+      priority: options.mode == ImportMode.forceDictionaryRefresh
           ? jobPriorityForceOverwrite
           : jobPriorityFillMissing,
+      requestedProviders: options.dictionaryProviders,
     );
     await _words.markInitializationQueuedIfNoDefinition(
       wordId: wordId,
-      now: now,
+      now: options.now,
     );
   }
 
-  /// 词条草稿。
-  ///
-  /// **与旧版的差异（有意）**：旧版只写 `words` 行、把 AI 卡片留在
-  /// `import_rows.raw_json` 里，结果短语与句子永远等不到内容——词典 provider
-  /// 给不出句子的释义，词条会一直停在 `PENDING`，进不了学习队列。
-  /// 本版把 AI 卡片的意译（缺失时用直译）作为初始释义写入，使导入的短语与
-  /// 句子立刻可用；单词没有 AI 释义，仍然保持空释义交给初始化队列。
-  WordDraft _draftFor(
-    ArticleCandidate candidate,
-    ArticleImportPreview preview,
-  ) => WordDraft(
-    term: candidate.term,
-    contentType: candidate.entryType,
-    sourceLanguage: preview.sourceLanguage,
-    targetLanguage: preview.targetLanguage,
-    definitions: _definitionsFor(candidate),
-  );
+  /// 词条草稿：保留原文出处例句（可选）与批次标签，单词释义留空交由有道查词补全。
+  WordDraft _draftFor(ArticleCandidate candidate, _CommitOptions options) {
+    final sourceSentence = candidate.sourceSentence?.trim() ?? '';
+    final examples =
+        options.includeSourceSentence &&
+            sourceSentence.isNotEmpty &&
+            candidate.entryType != LexicalContentType.sentence
+        ? <WordExampleDraft>[
+            WordExampleDraft(
+              sentence: sourceSentence,
+              source: 'article',
+              isUserAdded: true,
+            ),
+          ]
+        : const <WordExampleDraft>[];
+    return WordDraft(
+      term: candidate.term,
+      contentType: candidate.entryType,
+      sourceLanguage: options.preview.sourceLanguage,
+      targetLanguage: options.preview.targetLanguage,
+      definitions: _definitionsFor(candidate),
+      examples: examples,
+      tags: options.tags,
+    );
+  }
+
+  List<String>? _dictionaryProvidersFor(AppSettings settings) {
+    final p = settings.providers;
+    final enabled = <String>[
+      if (p.youdaoEnabled) 'youdao',
+      if (p.icibaEnabled) 'iciba',
+      if (p.merriamWebsterEnabled) 'merriam-webster',
+      if (p.dictionaryApiEnabled) 'dictionaryapi.dev',
+      if (p.myMemoryEnabled) 'mymemory',
+    ];
+    final ordered = <String>[
+      for (final id in defaultTranslationProviderOrder)
+        if (enabled.contains(id)) id,
+    ];
+    return ordered.isEmpty ? null : ordered;
+  }
+
+  List<String> _cleanTags(List<String> tags) {
+    final out = <String>[];
+    for (final raw in tags) {
+      final tag = raw.trim();
+      if (tag.isNotEmpty && !out.contains(tag)) out.add(tag);
+    }
+    return List<String>.unmodifiable(out);
+  }
 
   List<String> _definitionsFor(ArticleCandidate candidate) {
     final card = candidate.aiCard;
@@ -1010,6 +1184,8 @@ class _PreviewContext {
     required this.existing,
     required this.sentences,
     required this.examTargets,
+    required this.difficultyMode,
+    required this.extractScope,
   });
 
   final String sourceLanguage;
@@ -1017,6 +1193,44 @@ class _PreviewContext {
   final List<_ExistingTerm> existing;
   final List<String> sentences;
   final List<VocabularyLevel> examTargets;
+  final ArticleDifficultyMode difficultyMode;
+  final ArticleExtractScope extractScope;
+}
+
+/// 分段并发预览的公共参数。
+class _SegmentOptions {
+  const new({
+    required this.examTargets,
+    required this.difficultyMode,
+    required this.extractScope,
+    required this.now,
+  });
+
+  final List<VocabularyLevel>? examTargets;
+  final ArticleDifficultyMode difficultyMode;
+  final ArticleExtractScope extractScope;
+  final int now;
+}
+
+/// 提交选项。
+class _CommitOptions {
+  const new({
+    required this.preview,
+    required this.mode,
+    required this.now,
+    required this.resetAt,
+    required this.includeSourceSentence,
+    required this.tags,
+    required this.dictionaryProviders,
+  });
+
+  final ArticleImportPreview preview;
+  final ImportMode mode;
+  final int now;
+  final int? resetAt;
+  final bool includeSourceSentence;
+  final List<String> tags;
+  final List<String>? dictionaryProviders;
 }
 
 /// 一条已有词条（只取判定 KNOWN 需要的两列）。
@@ -1047,4 +1261,6 @@ class _CommitCounters {
   int created = 0;
   int existing = 0;
   int queued = 0;
+  final List<int> createdWordIds = <int>[];
+  final List<int> affectedWordIds = <int>[];
 }

@@ -29,13 +29,11 @@ class ArticleStrategyCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
     final state = ref.watch(articleWizardProvider);
     final notifier = ref.read(articleWizardProvider.notifier);
-    final canCommit =
-        state.selection.selected.isNotEmpty &&
-        state.analysis.finalToken != null;
     return ArticleSectionCard(
-      title: '导入策略',
+      title: '导入与查词策略',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -46,6 +44,43 @@ class ArticleStrategyCard extends ConsumerWidget {
               onTap: () => notifier.setMode(mode),
             ),
           const SizedBox(height: articleTightGap),
+          CheckboxListTile(
+            key: const Key('articleIncludeSourceSentence'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: state.selection.includeSourceSentence,
+            onChanged: (next) =>
+                notifier.setIncludeSourceSentence(value: next ?? true),
+            title: Text(
+              '保留文章原文出处作为例句',
+              style: LexiType.body.copyWith(color: colors.label),
+            ),
+            subtitle: Text(
+              '复习时可直接回忆当时读到的上下文；不影响有道词典补充双语例句。',
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+            ),
+          ),
+          const SizedBox(height: articleTightGap),
+          TextField(
+            key: const Key('articleBatchTags'),
+            onChanged: notifier.setBatchTagsText,
+            style: LexiType.body.copyWith(color: colors.label),
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: '本批标签（可选）',
+              hintText: '例如：经济学人, 雅思阅读（逗号或空格分隔）',
+              hintStyle: LexiType.footnote.copyWith(
+                color: colors.tertiaryLabel,
+              ),
+              filled: true,
+              fillColor: colors.fill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(LexiRadius.md),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: articleTightGap),
           ResetProgressOption(
             value: state.selection.resetLearningProgress,
             onChanged: (next) => notifier.setResetLearningProgress(value: next),
@@ -54,18 +89,6 @@ class ArticleStrategyCard extends ConsumerWidget {
             const SizedBox(height: articleTightGap),
             ArticleErrorBanner(message: state.error!),
           ],
-          const SizedBox(height: articleCardGap),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              key: const Key('articleCommit'),
-              onPressed: canCommit
-                  ? () => _commitWithConfirm(context, notifier, state)
-                  : null,
-              icon: const Icon(LucideIcons.arrowRight, size: 16),
-              label: Text('确认导入 ${state.selection.selected.length} 个'),
-            ),
-          ),
         ],
       ),
     );
@@ -149,14 +172,8 @@ String articleModeDescription(ImportMode mode) => switch (mode) {
   ImportMode.forceDictionaryRefresh => '重新查询已有词条的词典内容，但保留学习进度。',
 };
 
-/// 提交前把「重置学习进度」的确认补上。
-///
-/// **同一件事在两条路径上谨慎度不同**：CSV 导入在提交时会弹一个
-/// 不可撤销确认（`import_page.dart` 的 `_ResetProgressDialog`），
-/// 而文章导入这边勾上就直接写——勾选框本身只是一次点击，很容易
-/// 在滚动候选词的时候被顺手带上。这里对齐成同一条规则：
-/// 只要勾了「重置学习进度」，提交前必须再确认一次。
-Future<void> _commitWithConfirm(
+/// 提交前把「重置学习进度」的确认补上，供底部吸底栏调用。
+Future<void> commitArticleWithConfirm(
   BuildContext context,
   ArticleWizardNotifier notifier,
   ArticleWizardState state,

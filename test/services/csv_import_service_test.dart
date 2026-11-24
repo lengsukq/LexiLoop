@@ -14,7 +14,9 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/data/import/content_payload.dart';
+import 'package:lexiloop/data/import/csv_columns.dart';
 import 'package:lexiloop/data/import/import_models.dart';
+import 'package:lexiloop/data/import/wordlist_parser.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/services/csv_import_service.dart';
 import 'package:lexiloop/services/settings_service.dart';
@@ -138,6 +140,68 @@ void main() {
       final result = await preview('单词,释义\ncat,猫\n\n');
       expect(result.skippedCount, 1);
       expect(await countOf('import_rows'), 1);
+    });
+
+    test('支持纯文本词表（.txt）与批次标签，且兼容历史 zh 判重', () async {
+      await insertWord(term: 'banana');
+      final result = await service.previewFromContent(
+        '1. apple | 苹果\n2. banana\n',
+        filename: 'ielts_list.txt',
+        sourceLanguage: 'en',
+        targetLanguage: 'zh-CN',
+        extraTags: const <String>['IELTS', '高频'],
+        now: now,
+      );
+
+      expect(result.totalRows, 2);
+      expect(result.newRows, 1);
+      expect(result.existingRows, 1);
+
+      await service.commit(
+        batchId: result.batchId,
+        mode: ImportMode.skipExisting,
+        resetLearningProgress: false,
+        now: now,
+      );
+      final words = await db.select(db.words).get();
+      final apple = words.firstWhere((w) => w.term == 'apple');
+      final content = await contentOf(apple.id);
+      expect(jsonDecode(content.tagsJson), <Object?>['IELTS', '高频']);
+    });
+
+    test('无标准表头 CSV 抛 csvMissingHeaders 并附带列映射草稿，可手工映射预览', () async {
+      const raw = 'Col1,Col2\nubiquitous,无处不在的\n';
+      CsvColumnMappingDraft? draft;
+      try {
+        await service.previewFromContent(
+          raw,
+          filename: 'custom.csv',
+          sourceLanguage: 'en',
+          targetLanguage: 'zh-CN',
+          now: now,
+        );
+        fail('应抛出 csvMissingHeaders');
+      } on ValidationError catch (error) {
+        expect(error.code, AppErrorCode.csvMissingHeaders);
+        draft = error.details as CsvColumnMappingDraft?;
+      }
+      expect(draft, isNotNull);
+      expect(draft!.headers, <String>['Col1', 'Col2']);
+
+      final mapped = await service.previewWithColumnMap(
+        draft.content,
+        filename: draft.filename,
+        sourceLanguage: 'en',
+        targetLanguage: 'zh-CN',
+        columns: const <CsvField, int>{
+          CsvField.term: 0,
+          CsvField.definition: 1,
+        },
+        extraTags: const <String>['映射导入'],
+        now: now,
+      );
+      expect(mapped.totalRows, 1);
+      expect(mapped.newRows, 1);
     });
   });
 

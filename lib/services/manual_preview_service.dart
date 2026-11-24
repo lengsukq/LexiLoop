@@ -34,6 +34,7 @@ import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/domain/text/normalizer.dart';
 import 'package:lexiloop/services/dictionary/merge.dart';
 import 'package:lexiloop/services/dictionary/pipeline.dart';
+import 'package:lexiloop/services/llm/llm_config.dart';
 import 'package:lexiloop/services/settings_service.dart';
 import 'package:lexiloop/services/word_edit_service.dart';
 
@@ -242,10 +243,9 @@ class ManualPreviewService {
     return result;
   }
 
-  /// 只用有道查一次；失败（`FAILED`）时再用 AI 兜底一次。
+  /// 只用有道查一次；失败（`FAILED`）且用户开启了 AI 兜底查词时，再用 AI 兜底一次。
   ///
-  /// 两次都失败时抛 [AppErrorCode.requestedFieldsEmpty]，可操作原因写进
-  /// `details`。
+  /// 仍失败时抛 [AppErrorCode.requestedFieldsEmpty]，可操作原因写进 `details`。
   Future<_ResolvedLookup> _resolveLookup({
     required String term,
     required LexicalContentType type,
@@ -253,6 +253,7 @@ class ManualPreviewService {
     required String targetLanguage,
   }) async {
     final settings = await _settings.load();
+    final llmConfig = llmConfigFromSettings(settings.raw);
     final request = _request(
       term: term,
       type: type,
@@ -268,7 +269,10 @@ class ManualPreviewService {
     var attempts = primary.result.attempts;
     final youdaoUnavailable = primary.unavailableReason;
     String? aiUnavailable;
-    if (contentStatus(content, type) == InitializationStatus.failed) {
+    final triedAi =
+        contentStatus(content, type) == InitializationStatus.failed &&
+        llmConfig.canDictionaryFallback;
+    if (triedAi) {
       final fallback = await _tryLookup(
         settings: settings,
         request: request,
@@ -284,7 +288,11 @@ class ManualPreviewService {
     if (contentStatus(content, type) == InitializationStatus.failed) {
       throw ExternalServiceError(
         AppErrorCode.requestedFieldsEmpty,
-        details: _emptyPreviewReason(youdaoUnavailable, aiUnavailable),
+        details: _emptyPreviewReason(
+          youdaoUnavailable,
+          aiUnavailable,
+          triedAi: triedAi,
+        ),
       );
     }
     return _ResolvedLookup(content: content, attempts: attempts);
@@ -689,14 +697,21 @@ const String _previewMissingReason = '预览不存在，请重新生成。';
 /// 前半句与旧版 `DICTIONARY_PREVIEW_EMPTY` 的文案逐字一致，括号里补上
 /// 「查过谁、为什么还是没内容」——旧版只报「请调整输入」，用户无从判断
 /// 该改输入、该换语言，还是该去设置里配 AI。
-String _emptyPreviewReason(String? youdaoReason, String? aiReason) {
+String _emptyPreviewReason(
+  String? youdaoReason,
+  String? aiReason, {
+  required bool triedAi,
+}) {
   final notes = <String>[
     if (youdaoReason != null) '有道词典不可用：$youdaoReason',
     if (aiReason != null) 'AI 兜底不可用：$aiReason',
   ];
   if (notes.isEmpty) {
-    return '词典没有返回可用释义，请调整输入或稍后重试。'
-        '（已查有道词典并用 AI 兜底，两次都没有可用内容。）';
+    return triedAi
+        ? '词典没有返回可用释义，请调整输入或稍后重试。'
+              '（已查有道词典并用 AI 兜底，两次都没有可用内容。）'
+        : '词典没有返回可用释义，请调整输入或稍后重试。'
+              '（当前仅使用有道词典查词，未返回可用内容。）';
   }
   return '词典没有返回可用释义，请调整输入或稍后重试。'
       '（${notes.join('；')}）';

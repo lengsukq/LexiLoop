@@ -13,14 +13,18 @@ import 'package:lexiloop/data/db/daos/settings_dao.dart';
 import 'package:lexiloop/data/db/daos/study_dao.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/data/db/daos/word_pack_dao.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/data/dictionary/http_fetcher.dart';
+import 'package:lexiloop/data/word_packs/word_pack_downloader.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/services/audio/audio_cache.dart';
 import 'package:lexiloop/services/audio/audio_downloader.dart';
 import 'package:lexiloop/services/audio/audio_player_port.dart';
+import 'package:lexiloop/services/audio/audio_precache_service.dart';
 import 'package:lexiloop/services/audio/direct_edge_tts.dart';
 import 'package:lexiloop/services/audio/just_audio_engine.dart';
+import 'package:lexiloop/services/audio/speech_disk_cache.dart';
 import 'package:lexiloop/services/audio/word_speaker.dart';
 import 'package:lexiloop/services/dictionary/lookup_service.dart';
 import 'package:lexiloop/services/initialization/initialization_maintenance.dart';
@@ -32,6 +36,7 @@ import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/settings_service.dart';
 import 'package:lexiloop/services/study_service.dart';
 import 'package:lexiloop/services/tts_service.dart';
+import 'package:lexiloop/services/word_packs/word_pack_install_service.dart';
 
 /// 词条查询。
 final Provider<WordDao> wordDaoProvider = Provider<WordDao>(
@@ -42,6 +47,30 @@ final Provider<WordDao> wordDaoProvider = Provider<WordDao>(
 final Provider<WordDetailDao> wordDetailDaoProvider = Provider<WordDetailDao>(
   (ref) => WordDetailDao(ref.watch(databaseProvider)),
 );
+
+/// 词书包元信息与进度查询。
+final Provider<WordPackDao> wordPackDaoProvider = Provider<WordPackDao>(
+  (ref) => WordPackDao(ref.watch(databaseProvider)),
+);
+
+/// 词书包底层 HTTP 下载端口（测试可覆写）。
+final Provider<WordPackHttpPort> wordPackHttpPortProvider =
+    Provider<WordPackHttpPort>((ref) => DioWordPackHttpPort());
+
+/// 词书包多通道下载器。
+final Provider<WordPackDownloader> wordPackDownloaderProvider =
+    Provider<WordPackDownloader>(
+      (ref) => WordPackDownloader(ref.watch(wordPackHttpPortProvider)),
+    );
+
+/// 词书包安装、安全卸载与按需有道补全服务。
+final Provider<WordPackInstallService> wordPackInstallServiceProvider =
+    Provider<WordPackInstallService>(
+      (ref) => WordPackInstallService(
+        ref.watch(databaseProvider),
+        ref.watch(settingsServiceProvider),
+      ),
+    );
 
 /// 设置读写。
 final Provider<SettingsDao> settingsDaoProvider = Provider<SettingsDao>(
@@ -95,17 +124,52 @@ final Provider<TtsService> ttsServiceProvider = Provider<TtsService>(
 final Provider<AudioDownloadPort> audioDownloaderProvider =
     Provider<AudioDownloadPort>((ref) => DioAudioDownloader());
 
-/// 真人录音的内存 LRU 缓存（必须单例）。
+/// 统一离线语音磁盘缓存（原生端落盘，Web 端安全降级为空实现）。
+final Provider<SpeechDiskCachePort> speechDiskCacheProvider =
+    Provider<SpeechDiskCachePort>((ref) => createSpeechDiskCache());
+
+SpeechCachePolicy _speechCachePolicyOf(Ref ref) {
+  final playback = ref.exists(appSettingsProvider)
+      ? (ref.read(appSettingsProvider).value?.playback ??
+            PlaybackSettings.defaults)
+      : PlaybackSettings.defaults;
+  return SpeechCachePolicy(
+    enabled: playback.offlineAudioCacheEnabled,
+    maxBytes: playback.audioCacheMaxBytes,
+  );
+}
+
+/// 真人录音的二级缓存（L1 内存 LRU + L2 磁盘持久化，必须单例）。
 ///
 /// 缓存的价值全在「跨调用复用」上：构造多份等于每次播放都重新下载，
 /// 那就等于没有缓存。
 final Provider<AudioCache> audioCacheProvider = Provider<AudioCache>(
-  (ref) => AudioCache(ref.watch(audioDownloaderProvider)),
+  (ref) => AudioCache(
+    ref.watch(audioDownloaderProvider),
+    diskCache: ref.watch(speechDiskCacheProvider),
+    policy: () => _speechCachePolicyOf(ref),
+  ),
 );
 
-/// 直连 Edge TTS 生成器，默认无需账户或 Next.js 后端。
+/// 直连 Edge TTS 生成器，默认无需账户或后端，复用统一磁盘缓存。
 final Provider<DirectEdgeSpeechPort> directEdgeSpeechProvider =
-    Provider<DirectEdgeSpeechPort>((ref) => DirectEdgeSpeech());
+    Provider<DirectEdgeSpeechPort>(
+      (ref) => DirectEdgeSpeech(
+        diskCache: ref.watch(speechDiskCacheProvider),
+        policy: () => _speechCachePolicyOf(ref),
+      ),
+    );
+
+/// 词库离线语音批量预缓存服务。
+final Provider<AudioPrecacheService> audioPrecacheServiceProvider =
+    Provider<AudioPrecacheService>(
+      (ref) => AudioPrecacheService(
+        ref.watch(wordDaoProvider),
+        ref.watch(audioDownloaderProvider),
+        ref.watch(speechDiskCacheProvider),
+        edge: ref.watch(directEdgeSpeechProvider),
+      ),
+    );
 
 /// 音频播放器。
 ///

@@ -179,6 +179,7 @@ WHERE s.session_type = ?
   AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
   AND COALESCE(s.source_type, '') <> 'SENTENCE_REVIEW'
   AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+  AND COALESCE(s.source_type, '') NOT LIKE 'PACK:%'
   AND EXISTS (SELECT 1 FROM study_session_items i
               WHERE i.study_session_id = s.id AND i.status = 'PENDING')
 ORDER BY s.started_at DESC
@@ -193,6 +194,7 @@ WHERE s.completed_at IS NULL
   AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
   AND COALESCE(s.source_type, '') <> 'SENTENCE_REVIEW'
   AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+  AND COALESCE(s.source_type, '') NOT LIKE 'PACK:%'
   AND EXISTS (SELECT 1 FROM study_session_items i
               WHERE i.study_session_id = s.id AND i.status = 'PENDING'
                 AND i.task_type = ?)
@@ -410,8 +412,15 @@ class StudyDao implements DistractorSource {
     required int limit,
     required int now,
     required CandidateScope scope,
+    String? tag,
+    String? packId,
   }) {
-    final conditions = _candidateConditions(scope, now);
+    final conditions = _candidateConditions(
+      scope,
+      now,
+      tag: tag,
+      packId: packId,
+    );
     return _queryCandidates(
       '''
 SELECT $_candidateColumns,
@@ -446,8 +455,15 @@ LIMIT ?''',
     required int limit,
     required int now,
     required CandidateScope scope,
+    String? tag,
+    String? packId,
   }) {
-    final conditions = _candidateConditions(scope, now);
+    final conditions = _candidateConditions(
+      scope,
+      now,
+      tag: tag,
+      packId: packId,
+    );
     return _queryCandidates(
       '''
 SELECT $_candidateColumns
@@ -472,8 +488,35 @@ LIMIT ?''',
     required int limit,
     required int now,
     required CandidateScope scope,
+    String? tag,
+    String? packId,
   }) {
-    final conditions = _candidateConditions(scope, now);
+    final cleanPack = packId?.trim();
+    final hasPack = cleanPack != null && cleanPack.isNotEmpty;
+    final conditions = _candidateConditions(
+      scope,
+      now,
+      tag: tag,
+      packId: cleanPack,
+    );
+    if (hasPack) {
+      return _queryCandidates(
+        '''
+SELECT $_candidateColumns
+FROM words w
+JOIN word_pack_items pi ON pi.word_id = w.id AND pi.pack_id = ?
+LEFT JOIN review_cards c ON c.word_id = w.id
+WHERE c.word_id IS NULL
+${conditions.sql}
+ORDER BY pi.rank ASC, w.id ASC
+LIMIT ?''',
+        <Variable<Object>>[
+          Variable<String>(cleanPack),
+          ...conditions.variables,
+          Variable<int>(limit),
+        ],
+      );
+    }
     return _queryCandidates(
       '''
 SELECT $_candidateColumns
@@ -493,8 +536,15 @@ LIMIT ?''',
     required int now,
     required CandidateScope scope,
     required Set<int> excludedIds,
+    String? tag,
+    String? packId,
   }) {
-    final conditions = _candidateConditions(scope, now);
+    final conditions = _candidateConditions(
+      scope,
+      now,
+      tag: tag,
+      packId: packId,
+    );
     final exclusion = _excludeIds(excludedIds);
     return _queryCandidates(
       '''
@@ -565,6 +615,8 @@ ${conditions.sql}) AS fresh''',
     required int now,
     required CandidateScope scope,
     bool applyDailySoftQuota = false,
+    String? tag,
+    String? packId,
   }) async {
     final configured = await _configuredLimits();
     final soft = applyDailySoftQuota && scope == CandidateScope.lexical;
@@ -577,16 +629,22 @@ ${conditions.sql}) AS fresh''',
         limit: limits.due + buffer,
         now: now,
         scope: scope,
+        tag: tag,
+        packId: packId,
       ),
       wrong: await wrongCandidates(
         limit: limits.wrong + buffer,
         now: now,
         scope: scope,
+        tag: tag,
+        packId: packId,
       ),
       fresh: await newCandidates(
         limit: limits.fresh + buffer,
         now: now,
         scope: scope,
+        tag: tag,
+        packId: packId,
       ),
       limits: limits,
     );
@@ -609,6 +667,7 @@ SELECT i.task_type AS task_type, count(*) AS c
 FROM study_session_items i
 JOIN study_sessions s ON s.id = i.study_session_id
 WHERE s.session_type = ?
+  AND COALESCE(s.source_type, '') NOT LIKE 'PACK:%'
   AND (
     (i.status IN ('ANSWERED', 'SKIPPED') AND i.answered_at >= ?)
     OR (i.status = 'PENDING' AND s.started_at >= ?)
@@ -678,6 +737,7 @@ WHERE i.status = 'PENDING'
   AND COALESCE(w.content_type, w.entry_type) <> 'SENTENCE'
   AND COALESCE(s.source_type, '') <> 'MATCH_GAME'
   AND COALESCE(s.source_type, '') NOT LIKE 'GAME_%'
+  AND COALESCE(s.source_type, '') NOT LIKE 'PACK:%'
 GROUP BY category''',
           variables: <Variable<Object>>[
             Variable<int>(now),
@@ -818,8 +878,19 @@ WHERE i.status = 'PENDING'
   /// 先按 `session_type` 精确匹配，再退回「任意未完成会话里还有该任务类型
   /// 的待答题目」。只认 [sessionResumeTtlMs] 内开始的会话——更早的会话
   /// 应由 [expireStaleSessions] 收尾，恢复它们等于把过期题目塞回用户面前。
-  Future<int?> findResumableSession(StudyMode mode, int now) async {
+  Future<int?> findResumableSession(
+    StudyMode mode,
+    int now, {
+    String? packId,
+  }) async {
     final ttl = now - sessionResumeTtlMs;
+    final cleanPack = packId?.trim();
+    if (cleanPack != null && cleanPack.isNotEmpty) {
+      return await _resumableId(_resumableSpecialSql, <Variable<Object>>[
+        Variable<String>('$wordPackSessionSourcePrefix$cleanPack'),
+        Variable<int>(ttl),
+      ]);
+    }
     if (mode == StudyMode.aiRecommended || mode == StudyMode.sentenceReview) {
       return await _resumableId(_resumableSpecialSql, <Variable<Object>>[
         Variable<String>(mode.wire),
@@ -1606,14 +1677,55 @@ $_learnableSql$_meaningSql
 /// 参数顺序必须与 SQL 文本里的 `?` 顺序一致：可用性条件的两个占位符
 /// （跳过冷却、会话恢复期）排在最前，因为它们出现在 WHERE 子句里，
 /// 而 `LIMIT ?` 永远在最后。
-_Clause _candidateConditions(CandidateScope scope, int now) => _Clause(
-  '$_learnableSql${_scopeSql(scope)}${_meaningSqlFor(scope)}'
-  'AND $_availabilitySql',
-  <Variable<Object>>[
-    Variable<int>(now - skipCooldownMs),
-    Variable<int>(now - sessionResumeTtlMs),
-  ],
-);
+_Clause _candidateConditions(
+  CandidateScope scope,
+  int now, {
+  String? tag,
+  String? packId,
+}) {
+  final cleanTag = tag?.trim();
+  final hasTag = cleanTag != null && cleanTag.isNotEmpty;
+  final cleanPack = packId?.trim();
+  final hasPack = cleanPack != null && cleanPack.isNotEmpty;
+  final tagSql = hasTag
+      ? '''
+AND EXISTS (
+  SELECT 1 FROM word_contents twc, json_each(twc.tags_json) tt
+  WHERE twc.word_id = w.id
+    AND json_valid(twc.tags_json)
+    AND json_type(twc.tags_json) = 'array'
+    AND tt.value = ?
+)
+'''
+      : '';
+  final packSql = hasPack
+      ? '''
+AND EXISTS (
+  SELECT 1 FROM word_pack_items pi
+  WHERE pi.word_id = w.id AND pi.pack_id = ?
+)
+'''
+      : '''
+AND (
+  w.is_personal = 1
+  OR EXISTS (
+    SELECT 1 FROM word_pack_items pi
+    JOIN word_packs p ON p.id = pi.pack_id
+    WHERE pi.word_id = w.id AND p.include_in_daily_study = 1
+  )
+)
+''';
+  return _Clause(
+    '$_learnableSql${_scopeSql(scope)}${_meaningSqlFor(scope)}'
+    'AND $_availabilitySql$tagSql$packSql',
+    <Variable<Object>>[
+      Variable<int>(now - skipCooldownMs),
+      Variable<int>(now - sessionResumeTtlMs),
+      if (hasTag) Variable<String>(cleanTag),
+      if (hasPack) Variable<String>(cleanPack),
+    ],
+  );
+}
 
 /// 范围条件。
 String _scopeSql(CandidateScope scope) => switch (scope) {

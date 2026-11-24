@@ -1,4 +1,4 @@
-/// Flutter 复用 Next.js Edge TTS 的 HTTP 音频契约及失败降级。
+/// 多引擎自定义优先级与自动顺延策略单测（有道 / Edge / 系统 TTS）。
 library;
 
 import 'dart:typed_data';
@@ -17,7 +17,7 @@ import 'package:lexiloop/services/tts_service.dart';
 import 'audio_fakes.dart';
 import 'audio_fixtures.dart';
 
-/// 直连合成器的假实现：记录请求，验证无后端依赖的路径。
+/// 直连 Edge 合成器的假实现。
 class _FakeDirectEdgeSpeech implements DirectEdgeSpeechPort {
   int calls = 0;
   Accent? accent;
@@ -34,41 +34,41 @@ class _FakeDirectEdgeSpeech implements DirectEdgeSpeechPort {
   }
 }
 
-PlaybackSettings _settings(
-  SpeechSource source, {
-  bool fallback = true,
-  String server = 'https://speech.example.com',
-}) => PlaybackSettings(
-  choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
-  defaultAccent: Accent.us,
-  wordSpeed: defaultSpeechRate,
-  phraseSpeed: defaultSpeechRate,
-  sentenceSpeed: defaultSpeechRate,
-  autoPlayPronunciation: false,
-  speechSource: source,
-  speechFallbackEnabled: fallback,
-  onlineTtsBaseUrl: server,
-);
+PlaybackSettings _playbackWithChain(List<SpeechSourcePreference> chain) =>
+    PlaybackSettings(
+      choiceRevealDelaySeconds: defaultChoiceRevealDelaySeconds,
+      defaultAccent: Accent.us,
+      wordSpeed: defaultSpeechRate,
+      phraseSpeed: defaultSpeechRate,
+      sentenceSpeed: defaultSpeechRate,
+      autoPlayPronunciation: false,
+      speechChain: chain,
+    );
 
 void main() {
-  test('Edge TTS 可直接合成英音并播放，不要求 Next.js 地址', () async {
+  test('仅勾选 Edge 时直接合成英音并播放，不访问有道或系统 TTS', () async {
     final edge = _FakeDirectEdgeSpeech();
     final downloader = FakeAudioDownloader()..openGate();
     final player = FakeAudioPlayer();
-    final system = RecordingSpeechEngine()..speakError = Exception('本机缺少英文语音包');
+    final system = RecordingSpeechEngine()..speakError = Exception('缺少语音包');
     final speaker = WordSpeaker(
       player,
       AudioCache(downloader),
       TtsService(system),
       edge: edge,
     );
-    final request = speechRequest(
-      term: 'majority',
-      accent: Accent.uk,
-      playback: _settings(SpeechSource.edge, server: '', fallback: false),
+    final playback = _playbackWithChain(const <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: false),
+      SpeechSourcePreference(source: SpeechSource.system, enabled: false),
+    ]);
+
+    final result = await speaker.speak(
+      speechRequest(term: 'majority', accent: Accent.uk, playback: playback),
     );
 
-    expect(await speaker.speak(request), isA<DirectEdgeVoicePlayed>());
+    expect(result, isA<DirectEdgeVoicePlayed>());
+    expect(result.fellBack, isFalse);
     expect(edge.calls, 1);
     expect(edge.accent, Accent.uk);
     expect(player.playCount, 1);
@@ -76,7 +76,7 @@ void main() {
     expect(system.spoken, isEmpty);
   });
 
-  test('Edge TTS 不可用时可自动回退系统发音', () async {
+  test('按自定义顺序 Edge → 有道 → 系统依次顺延，精确记录回退来源', () async {
     final edge = _FakeDirectEdgeSpeech()..audio = null;
     final downloader = FakeAudioDownloader()..openGate();
     final player = FakeAudioPlayer();
@@ -87,155 +87,54 @@ void main() {
       TtsService(system),
       edge: edge,
     );
+    final playback = _playbackWithChain(const <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.system, enabled: true),
+    ]);
 
-    expect(
-      await speaker.speak(
-        speechRequest(playback: _settings(SpeechSource.edge, server: '')),
-      ),
-      isA<SystemVoicePlayed>(),
+    // Edge 失败 → 顺延到有道直连成功
+    final second = await speaker.speak(speechRequest(playback: playback));
+    expect(second, isA<HumanRecordingPlayed>());
+    expect(second.fellBack, isTrue);
+    expect(second.fellBackFrom, SpeechSource.edge);
+    expect(downloader.downloaded.single, youdaoAudioUri('apple', Accent.us));
+    expect(system.spoken, isEmpty);
+
+    // 有道也失败 → 继续顺延到系统朗读
+    downloader.failing.add(youdaoAudioUri('banana', Accent.us)!.toString());
+    final third = await speaker.speak(
+      speechRequest(term: 'banana', playback: playback),
     );
-    expect(system.spoken, <String>['apple']);
-    expect(
-      await speaker.speak(
-        speechRequest(
-          playback: _settings(SpeechSource.edge, server: '', fallback: false),
-        ),
-      ),
-      isA<SpeechFailed>(),
-    );
+    expect(third, isA<SystemVoicePlayed>());
+    expect(third.fellBack, isTrue);
+    expect(third.fellBackFrom, SpeechSource.edge);
+    expect(system.spoken, <String>['banana']);
   });
 
-  test('自动来源在无词典音频时使用直连 Edge，不要求配置服务地址', () async {
-    final edge = _FakeDirectEdgeSpeech();
+  test('未勾选备用引擎时失败直接返回 SpeechFailed，不私自调用已关闭引擎', () async {
+    final edge = _FakeDirectEdgeSpeech()..audio = null;
     final downloader = FakeAudioDownloader()..openGate();
-    final system = RecordingSpeechEngine()..speakError = Exception('本机缺少英文语音包');
+    final system = RecordingSpeechEngine();
     final speaker = WordSpeaker(
       FakeAudioPlayer(),
       AudioCache(downloader),
       TtsService(system),
       edge: edge,
     );
+    final edgeOnly = _playbackWithChain(const <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: false),
+      SpeechSourcePreference(source: SpeechSource.system, enabled: false),
+    ]);
 
-    expect(
-      await speaker.speak(
-        speechRequest(playback: _settings(SpeechSource.automatic, server: '')),
-      ),
-      isA<DirectEdgeVoicePlayed>(),
-    );
-    expect(edge.calls, 1);
+    final result = await speaker.speak(speechRequest(playback: edgeOnly));
+    expect(result, isA<SpeechFailed>());
+    expect(downloader.downloaded, isEmpty);
     expect(system.spoken, isEmpty);
   });
 
-  test('Next.js URL 与美音/英音、特殊字符参数保持接口一致', () {
-    final us = onlineTtsAudioUri(
-      baseUrl: 'https://speech.example.com/',
-      term: 'hello world',
-      accent: Accent.us,
-    )!;
-    expect(us.path, '/api/tts');
-    expect(us.queryParameters, <String, String>{
-      'word': 'hello world',
-      'accent': 'US',
-    });
-    final uk = onlineTtsAudioUri(
-      baseUrl: 'https://speech.example.com',
-      term: 'majority',
-      accent: Accent.uk,
-    )!;
-    expect(uk.queryParameters['accent'], 'UK');
-    expect(
-      onlineTtsAudioUri(
-        baseUrl: 'http://not-secure.example.com',
-        term: 'hello',
-        accent: Accent.us,
-      ),
-      isNull,
-    );
-    expect(
-      onlineTtsAudioUri(
-        baseUrl: 'https://speech.example.com/private',
-        term: 'hello',
-        accent: Accent.us,
-      ),
-      isNull,
-    );
-  });
-
-  test('选择 Next.js 在线 TTS，直接播放 MP3，命中缓存不重复下载', () async {
-    final downloader = FakeAudioDownloader()..openGate();
-    final player = FakeAudioPlayer();
-    final engine = RecordingSpeechEngine();
-    final speaker = WordSpeaker(
-      player,
-      AudioCache(downloader),
-      TtsService(engine),
-    );
-    final request = speechRequest(
-      playback: _settings(SpeechSource.online),
-      term: 'majority',
-      accent: Accent.uk,
-    );
-
-    expect(await speaker.speak(request), isA<OnlineVoicePlayed>());
-    expect(await speaker.speak(request), isA<OnlineVoicePlayed>());
-    expect(downloader.downloaded, hasLength(1));
-    expect(downloader.downloaded.single.path, '/api/tts');
-    expect(downloader.downloaded.single.queryParameters['accent'], 'UK');
-    expect(player.playCount, 2);
-    expect(engine.spoken, isEmpty);
-  });
-
-  test('Next.js 请求失败：允许降级时系统朗读，不允许时明确失败', () async {
-    final downloader = FakeAudioDownloader()..openGate();
-    final player = FakeAudioPlayer();
-    final engine = RecordingSpeechEngine();
-    final speaker = WordSpeaker(
-      player,
-      AudioCache(downloader),
-      TtsService(engine),
-    );
-    final url = onlineTtsAudioUri(
-      baseUrl: 'https://speech.example.com',
-      term: 'apple',
-      accent: Accent.us,
-    )!;
-    downloader.failing.add(url.toString());
-
-    expect(
-      await speaker.speak(
-        speechRequest(playback: _settings(SpeechSource.online)),
-      ),
-      isA<SystemVoicePlayed>(),
-    );
-    expect(engine.spoken, <String>['apple']);
-    expect(
-      await speaker.speak(
-        speechRequest(
-          playback: _settings(SpeechSource.online, fallback: false),
-        ),
-      ),
-      isA<SpeechFailed>(),
-    );
-  });
-
-  test('没有在线服务地址且不允许降级时返回配置提示', () async {
-    final downloader = FakeAudioDownloader()..openGate();
-    final speaker = WordSpeaker(
-      FakeAudioPlayer(),
-      AudioCache(downloader),
-      TtsService(RecordingSpeechEngine()),
-    );
-    final result = await speaker.speak(
-      speechRequest(
-        playback: _settings(SpeechSource.online, server: '', fallback: false),
-      ),
-    );
-    expect(result, isA<SpeechFailed>());
-    expect((result as SpeechFailed).error.message, contains('Next.js'));
-    expect(downloader.downloaded, isEmpty);
-  });
-
-  test('系统 TTS 无英文包时自动回退到在线词典录音', () async {
+  test('系统排第一但缺少英文包时，自动顺延到有道直连发音', () async {
     final downloader = FakeAudioDownloader()..openGate();
     final engine = RecordingSpeechEngine()..languageAvailable = false;
     final speaker = WordSpeaker(
@@ -243,26 +142,62 @@ void main() {
       AudioCache(downloader),
       TtsService(engine),
     );
-    final result = await speaker.speak(
-      speechRequest(playback: _settings(SpeechSource.automatic, server: '')),
-    );
+    final playback = _playbackWithChain(const <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.system, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: true),
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: false),
+    ]);
+
+    final result = await speaker.speak(speechRequest(playback: playback));
     expect(result, isA<HumanRecordingPlayed>());
+    expect(result.fellBackFrom, SpeechSource.system);
     expect(downloader.downloaded.single, youdaoAudioUri('apple', Accent.us));
   });
 
-  test('关闭发音时不会访问网络或系统 TTS', () async {
+  test('整句在默认链（有道 → Edge → 系统）下直接跳过有道并由 Edge 无降级提示播报', () async {
+    final edge = _FakeDirectEdgeSpeech();
+    final downloader = FakeAudioDownloader()..openGate();
+    final speaker = WordSpeaker(
+      FakeAudioPlayer(),
+      AudioCache(downloader),
+      TtsService(RecordingSpeechEngine()),
+      edge: edge,
+    );
+
+    final result = await speaker.speak(
+      speechRequest(
+        term: 'This is a resilient team.',
+        contentType: LexicalContentType.sentence,
+      ),
+    );
+    expect(result, isA<DirectEdgeVoicePlayed>());
+    expect(result.fellBack, isFalse);
+    expect(downloader.downloaded, isEmpty);
+    expect(edge.calls, 1);
+  });
+
+  test('全部引擎关闭时返回 SpeechDisabled，不发请求也不调用系统 TTS', () async {
+    final edge = _FakeDirectEdgeSpeech();
     final downloader = FakeAudioDownloader()..openGate();
     final engine = RecordingSpeechEngine();
     final speaker = WordSpeaker(
       FakeAudioPlayer(),
       AudioCache(downloader),
       TtsService(engine),
+      edge: edge,
     );
+    final muted = _playbackWithChain(const <SpeechSourcePreference>[
+      SpeechSourcePreference(source: SpeechSource.youdao, enabled: false),
+      SpeechSourcePreference(source: SpeechSource.edge, enabled: false),
+      SpeechSourcePreference(source: SpeechSource.system, enabled: false),
+    ]);
+
     expect(
-      await speaker.speak(speechRequest(playback: _settings(SpeechSource.off))),
+      await speaker.speak(speechRequest(playback: muted)),
       isA<SpeechDisabled>(),
     );
     expect(downloader.downloaded, isEmpty);
+    expect(edge.calls, 0);
     expect(engine.spoken, isEmpty);
   });
 }

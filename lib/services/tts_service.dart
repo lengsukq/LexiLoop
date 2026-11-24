@@ -168,6 +168,10 @@ class TtsService {
   /// 停止朗读（离开页面时调用）。
   Future<void> stop() => _engine.stop();
 
+  /// 检查设备系统语音是否支持指定语言（用于设置页检测）。
+  Future<bool> isLanguageAvailable(String language) =>
+      _engine.isLanguageAvailable(_resolveLanguage(language));
+
   /// 把 ISO 639-1 代码映射为 BCP-47；未知语言原样返回，交给引擎判断。
   String _resolveLanguage(String code) =>
       _ttsLanguageByCode[code.toLowerCase()] ?? code;

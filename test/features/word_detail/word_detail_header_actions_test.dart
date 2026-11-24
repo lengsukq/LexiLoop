@@ -166,17 +166,25 @@ void main() {
     expect(request.pronunciations.single.phonetic, 'ˈæpl');
   });
 
-  testWidgets('设置关掉真人录音后同步到 speaker', (tester) async {
+  testWidgets('朗读请求携带设置表中最新的发音优先级链', (tester) async {
     final id = await insertWordRow(db);
-    await SettingsDao(db)
-        .saveAll(<String, Object?>{'humanAudioEnabled': false}, now);
+    await SettingsDao(db).saveAll(<String, Object?>{
+      'speechChain': <Map<String, Object?>>[
+        <String, Object?>{'source': 'edge', 'enabled': true},
+        <String, Object?>{'source': 'system', 'enabled': true},
+        <String, Object?>{'source': 'youdao', 'enabled': false},
+      ],
+    }, now);
     await open(tester, id);
 
-    expect(speaker.humanAudioEnabled, isTrue, reason: '未点朗读前不该被动改状态');
     await tester.tap(find.byTooltip('朗读'));
     await tester.pumpAndSettle();
 
-    expect(speaker.humanAudioEnabled, isFalse);
+    expect(speaker.requests, hasLength(1));
+    expect(
+      speaker.requests.single.playback.enabledSpeechSources.map((s) => s.wire),
+      <String>['edge', 'system'],
+    );
   });
 
   testWidgets('缺少中文译文时给出 AI 翻译释义入口并入队', (tester) async {

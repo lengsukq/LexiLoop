@@ -21,13 +21,13 @@ import 'package:share_plus/share_plus.dart';
 Future<String> shareBackupBytes({
   required Uint8List bytes,
   required String fileName,
+  String mimeType = backupMimeType,
+  String subject = 'LexiLoop 备份',
 }) async {
   await SharePlus.instance.share(
     ShareParams(
-      subject: 'LexiLoop 备份',
-      files: <XFile>[
-        XFile.fromData(bytes, name: fileName, mimeType: backupMimeType),
-      ],
+      subject: subject,
+      files: <XFile>[XFile.fromData(bytes, name: fileName, mimeType: mimeType)],
       fileNameOverrides: <String>[fileName],
     ),
   );

@@ -5,16 +5,27 @@
 /// 这与现有 `ttsServiceProvider.overrideWithValue(...)` 的写法是同一套。
 library;
 
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/study_models.dart';
+import 'package:lexiloop/services/audio/direct_edge_tts.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';
 import 'package:lexiloop/services/tts_service.dart';
 
 import 'audio_fakes.dart';
 import 'audio_fixtures.dart';
+
+class _OfflineEdgeSpeech implements DirectEdgeSpeechPort {
+  @override
+  Future<Uint8List?> synthesize({
+    required String text,
+    required Accent accent,
+  }) async => null;
+}
 
 void main() {
   late FakeAudioPlayer player;
@@ -32,6 +43,7 @@ void main() {
     overrides: [
       audioPlayerPortProvider.overrideWithValue(player),
       audioDownloaderProvider.overrideWithValue(downloader),
+      directEdgeSpeechProvider.overrideWithValue(_OfflineEdgeSpeech()),
       ttsServiceProvider.overrideWithValue(TtsService(engine)),
     ],
   );
@@ -57,6 +69,9 @@ void main() {
   });
 
   test('覆盖 ttsServiceProvider 即可观察降级路径', () async {
+    downloader.failing.add(
+      'https://dict.youdao.com/dictvoice?audio=apple&type=1',
+    );
     final container = containerWithOverrides();
     addTearDown(container.dispose);
 

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
+import 'package:lexiloop/features/settings/audio_cache_providers.dart';
 import 'package:lexiloop/features/settings/backup_size_label.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
 import 'package:lexiloop/features/settings/import_backup_confirm.dart';
@@ -178,8 +179,9 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
 
     final messenger = ScaffoldMessenger.of(context);
     await clearAllData(ref.read(databaseProvider));
+    await clearSpeechCache(ref);
     ref.read(settingsServiceProvider).invalidate();
     invalidateLocalData(ref);
-    messenger.showSnackBar(const SnackBar(content: Text('本地数据已清空。')));
+    messenger.showSnackBar(const SnackBar(content: Text('本地数据与语音缓存已清空。')));
   }
 }

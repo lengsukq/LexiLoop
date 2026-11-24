@@ -51,6 +51,7 @@ class Words extends Table {
       .withDefault(const Constant('NEW'))();
   IntColumn get masteryScore => integer().withDefault(const Constant(0))();
   BoolColumn get isSuspended => boolean().withDefault(const Constant(false))();
+  BoolColumn get isPersonal => boolean().withDefault(const Constant(true))();
   TextColumn get userNote => text().nullable()();
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();

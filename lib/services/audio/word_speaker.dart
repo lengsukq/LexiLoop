@@ -1,16 +1,15 @@
-/// 词条发音：真人录音优先，系统朗读兜底。
+/// 词条发音：按用户自定义的多选优先级链依次尝试，失败自动顺延。
 ///
-/// **这层存在的理由**：旧版 Next 应用同时提供有道真人 mp3 与服务端 Edge-TTS，
-/// 两者的口音参数、缓存键、降级判断散落在 `lib/tts-client.ts` 与详情页 hook 里；
-/// 本版只剩系统 TTS 时，声音质量相对旧版是明确的退步。把策略集中成一个
-/// 不抛异常的服务之后，界面层只需要「调用 → 看结果」两件事。
+/// 支持三种本地/直连引擎：
+/// - [SpeechSource.youdao]：有道词典真人 MP3（优先词典自带地址，缺失时直连有道接口；整句自动跳过）；
+/// - [SpeechSource.edge]：Flutter 直连微软 Edge 神经网络语音；
+/// - [SpeechSource.system]：设备本地系统 TTS。
 ///
-/// **三条硬性约定**：
-/// - 真人录音（词典 mp3）优先，这是相对旧版唯一不能丢的能力；
-/// - 任何环节失败都回落到系统朗读，**绝不把异常抛给界面层**；
-/// - 回落必须能被界面层观测到，否则用户无从判断词典音频是否可用。
+/// 任何环节失败都不会把异常抛给界面层，而是自动顺延到下一个已启用引擎；
+/// 全部失败时返回 [SpeechFailed]，全部关闭时返回 [SpeechDisabled]。
 library;
 
+import 'dart:async';
 import 'dart:math' show min;
 import 'dart:typed_data';
 
@@ -25,6 +24,9 @@ import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/audio/speech_request.dart';
 import 'package:lexiloop/services/audio/speech_result.dart';
 import 'package:lexiloop/services/tts_service.dart';
+
+final RegExp _youdaoTermPattern = RegExp(r"^[a-zA-Z][a-zA-Z '\-]*$");
+final RegExp _whitespacePattern = RegExp(r'\s+');
 
 /// 口音到系统朗读语言的映射。
 ///
@@ -46,213 +48,163 @@ class WordSpeaker {
   final TtsService _tts;
   final DirectEdgeSpeechPort? _edge;
 
-  /// 是否启用真人录音。
-  ///
-  /// 留作运行时总开关：真人录音依赖联网与第三方站点，一旦站点不可用，
-  /// 关掉它就能立刻得到「只用系统朗读」的行为，而不必改任何调用点。
-  /// 设置页尚未提供该项，接线时由界面层从设置读出来赋值即可。
-  bool humanAudioEnabled = true;
+  /// 单调递增的朗读代际号，用于打断已过期的在途下载，避免快速连点导致叠音。
+  int _speakGeneration = 0;
+  Timer? _activeTimer;
+  Completer<void>? _cancelOnline;
 
   /// 朗读一个词条。
   ///
-  /// 永远不会抛出：调用方只需要根据返回的 `SpeechResult` 决定提示什么。
-  Future<SpeechResult> speak(SpeechRequest request) async {
-    final playback = request.playback;
-    if (playback.speechSource == SpeechSource.off) {
-      return const SpeechDisabled();
-    }
-    final primary = await _tryPreferred(request);
-    if (primary != null) return primary;
-    final strict = _strictFailure(request);
-    if (strict != null) return strict;
-    final system = await _speakWithSystemVoice(request);
-    if (system is SystemVoicePlayed || !playback.speechFallbackEnabled) {
-      return system;
-    }
-    return await _tryFallback(request) ?? system;
-  }
+  /// 严格按 `request.playback.enabledSpeechSources` 的顺序尝试，永不抛出异常。
+  Future<SpeechResult> speak(SpeechRequest request) =>
+      _speakWithChain(request, onlineTimeout: null);
 
-  /// 学习题目自动朗读必须立即出声，不能被在线真人录音的连接超时阻塞。
-  /// 普通手动朗读仍遵循音源优先级；只有「自动选择」的背景播放采用
-  /// 已缓存真人录音 → 系统语音 → Edge 的快速回退策略。
-  Future<SpeechResult> speakForAutoPlay(SpeechRequest request) async {
-    if (request.playback.speechSource != SpeechSource.automatic) {
-      return await speak(request);
-    }
-    final url = humanAudioEnabled ? _audioUrlOf(request) : null;
-    final cached = url == null ? null : _cache.peek(url);
-    if (cached != null) {
-      try {
-        await _player.prepare(
-          cached,
-          speed: request.playback.speedFor(request.contentType),
-        );
-        await _player.play();
-        return const HumanRecordingPlayed();
-      } on Object {
-        // 缓存字节可能不被设备解码；系统语音继续兜底。
-      }
-    }
-    final system = await _speakWithSystemVoice(request);
-    if (system is SystemVoicePlayed ||
-        !request.playback.speechFallbackEnabled) {
-      return system;
-    }
-    return await _tryDirectEdge(request) ?? system;
-  }
-
-  Future<SpeechResult?> _tryPreferred(SpeechRequest request) {
-    if (request.playback.speechSource == SpeechSource.edge) {
-      return _tryDirectEdge(request);
-    }
-    return _tryUrls(_preferredUrls(request), request);
-  }
-
-  SpeechResult? _strictFailure(SpeechRequest request) {
-    final source = request.playback.speechSource;
-    if (request.playback.speechFallbackEnabled ||
-        source == SpeechSource.system) {
-      return null;
-    }
-    if (source == SpeechSource.online && _nextUrl(request) == null) {
-      return const SpeechFailed(
-        PlatformCapabilityError(AppErrorCode.ttsOnlineNotConfigured),
-      );
-    }
-    if (source == SpeechSource.edge ||
-        _preferredUrls(request).any((url) => url != null)) {
-      return const SpeechFailed(
-        PlatformCapabilityError(AppErrorCode.ttsSynthesisFailed),
-      );
-    }
-    return null;
-  }
-
-  Future<SpeechResult?> _tryFallback(SpeechRequest request) async {
-    final source = request.playback.speechSource;
-    if (source == SpeechSource.automatic && humanAudioEnabled) {
-      final direct = await _tryDirectEdge(request);
-      if (direct != null) return direct;
-    }
-    final other = switch (source) {
-      SpeechSource.system => <Uri?>[
-        _audioUrlOf(request),
-        _nextUrl(request),
-        _onlineUrlOf(request),
-      ],
-      SpeechSource.online => <Uri?>[
-        _audioUrlOf(request),
-        _onlineUrlOf(request),
-      ],
-      SpeechSource.dictionary => <Uri?>[_nextUrl(request)],
-      SpeechSource.edge => <Uri?>[_audioUrlOf(request), _onlineUrlOf(request)],
-      SpeechSource.automatic => <Uri?>[
-        if (humanAudioEnabled) _onlineUrlOf(request),
-      ],
-      SpeechSource.off => <Uri?>[],
-    };
-    final backup = await _tryUrls(other, request);
-    if (backup != null) return backup;
-    if (source == SpeechSource.online ||
-        source == SpeechSource.dictionary ||
-        source == SpeechSource.system) {
-      return await _tryDirectEdge(request);
-    }
-    return null;
-  }
-
-  Uri? _nextUrl(SpeechRequest request) => onlineTtsAudioUri(
-    baseUrl: request.playback.onlineTtsBaseUrl,
-    term: request.term,
-    accent: request.accent,
-  );
-
-  List<Uri?> _preferredUrls(SpeechRequest request) =>
-      switch (request.playback.speechSource) {
-        SpeechSource.automatic => <Uri?>[
-          if (humanAudioEnabled) _audioUrlOf(request),
-          if (humanAudioEnabled) _nextUrl(request),
-        ],
-        SpeechSource.dictionary => <Uri?>[
-          _audioUrlOf(request),
-          _onlineUrlOf(request),
-        ],
-        SpeechSource.online => <Uri?>[_nextUrl(request)],
-        SpeechSource.edge ||
-        SpeechSource.system ||
-        SpeechSource.off => <Uri?>[],
-      };
-
-  /// 直接播放 Flutter 本机请求到的 Edge MP3，失败由策略层选择下一个方案。
-  Future<SpeechResult?> _tryDirectEdge(SpeechRequest request) async {
-    final edge = _edge;
-    if (edge == null) return null;
-    try {
-      final audio = await edge.synthesize(
-        text: request.term,
-        accent: request.accent,
-      );
-      if (audio == null || audio.isEmpty) return null;
-      await _player.prepare(
-        audio,
-        speed: request.playback.speedFor(request.contentType),
-      );
-      await _player.play();
-      return const DirectEdgeVoicePlayed();
-    } on Object {
-      return null;
-    }
-  }
-
-  /// 批量预取真人录音。
+  /// 学习题目自动朗读。
   ///
-  /// 预热的是「即将被点到的词」：学习界面一次只往前看几个词，提前把音频
-  /// 拉好，点击时才有「秒开」的手感。按地址去重并限制并发
-  /// （[audioPreloadConcurrency]），单条失败由缓存层吸收，整批照常完成。
+  /// 同样遵守用户排定的优先级链（已预取的音频可直接 0ms 命中内存缓存）；
+  /// 当链中后续包含离线系统朗读时，对在线引擎施加短超时（[autoPlayOnlineTimeoutMs]），
+  /// 防止弱网阻塞答题节奏。
+  Future<SpeechResult> speakForAutoPlay(SpeechRequest request) {
+    final sources = request.playback.enabledSpeechSources;
+    final hasOfflineBackup = sources.contains(SpeechSource.system);
+    return _speakWithChain(
+      request,
+      onlineTimeout: hasOfflineBackup
+          ? const Duration(milliseconds: autoPlayOnlineTimeoutMs)
+          : null,
+    );
+  }
+
+  /// 批量预取即将播放词条的首选在线音频。
   ///
-  /// 只预热、不播放，因此**不涉及语速**：语速是播放时的参数。
+  /// 只预热、不播放，按地址/文本去重并限制并发（[audioPreloadConcurrency]），
+  /// 单条失败由缓存层吸收，整批照常完成。
   Future<void> preloadBatch(List<SpeechRequest> requests) async {
-    if (requests.isNotEmpty &&
-        requests.first.playback.speechSource == SpeechSource.edge) {
-      final edge = _edge;
-      if (edge == null) return;
-      var cursor = 0;
-      final workers = min(audioPreloadConcurrency, requests.length);
-      await Future.wait(<Future<void>>[
-        for (var worker = 0; worker < workers; worker += 1)
-          () async {
-            while (cursor < requests.length) {
-              final request = requests[cursor++];
-              await edge.synthesize(text: request.term, accent: request.accent);
-            }
-          }(),
-      ]);
-      return;
-    }
-    if (!humanAudioEnabled &&
-        requests.every(
-          (request) =>
-              request.playback.speechSource != SpeechSource.online &&
-              request.playback.speechSource != SpeechSource.dictionary,
-        )) {
-      return;
-    }
-    final urls = _distinctAudioUrls(requests);
-    if (urls.isEmpty) return;
-    var cursor = 0;
-    final workers = min(audioPreloadConcurrency, urls.length);
+    final youdaoUrls = _distinctYoudaoUrls(requests);
+    final edgeItems = _distinctEdgeRequests(requests);
     await Future.wait(<Future<void>>[
-      for (var worker = 0; worker < workers; worker += 1)
-        _drain(urls, () => cursor++),
+      if (youdaoUrls.isNotEmpty) _preloadUrls(youdaoUrls),
+      if (edgeItems.isNotEmpty) _preloadEdge(edgeItems),
     ]);
   }
 
-  /// 停止播放。
+  /// 停止当前播放并取消在途等待。
   ///
-  /// 播放器的释放由 `audioPlayerPortProvider` 负责——它构造播放器，
-  /// 就只有它有权释放；在本服务里也释放一次会让两处 provider 都去
-  /// 关闭同一个平台资源。
-  Future<void> stop() => _player.stop();
+  /// 播放器的释放由 `audioPlayerPortProvider` 负责，这里只停止播放。
+  Future<void> stop() {
+    _speakGeneration += 1;
+    _cancelPendingOnlineWait();
+    return _player.stop();
+  }
+
+  void _cancelPendingOnlineWait() {
+    _activeTimer?.cancel();
+    _activeTimer = null;
+    final signal = _cancelOnline;
+    _cancelOnline = null;
+    if (signal != null && !signal.isCompleted) signal.complete();
+  }
+
+  Future<SpeechResult> _speakWithChain(
+    SpeechRequest request, {
+    required Duration? onlineTimeout,
+  }) async {
+    final sources = request.playback.enabledSpeechSources;
+    if (sources.isEmpty) return const SpeechDisabled();
+    final generation = ++_speakGeneration;
+    SpeechSource? failedPrimary;
+    SpeechFailed? lastFailure;
+    for (final source in sources) {
+      if (generation != _speakGeneration) return const SpeechDisabled();
+      final attempt = await _trySource(
+        source,
+        request,
+        generation: generation,
+        fellBackFrom: failedPrimary,
+        onlineTimeout: onlineTimeout,
+      );
+      if (generation != _speakGeneration) return const SpeechDisabled();
+      final outcome = attempt.result;
+      if (outcome is SpeechFailed) {
+        lastFailure = outcome;
+        failedPrimary ??= source;
+        continue;
+      }
+      if (outcome != null) return outcome;
+      if (attempt.applicable) failedPrimary ??= source;
+    }
+    return lastFailure ??
+        const SpeechFailed(
+          PlatformCapabilityError(AppErrorCode.ttsSynthesisFailed),
+        );
+  }
+
+  Future<({SpeechResult? result, bool applicable})> _trySource(
+    SpeechSource source,
+    SpeechRequest request, {
+    required int generation,
+    required SpeechSource? fellBackFrom,
+    required Duration? onlineTimeout,
+  }) async => switch (source) {
+    SpeechSource.youdao => await _tryYoudao(
+      request,
+      generation: generation,
+      fellBackFrom: fellBackFrom,
+      timeout: onlineTimeout,
+    ),
+    SpeechSource.edge => (
+      result: await _tryDirectEdge(
+        request,
+        generation: generation,
+        fellBackFrom: fellBackFrom,
+        timeout: onlineTimeout,
+      ),
+      applicable: true,
+    ),
+    SpeechSource.system => (
+      result: await _speakWithSystemVoice(request, fellBackFrom: fellBackFrom),
+      applicable: true,
+    ),
+  };
+
+  Future<({SpeechResult? result, bool applicable})> _tryYoudao(
+    SpeechRequest request, {
+    required int generation,
+    required SpeechSource? fellBackFrom,
+    required Duration? timeout,
+  }) async {
+    final urls = _youdaoUrls(request);
+    if (urls.isEmpty) return (result: null, applicable: false);
+    for (final uri in urls) {
+      final played = await _tryRecording(
+        uri,
+        request,
+        generation: generation,
+        fellBackFrom: fellBackFrom,
+        timeout: timeout,
+      );
+      if (played != null) return (result: played, applicable: true);
+      if (generation != _speakGeneration) {
+        return (result: const SpeechDisabled(), applicable: true);
+      }
+    }
+    return (result: null, applicable: true);
+  }
+
+  /// 收集该请求可用的有道/词典音频地址（去重）：
+  /// 1. 词典表里已存的同口音地址优先；
+  /// 2. 单词和短语始终补一条有道直连地址，修复无预存 `audioUrl` 时直接跳过有道的问题。
+  List<Uri> _youdaoUrls(SpeechRequest request) {
+    final seen = <String>{};
+    final urls = <Uri>[];
+    void addIfValid(Uri? uri) {
+      if (uri != null && seen.add(uri.toString())) urls.add(uri);
+    }
+
+    addIfValid(_audioUrlOf(request));
+    addIfValid(_youdaoDirectUrlOf(request));
+    return urls;
+  }
 
   Uri? _audioUrlOf(SpeechRequest request) => resolveHumanAudioUrl(
     term: request.term,
@@ -260,58 +212,108 @@ class WordSpeaker {
     pronunciations: request.pronunciations,
   );
 
-  /// 播放词典录音。
-  ///
-  /// 录音按设置里的倍率放，与系统朗读共用同一套语速：两者都取自
-  /// [PlaybackSettings.speedFor]，各自引擎的换算只发生在
-  /// `TtsService._engineRate`。若播录音时不传倍率，用户把「单词语速」调到
-  /// 0.5 后会发现系统朗读变慢了、词典录音却纹丝不动。
-  Future<SpeechResult?> _tryRecording(Uri url, SpeechRequest request) async {
-    Uint8List? bytes;
-    try {
-      bytes = await _cache.resolve(url);
-    } on Object {
+  /// 仅为英文单词与短语构造有道直连地址；完整长句交由 Edge 或系统朗读。
+  Uri? _youdaoDirectUrlOf(SpeechRequest request) {
+    if (request.contentType == LexicalContentType.sentence) return null;
+    final trimmed = request.term.trim();
+    if (!_youdaoTermPattern.hasMatch(trimmed)) return null;
+    if (trimmed.split(_whitespacePattern).length > youdaoDirectMaxWords) {
       return null;
     }
-    if (bytes == null) return null;
+    return youdaoAudioUri(trimmed, request.accent);
+  }
+
+  Future<SpeechResult?> _tryRecording(
+    Uri url,
+    SpeechRequest request, {
+    required int generation,
+    required SpeechSource? fellBackFrom,
+    required Duration? timeout,
+  }) async {
+    final bytes = await _resolveBytes(url, timeout: timeout);
+    if (bytes == null || generation != _speakGeneration) return null;
     try {
       await _player.prepare(
         bytes,
         speed: request.playback.speedFor(request.contentType),
       );
+      if (generation != _speakGeneration) return const SpeechDisabled();
       await _player.play();
-      return url.path == '/api/tts'
-          ? const OnlineVoicePlayed()
-          : const HumanRecordingPlayed();
+      return HumanRecordingPlayed(fellBackFrom: fellBackFrom);
     } on Object {
       return null;
     }
   }
 
-  /// 依次尝试多个音频 URL，相同地址只请求一次。
-  Future<SpeechResult?> _tryUrls(
-    Iterable<Uri?> urls,
-    SpeechRequest request,
-  ) async {
-    final seen = <String>{};
-    for (final uri in urls) {
-      if (uri == null || !seen.add(uri.toString())) continue;
-      final result = await _tryRecording(uri, request);
-      if (result != null) return result;
+  Future<Uint8List?> _resolveBytes(Uri url, {required Duration? timeout}) =>
+      _awaitOnline(_cache.resolve(url), timeout: timeout);
+
+  Future<Uint8List?> _awaitOnline(
+    Future<Uint8List?> work, {
+    required Duration? timeout,
+  }) async {
+    if (timeout == null) return await _resolveUnbounded(work);
+    _cancelPendingOnlineWait();
+    final completer = Completer<Uint8List?>();
+    final cancel = Completer<void>();
+    _cancelOnline = cancel;
+    void finish(Uint8List? value) {
+      if (!completer.isCompleted) completer.complete(value);
     }
-    return null;
+
+    _activeTimer = Timer(timeout, () => finish(null));
+    unawaited(cancel.future.then((_) => finish(null)));
+    unawaited(work.then(finish, onError: (Object _) => finish(null)));
+    try {
+      return await completer.future;
+    } finally {
+      _activeTimer?.cancel();
+      _activeTimer = null;
+      if (identical(_cancelOnline, cancel)) _cancelOnline = null;
+    }
   }
 
-  /// 仅为英文单词、短语构造公开词典地址；整句不猜测为词典音频。
-  Uri? _onlineUrlOf(SpeechRequest request) {
-    if (request.contentType == LexicalContentType.sentence) return null;
-    if (!RegExp(r"^[a-zA-Z][a-zA-Z '\-]*$").hasMatch(request.term.trim())) {
+  Future<Uint8List?> _resolveUnbounded(Future<Uint8List?> work) async {
+    try {
+      return await work;
+    } on Object {
       return null;
     }
-    return youdaoAudioUri(request.term, request.accent);
   }
 
-  Future<SpeechResult> _speakWithSystemVoice(SpeechRequest request) async {
+  /// 直接播放 Flutter 本机请求到的 Edge MP3，失败由策略层顺延下一个引擎。
+  Future<SpeechResult?> _tryDirectEdge(
+    SpeechRequest request, {
+    required int generation,
+    required SpeechSource? fellBackFrom,
+    required Duration? timeout,
+  }) async {
+    final edge = _edge;
+    if (edge == null) return null;
+    final audio = await _awaitOnline(
+      edge.synthesize(text: request.term, accent: request.accent),
+      timeout: timeout,
+    );
+    if (audio == null || audio.isEmpty || generation != _speakGeneration) {
+      return null;
+    }
+    try {
+      await _player.prepare(
+        audio,
+        speed: request.playback.speedFor(request.contentType),
+      );
+      if (generation != _speakGeneration) return const SpeechDisabled();
+      await _player.play();
+      return DirectEdgeVoicePlayed(fellBackFrom: fellBackFrom);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<SpeechResult> _speakWithSystemVoice(
+    SpeechRequest request, {
+    required SpeechSource? fellBackFrom,
+  }) async {
     try {
       // 先掐掉播放器：macOS 的系统朗读不会自动停掉上一段 mp3，
       // 不掐的话会出现「真人录音与机器音叠在一起」。
@@ -322,43 +324,77 @@ class WordSpeaker {
         contentType: request.contentType,
         playback: request.playback,
       );
-      return const SystemVoicePlayed();
+      return SystemVoicePlayed(fellBackFrom: fellBackFrom);
     } on Object catch (error) {
       return SpeechFailed(normalizeError(error));
     }
   }
 
-  List<Uri> _distinctAudioUrls(List<SpeechRequest> requests) {
+  List<Uri> _distinctYoudaoUrls(List<SpeechRequest> requests) {
     final seen = <String>{};
     final urls = <Uri>[];
     for (final request in requests) {
-      final playback = request.playback;
-      final url = switch (playback.speechSource) {
-        SpeechSource.online => onlineTtsAudioUri(
-          baseUrl: playback.onlineTtsBaseUrl,
-          term: request.term,
-          accent: request.accent,
-        ),
-        SpeechSource.off || SpeechSource.system || SpeechSource.edge => null,
-        SpeechSource.dictionary || SpeechSource.automatic =>
-          humanAudioEnabled ? _audioUrlOf(request) : null,
-      };
-      if (url == null) continue;
-      if (seen.add(url.toString())) urls.add(url);
+      final enabled = request.playback.enabledSpeechSources;
+      if (enabled.isEmpty || enabled.first != SpeechSource.youdao) continue;
+      final candidates = _youdaoUrls(request);
+      if (candidates.isEmpty) continue;
+      final primaryUrl = candidates.first;
+      if (seen.add(primaryUrl.toString())) urls.add(primaryUrl);
     }
     return urls;
   }
 
-  /// 取下一个待下载的下标并下载，直到越过末尾。
-  ///
-  /// [nextIndex] 必须返回**本次要用的下标**（0 起）：写成 `cursor += 1`
-  /// 会把下标整体推后一位，第 0 个地址永远不下载——1 条时一条都不下，
-  /// 6 条时只下 5 条，而且失败得毫无声息。
-  Future<void> _drain(List<Uri> urls, int Function() nextIndex) async {
+  List<SpeechRequest> _distinctEdgeRequests(List<SpeechRequest> requests) {
+    if (_edge == null) return const <SpeechRequest>[];
+    final seen = <String>{};
+    final items = <SpeechRequest>[];
+    for (final request in requests) {
+      final enabled = request.playback.enabledSpeechSources;
+      if (enabled.isEmpty || enabled.first != SpeechSource.edge) continue;
+      final key = '${request.accent.wire}:${request.term.trim().toLowerCase()}';
+      if (seen.add(key)) items.add(request);
+    }
+    return items;
+  }
+
+  Future<void> _preloadUrls(List<Uri> urls) async {
+    var cursor = 0;
+    final workers = min(audioPreloadConcurrency, urls.length);
+    await Future.wait(<Future<void>>[
+      for (var worker = 0; worker < workers; worker += 1)
+        _drainUrls(urls, () => cursor++),
+    ]);
+  }
+
+  Future<void> _drainUrls(List<Uri> urls, int Function() nextIndex) async {
     while (true) {
       final index = nextIndex();
       if (index >= urls.length) return;
       await _cache.resolve(urls[index]);
+    }
+  }
+
+  Future<void> _preloadEdge(List<SpeechRequest> items) async {
+    final edge = _edge;
+    if (edge == null) return;
+    var cursor = 0;
+    final workers = min(audioPreloadConcurrency, items.length);
+    await Future.wait(<Future<void>>[
+      for (var worker = 0; worker < workers; worker += 1)
+        _drainEdge(edge, items, () => cursor++),
+    ]);
+  }
+
+  Future<void> _drainEdge(
+    DirectEdgeSpeechPort edge,
+    List<SpeechRequest> items,
+    int Function() nextIndex,
+  ) async {
+    while (true) {
+      final index = nextIndex();
+      if (index >= items.length) return;
+      final request = items[index];
+      await edge.synthesize(text: request.term, accent: request.accent);
     }
   }
 }

@@ -121,6 +121,12 @@ class WordDetailActions {
 
   final Ref _ref;
 
+  /// 将词书包词条收入个人词库（`is_personal = 1`）。
+  Future<void> promoteToPersonal(int wordId) async {
+    await _ref.read(wordPackDaoProvider).promoteToPersonal(wordId, now: _now());
+    _invalidateWord(wordId);
+  }
+
   /// 切换「暂停学习」。
   ///
   /// 时间戳在方法内部取：写操作只需要一个「现在」，为它多开一个参数

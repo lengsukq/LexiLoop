@@ -81,32 +81,23 @@ SpeechRequest studySpeechRequest({
 
 /// 按当前设置朗读一个词条，返回需要提示给用户的文案；无需提示时返回 `null`。
 ///
-/// 真人录音成功就不打扰用户；回落到系统朗读必须**说出来**（否则用户会以为
-/// 词典音频坏了）；两者都没响时把错误自带的中文文案透出去。
+/// 首选引擎成功就不打扰用户；因首选失败而自动顺延到备用引擎时给出温和提示；
+/// 全部失败时把错误自带的中文文案透出去。
 Future<String?> studySpeakTerm({
   required WordSpeaker speaker,
   required SpeechRequest request,
-  required bool humanAudioEnabled,
 }) async {
-  speaker.humanAudioEnabled = humanAudioEnabled;
   final result = await speaker.speak(request);
   return switch (result) {
-    HumanRecordingPlayed() => null,
-    OnlineVoicePlayed() => null,
-    DirectEdgeVoicePlayed() => null,
     SpeechDisabled() => null,
-    SystemVoicePlayed() => switch (request.playback.speechSource) {
-      SpeechSource.edge => 'Edge TTS 暂不可用，已改用系统朗读',
-      SpeechSource.online => 'Next.js TTS 暂不可用，已改用系统朗读',
-      SpeechSource.dictionary => '词典录音暂不可用，已改用系统朗读',
-      SpeechSource.automatic => humanAudioEnabled ? '暂无真人录音，已改用系统朗读' : null,
-      SpeechSource.system || SpeechSource.off => null,
-    },
     SpeechFailed(:final error) => '发音暂不可用：${error.message}',
+    _ when result.fellBack =>
+      '${result.fellBackFrom!.label}暂不可用，已自动切换为${result.playedSource!.label}',
+    _ => null,
   };
 }
 
-/// 预取「接下来若干题」的真人录音。
+/// 预取「接下来若干题」的首选在线音频。
 ///
 /// 只预热、不播放。这里**不**再包一层错误处理：`WordSpeaker.preloadBatch`
 /// 按地址去重、限制并发，单条失败由缓存层吸收（`AudioCache.resolve` 从不抛），
@@ -117,7 +108,6 @@ void studyPreloadAhead({
   required Accent accent,
   required PlaybackSettings playback,
 }) {
-  speaker.humanAudioEnabled = playback.humanAudioEnabled;
   final requests = <SpeechRequest>[
     for (final item in items)
       studySpeechRequest(word: item.word, accent: accent, playback: playback),
@@ -132,9 +122,8 @@ bool studyAutoSpeakAllowed(QuestionType type) =>
 
 /// 进入题目时静默播放一次发音。
 ///
-/// 自动播放是背景行为，不弹「已改用系统朗读」之类的提示：用户并没有点任何
-/// 东西，每换一题冒一条 SnackBar 会把答题节奏切碎。失败也只是没声音，
-/// 页面上仍有朗读按钮可以重试。
+/// 自动播放是背景行为，不弹「已自动切换」之类的提示：用户并没有点任何
+/// 东西，每换一题冒一条 SnackBar 会把答题节奏切碎。失败时才提示检查设置。
 Future<String?> studyAutoSpeak({
   required WordSpeaker speaker,
   required PlaybackSettings playback,
@@ -146,7 +135,6 @@ Future<String?> studyAutoSpeak({
   if (!answerRevealed && !studyAutoSpeakAllowed(item.questionType)) {
     return null;
   }
-  speaker.humanAudioEnabled = playback.humanAudioEnabled;
   final result = await speaker.speakForAutoPlay(
     studySpeechRequest(word: item.word, accent: accent, playback: playback),
   );
@@ -174,7 +162,6 @@ Future<void> speakStudyWord(
   final message = await studySpeakTerm(
     speaker: ref.read(wordSpeakerProvider),
     request: studySpeechRequest(word: word, accent: accent, playback: playback),
-    humanAudioEnabled: playback.humanAudioEnabled,
   );
   if (message == null || !context.mounted) return;
   messenger

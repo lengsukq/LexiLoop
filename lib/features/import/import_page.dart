@@ -11,7 +11,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lexiloop/data/import/csv_columns.dart';
 import 'package:lexiloop/data/import/import_models.dart';
+import 'package:lexiloop/data/import/wordlist_parser.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/import/import_history_section.dart';
 import 'package:lexiloop/features/import/import_preview_table.dart';
@@ -49,7 +51,7 @@ class ImportPage extends ConsumerWidget {
       // 最要紧的一个改动。
       header: PageHeader(
         title: '导入词库',
-        subtitle: '从 EasyDict 导出的 CSV 建库；文件只在本机解析，不会上传。',
+        subtitle: '支持 EasyDict CSV、Anki / 欧路 / 墨墨 TSV 与纯文本词表（TXT）；文件仅在本机解析。',
         leading: Builder(
           builder: (backContext) => IconButton(
             key: const Key('importBack'),
@@ -82,9 +84,17 @@ class ImportPage extends ConsumerWidget {
           const SizedBox(height: LexiSpace.s12),
           const _StepCard(
             step: 2,
-            title: '选择 EasyDict CSV 文件',
+            title: '选择词表文件（CSV / TSV / TXT）',
             child: _FileStep(),
           ),
+          if (state.pendingMapping != null) ...<Widget>[
+            const SizedBox(height: LexiSpace.s12),
+            _StepCard(
+              step: 2,
+              title: '未识别到标准表头 · 手动指定列映射',
+              child: _ColumnMappingForm(draft: state.pendingMapping!),
+            ),
+          ],
           if (state.errorMessage != null) ...<Widget>[
             const SizedBox(height: LexiSpace.s12),
             _ErrorBanner(message: state.errorMessage!),
@@ -222,25 +232,30 @@ class _LanguageDropdown extends StatelessWidget {
           style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
         ),
         const SizedBox(height: LexiSpace.s4),
-        // **不 `isExpanded`**：两个下拉框各占半行时，展开会让三角形箭头
-        // 落到各自那一半的最右端（离选中的语言约 900 像素），
-        // 控件与它显示的值看不出是一体的。让它按内容取宽。
-        DropdownButton<String>(
-          value: value,
-          underline: const SizedBox.shrink(),
-          items: <DropdownMenuItem<String>>[
-            for (final language in importLanguages)
-              DropdownMenuItem<String>(
-                value: language.code,
-                child: Text(
-                  '${language.label}（${language.code}）',
-                  style: LexiType.body.copyWith(color: colors.label),
+        // 限制最大宽度并用 `isExpanded`：桌面端箭头紧贴文案、不会被拉到行尾，
+        // 窄屏 + 2.0 倍大字体下也不会撑爆 360px 版心。
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 240),
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: <DropdownMenuItem<String>>[
+              for (final language in importLanguages)
+                DropdownMenuItem<String>(
+                  value: language.code,
+                  child: Text(
+                    '${language.label}（${language.code}）',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: LexiType.body.copyWith(color: colors.label),
+                  ),
                 ),
-              ),
-          ],
-          onChanged: (selected) {
-            if (selected != null) onChanged(selected);
-          },
+            ],
+            onChanged: (selected) {
+              if (selected != null) onChanged(selected);
+            },
+          ),
         ),
       ],
     );
@@ -257,32 +272,217 @@ class _FileStep extends ConsumerWidget {
     final notifier = ref.read(importWizardProvider.notifier);
     final preview = state.preview;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Expanded(
-          child: Text(
-            preview == null
-                ? '尚未选择文件。'
-                : '${preview.filename}（${preview.totalRows} 行）',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: LexiType.body.copyWith(
-              color: preview == null ? colors.secondaryLabel : colors.label,
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                preview == null
+                    ? '尚未选择文件（支持 CSV、TSV、每行一词 TXT）。'
+                    : '${preview.filename}（${preview.totalRows} 行）',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: LexiType.body.copyWith(
+                  color: preview == null ? colors.secondaryLabel : colors.label,
+                ),
+              ),
+            ),
+            const SizedBox(width: LexiSpace.s12),
+            FilledButton.icon(
+              key: const Key('importPickFile'),
+              onPressed: state.busy ? null : notifier.pickFile,
+              icon: state.busy
+                  ? const SizedBox(
+                      width: LexiSpace.s14,
+                      height: LexiSpace.s14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(LucideIcons.folderOpen, size: 16),
+              label: Text(preview == null ? '选择文件' : '重新选择'),
+            ),
+          ],
+        ),
+        const SizedBox(height: LexiSpace.s10),
+        TextField(
+          key: const Key('importBatchTags'),
+          onChanged: notifier.setBatchTagsText,
+          style: LexiType.body.copyWith(color: colors.label),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: '本批标签（选文件前填写，可选）',
+            hintText: '例如：雅思核心, Anki 导出（逗号或空格分隔）',
+            hintStyle: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
+            filled: true,
+            fillColor: colors.fill,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LexiRadius.md),
+              borderSide: BorderSide.none,
             ),
           ),
         ),
-        const SizedBox(width: LexiSpace.s12),
-        FilledButton.icon(
-          key: const Key('importPickFile'),
-          onPressed: state.busy ? null : notifier.pickFile,
-          icon: state.busy
-              ? const SizedBox(
-                  width: LexiSpace.s14,
-                  height: LexiSpace.s14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(LucideIcons.folderOpen, size: 16),
-          label: Text(preview == null ? '选择文件' : '重新选择'),
+      ],
+    );
+  }
+}
+
+/// 自定义 CSV/TSV 列映射表单。
+class _ColumnMappingForm extends ConsumerStatefulWidget {
+  const new({required this.draft});
+
+  final CsvColumnMappingDraft draft;
+
+  @override
+  ConsumerState<_ColumnMappingForm> createState() => _ColumnMappingFormState();
+}
+
+class _ColumnMappingFormState extends ConsumerState<_ColumnMappingForm> {
+  int _termCol = 0;
+  int? _definitionCol;
+  int? _phoneticCol;
+  int? _exampleCol;
+  int? _tagsCol;
+  bool _hasHeader = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final cols = widget.draft.headers.length;
+    _definitionCol = cols > 1 ? 1 : null;
+  }
+
+  Map<CsvField, int> _buildColumnMap() => <CsvField, int>{
+    CsvField.term: _termCol,
+    CsvField.definition: ?_definitionCol,
+    CsvField.phonetic: ?_phoneticCol,
+    CsvField.examples: ?_exampleCol,
+    CsvField.tags: ?_tagsCol,
+  };
+
+  List<Widget> _buildPickers(List<String> headers) => <Widget>[
+    _ColPicker(
+      label: '词条列（必选）',
+      headers: headers,
+      value: _termCol,
+      allowNone: false,
+      onChanged: (v) => setState(() => _termCol = v ?? 0),
+    ),
+    _ColPicker(
+      label: '释义列',
+      headers: headers,
+      value: _definitionCol,
+      onChanged: (v) => setState(() => _definitionCol = v),
+    ),
+    _ColPicker(
+      label: '音标列',
+      headers: headers,
+      value: _phoneticCol,
+      onChanged: (v) => setState(() => _phoneticCol = v),
+    ),
+    _ColPicker(
+      label: '例句列',
+      headers: headers,
+      value: _exampleCol,
+      onChanged: (v) => setState(() => _exampleCol = v),
+    ),
+    _ColPicker(
+      label: '标签列',
+      headers: headers,
+      value: _tagsCol,
+      onChanged: (v) => setState(() => _tagsCol = v),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final notifier = ref.read(importWizardProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '文件 ${widget.draft.filename} 未匹配到 EasyDict 标准表头，请指定各列含义：',
+          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+        ),
+        const SizedBox(height: LexiSpace.s8),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          value: _hasHeader,
+          onChanged: (value) => setState(() => _hasHeader = value ?? true),
+          title: Text(
+            '首行是表头（导入时跳过首行）',
+            style: LexiType.body.copyWith(color: colors.label),
+          ),
+        ),
+        Wrap(
+          spacing: LexiSpace.s16,
+          runSpacing: LexiSpace.s8,
+          children: _buildPickers(widget.draft.headers),
+        ),
+        const SizedBox(height: LexiSpace.s12),
+        Wrap(
+          spacing: LexiSpace.s8,
+          children: <Widget>[
+            FilledButton(
+              key: const Key('importApplyMapping'),
+              onPressed: () => notifier.applyColumnMapping(
+                _buildColumnMap(),
+                hasHeaderRow: _hasHeader,
+              ),
+              child: const Text('应用映射并预览'),
+            ),
+            TextButton(
+              onPressed: notifier.cancelColumnMapping,
+              child: const Text('取消'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ColPicker extends StatelessWidget {
+  const new({
+    required this.label,
+    required this.headers,
+    required this.value,
+    required this.onChanged,
+    this.allowNone = true,
+  });
+
+  final String label;
+  final List<String> headers;
+  final int? value;
+  final ValueChanged<int?> onChanged;
+  final bool allowNone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+        ),
+        DropdownButton<int?>(
+          value: value,
+          underline: const SizedBox.shrink(),
+          items: <DropdownMenuItem<int?>>[
+            if (allowNone) const DropdownMenuItem<int?>(child: Text('不导入')),
+            for (var i = 0; i < headers.length; i += 1)
+              DropdownMenuItem<int?>(
+                value: i,
+                child: Text(
+                  '第 ${i + 1} 列：${headers[i].isEmpty ? '(空)' : headers[i]}',
+                ),
+              ),
+          ],
+          onChanged: onChanged,
         ),
       ],
     );

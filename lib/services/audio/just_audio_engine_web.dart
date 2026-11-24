@@ -16,6 +16,7 @@ final class JustAudioEngine implements AudioPlayerPort {
   @override
   Future<void> prepare(Uint8List audio, {required double speed}) async {
     final uri = Uri.dataFromBytes(audio, mimeType: 'audio/mpeg');
+    await _player.stop();
     await _player.setUrl(uri.toString());
     await _player.setSpeed(speed);
   }

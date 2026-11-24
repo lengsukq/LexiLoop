@@ -107,6 +107,7 @@ class _ManualSectionState extends ConsumerState<_ManualSection> {
         else if (state.isCreated)
           _CreatedCard(
             wordId: state.createdWordId!,
+            queuedForLookup: state.queuedForLookup,
             onAddAnother: () => ref.read(manualEntryProvider.notifier).reset(),
           )
         else
@@ -116,40 +117,47 @@ class _ManualSectionState extends ConsumerState<_ManualSection> {
   }
 }
 
-/// 「粘贴文章」入口卡片。
+/// 「资料导入中心」卡片组：文章智能分词与词表文件导入。
 ///
-/// 整条链路（粘贴 → 分段预览 → 勾选 → 提交）是一个多步向导，因此进入
-/// 顶层路由 `/article`，而不是在本页内联展开。
+/// 整条文章链路（多源输入 → 难度分词 → 有道预查 → 入库）是一个多步向导，
+/// 因此进入顶层路由 `/article`，而不是在本页内联展开。
 class _ArticleImportCard extends StatelessWidget {
   const new();
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final accent = context.lexiTones.styleOf(LexiTone.lavender).foreground;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          '从已有内容导入',
-          style: LexiType.title.copyWith(color: context.lexiColors.label),
-        ),
+        Text('从已有内容导入', style: LexiType.title.copyWith(color: colors.label)),
         const SizedBox(height: LexiSpace.s12),
         Surface(
           variant: SurfaceVariant.raised,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(
-                LucideIcons.fileText,
-                color: context.lexiTones.styleOf(LexiTone.lavender).foreground,
-              ),
+              Icon(LucideIcons.sparkles, color: accent),
               const SizedBox(height: LexiSpace.s12),
-              const Text('从文章提取词汇', style: LexiType.callout),
+              Text(
+                '文章智能分词（LLM 分词 · 有道查词）',
+                style: LexiType.callout.copyWith(
+                  color: colors.label,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: LexiSpace.s4),
-              const Text('分析英文文章，预览后加入词库。', style: LexiType.footnote),
-              TextButton(
+              Text(
+                '支持粘贴正文、TXT / Markdown / SRT 字幕文件与网页链接，按高考、四六级、考研、专四/专八、雅思、托福、GRE 难度选词，再由有道词典查词补全。',
+                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+              ),
+              const SizedBox(height: LexiSpace.s10),
+              FilledButton.tonalIcon(
                 key: const Key('addOpenArticleImport'),
                 onPressed: () => context.go(articlePath),
-                child: const Text('开始粘贴'),
+                icon: const Icon(LucideIcons.fileText, size: 16),
+                label: const Text('开始文章分词'),
               ),
             ],
           ),
@@ -160,10 +168,12 @@ class _ArticleImportCard extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(
               LucideIcons.fileSpreadsheet,
-              color: context.lexiColors.accentText,
+              color: colors.accentText,
             ),
-            title: const Text('导入 CSV 词库'),
-            subtitle: const Text('从 EasyDict 收藏建立词库。'),
+            title: const Text('导入词表文件（CSV / TSV / TXT）'),
+            subtitle: const Text(
+              '支持 EasyDict、Anki、欧路、纯文本词表与自定义列映射，导入后自动由有道补全。',
+            ),
             trailing: const Icon(LucideIcons.chevronRight),
             onTap: () => context.go(csvImportPath),
           ),
@@ -175,9 +185,14 @@ class _ArticleImportCard extends StatelessWidget {
 
 /// 创建成功后的回执卡片。
 class _CreatedCard extends StatelessWidget {
-  const new({required this.wordId, required this.onAddAnother});
+  const new({
+    required this.wordId,
+    required this.queuedForLookup,
+    required this.onAddAnother,
+  });
 
   final int wordId;
+  final bool queuedForLookup;
   final VoidCallback onAddAnother;
 
   @override
@@ -201,7 +216,9 @@ class _CreatedCard extends StatelessWidget {
           ),
           const SizedBox(height: LexiSpace.s6),
           Text(
-            '词条已加入单词本，可在「单词本」中查看或补充例句。',
+            queuedForLookup
+                ? '未填写释义，已自动排入有道词典查词补全队列。'
+                : '词条已加入单词本，可在「单词本」中查看或补充例句。',
             style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
           ),
           const SizedBox(height: LexiSpace.s14),
@@ -209,10 +226,7 @@ class _CreatedCard extends StatelessWidget {
             spacing: LexiSpace.s10,
             runSpacing: LexiSpace.s8,
             children: <Widget>[
-              FilledButton(
-                onPressed: onAddAnother,
-                child: const Text('继续添加'),
-              ),
+              FilledButton(onPressed: onAddAnother, child: const Text('继续添加')),
               OutlinedButton(
                 onPressed: () => context.go('$wordDetailPathPrefix$wordId'),
                 child: const Text('查看词条'),

@@ -335,10 +335,7 @@ void main() {
       await tester.tap(find.byKey(const Key('lanSyncCodeConfirm')));
       await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const Key('lanSyncPullConfirmButton')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('lanSyncPullConfirmButton')), findsOneWidget);
       expect(find.byKey(const Key('lanSyncMergeConfirm')), findsNothing);
       expect(factory.calls, isEmpty);
       expect(

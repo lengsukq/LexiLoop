@@ -24,6 +24,7 @@ import 'package:lexiloop/features/games/games_page.dart';
 import 'package:lexiloop/features/import/import_page.dart';
 import 'package:lexiloop/features/initialize/initialize_page.dart';
 import 'package:lexiloop/features/match/match_page.dart';
+import 'package:lexiloop/features/packs/word_packs_page.dart';
 import 'package:lexiloop/features/phonetics/phonetics_page.dart';
 import 'package:lexiloop/features/settings/settings_page.dart';
 import 'package:lexiloop/features/statistics/statistics_page.dart';
@@ -75,6 +76,11 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
         path: articlePath,
         builder: (context, state) => _capped(const ArticlePage()),
       ),
+      GoRoute(
+        path: packsPath,
+        builder: (context, state) =>
+            _capped(const WordPacksPage(), maxWidth: LexiLayout.pageMaxWidth),
+      ),
       // 小游戏与配对不在主导航里（它们是「独立模式，不占用今日复习队列」），
       // 从首页的「趣味训练」进入，因此是顶层路由、不套外壳。
       GoRoute(
@@ -98,6 +104,9 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
                   builder: (context, state) => pageForDestination(
                     destination,
                     studyModeWire: state.uri.queryParameters['mode'],
+                    studyTag: state.uri.queryParameters['tag'],
+                    studyPackId: state.uri.queryParameters['pack'],
+                    settingsTab: state.uri.queryParameters['tab'],
                   ),
                   routes: _subRoutesFor(destination),
                 ),
@@ -119,7 +128,13 @@ GoRouter createAppRouter({String initialLocation = '/'}) {
 /// **未知路径抛 [StateError] 而不是渲染一个兜底页**：兜底页会让「新加了
 /// 目的地却忘了接线」表现为一个能正常打开的空页面，而抛错会在测试里
 /// 立刻暴露。旧版没有这层保护，占位组件被当成已完成页面用了很久。
-Widget pageForDestination(AppDestination destination, {String? studyModeWire}) {
+Widget pageForDestination(
+  AppDestination destination, {
+  String? studyModeWire,
+  String? studyTag,
+  String? studyPackId,
+  String? settingsTab,
+}) {
   return switch (destination.path) {
     '/' => const DashboardPage(),
     '/add' => const AddPage(),
@@ -128,9 +143,13 @@ Widget pageForDestination(AppDestination destination, {String? studyModeWire}) {
     '/match' => const MatchPage(),
     '/phonetics' => const PhoneticsPage(),
     '/words' => const WordsPage(),
-    '/settings' => const SettingsPage(),
+    '/settings' => SettingsPage(initialTab: settingsTab),
     '/statistics' => const StatisticsPage(),
-    '/study' => StudyPage(mode: studyModeOf(studyModeWire)),
+    '/study' => StudyPage(
+      mode: studyModeOf(studyModeWire),
+      tag: studyTag,
+      packId: studyPackId,
+    ),
     _ => throw StateError(
       '导航目的地 ${destination.path} 没有对应页面：'
       ' 请在 pageForDestination 里补一个分支。',

@@ -149,29 +149,41 @@ class _LevelOption extends StatelessWidget {
 
 /// 可选为考试目标的档位（不含「不限定」）。
 const List<VocabularyLevel> _examLevels = <VocabularyLevel>[
+  VocabularyLevel.gaokao,
   VocabularyLevel.cet4,
   VocabularyLevel.cet6,
   VocabularyLevel.ky,
+  VocabularyLevel.tem4,
+  VocabularyLevel.tem8,
   VocabularyLevel.ielts,
   VocabularyLevel.toefl,
+  VocabularyLevel.gre,
 ];
 
 /// 词汇水平的中文名。
 String vocabularyLevelLabel(VocabularyLevel level) => switch (level) {
   VocabularyLevel.auto => '不限定',
+  VocabularyLevel.gaokao => '高考英语',
   VocabularyLevel.cet4 => '大学英语四级（CET4）',
   VocabularyLevel.cet6 => '大学英语六级（CET6）',
   VocabularyLevel.ky => '考研（KY）',
+  VocabularyLevel.tem4 => '英语专业四级（TEM4）',
+  VocabularyLevel.tem8 => '英语专业八级（TEM8）',
   VocabularyLevel.ielts => '雅思（IELTS）',
   VocabularyLevel.toefl => '托福（TOEFL）',
+  VocabularyLevel.gre => 'GRE 核心词汇',
 };
 
 /// 考试目标的短标签。
 String _examLabel(VocabularyLevel level) => switch (level) {
+  VocabularyLevel.gaokao => '高考',
   VocabularyLevel.cet4 => 'CET4',
   VocabularyLevel.cet6 => 'CET6',
   VocabularyLevel.ky => '考研',
+  VocabularyLevel.tem4 => '专四',
+  VocabularyLevel.tem8 => '专八',
   VocabularyLevel.ielts => '雅思',
   VocabularyLevel.toefl => '托福',
+  VocabularyLevel.gre => 'GRE',
   VocabularyLevel.auto => '不限定',
 };

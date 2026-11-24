@@ -336,7 +336,46 @@ void main() {
       ]);
     });
 
-    test('有道没有可用内容时再用 AI 兜底一次', () async {
+    Future<void> enableAiFallback() => settings.update(<String, Object?>{
+      'llmConfig': <String, Object?>{
+        'providers': <Object?>[
+          <String, Object?>{
+            'id': 'p1',
+            'name': 'OpenAI',
+            'apiType': 'openai',
+            'baseUrl': 'https://a.example/v1',
+            'apiKey': 'sk-test',
+          },
+        ],
+        'ai': <String, Object?>{
+          'enabled': true,
+          'providerId': 'p1',
+          'model': 'gpt-4o',
+          'features': <String, Object?>{'dictionaryFallback': true},
+        },
+      },
+    }, now: now);
+
+    test('默认不开启 AI 兜底时，有道无结果不会静默调用 AI', () async {
+      dictionary.handler = (_) async => _emptyResult();
+
+      await expectLater(
+        preview(),
+        throwsA(
+          isA<ExternalServiceError>().having(
+            (error) => error.details,
+            'details',
+            contains('当前仅使用有道词典查词'),
+          ),
+        ),
+      );
+      expect(dictionary.selections, <List<String>>[
+        <String>['youdao'],
+      ]);
+    });
+
+    test('开启 AI 兜底且有道没有可用内容时再用 AI 兜底一次', () async {
+      await enableAiFallback();
       dictionary.handler = (selected) async => selected.contains('ai')
           ? _richResult(providerId: 'ai:openai:gpt-4o')
           : _emptyResult();
@@ -351,6 +390,7 @@ void main() {
     });
 
     test('两次都没有可用内容时报错，文案点明可操作原因', () async {
+      await enableAiFallback();
       dictionary.handler = (_) async => _emptyResult();
 
       await expectLater(
@@ -372,6 +412,7 @@ void main() {
     });
 
     test('AI 兜底不可用时，报错里说明「AI 不可用」', () async {
+      await enableAiFallback();
       dictionary.handler = (selected) async {
         if (selected.contains('ai')) {
           throw const ExternalServiceError(

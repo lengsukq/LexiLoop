@@ -328,6 +328,73 @@ void main() {
       expect(fetcher.calls, isEmpty);
       expect((await jobRow(jobId))['status'], InitializationStatus.ready.wire);
     });
+
+    test('开启 AI 但未开启「后台自动生成助记」时，有道完成后不入队助记任务', () async {
+      await settings.update(<String, Object?>{
+        'llmConfig': <String, Object?>{
+          'providers': <Object?>[
+            <String, Object?>{
+              'id': 'p1',
+              'name': 'OpenAI',
+              'apiType': 'openai',
+              'baseUrl': 'https://a.example/v1',
+              'apiKey': 'sk-test',
+            },
+          ],
+          'ai': <String, Object?>{
+            'enabled': true,
+            'providerId': 'p1',
+            'model': 'gpt-4o',
+          },
+        },
+      }, now: now);
+      final wordId = await insertWord();
+      await insertJob(wordId: wordId);
+
+      await workerWith(succeedingFetcher('hello')).tick(now: now);
+
+      final mnemonicJobs = await db
+          .customSelect(
+            'SELECT COUNT(*) AS c FROM initialization_jobs '
+            "WHERE task_type = 'MNEMONIC'",
+          )
+          .getSingle();
+      expect(mnemonicJobs.read<int>('c'), 0);
+    });
+
+    test('显式开启「后台自动生成助记」时，有道完成后自动入队助记任务', () async {
+      await settings.update(<String, Object?>{
+        'llmConfig': <String, Object?>{
+          'providers': <Object?>[
+            <String, Object?>{
+              'id': 'p1',
+              'name': 'OpenAI',
+              'apiType': 'openai',
+              'baseUrl': 'https://a.example/v1',
+              'apiKey': 'sk-test',
+            },
+          ],
+          'ai': <String, Object?>{
+            'enabled': true,
+            'providerId': 'p1',
+            'model': 'gpt-4o',
+            'features': <String, Object?>{'autoMnemonic': true},
+          },
+        },
+      }, now: now);
+      final wordId = await insertWord();
+      await insertJob(wordId: wordId);
+
+      await workerWith(succeedingFetcher('hello')).tick(now: now);
+
+      final mnemonicJobs = await db
+          .customSelect(
+            'SELECT COUNT(*) AS c FROM initialization_jobs '
+            "WHERE task_type = 'MNEMONIC'",
+          )
+          .getSingle();
+      expect(mnemonicJobs.read<int>('c'), 1);
+    });
   });
 
   group('resetStaleRunningJobs', () {

@@ -88,10 +88,15 @@ class InitializationMaintenance {
   final List<MaintenanceTickListener> _listeners = <MaintenanceTickListener>[];
   MaintenanceTimer? _timer;
   bool _running = false;
+  bool _paused = false;
   bool _ticking = false;
+  bool _kickPending = false;
 
   /// 是否已启动且尚未 [dispose]。
   bool get isRunning => _running;
+
+  /// 是否已暂停（例如应用切入后台）。
+  bool get isPaused => _paused;
 
   /// 订阅「后台一批跑完」事件。
   ///
@@ -111,12 +116,42 @@ class InitializationMaintenance {
   Future<void> start({required int now}) async {
     if (_running) return;
     _running = true;
+    _paused = false;
     await _reclaimJobs(now);
     await _sweepStaleData(now);
     final processed = await _tickAndReport();
-    // 上面三步都是 await，期间可能已被 dispose；此时不该把定时器复活。
-    if (!_running) return;
+    // 上面三步都是 await，期间可能已被 dispose 或 pause；此时不该把定时器复活。
+    if (!_running || _paused) return;
     _schedule(_policy.intervalAfter(processed: processed));
+  }
+
+  /// 立即唤醒队列（例如导入或手动添加新词条后，不必等空闲间隔）。
+  ///
+  /// 未启动或已暂停时为安全空操作（避免在无 `MaintenanceBootstrap` 的测试里挂出定时器）。
+  void kick() {
+    if (!_running || _paused) return;
+    if (_ticking) {
+      _kickPending = true;
+      return;
+    }
+    _timer?.cancel();
+    _timer = null;
+    unawaited(_tickThenReschedule());
+  }
+
+  /// 暂停后台调度（应用切入后台时停止定时器，节省电量）。
+  void pause() {
+    if (!_running || _paused) return;
+    _paused = true;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  /// 恢复后台调度（应用回到前台时立即检查一次并继续排期）。
+  void resume() {
+    if (!_running || !_paused) return;
+    _paused = false;
+    unawaited(_tickThenReschedule());
   }
 
   /// 只做一次 `tick(now)`（队列页「立即处理」按钮走这里）。
@@ -140,6 +175,8 @@ class InitializationMaintenance {
   /// 取消定时器，之后 [start] 可以重新点火。
   void dispose() {
     _running = false;
+    _paused = false;
+    _kickPending = false;
     _timer?.cancel();
     _timer = null;
   }
@@ -194,7 +231,12 @@ class InitializationMaintenance {
 
   Future<void> _tickThenReschedule() async {
     final processed = await _tickAndReport();
-    if (!_running) return;
+    if (!_running || _paused) return;
+    if (_kickPending) {
+      _kickPending = false;
+      _schedule(_policy.busyTickInterval);
+      return;
+    }
     _schedule(_policy.intervalAfter(processed: processed));
   }
 
@@ -204,7 +246,7 @@ class InitializationMaintenance {
   }
 
   void _onTimerElapsed() {
-    if (!_running) return;
+    if (!_running || _paused) return;
     unawaited(_tickThenReschedule());
   }
 

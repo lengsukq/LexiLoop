@@ -53,38 +53,6 @@ Uri? resolveHumanAudioUrl({
   return null;
 }
 
-/// 构建与 Next.js `GET /api/tts` 相同的 HTTP 请求。
-///
-/// 不在客户端实现非官方 Edge WebSocket：由用户部署的 Next.js 服务完成合成。
-/// 仅接受 HTTPS（或本机调试 HTTP）根地址，不允许附带凭证与任意路径。
-Uri? onlineTtsAudioUri({
-  required String baseUrl,
-  required String term,
-  required Accent accent,
-}) {
-  final root = Uri.tryParse(baseUrl.trim());
-  final text = term.trim();
-  if (root == null ||
-      text.isEmpty ||
-      root.host.isEmpty ||
-      (root.path.isNotEmpty && root.path != '/') ||
-      root.userInfo.isNotEmpty ||
-      root.hasQuery ||
-      root.hasFragment ||
-      (root.scheme != 'https' &&
-          !(root.scheme == 'http' &&
-              (root.host == 'localhost' || root.host == '127.0.0.1')))) {
-    return null;
-  }
-  return root.replace(
-    path: '/api/tts',
-    queryParameters: <String, String>{
-      'word': text,
-      'accent': accent == Accent.uk ? 'UK' : 'US',
-    },
-  );
-}
-
 /// 有道真人发音的地址；词条为空时返回 `null`。
 ///
 /// `type` 参数决定口音（英音 `1`、美音 `2`），这是同一个词在两种口音下

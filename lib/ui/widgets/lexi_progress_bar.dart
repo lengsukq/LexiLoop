@@ -11,12 +11,7 @@ import 'package:lexiloop/ui/theme/lexi_motion.dart';
 /// 通用平滑动画进度条。
 class LexiProgressBar extends StatelessWidget {
   /// 以 `0.0`–`1.0` 的进度值构造。
-  const new({
-    required this.value,
-    this.color,
-    this.height = 6,
-    super.key,
-  });
+  const new({required this.value, this.color, this.height = 6, super.key});
 
   /// 当前进度（自动钳制在 `0.0`–`1.0` 之间）。
   final double value;

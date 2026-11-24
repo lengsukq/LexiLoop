@@ -16,6 +16,7 @@ import 'package:lexiloop/data/db/tables/initialization_tables.dart';
 import 'package:lexiloop/data/db/tables/misc_tables.dart';
 import 'package:lexiloop/data/db/tables/review_tables.dart';
 import 'package:lexiloop/data/db/tables/study_tables.dart';
+import 'package:lexiloop/data/db/tables/word_pack_tables.dart';
 import 'package:lexiloop/data/db/tables/word_tables.dart';
 // 生成的 part 文件会引用这些枚举类型，必须在此导入。
 import 'package:lexiloop/domain/enums.dart';
@@ -39,6 +40,9 @@ const String _indexDdl = """
 CREATE INDEX IF NOT EXISTS words_status_idx ON words(initialization_status);
 CREATE INDEX IF NOT EXISTS words_mastery_idx ON words(mastery_level);
 CREATE INDEX IF NOT EXISTS words_created_idx ON words(created_at);
+CREATE INDEX IF NOT EXISTS words_personal_idx ON words(is_personal);
+CREATE INDEX IF NOT EXISTS word_pack_items_word_idx ON word_pack_items(word_id);
+CREATE INDEX IF NOT EXISTS word_pack_items_pack_rank_idx ON word_pack_items(pack_id, rank);
 CREATE INDEX IF NOT EXISTS study_sessions_started_idx ON study_sessions(started_at);
 CREATE INDEX IF NOT EXISTS study_sessions_completed_idx ON study_sessions(completed_at, started_at);
 CREATE INDEX IF NOT EXISTS study_sessions_source_idx ON study_sessions(source_type, completed_at, started_at);
@@ -80,6 +84,8 @@ List<String> get _indexStatements => _indexDdl
     Words,
     WordContents,
     WordReviewStats,
+    WordPacks,
+    WordPackItems,
     StudySessions,
     StudySessionItems,
     ReviewCards,
@@ -106,7 +112,7 @@ class AppDatabase extends _$AppDatabase {
   factory open() => AppDatabase(openAppDatabaseExecutor());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -116,7 +122,11 @@ class AppDatabase extends _$AppDatabase {
         await _createIndexes();
       },
       onUpgrade: (m, from, to) async {
-        // 尚无历史版本；后续 schema 变更在此按版本分支迁移。
+        if (from < 2) {
+          await m.addColumn(words, words.isPersonal);
+          await m.createTable(wordPacks);
+          await m.createTable(wordPackItems);
+        }
         await _createIndexes();
       },
       beforeOpen: (details) async {

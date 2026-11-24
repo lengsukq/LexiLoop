@@ -43,11 +43,21 @@ class StudyService {
     required int now,
     bool resume = true,
     bool continuous = false,
+    String? tag,
+    String? packId,
   }) async {
     await _study.expireStaleSessions(now);
+    final cleanTag = tag?.trim();
+    final hasTag = cleanTag != null && cleanTag.isNotEmpty;
+    final cleanPack = packId?.trim();
+    final hasPack = cleanPack != null && cleanPack.isNotEmpty;
 
-    if (resume) {
-      final resumableId = await _study.findResumableSession(mode, now);
+    if (resume && !hasTag) {
+      final resumableId = await _study.findResumableSession(
+        mode,
+        now,
+        packId: hasPack ? cleanPack : null,
+      );
       if (resumableId != null) {
         return await _study.loadSession(resumableId, resumed: true);
       }
@@ -57,7 +67,9 @@ class StudyService {
     final pools = await _study.loadPools(
       now: now,
       scope: scope,
-      applyDailySoftQuota: mode == StudyMode.daily,
+      applyDailySoftQuota: mode == StudyMode.daily && !hasTag && !hasPack,
+      tag: hasTag ? cleanTag : null,
+      packId: hasPack ? cleanPack : null,
     );
     final recommended = mode == StudyMode.aiRecommended
         ? await _study.aiRecommendedCandidates(now)
@@ -73,6 +85,8 @@ class StudyService {
         limit: continuousBatchSize,
         now: now,
         scope: CandidateScope.lexical,
+        tag: hasTag ? cleanTag : null,
+        packId: hasPack ? cleanPack : null,
       );
     }
 
@@ -82,9 +96,12 @@ class StudyService {
       pools: pools,
       now: now,
     );
+    final sourceType = hasPack
+        ? '$wordPackSessionSourcePrefix$cleanPack'
+        : (hasTag ? 'TAG:$cleanTag' : _sourceType(mode));
     final sessionId = await _study.createSession(
       mode: _persistedMode(mode),
-      sourceType: _sourceType(mode),
+      sourceType: sourceType,
       items: drafts,
       now: now,
     );
@@ -270,23 +287,31 @@ class StudyService {
     required int limit,
     required int now,
     required CandidateScope scope,
+    String? tag,
+    String? packId,
   }) async {
     final due = await _study.dueCandidates(
       limit: limit,
       now: now,
       scope: scope,
+      tag: tag,
+      packId: packId,
     );
     final dueIds = due.map((item) => item.id).toSet();
     final wrong = (await _study.wrongCandidates(
       limit: limit,
       now: now,
       scope: scope,
+      tag: tag,
+      packId: packId,
     )).where((item) => !dueIds.contains(item.id)).toList(growable: false);
     final reviewIds = <int>{...dueIds, ...wrong.map((item) => item.id)};
     final fresh = (await _study.newCandidates(
       limit: limit,
       now: now,
       scope: scope,
+      tag: tag,
+      packId: packId,
     )).where((item) => !reviewIds.contains(item.id)).toList(growable: false);
 
     final pools = StudyPools(
@@ -304,6 +329,8 @@ class StudyService {
       now: now,
       scope: scope,
       excludedIds: selected.map((item) => item.id).toSet(),
+      tag: tag,
+      packId: packId,
     );
     return <StudyCandidate>[
       ...selected,

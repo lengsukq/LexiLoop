@@ -5,13 +5,16 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_candidate_list.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
 import 'package:lexiloop/features/add/widgets/article_progress_step.dart';
 import 'package:lexiloop/features/add/widgets/article_strategy_card.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -54,10 +57,20 @@ class _SummaryCard extends ConsumerWidget {
     final notifier = ref.read(articleWizardProvider.notifier);
     return ArticleSectionCard(
       title: preview.filename,
-      trailing: TextButton(
-        key: const Key('articleRestart'),
-        onPressed: notifier.restart,
-        child: const Text('重新粘贴'),
+      trailing: Wrap(
+        spacing: LexiSpace.s4,
+        children: <Widget>[
+          TextButton(
+            key: const Key('articleBackToEdit'),
+            onPressed: notifier.backToEdit,
+            child: const Text('修改/重选难度'),
+          ),
+          TextButton(
+            key: const Key('articleRestart'),
+            onPressed: notifier.restart,
+            child: const Text('重新粘贴'),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,6 +210,12 @@ class _SummaryNotices extends ConsumerWidget {
       child: ArticleNotice(
         icon: LucideIcons.wandSparkles,
         message: _configureAiHint,
+        action: TextButton(
+          key: const Key('articleConfigureAiLink'),
+          onPressed: () =>
+              GoRouter.maybeOf(context)?.go('$settingsPath?tab=ai'),
+          child: const Text('去配置'),
+        ),
       ),
     );
   }
@@ -204,8 +223,8 @@ class _SummaryNotices extends ConsumerWidget {
 
 /// 未配置 AI 时的引导文案。
 final String _configureAiHint = <String>[
-  '到「设置 → 模型服务 → AI」配置 LLM，',
-  '可获得按你词汇量智能筛选的短语与句子卡片。',
+  '到「设置 → AI 模型」配置 LLM，',
+  '即可按高考/四六级/雅思/托福等难度自动分词并还原词形；查词与发音仍由有道词典完成。',
 ].join();
 
 /// AI 回退后的重试入口。

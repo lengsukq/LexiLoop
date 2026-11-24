@@ -78,7 +78,50 @@ class LlmProviderConfig {
   bool get isUsable => baseUrl.isNotEmpty && apiKey.isNotEmpty;
 }
 
-/// 词条初始化 / 建议等用途共用的 AI 配置。
+/// AI 各用途的独立开关。
+///
+/// 默认仅开启「文章智能分词」与「每日学习建议」：
+/// 词典查词、例句与发音默认由有道等词典数据源完成，避免配置好 AI 后
+/// 在后台静默消耗额度生成助记、补翻译或兜底查词。
+class LlmFeatureToggles {
+  /// 以各用途开关构造。
+  const new({
+    this.articleTokenize = true,
+    this.autoMnemonic = false,
+    this.autoTranslate = false,
+    this.dictionaryFallback = false,
+    this.dailySuggestion = true,
+  });
+
+  /// 文章智能分词与难度筛选（默认开启）。
+  final bool articleTokenize;
+
+  /// 有道查词完成后，后台自动调用 AI 生成助记（默认关闭）。
+  final bool autoMnemonic;
+
+  /// 句子词条缺目标语言翻译时，后台自动调用 AI 补翻译（默认关闭）。
+  final bool autoTranslate;
+
+  /// 词典无结果或显式选源时，允许使用 AI 兜底查词（默认关闭）。
+  final bool dictionaryFallback;
+
+  /// 首页每日学习建议允许由 AI 润色（默认开启）。
+  final bool dailySuggestion;
+
+  /// 默认用途开关。
+  static const LlmFeatureToggles defaults = LlmFeatureToggles();
+
+  /// 序列化为可落库的键值映射。
+  Map<String, Object?> toJson() => <String, Object?>{
+    'articleTokenize': articleTokenize,
+    'autoMnemonic': autoMnemonic,
+    'autoTranslate': autoTranslate,
+    'dictionaryFallback': dictionaryFallback,
+    'dailySuggestion': dailySuggestion,
+  };
+}
+
+/// 词条初始化 / 分词 / 建议等用途共用的 AI 配置。
 class LlmAiConfig {
   /// 以各字段构造。
   const new({
@@ -94,6 +137,7 @@ class LlmAiConfig {
     this.thinkingBudgetTokens = defaultThinkingBudgetTokens,
     this.reasoningEffort = '',
     this.retryCount = defaultAiRetryCount,
+    this.features = LlmFeatureToggles.defaults,
   });
 
   /// 是否启用。
@@ -131,6 +175,9 @@ class LlmAiConfig {
 
   /// 重试遍数。
   final int retryCount;
+
+  /// 各用途的独立开关。
+  final LlmFeatureToggles features;
 }
 
 /// LLM 配置。
@@ -169,6 +216,21 @@ class LlmConfig {
         primary.isUsable &&
         ai.model.trim().isNotEmpty;
   }
+
+  /// 是否允许用于文章智能分词。
+  bool get canArticleTokenize => isUsable && ai.features.articleTokenize;
+
+  /// 是否允许在查词后自动入队助记生成。
+  bool get canAutoMnemonic => isUsable && ai.features.autoMnemonic;
+
+  /// 是否允许在查词后自动入队句子翻译。
+  bool get canAutoTranslate => isUsable && ai.features.autoTranslate;
+
+  /// 是否允许作为词典兜底或手动 AI 查词数据源。
+  bool get canDictionaryFallback => isUsable && ai.features.dictionaryFallback;
+
+  /// 是否允许用于首页每日学习建议。
+  bool get canDailySuggestion => isUsable && ai.features.dailySuggestion;
 }
 
 /// 从整份 `settings.raw` 解析 LLM 配置。
@@ -195,6 +257,7 @@ LlmConfig llmConfigFromSettings(Map<Object?, Object?> settingsRaw) {
       timeoutMs: config.ai.timeoutMs,
       thinkingBudgetTokens: config.ai.thinkingBudgetTokens,
       retryCount: override.round().clamp(1, maxAiRetryCount),
+      features: config.ai.features,
     ),
   );
 }
@@ -260,8 +323,23 @@ LlmAiConfig _ai(Object? raw) {
     maxOutputTokens: limits.$2,
     timeoutMs: limits.$3,
     thinkingBudgetTokens: limits.$4,
+    features: _features(raw['features']),
   );
 }
+
+LlmFeatureToggles _features(Object? raw) {
+  if (raw is! Map) return LlmFeatureToggles.defaults;
+  return LlmFeatureToggles(
+    articleTokenize: _boolOr(raw['articleTokenize'], fallback: true),
+    autoMnemonic: _boolOr(raw['autoMnemonic'], fallback: false),
+    autoTranslate: _boolOr(raw['autoTranslate'], fallback: false),
+    dictionaryFallback: _boolOr(raw['dictionaryFallback'], fallback: false),
+    dailySuggestion: _boolOr(raw['dailySuggestion'], fallback: true),
+  );
+}
+
+bool _boolOr(Object? value, {required bool fallback}) =>
+    value is bool ? value : fallback;
 
 /// 数值字段的取值夹取。
 ///

@@ -4,36 +4,44 @@
 /// 正文输入（带字符计数）、分段方案预览与「单次 / 分批」两个分析入口。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/domain/article_import/article_models.dart';
 import 'package:lexiloop/domain/models/app_settings.dart';
 import 'package:lexiloop/features/add/article_providers.dart';
 import 'package:lexiloop/features/add/widgets/article_common.dart';
+import 'package:lexiloop/services/llm/llm_config.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
 import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// 考试目标的中文名。
+/// 考试目标的中文名（全 9 档）。
 const Map<VocabularyLevel, String> articleExamTargetLabels =
     <VocabularyLevel, String>{
+      VocabularyLevel.gaokao: '高考',
       VocabularyLevel.cet4: 'CET-4',
       VocabularyLevel.cet6: 'CET-6',
       VocabularyLevel.ky: '考研',
+      VocabularyLevel.tem4: '专四',
+      VocabularyLevel.tem8: '专八',
       VocabularyLevel.ielts: '雅思',
       VocabularyLevel.toefl: '托福',
+      VocabularyLevel.gre: 'GRE',
     };
 
 /// 第一步的说明文案。
-///
-/// 用 `join()` 而不是相邻字符串字面量：中文文案之间不需要空格，而相邻字面量
-/// 的「缺空格」会被 `missing_whitespace_between_adjacent_strings` 判为笔误。
 final String _inputHint = <String>[
-  'AI 会结合你的词库与考试目标，自动挑出值得学的单词、短语与句子。',
-  '未配置 AI 也可按生词与本地切句导入。',
+  'LLM 负责按所选难度智能分词并还原词形，导入后自动通过有道词典查询音标、释义与例句；',
+  '未配置 AI 时也可使用本地分词导入。',
 ].join();
 
 /// 第一步界面。
@@ -49,7 +57,7 @@ class ArticleInputStep extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         ArticleSectionCard(
-          title: '粘贴英文文章',
+          title: '导入英文文章',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -59,9 +67,15 @@ class ArticleInputStep extends ConsumerWidget {
                   color: context.lexiColors.secondaryLabel,
                 ),
               ),
+              const SizedBox(height: articleTightGap),
+              const _AiReadinessBar(),
               const SizedBox(height: articleCardGap),
               const _ExamTargetPicker(),
               const SizedBox(height: articleCardGap),
+              const _TokenizeOptions(),
+              const SizedBox(height: articleCardGap),
+              const _SourceImportBar(),
+              const SizedBox(height: articleTightGap),
               const _ArticleTextField(),
               if (plan != null && plan.segments.length > 1) ...<Widget>[
                 const SizedBox(height: articleCardGap),
@@ -88,6 +102,222 @@ class ArticleInputStep extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _AiReadinessBar extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(appSettingsProvider).value;
+    if (settings == null) return const SizedBox.shrink();
+    final llm = llmConfigFromSettings(settings.raw);
+    final ready = llm.canArticleTokenize;
+    return Wrap(
+      spacing: LexiSpace.s8,
+      runSpacing: LexiSpace.s4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        ArticleBadge(
+          label: ready
+              ? 'AI 分词已就绪 · ${llm.ai.model} · 有道查词'
+              : '未启用 AI 分词 · 将使用本地提词',
+          tone: ready ? LexiBadgeTone.purple : LexiBadgeTone.warning,
+        ),
+        TextButton(
+          key: const Key('articleOpenAiSettings'),
+          onPressed: () {
+            final router = GoRouter.maybeOf(context);
+            router?.go('$settingsPath?tab=ai');
+          },
+          child: Text(ready ? '调整 AI 设置' : '去配置 AI'),
+        ),
+      ],
+    );
+  }
+}
+
+class _TokenizeOptions extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    final state = ref.watch(articleWizardProvider);
+    final notifier = ref.read(articleWizardProvider.notifier);
+    return Wrap(
+      spacing: LexiSpace.s16,
+      runSpacing: LexiSpace.s8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        Wrap(
+          spacing: LexiSpace.s6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            Text(
+              '难度口径：',
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+            ),
+            ChoiceChip(
+              key: const Key('articleModeAtOrAbove'),
+              label: const Text('该级别及以上'),
+              selected:
+                  state.draft.difficultyMode == ArticleDifficultyMode.atOrAbove,
+              onSelected: (_) =>
+                  notifier.setDifficultyMode(ArticleDifficultyMode.atOrAbove),
+            ),
+            ChoiceChip(
+              key: const Key('articleModeExactBand'),
+              label: const Text('精准匹配该级别'),
+              selected:
+                  state.draft.difficultyMode == ArticleDifficultyMode.exactBand,
+              onSelected: (_) =>
+                  notifier.setDifficultyMode(ArticleDifficultyMode.exactBand),
+            ),
+          ],
+        ),
+        Wrap(
+          spacing: LexiSpace.s6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            Text(
+              '提取范围：',
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+            ),
+            ChoiceChip(
+              key: const Key('articleScopeWordsOnly'),
+              label: const Text('仅分词（快速）'),
+              selected:
+                  state.draft.extractScope == ArticleExtractScope.wordsOnly,
+              onSelected: (_) =>
+                  notifier.setExtractScope(ArticleExtractScope.wordsOnly),
+            ),
+            ChoiceChip(
+              key: const Key('articleScopeFull'),
+              label: const Text('含短语与难句'),
+              selected:
+                  state.draft.extractScope ==
+                  ArticleExtractScope.withPhrasesAndSentences,
+              onSelected: (_) => notifier.setExtractScope(
+                ArticleExtractScope.withPhrasesAndSentences,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SourceImportBar extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    final state = ref.watch(articleWizardProvider);
+    final notifier = ref.read(articleWizardProvider.notifier);
+    final busy = state.draft.loadingSource;
+    return Wrap(
+      spacing: LexiSpace.s8,
+      runSpacing: LexiSpace.s6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        OutlinedButton.icon(
+          key: const Key('articlePasteClipboard'),
+          onPressed: busy ? null : () => unawaited(_paste(notifier)),
+          icon: const Icon(LucideIcons.clipboardPaste, size: 15),
+          label: const Text('粘贴剪贴板'),
+        ),
+        OutlinedButton.icon(
+          key: const Key('articlePickFile'),
+          onPressed: busy ? null : notifier.importLocalFile,
+          icon: const Icon(LucideIcons.fileUp, size: 15),
+          label: const Text('导入文件'),
+        ),
+        OutlinedButton.icon(
+          key: const Key('articleFetchUrl'),
+          onPressed: busy
+              ? null
+              : () => unawaited(_promptUrl(context, notifier)),
+          icon: const Icon(LucideIcons.globe, size: 15),
+          label: const Text('抓取网页'),
+        ),
+        if (busy)
+          const SizedBox(
+            width: LexiSpace.s16,
+            height: LexiSpace.s16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (state.draft.sourceLabel != null)
+          Text(
+            '来源：${state.draft.sourceLabel}',
+            style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _paste(ArticleWizardNotifier notifier) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isEmpty) return;
+    await notifier.ingestExternalText(text);
+  }
+
+  Future<void> _promptUrl(
+    BuildContext context,
+    ArticleWizardNotifier notifier,
+  ) async {
+    final url = await showDialog<String>(
+      context: context,
+      builder: (_) => const _UrlPromptDialog(),
+    );
+    if (url != null && url.isNotEmpty) {
+      await notifier.fetchWebUrl(url);
+    }
+  }
+}
+
+class _UrlPromptDialog extends StatefulWidget {
+  const new();
+
+  @override
+  State<_UrlPromptDialog> createState() => _UrlPromptDialogState();
+}
+
+class _UrlPromptDialogState extends State<_UrlPromptDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('抓取英文网页正文'),
+    content: TextField(
+      key: const Key('articleUrlInput'),
+      controller: _controller,
+      autofocus: true,
+      decoration: const InputDecoration(
+        hintText: 'https://example.com/article',
+      ),
+    ),
+    actions: <Widget>[
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        key: const Key('articleUrlConfirm'),
+        onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+        child: const Text('抓取正文'),
+      ),
+    ],
+  );
 }
 
 class _ExamTargetPicker extends ConsumerWidget {

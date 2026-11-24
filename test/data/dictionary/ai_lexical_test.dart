@@ -128,7 +128,10 @@ String openAiBody(
   ],
 });
 
-Map<String, Object?> llmConfigRaw({bool enabled = true}) => <String, Object?>{
+Map<String, Object?> llmConfigRaw({
+  bool enabled = true,
+  bool dictionaryFallback = false,
+}) => <String, Object?>{
   'providers': <Object?>[
     <String, Object?>{
       'id': 'p1',
@@ -142,12 +145,19 @@ Map<String, Object?> llmConfigRaw({bool enabled = true}) => <String, Object?>{
     'enabled': enabled,
     'providerId': 'p1',
     'model': 'm1',
+    'features': <String, Object?>{'dictionaryFallback': dictionaryFallback},
   },
 };
 
-AppSettings settingsWith({bool enabled = true}) => appSettingsFromRaw(
-  <String, Object?>{'llmConfig': llmConfigRaw(enabled: enabled)},
-);
+AppSettings settingsWith({
+  bool enabled = true,
+  bool dictionaryFallback = false,
+}) => appSettingsFromRaw(<String, Object?>{
+  'llmConfig': llmConfigRaw(
+    enabled: enabled,
+    dictionaryFallback: dictionaryFallback,
+  ),
+});
 
 ProviderRequest request() => const ProviderRequest(
   term: 'hello',
@@ -283,10 +293,20 @@ void main() {
       expect(fetcher.calls, isEmpty);
     });
 
-    test('isEnabled 取决于设置里的 llmConfig', () {
+    test('isEnabled 取决于设置里的 llmConfig 与 dictionaryFallback 开关', () {
       final provider = providerFor(fetcherReturning('{}'));
-      expect(provider.isEnabled(settingsWith()), isTrue);
-      expect(provider.isEnabled(settingsWith(enabled: false)), isFalse);
+      // 默认仅用于分词与建议，不开启 AI 兜底查词。
+      expect(provider.isEnabled(settingsWith()), isFalse);
+      expect(
+        provider.isEnabled(settingsWith(dictionaryFallback: true)),
+        isTrue,
+      );
+      expect(
+        provider.isEnabled(
+          settingsWith(enabled: false, dictionaryFallback: true),
+        ),
+        isFalse,
+      );
       expect(provider.isEnabled(AppSettings.defaults), isFalse);
     });
 

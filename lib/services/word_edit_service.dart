@@ -44,13 +44,24 @@ class ExampleLocation {
 /// 一条例句草稿。
 class WordExampleDraft {
   /// 以各字段构造。
-  const new({required this.sentence, this.translation});
+  const new({
+    required this.sentence,
+    this.translation,
+    this.source,
+    this.isUserAdded = false,
+  });
 
   /// 例句原文。
   final String sentence;
 
   /// 例句翻译。
   final String? translation;
+
+  /// 例句来源（如 `article` / `manual`）。
+  final String? source;
+
+  /// 是否属于用户资产（强制刷新词典时受保护）。
+  final bool isUserAdded;
 }
 
 /// 词条草稿。
@@ -128,10 +139,23 @@ class WordEditService {
     required String targetLanguage,
   }) async {
     final normalized = normalizeTerm(term, sourceLanguage);
+    final existing = await _findExistingWord(
+      normalized: normalized,
+      sourceLanguage: sourceLanguage,
+      targetLanguage: targetLanguage,
+    );
+    return existing?.id;
+  }
+
+  Future<({int id, bool isPersonal})?> _findExistingWord({
+    required String normalized,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) async {
     final row = await _db
         .customSelect(
           '''
-SELECT id FROM words
+SELECT id, is_personal FROM words
 WHERE normalized_term = ? AND source_language = ? AND target_language = ?
 LIMIT 1''',
           variables: <Variable<Object>>[
@@ -141,7 +165,39 @@ LIMIT 1''',
           ],
         )
         .getSingleOrNull();
-    return row?.read<int>('id');
+    if (row == null) return null;
+    return (
+      id: row.read<int>('id'),
+      isPersonal: row.read<int>('is_personal') != 0,
+    );
+  }
+
+  /// 将词书包已有词条升格为个人词库词条，保留已有释义与学习进度。
+  Future<void> _promotePackWordToPersonal(
+    int wordId,
+    WordDraft draft,
+    int now,
+  ) async {
+    final note = _blankToNull(draft.note);
+    if (note != null) {
+      await _db.customUpdate(
+        'UPDATE words SET is_personal = 1, '
+        "user_note = COALESCE(NULLIF(trim(user_note), ''), ?), "
+        'updated_at = ? WHERE id = ?',
+        variables: <Variable<Object>>[
+          Variable<String>(note),
+          Variable<int>(now),
+          Variable<int>(wordId),
+        ],
+        updates: <ResultSetImplementation<dynamic, dynamic>>{_db.words},
+      );
+      return;
+    }
+    await _db.customUpdate(
+      'UPDATE words SET is_personal = 1, updated_at = ? WHERE id = ?',
+      variables: <Variable<Object>>[Variable<int>(now), Variable<int>(wordId)],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{_db.words},
+    );
   }
 
   /// 创建词条与内容，返回新词条 ID。
@@ -153,13 +209,17 @@ LIMIT 1''',
     _assertValidTerm(term);
     final normalized = draft.normalizedTerm;
 
-    final existing = await findByTerm(
-      term: term,
+    final existing = await _findExistingWord(
+      normalized: normalized,
       sourceLanguage: draft.sourceLanguage,
       targetLanguage: draft.targetLanguage,
     );
     if (existing != null) {
-      throw const ConflictError(AppErrorCode.termAlreadyExists);
+      if (existing.isPersonal) {
+        throw const ConflictError(AppErrorCode.termAlreadyExists);
+      }
+      await _promotePackWordToPersonal(existing.id, draft, now);
+      return existing.id;
     }
 
     return await _db.transaction(() async {
@@ -818,6 +878,101 @@ WHERE word_id = ? AND status = ?''',
     await (_db.delete(_db.words)..where((row) => row.id.equals(wordId))).go();
   }
 
+  /// 批量给指定词条追加标签（自动去重，不覆盖已有标签）。
+  Future<int> bulkAddTag({
+    required List<int> wordIds,
+    required String tag,
+    required int now,
+  }) async {
+    final cleanTag = tag.trim();
+    if (wordIds.isEmpty || cleanTag.isEmpty) return 0;
+    var updated = 0;
+    await _db.transaction(() async {
+      for (final id in wordIds) {
+        if (await _appendTagToWord(id, cleanTag, now)) updated += 1;
+      }
+    });
+    return updated;
+  }
+
+  Future<bool> _appendTagToWord(int wordId, String tag, int now) async {
+    final existing = await (_db.select(
+      _db.wordContents,
+    )..where((row) => row.wordId.equals(wordId))).getSingleOrNull();
+    final tags = existing == null
+        ? <String>[]
+        : parseTextList(decodeJsonList(existing.tagsJson)).toList();
+    if (tags.contains(tag)) return false;
+    tags.add(tag);
+    final encoded = jsonEncode(tags);
+    if (existing == null) {
+      await _db
+          .into(_db.wordContents)
+          .insert(
+            WordContentsCompanion.insert(
+              wordId: Value<int>(wordId),
+              tagsJson: Value<String>(encoded),
+              updatedAt: now,
+            ),
+          );
+    } else {
+      await (_db.update(
+        _db.wordContents,
+      )..where((row) => row.wordId.equals(wordId))).write(
+        WordContentsCompanion(
+          tagsJson: Value<String>(encoded),
+          updatedAt: Value<int>(now),
+        ),
+      );
+    }
+    return true;
+  }
+
+  /// 批量切换「暂停学习」状态。
+  Future<void> bulkSetSuspended({
+    required List<int> wordIds,
+    required bool suspended,
+    required int now,
+  }) async {
+    for (final id in wordIds) {
+      await setSuspended(wordId: id, suspended: suspended, now: now);
+    }
+  }
+
+  /// 批量删除尚无学习记录的词条；已有复习记录的自动跳过以保护历史。
+  Future<({int deleted, int skippedWithHistory})> bulkDeleteUnreviewed(
+    List<int> wordIds,
+  ) async {
+    var deleted = 0;
+    var skipped = 0;
+    await _db.transaction(() async {
+      for (final id in wordIds) {
+        if (await _hasLearningHistory(id)) {
+          skipped += 1;
+        } else {
+          await delete(id);
+          deleted += 1;
+        }
+      }
+    });
+    return (deleted: deleted, skippedWithHistory: skipped);
+  }
+
+  Future<bool> _hasLearningHistory(int wordId) async {
+    final row = await _db
+        .customSelect(
+          '''
+SELECT EXISTS(SELECT 1 FROM review_logs WHERE word_id = ?)
+    OR EXISTS(SELECT 1 FROM study_session_items WHERE word_id = ?) AS used''',
+          variables: <Variable<Object>>[
+            Variable<int>(wordId),
+            Variable<int>(wordId),
+          ],
+        )
+        .getSingle();
+    return row.read<int>('used') != 0;
+  }
+
   /// 把词条加入初始化队列（补全缺失字段）。
   ///
   /// 同一词条的同一任务类型最多一个活跃任务——那条部分唯一索引在
@@ -837,15 +992,18 @@ WHERE word_id = ? AND status = ?''',
     JobTaskType taskType = JobTaskType.initialize,
     InitializationMode mode = InitializationMode.fillMissingFields,
     int priority = jobPriorityDefault,
+    List<String>? requestedProviders,
   }) async {
+    final providersJson = _encodeProviders(requestedProviders);
     final active = await _activeJob(wordId, taskType);
     if (active == null) {
-      await _insertJob(wordId, taskType, mode, priority, now);
+      await _insertJob(wordId, taskType, mode, priority, now, providersJson);
       return;
     }
     await _db.customUpdate(
       'UPDATE initialization_jobs SET mode = ?, priority = max(priority, ?), '
-      'max_attempts = max(max_attempts, ?), available_at = ?, updated_at = ? '
+      'max_attempts = max(max_attempts, ?), available_at = ?, updated_at = ?, '
+      'requested_providers_json = COALESCE(?, requested_providers_json) '
       'WHERE id = ?',
       variables: <Variable<Object>>[
         Variable<String>(strongerInitializationMode(active.mode, mode).wire),
@@ -853,6 +1011,7 @@ WHERE word_id = ? AND status = ?''',
         const Variable<int>(importJobMaxAttempts),
         Variable<int>(now),
         Variable<int>(now),
+        Variable<String>(providersJson),
         Variable<int>(active.id),
       ],
       updates: <ResultSetImplementation<dynamic, dynamic>>{
@@ -939,13 +1098,14 @@ WHERE word_id = ? AND status = ?''',
     InitializationMode mode,
     int priority,
     int now,
+    String? requestedProvidersJson,
   ) async {
     await _db.customInsert(
       '''
 INSERT INTO initialization_jobs
   (word_id, task_type, mode, status, priority, attempt_count, max_attempts,
-   available_at, created_at, updated_at)
-VALUES (?, ?, ?, 'QUEUED', ?, 0, ?, ?, ?, ?)
+   requested_providers_json, available_at, created_at, updated_at)
+VALUES (?, ?, ?, 'QUEUED', ?, 0, ?, ?, ?, ?, ?)
 ON CONFLICT DO NOTHING''',
       variables: <Variable<Object>>[
         Variable<int>(wordId),
@@ -953,6 +1113,7 @@ ON CONFLICT DO NOTHING''',
         Variable<String>(mode.wire),
         Variable<int>(priority),
         const Variable<int>(importJobMaxAttempts),
+        Variable<String>(requestedProvidersJson),
         Variable<int>(now),
         Variable<int>(now),
         Variable<int>(now),
@@ -961,6 +1122,12 @@ ON CONFLICT DO NOTHING''',
         _db.initializationJobs,
       },
     );
+  }
+
+  String? _encodeProviders(List<String>? providers) {
+    if (providers == null || providers.isEmpty) return null;
+    final clean = _cleanList(providers);
+    return clean.isEmpty ? null : jsonEncode(clean);
   }
 
   Future<void> _upsertContent(int wordId, WordDraft draft, int now) async {
@@ -1014,6 +1181,9 @@ ON CONFLICT DO NOTHING''',
         <String, Object?>{
           'sentence': example.sentence.trim(),
           'translation': _blankToNull(example.translation),
+          if (_blankToNull(example.source) != null)
+            'source': _blankToNull(example.source),
+          if (example.isUserAdded) 'isUserAdded': true,
         },
   ]);
 

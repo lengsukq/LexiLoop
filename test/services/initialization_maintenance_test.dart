@@ -639,4 +639,92 @@ void main() {
       expect(await maintenance.pumpOnce(now: now), 1);
     });
   });
+
+  group('kick / pause / resume', () {
+    const idleInterval = Duration(minutes: 10);
+    const busyInterval = Duration(seconds: 5);
+
+    InitializationMaintenance build(
+      RecordingRunner runner,
+      FakeScheduler scheduler,
+    ) => InitializationMaintenance(
+      runner,
+      const MaintenancePolicy(),
+      () => now,
+      scheduler.create,
+    );
+
+    test('未 start 时 kick / pause / resume 均为安全空操作', () {
+      final runner = RecordingRunner();
+      final scheduler = FakeScheduler();
+      build(runner, scheduler)
+        ..kick()
+        ..pause()
+        ..resume();
+
+      expect(runner.calls, isEmpty);
+      expect(scheduler.timers, isEmpty);
+    });
+
+    test('空闲状态下 kick 会立刻取消长定时并立即执行一次 tick', () async {
+      final runner = RecordingRunner();
+      final scheduler = FakeScheduler();
+      final maintenance = build(runner, scheduler);
+      addTearDown(maintenance.dispose);
+
+      await maintenance.start(now: now);
+      expect(scheduler.lastDelay, idleInterval);
+
+      runner.tickResult = 2;
+      maintenance.kick();
+      await pumpEventQueue();
+
+      expect(runner.calls.where((c) => c == 'tick'), hasLength(2));
+      expect(scheduler.timers.first.cancelled, isTrue);
+      expect(scheduler.lastDelay, busyInterval);
+    });
+
+    test('tick 正在跑时 kick 会标记待续跑，完成后按短间隔排期', () async {
+      final runner = RecordingRunner();
+      final scheduler = FakeScheduler();
+      final maintenance = build(runner, scheduler);
+      addTearDown(maintenance.dispose);
+
+      await maintenance.start(now: now);
+      final gate = Completer<void>();
+      runner
+        ..tickResult = 0
+        ..tickGate = gate;
+      scheduler.fire();
+      await pumpEventQueue();
+
+      maintenance.kick();
+      gate.complete();
+      await pumpEventQueue();
+
+      expect(scheduler.lastDelay, busyInterval);
+    });
+
+    test('pause 取消定时器并阻塞触发，resume 回到前台立即恢复', () async {
+      final runner = RecordingRunner();
+      final scheduler = FakeScheduler();
+      final maintenance = build(runner, scheduler);
+      addTearDown(maintenance.dispose);
+
+      await maintenance.start(now: now);
+      maintenance.pause();
+      expect(maintenance.isPaused, isTrue);
+      expect(scheduler.timers.last.cancelled, isTrue);
+
+      maintenance.kick();
+      await pumpEventQueue();
+      expect(runner.calls.where((c) => c == 'tick'), hasLength(1));
+
+      maintenance.resume();
+      await pumpEventQueue();
+      expect(maintenance.isPaused, isFalse);
+      expect(runner.calls.where((c) => c == 'tick'), hasLength(2));
+      expect(scheduler.timers.last.cancelled, isFalse);
+    });
+  });
 }

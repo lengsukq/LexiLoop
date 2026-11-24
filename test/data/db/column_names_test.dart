@@ -31,6 +31,7 @@ const Map<String, Set<String>> expectedColumns = <String, Set<String>>{
     'mastery_level',
     'mastery_score',
     'is_suspended',
+    'is_personal',
     'user_note',
     'created_at',
     'updated_at',
@@ -231,6 +232,22 @@ const Map<String, Set<String>> expectedColumns = <String, Set<String>>{
     'created_at',
   },
   'settings': <String>{'key', 'value_json', 'updated_at'},
+  'word_packs': <String>{
+    'id',
+    'slug',
+    'name',
+    'category',
+    'description',
+    'version',
+    'content_mode',
+    'word_count',
+    'include_in_daily_study',
+    'sha256',
+    'source_url',
+    'installed_at',
+    'updated_at',
+  },
+  'word_pack_items': <String>{'pack_id', 'word_id', 'rank'},
 };
 
 void main() {

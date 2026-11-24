@@ -55,6 +55,9 @@ class PageEmptyState extends StatelessWidget {
     this.primaryLabel,
     this.onPrimary,
     this.primaryKey,
+    this.secondaryLabel,
+    this.onSecondary,
+    this.secondaryKey,
     this.iconColor,
     super.key,
   });
@@ -77,6 +80,15 @@ class PageEmptyState extends StatelessWidget {
   /// 主按钮的 key，供测试定位。
   final Key? primaryKey;
 
+  /// 可选第二按钮文案。
+  final String? secondaryLabel;
+
+  /// 可选第二按钮回调。
+  final VoidCallback? onSecondary;
+
+  /// 可选第二按钮的 key。
+  final Key? secondaryKey;
+
   /// 图标颜色；默认取强调色。
   final Color? iconColor;
 
@@ -84,6 +96,8 @@ class PageEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     final accent = iconColor ?? colors.accent;
+    final hasPrimary = primaryLabel != null && onPrimary != null;
+    final hasSecondary = secondaryLabel != null && onSecondary != null;
     return Center(
       child: SingleChildScrollView(
         padding: _statePadding,
@@ -116,12 +130,26 @@ class PageEmptyState extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: LexiType.body.copyWith(color: colors.secondaryLabel),
                 ),
-                if (primaryLabel != null && onPrimary != null) ...<Widget>[
+                if (hasPrimary || hasSecondary) ...<Widget>[
                   const SizedBox(height: _stateActionGap),
-                  FilledButton(
-                    key: primaryKey,
-                    onPressed: onPrimary,
-                    child: Text(primaryLabel!),
+                  Wrap(
+                    spacing: LexiSpace.s12,
+                    runSpacing: LexiSpace.s8,
+                    alignment: WrapAlignment.center,
+                    children: <Widget>[
+                      if (hasPrimary)
+                        FilledButton(
+                          key: primaryKey,
+                          onPressed: onPrimary,
+                          child: Text(primaryLabel!),
+                        ),
+                      if (hasSecondary)
+                        OutlinedButton(
+                          key: secondaryKey,
+                          onPressed: onSecondary,
+                          child: Text(secondaryLabel!),
+                        ),
+                    ],
                   ),
                 ],
               ],

@@ -34,11 +34,21 @@ import 'package:lexiloop/features/study/study_clock.dart';
 import 'package:lexiloop/features/study/study_page.dart';
 import 'package:lexiloop/features/study/study_providers.dart';
 import 'package:lexiloop/features/study/study_texts.dart';
+import 'package:lexiloop/services/audio/direct_edge_tts.dart';
+import 'package:lexiloop/services/audio/pronunciation_audio.dart';
 import 'package:lexiloop/services/review_service.dart';
 import 'package:lexiloop/services/tts_service.dart';
 import 'package:lexiloop/ui/theme/lexi_theme.dart';
 
 import '../../services/audio/audio_fakes.dart';
+
+class _OfflineEdgeSpeech implements DirectEdgeSpeechPort {
+  @override
+  Future<Uint8List?> synthesize({
+    required String text,
+    required Accent accent,
+  }) async => null;
+}
 
 /// 记录朗读文本的假引擎。
 class RecordingSpeechEngine implements SpeechEngine {
@@ -232,6 +242,7 @@ void main() {
         databaseProvider.overrideWithValue(db),
         audioPlayerPortProvider.overrideWithValue(audioPlayer),
         audioDownloaderProvider.overrideWithValue(audioDownloader),
+        directEdgeSpeechProvider.overrideWithValue(_OfflineEdgeSpeech()),
         appSettingsProvider.overrideWith((ref) => settings),
         ttsServiceProvider.overrideWithValue(
           TtsService(speechEngine ?? RecordingSpeechEngine()),
@@ -723,7 +734,11 @@ void main() {
       await tester.tap(find.byTooltip('朗读'));
       await tester.pumpAndSettle();
 
-      expect(engine.spoken, <String>['apple']);
+      expect(
+        audioDownloader.downloaded,
+        contains(youdaoAudioUri('apple', Accent.us)),
+      );
+      expect(audioPlayer.playCount, 1);
       expect(container.read(studySessionProvider).hasValue, isTrue);
     });
 
@@ -1165,7 +1180,11 @@ void main() {
 
       await pumpStudy(tester, autoPlay: true, speechEngine: engine);
       await tester.pump(const Duration(milliseconds: 300));
-      expect(engine.spoken, <String>['apple']);
+      expect(audioPlayer.playCount, 1);
+      expect(
+        audioDownloader.downloaded,
+        contains(youdaoAudioUri('apple', Accent.us)),
+      );
     });
 
     testWidgets('自动朗读：拼写题不播放（听完就等于拿到答案）', (tester) async {
@@ -1178,6 +1197,7 @@ void main() {
 
       await pumpStudy(tester, autoPlay: true, speechEngine: engine);
       await tester.pump(const Duration(milliseconds: 300));
+      expect(audioPlayer.playCount, 0);
       expect(engine.spoken, isEmpty);
     });
 
@@ -1190,6 +1210,7 @@ void main() {
       );
 
       await pumpStudy(tester, autoPlay: true, speechEngine: engine);
+      expect(audioPlayer.playCount, 0);
       expect(engine.spoken, isEmpty);
       await tester.enterText(find.byType(TextField), 'banana');
       await tester.pump();
@@ -1197,7 +1218,11 @@ void main() {
       expect(find.text('回答正确'), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
-      expect(engine.spoken, <String>['banana']);
+      expect(audioPlayer.playCount, 1);
+      expect(
+        audioDownloader.downloaded,
+        contains(youdaoAudioUri('banana', Accent.us)),
+      );
     });
 
     testWidgets('关闭自动朗读时不播放', (tester) async {
@@ -1248,7 +1273,10 @@ void main() {
     });
 
     testWidgets('降级到系统朗读时界面给出提示', (tester) async {
-      // 词条没有真人录音地址：必然回落到系统朗读。
+      // 有道与 Edge 均不可用时自动顺延到系统朗读，并展示明确提示。
+      audioDownloader.failing.add(
+        youdaoAudioUri('apple', Accent.us)!.toString(),
+      );
       final wordId = await insertWord(term: 'apple', meaning: '苹果');
       await insertSession(wordId: wordId, questionType: QuestionType.enToZh);
 
@@ -1259,7 +1287,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(engine.spoken, <String>['apple']);
-      expect(find.text('暂无真人录音，已改用系统朗读'), findsOneWidget);
+      expect(find.text('有道词典发音暂不可用，已自动切换为设备系统朗读'), findsOneWidget);
     });
   });
 

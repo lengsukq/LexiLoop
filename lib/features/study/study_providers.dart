@@ -5,6 +5,8 @@
 /// 熟练度全部留在服务层——界面层重复哪怕一条规则，双端就会漂移。
 library;
 
+import 'dart:async' show unawaited;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
@@ -72,16 +74,48 @@ class StudySessionController extends AsyncNotifier<StudySessionView?> {
   ///
   /// [StudyService.startSession] 默认 `resume: true`：中途退出应用是常态，
   /// 每次重新抽题会让「今天学了什么」变得不可预期。
-  Future<void> start(StudyMode mode, {bool continuous = false}) async {
+  Future<void> start(
+    StudyMode mode, {
+    bool continuous = false,
+    String? tag,
+    String? packId,
+  }) async {
     state = const AsyncValue<StudySessionView?>.loading();
     state = await AsyncValue.guard<StudySessionView?>(() async {
       final now = _now();
+      final cleanPack = packId?.trim();
+      if (cleanPack != null && cleanPack.isNotEmpty) {
+        unawaited(_triggerPackLazyEnrich(cleanPack, now));
+      }
       final session = await ref
           .read(studyServiceProvider)
-          .startSession(mode: mode, now: now, continuous: continuous);
+          .startSession(
+            mode: mode,
+            now: now,
+            continuous: continuous,
+            tag: tag,
+            packId: cleanPack,
+          );
       _itemShownAt = now;
       return session;
     });
+  }
+
+  /// 词书专项学习开局时，异步触发前瞻 30 词的按需有道补全（不阻塞开局）。
+  Future<void> _triggerPackLazyEnrich(String packId, int now) async {
+    try {
+      final enqueued = await ref
+          .read(wordPackInstallServiceProvider)
+          .enqueueLazyEnrichment(packId: packId, now: now);
+      if (enqueued > 0) {
+        unawaited(
+          ref.read(initializationMaintenanceProvider).pumpOnce(now: now),
+        );
+      }
+    } on Object catch (error) {
+      // 按需补全失败不影响已预填充词条的正常背诵。
+      assert(error.toString().isNotEmpty, 'unexpected empty enrichment error');
+    }
   }
 
   /// 提交当前题目的作答；没有待答题目时返回 `null`。

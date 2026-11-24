@@ -6,16 +6,19 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lexiloop/data/db/daos/word_dao.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/features/initialize/widgets/queue_toolbar.dart'
     show chipGap, chipPaddingH, chipPaddingV, toolbarGap;
 import 'package:lexiloop/features/words/words_format.dart';
 import 'package:lexiloop/features/words/words_providers.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
 import 'package:lexiloop/ui/theme/lexi_tint.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 筛选与排序控件组。
 class WordFilterControls extends ConsumerWidget {
@@ -36,9 +39,12 @@ class WordFilterControls extends ConsumerWidget {
           children: <Widget>[_InitializationStatusPicker()],
         ),
         SizedBox(height: toolbarGap),
+        _ContentTypeChips(),
+        SizedBox(height: toolbarGap),
         _MasteryChips(),
         SizedBox(height: toolbarGap),
         _SpecialChips(),
+        _TagFilterSection(),
       ],
     );
   }
@@ -118,6 +124,94 @@ class WordSortPicker extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 内容类型筛选芯片（单词 / 短语 / 句子）。
+class _ContentTypeChips extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final query = ref.watch(wordQueryProvider);
+    final notifier = ref.read(wordQueryProvider.notifier);
+    return Wrap(
+      spacing: chipGap,
+      runSpacing: chipGap,
+      children: <Widget>[
+        _FilterChip(
+          label: '全部类型',
+          selected: query.contentType == null,
+          onTap: () => notifier.setContentType(null),
+        ),
+        for (final type in LexicalContentType.values)
+          _FilterChip(
+            label: _contentTypeLabel(type),
+            selected: query.contentType == type,
+            onTap: () => notifier.setContentType(type),
+          ),
+      ],
+    );
+  }
+
+  String _contentTypeLabel(LexicalContentType type) => switch (type) {
+    LexicalContentType.word => '单词',
+    LexicalContentType.phrase => '短语',
+    LexicalContentType.sentence => '句子',
+  };
+}
+
+/// 标签筛选与专项复习入口（词库无标签时自动隐藏）。
+class _TagFilterSection extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(wordTagsProvider).value ?? const <String>[];
+    if (tags.isEmpty) return const SizedBox.shrink();
+    final selectedTag = ref.watch(wordQueryProvider.select((q) => q.tag));
+    final notifier = ref.read(wordQueryProvider.notifier);
+    return Padding(
+      padding: const EdgeInsets.only(top: toolbarGap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Wrap(
+            spacing: chipGap,
+            runSpacing: chipGap,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              const _FieldLabel('标签'),
+              _FilterChip(
+                label: '全部标签',
+                selected: selectedTag == null,
+                onTap: () => notifier.setTag(null),
+              ),
+              for (final tag in tags)
+                _FilterChip(
+                  label: '#$tag',
+                  selected: selectedTag == tag,
+                  onTap: () => notifier.setTag(selectedTag == tag ? null : tag),
+                ),
+            ],
+          ),
+          if (selectedTag != null) ...<Widget>[
+            const SizedBox(height: LexiSpace.s8),
+            FilledButton.tonalIcon(
+              key: const Key('wordsStudyCurrentTag'),
+              onPressed: () {
+                final encoded = Uri.encodeQueryComponent(selectedTag);
+                context.go(
+                  '$studyPath?mode=${StudyMode.daily.wire}&tag=$encoded',
+                );
+              },
+              icon: const Icon(LucideIcons.graduationCap, size: 15),
+              label: Text('专项复习 #$selectedTag'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

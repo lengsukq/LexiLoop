@@ -1,32 +1,28 @@
-/// 从局域网设备拉取数据：合并进来，或者整体替换。
-///
-/// **两种模式的区别只有最后一步**：握手、快照本机设置、下载、回写设置、记录
-/// 状态全都一样；区别在于下载到的字节交给
-/// `BackupMergeService`（合并）还是 `BackupImporter`（替换）。
-///
-/// **覆盖是破坏性的、合并不是**：前者会清空本机的词条与学习记录，后者一条
-/// 都不删。确认门槛因此不同（见界面层的两种对话框）。
-///
-/// **为什么不在服务里失效界面缓存**：`invalidateLocalData` 需要 `WidgetRef`，
-/// 属于界面的一次动作；两条模式都一样，由调用方在返回后做。
+/// 从局域网设备同步数据：支持 v2 双向增量同步、单向增量合并与全量覆盖。
 library;
+
+import 'dart:typed_data';
 
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
+import 'package:lexiloop/data/backup/incremental_sync_exporter.dart';
+import 'package:lexiloop/data/backup/incremental_sync_payload.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_client.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_codec.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_discovery_port.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_protocol.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_session_client.dart';
+import 'package:lexiloop/domain/models/lan_sync_progress.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
-import 'package:lexiloop/services/backup/backup_bytes.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_state_store.dart';
 import 'package:lexiloop/services/merge/backup_merge_service.dart';
+import 'package:lexiloop/services/merge/incremental_merge_service.dart';
 
-/// 一次拉取的结果。
-///
-/// 两条模式的字段含义一致（都回答「这次往本机写了多少东西」），
-/// 只是覆盖模式下的 `updatedWords` 恒为 0——它没有"更新"这个概念。
+/// 一次同步的结果（覆盖、单向合并与双向增量合并统一形态）。
 class LanSyncPullResult {
-  /// 以各字段构造。
+  /// 以各统计字段构造。
   const new({
     required this.mode,
     required this.addedWords,
@@ -34,49 +30,77 @@ class LanSyncPullResult {
     required this.addedLogs,
     required this.writtenRows,
     required this.wordCount,
+    this.isIncremental = false,
+    this.rebuiltWords = 0,
+    this.peerAddedWords = 0,
+    this.peerAddedLogs = 0,
+    this.transferredWireBytes = 0,
+    this.uncompressedBytes = 0,
   });
 
   /// 本次用的模式。
   final LanSyncPullMode mode;
 
-  /// 新增的词条数。
+  /// 本机新增的词条数。
   final int addedWords;
 
-  /// 被对端更新的词条数（仅合并模式非零）。
+  /// 本机更新元数据的词条数。
   final int updatedWords;
 
-  /// 新增的作答条数。
+  /// 本机新增的作答条数。
   final int addedLogs;
 
-  /// 本次写进库的行数（覆盖模式下是整份备份的行数）。
+  /// 本次写进库的行数。
   final int writtenRows;
 
   /// 完成后本机的词条总数。
   final int wordCount;
+
+  /// 本次是否命中增量同步。
+  final bool isIncremental;
+
+  /// 本机重排 FSRS 的词条数。
+  final int rebuiltWords;
+
+  /// 双向模式下对端新增的词条数。
+  final int peerAddedWords;
+
+  /// 双向模式下对端新增的作答条数。
+  final int peerAddedLogs;
+
+  /// 本次网络实际传输的压缩总字节数。
+  final int transferredWireBytes;
+
+  /// 解压前的原始 JSON 总字节数。
+  final int uncompressedBytes;
 }
 
-/// 局域网拉取服务。
+/// 局域网同步客户端编排服务。
 class LanSyncPullService {
-  /// 以客户端工厂、发现器、导入器、合并器与状态存储构造。
+  /// 以客户端工厂、发现器、导入器、全量合并器、状态存储及可选 v2 增量通道构造。
   new(
     this._clientFactory,
     this._discovery,
     this._importer,
     this._merger,
-    this._states,
-  );
+    this._states, {
+    this._sessionRunner,
+    this._deltaExporter,
+    this._incrementalMerger,
+    int Function()? clock,
+  }) : _clock = clock ?? _wallClockMs;
 
   final LanSyncClientFactory _clientFactory;
   final LanSyncDiscovery _discovery;
   final BackupImporter _importer;
   final BackupMergeService _merger;
   final LanSyncStateStore _states;
+  final LanSyncSessionRunner? _sessionRunner;
+  final IncrementalSyncExporter? _deltaExporter;
+  final IncrementalMergeService? _incrementalMerger;
+  final int Function() _clock;
 
   /// 搜索同网段的共享设备。
-  ///
-  /// [excludeInstanceId] 是本机当前共享会话的标识：同一台设备既开着共享、
-  /// 又点了「搜索设备」时会收到自己的应答，按会话标识剔除是精确的
-  /// （按地址比对会漏掉多网卡与多网段的情况）。
   Future<LanSyncDiscoveryResult> discover({String? excludeInstanceId}) async {
     final result = await _discovery.discover(
       timeout: const Duration(milliseconds: lanSyncDiscoveryTimeoutMs),
@@ -90,27 +114,216 @@ class LanSyncPullService {
     );
   }
 
-  /// 拉取指定设备的数据，按 [mode] 合并或替换。
-  ///
-  /// 顺序不能调换：**先握手验码，再取快照，最后才下载**——错码的代价应当是
-  /// 一次几百字节的请求，而不是一次 27MB 的传输。
+  /// 前置校验配对码并取回对端能力与设备信息（不改动本机数据）。
+  Future<LanSyncHandshake> verifyPairing({
+    required DiscoveredLanHost host,
+    required String pairingCode,
+  }) => _clientFactory(host, pairingCode).handshake();
+
+  /// 与指定设备执行同步（配置了 v2 通道时自动走增量 + 双向 + 实时进度）。
   Future<LanSyncPullResult> pull({
     required DiscoveredLanHost host,
     required String pairingCode,
     required LanSyncPullMode mode,
+    LanSyncHandshake? verifiedHandshake,
+    void Function(LanSyncTransferProgress progress)? onProgress,
+    LanSyncCancelSignal? cancelSignal,
+  }) async {
+    final useV2 =
+        _sessionRunner != null &&
+        _deltaExporter != null &&
+        _incrementalMerger != null;
+    if (useV2) {
+      return await _pullViaV2Session(
+        host: host,
+        pairingCode: pairingCode,
+        mode: mode,
+        verifiedHandshake: verifiedHandshake,
+        onProgress: onProgress,
+        cancelSignal: cancelSignal,
+      );
+    }
+    return await _pullViaLegacyHttp(
+      host: host,
+      pairingCode: pairingCode,
+      mode: mode,
+      verifiedHandshake: verifiedHandshake,
+    );
+  }
+
+  Future<LanSyncPullResult> _pullViaV2Session({
+    required DiscoveredLanHost host,
+    required String pairingCode,
+    required LanSyncPullMode mode,
+    LanSyncHandshake? verifiedHandshake,
+    void Function(LanSyncTransferProgress progress)? onProgress,
+    LanSyncCancelSignal? cancelSignal,
+  }) async {
+    try {
+      final handshake =
+          verifiedHandshake ??
+          await _clientFactory(host, pairingCode).handshake();
+      if (mode == LanSyncPullMode.bidirectional &&
+          !handshake.allowsBidirectional) {
+        throw const ValidationError(AppErrorCode.lanSyncPeerRejected);
+      }
+      final settings = await _states.ensureIdentity();
+      final knownWm = handshake.deviceId.isEmpty
+          ? null
+          : settings.peerWatermarks[handshake.deviceId];
+      final outcome = await _sessionRunner!(
+        LanSyncSessionRequest(
+          host: host,
+          pairingCode: pairingCode,
+          mode: mode,
+          local: LanSyncClientContext(
+            endpoint: LanSyncEndpoint(
+              name: settings.deviceName,
+              deviceKind: lanSyncDeviceKind(isDesktop: PlatformCaps.isDesktop),
+            ),
+            identity: settings.identity,
+            knownHostEpoch: knownWm?.peerDatasetEpoch ?? '',
+            pullSince: mode == LanSyncPullMode.replace
+                ? null
+                : knownWm?.peerCursorMs,
+          ),
+          callbacks: LanSyncSessionCallbacks(
+            exportLocalDelta: _exportLocalDeltaForPeer,
+            applyIncoming: (bytes, acceptedMode) => _applyIncomingV2(
+              bytes: bytes,
+              mode: acceptedMode,
+              peerDeviceId: handshake.deviceId,
+            ),
+            onProgress: onProgress ?? _ignoreProgress,
+            cancelSignal: cancelSignal,
+          ),
+        ),
+      );
+      await _recordV2Watermark(host: host, outcome: outcome);
+      return _resultFromOutcome(outcome);
+    } on AppError catch (error) {
+      if (error.code != AppErrorCode.lanSyncCancelled) {
+        await _states.recordFailure(error.code.code);
+      }
+      rethrow;
+    }
+  }
+
+  Future<LanSyncWirePayload> _exportLocalDeltaForPeer(int? pushSince) async {
+    final settings = await _states.ensureIdentity();
+    final payload = await _deltaExporter!.exportDelta(
+      datasetEpoch: settings.datasetEpoch,
+      since: pushSince,
+    );
+    final encoded = await encodeJsonGzipWithStats(payload.toEnvelope());
+    return LanSyncWirePayload(
+      compressedBytes: encoded.compressedBytes,
+      uncompressedBytes: encoded.uncompressedBytes,
+      totalRows: payload.totalRows,
+      isIncremental: payload.isIncremental,
+      serverNow: payload.serverNow,
+      datasetEpoch: payload.datasetEpoch,
+    );
+  }
+
+  Future<LanSyncClientApplyResult> _applyIncomingV2({
+    required Uint8List bytes,
+    required LanSyncPullMode mode,
+    required String peerDeviceId,
+  }) async {
+    if (mode == LanSyncPullMode.replace) {
+      final snapshot = await _states.snapshot();
+      final raw = await decodeBackupMaybeGzipUtf8(bytes);
+      final imported = await _importer.import(raw);
+      await _states.restoreAfterReplace(snapshot);
+      final refreshed = await _states.ensureIdentity();
+      final wordCount = imported.rowCounts['words'] ?? 0;
+      return LanSyncClientApplyResult(
+        summary: LanSyncDeltaSummary(
+          addedWords: wordCount,
+          addedLogs: imported.rowCounts['review_logs'] ?? 0,
+          wordCount: wordCount,
+        ),
+        datasetEpoch: refreshed.datasetEpoch,
+      );
+    }
+    final decoded = await decodeJsonObjectMaybeGzip(bytes);
+    final delta = parseIncrementalSyncPayload(decoded);
+    final summary = await _incrementalMerger!.apply(delta);
+    var settings = await _states.ensureIdentity();
+    var epoch = settings.datasetEpoch;
+    final hasOtherPeers = settings.peerWatermarks.keys.any(
+      (id) => id != peerDeviceId,
+    );
+    if (summary.hasChanges && hasOtherPeers) {
+      epoch = (await _states.rotateDatasetEpoch()).datasetEpoch;
+      settings = await _states.ensureIdentity();
+    }
+    return LanSyncClientApplyResult(summary: summary, datasetEpoch: epoch);
+  }
+
+  Future<void> _recordV2Watermark({
+    required DiscoveredLanHost host,
+    required LanSyncSessionOutcome outcome,
+  }) async {
+    final label = _peerLabel(host, outcome.peerEndpoint.name);
+    if (outcome.peerIdentity.deviceId.isEmpty) {
+      await _states.recordSuccess(peer: label);
+      return;
+    }
+    await _states.recordPeerSync(
+      watermark: LanSyncPeerWatermark(
+        peerDeviceId: outcome.peerIdentity.deviceId,
+        peerDatasetEpoch: outcome.peerIdentity.datasetEpoch,
+        peerCursorMs: outcome.peerServerNow,
+        localCursorMs: outcome.localServerNow,
+        lastSyncedAt: _clock(),
+      ),
+      peerLabel: label,
+    );
+  }
+
+  LanSyncPullResult _resultFromOutcome(LanSyncSessionOutcome outcome) {
+    final local = outcome.localSummary;
+    final peer = outcome.peerSummary;
+    return LanSyncPullResult(
+      mode: outcome.mode,
+      addedWords: local.addedWords,
+      updatedWords: local.updatedWords,
+      addedLogs: local.addedLogs,
+      writtenRows: local.addedWords + local.addedLogs,
+      wordCount: local.wordCount,
+      isIncremental: outcome.isIncremental,
+      rebuiltWords: local.rebuiltWords,
+      peerAddedWords: peer?.addedWords ?? 0,
+      peerAddedLogs: peer?.addedLogs ?? 0,
+      transferredWireBytes: outcome.transferredWireBytes,
+      uncompressedBytes: outcome.uncompressedBytes,
+    );
+  }
+
+  Future<LanSyncPullResult> _pullViaLegacyHttp({
+    required DiscoveredLanHost host,
+    required String pairingCode,
+    required LanSyncPullMode mode,
+    LanSyncHandshake? verifiedHandshake,
   }) async {
     try {
       final client = _clientFactory(host, pairingCode);
-      final handshake = await client.handshake();
-      // 快照必须在写入**之前**取：写入会整份替换设置表，之后再取就晚了。
+      final handshake = verifiedHandshake ?? await client.handshake();
       final snapshot = await _states.snapshot();
       final backup = await client.downloadBackup();
-      final raw = decodeBackupUtf8(backup.bytes);
+      final raw = await decodeBackupMaybeGzipUtf8(backup.bytes);
       final result = switch (mode) {
-        LanSyncPullMode.merge => await _merge(raw),
         LanSyncPullMode.replace => await _replace(raw),
+        LanSyncPullMode.merge ||
+        LanSyncPullMode.bidirectional => await _merge(raw),
       };
-      await _states.restore(snapshot);
+      if (mode == LanSyncPullMode.replace) {
+        await _states.restoreAfterReplace(snapshot);
+      } else {
+        await _states.restore(snapshot);
+      }
       await _states.recordSuccess(peer: _peerLabel(host, handshake.deviceName));
       return result;
     } on AppError catch (error) {
@@ -119,7 +332,6 @@ class LanSyncPullService {
     }
   }
 
-  /// 合并路径。
   Future<LanSyncPullResult> _merge(String raw) async {
     final outcome = await _merger.merge(raw);
     final counts = outcome.counts;
@@ -130,10 +342,10 @@ class LanSyncPullService {
       addedLogs: counts.addedLogs,
       writtenRows: counts.addedWords + counts.addedLogs + counts.addedSessions,
       wordCount: outcome.tables['words']?.length ?? 0,
+      rebuiltWords: counts.rebuiltWords,
     );
   }
 
-  /// 覆盖路径（与 v1 完全相同）。
   Future<LanSyncPullResult> _replace(String raw) async {
     final imported = await _importer.import(raw);
     final words = imported.rowCounts['words'] ?? 0;
@@ -147,10 +359,10 @@ class LanSyncPullService {
     );
   }
 
-  /// 状态行里的对端标签。
-  ///
-  /// 优先用握手带回来的设备名：发现列表里的名字可能是空串（对方还没命名），
-  /// 而握手那一份是同一台设备在同一个响应里给出的、更权威的展示名。
   String _peerLabel(DiscoveredLanHost host, String handshakeName) =>
       handshakeName.isEmpty ? host.label : '$handshakeName（${host.address}）';
 }
+
+void _ignoreProgress(LanSyncTransferProgress _) {}
+
+int _wallClockMs() => DateTime.now().millisecondsSinceEpoch;

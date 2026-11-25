@@ -421,9 +421,63 @@ const int lanSyncDiscoveryPort = 8766;
 
 /// 局域网同步的协议版本。
 ///
-/// 握手与发现报文都带它；两端不一致时明确报「版本不兼容」，
-/// 而不是让一台旧版设备用错误的字段解读新版的回复。
-const int lanSyncProtocolVersion = 1;
+/// v2 新增 WebSocket 双向增量同步会话、GZip 传输压缩与双端实时进度广播；
+/// 仍保留 `/lexiloop/v1/handshake` 与 `/lexiloop/v1/backup` 供校验与单向拉取。
+const int lanSyncProtocolVersion = 2;
+
+/// 增量同步水位线安全回看窗口（毫秒）。
+///
+/// 防止同一毫秒内并发写入或事务提交时机差导致的边界遗漏；合并本身天然幂等，
+/// 多带 1 秒重叠数据不会产生重复记录。
+const int lanSyncDeltaLookbackMs = secondMs;
+
+/// 持久化设备标识的长度（十六进制字符）。
+///
+/// 用于跨会话稳定识别对端设备以维护每台设备的增量同步水位线。
+const int lanSyncDeviceIdLength = 16;
+
+/// 数据集纪元标识的长度（十六进制字符）。
+///
+/// 清空本地数据或覆盖恢复后轮换纪元，确保对端检测到纪元变化时自动退回全量合并。
+const int lanSyncDatasetEpochLength = 16;
+
+/// 设置表里最多保留多少台对端设备的同步水位线。
+///
+/// 避免长期使用后 `settings.raw['lanSync']` 无限膨胀；超出上限按最近同步时间淘汰最旧项。
+const int lanSyncMaxTrackedPeers = 24;
+
+/// WebSocket 传输单个二进制分片的大小上限（字节）。
+///
+/// 64 KiB 足够小到让小中体积增量包也能驱动平滑的确定性进度环，
+/// 又足够大到不会制造过多帧开销。
+const int lanSyncWsChunkBytes = 64 * 1024;
+
+/// 增量同步载荷的格式标识。
+const String lanSyncDeltaFormat = 'lexiloop-json-delta';
+
+/// 增量同步载荷的格式版本号。
+const int lanSyncDeltaVersion = 1;
+
+/// 增量同步里单批 `IN (...)` SQL 查询的键数上限（避开 SQLite 999 变量上限）。
+const int lanSyncSqlBatchSize = 200;
+
+/// 桌面端设备类型标识（用于双端同步动画选择设备图标）。
+const String lanSyncDeviceKindDesktop = 'desktop';
+
+/// 移动端设备类型标识（用于双端同步动画选择设备图标）。
+const String lanSyncDeviceKindMobile = 'mobile';
+
+/// WebSocket 同步单次双向会话的总超时。
+const int lanSyncSessionTimeoutMs = 5 * minuteMs;
+
+/// WebSocket 同步会话保活心跳间隔（避免大库落库期间被路由器或休眠策略断开）。
+const int lanSyncWsPingIntervalMs = 10 * secondMs;
+
+/// 主机发出 `host_done` 后等待客户端正常关闭连接的最大宽限时间。
+const int lanSyncWsCloseGraceMs = 2 * secondMs;
+
+/// 发送错误帧后等待套接字冲刷缓冲的短暂让出时间。
+const int lanSyncWsErrorFlushMs = 80;
 
 /// 配对码的位数。
 ///

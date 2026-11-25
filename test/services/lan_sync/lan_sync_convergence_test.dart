@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/time.dart';
 import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
@@ -265,7 +266,7 @@ class _Peer {
         deviceName: other.deviceName,
         address: '127.0.0.1',
         port: host.baseUri.port,
-        protocolVersion: 1,
+        protocolVersion: lanSyncProtocolVersion,
       ),
       pairingCode: '246810',
       mode: mode,

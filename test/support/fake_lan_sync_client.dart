@@ -7,6 +7,7 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_backup.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_client.dart';
@@ -28,7 +29,7 @@ final class FakeLanSyncClient implements LanSyncClient {
            handshake ??
            const LanSyncHandshake(
              deviceName: 'LexiLoop 手机',
-             protocolVersion: 1,
+             protocolVersion: lanSyncProtocolVersion,
            ),
        backupResult =
            backup ??
@@ -190,7 +191,7 @@ DiscoveredLanHost fakeDiscoveredHost({
   String deviceName = 'LexiLoop 手机',
   String address = '192.168.1.7',
   int port = 8765,
-  int protocolVersion = 1,
+  int protocolVersion = lanSyncProtocolVersion,
 }) => DiscoveredLanHost(
   instanceId: instanceId,
   deviceName: deviceName,

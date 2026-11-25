@@ -142,9 +142,22 @@ void main() {
       const original = LanSyncSettings(
         deviceName: '书房 Mac',
         port: 9123,
-        lastSuccessAt: 42,
-        lastError: 'LAN_SYNC_BUSY',
-        lastPeer: '手机',
+        sharePolicy: LanSyncSharePolicy.readOnly,
+        identity: LanSyncIdentity(deviceId: 'dev-a', datasetEpoch: 'epoch-1'),
+        status: LanSyncLastStatus(
+          lastSuccessAt: 42,
+          lastError: 'LAN_SYNC_BUSY',
+          lastPeer: '手机',
+        ),
+        peerWatermarks: <String, LanSyncPeerWatermark>{
+          'dev-b': LanSyncPeerWatermark(
+            peerDeviceId: 'dev-b',
+            peerDatasetEpoch: 'epoch-b',
+            peerCursorMs: 1000,
+            localCursorMs: 2000,
+            lastSyncedAt: 3000,
+          ),
+        },
       );
       final restored = lanSyncSettingsFromRaw(
         original.toStorage(),
@@ -152,9 +165,14 @@ void main() {
       );
       expect(restored.deviceName, original.deviceName);
       expect(restored.port, original.port);
+      expect(restored.sharePolicy, LanSyncSharePolicy.readOnly);
+      expect(restored.deviceId, 'dev-a');
+      expect(restored.datasetEpoch, 'epoch-1');
       expect(restored.lastSuccessAt, original.lastSuccessAt);
       expect(restored.lastError, original.lastError);
       expect(restored.lastPeer, original.lastPeer);
+      expect(restored.peerWatermarks['dev-b']?.peerCursorMs, 1000);
+      expect(restored.peerWatermarks['dev-b']?.localCursorMs, 2000);
     });
 
     test('空设备名不落盘，读回时用兜底名', () {
@@ -180,9 +198,11 @@ void main() {
       const original = LanSyncSettings(
         deviceName: '书房 Mac',
         port: 9123,
-        lastSuccessAt: 42,
-        lastError: 'LAN_SYNC_BUSY',
-        lastPeer: '手机',
+        status: LanSyncLastStatus(
+          lastSuccessAt: 42,
+          lastError: 'LAN_SYNC_BUSY',
+          lastPeer: '手机',
+        ),
       );
       final updated = original.copyWith(port: 9000);
       expect(updated.deviceName, '书房 Mac');
@@ -196,8 +216,7 @@ void main() {
       const original = LanSyncSettings(
         deviceName: '书房 Mac',
         port: 9123,
-        lastError: 'LAN_SYNC_BUSY',
-        lastPeer: '手机',
+        status: LanSyncLastStatus(lastError: 'LAN_SYNC_BUSY', lastPeer: '手机'),
       );
       final cleared = original.copyWith(lastSuccessAt: 99, clearError: true);
       expect(cleared.lastError, isNull);
@@ -210,7 +229,7 @@ void main() {
       const original = LanSyncSettings(
         deviceName: '书房 Mac',
         port: 9123,
-        lastPeer: '手机',
+        status: LanSyncLastStatus(lastPeer: '手机'),
       );
       expect(original.copyWith(clearPeer: true).lastPeer, isNull);
     });
@@ -218,6 +237,46 @@ void main() {
     test('defaults 用默认端口且设备名留给调用方兜底', () {
       expect(LanSyncSettings.defaults.port, lanSyncDefaultPort);
       expect(LanSyncSettings.defaults.deviceName, isEmpty);
+    });
+
+    test('peerWatermarks 超过上限时按最近同步时间淘汰最旧项', () {
+      final raw = <String, Object?>{
+        for (var i = 0; i < lanSyncMaxTrackedPeers + 5; i += 1)
+          'peer-$i': LanSyncPeerWatermark(
+            peerDeviceId: 'peer-$i',
+            peerDatasetEpoch: 'ep',
+            peerCursorMs: i,
+            lastSyncedAt: i * 100,
+          ).toStorage(),
+      };
+      final parsed = lanSyncSettingsFromRaw(<String, Object?>{
+        'peerWatermarks': raw,
+      }, fallbackDeviceName: '兜底');
+      expect(parsed.peerWatermarks.length, lanSyncMaxTrackedPeers);
+      expect(parsed.peerWatermarks.containsKey('peer-0'), isFalse);
+      expect(
+        parsed.peerWatermarks.containsKey('peer-${lanSyncMaxTrackedPeers + 4}'),
+        isTrue,
+      );
+    });
+  });
+
+  group('parseManualLanHost', () {
+    test('解析纯 IP、IP:端口与带 http 前缀的地址', () {
+      final bare = parseManualLanHost('192.168.1.8');
+      expect(bare?.address, '192.168.1.8');
+      expect(bare?.port, lanSyncDefaultPort);
+
+      final withPort = parseManualLanHost('http://10.0.0.5:9090/');
+      expect(withPort?.address, '10.0.0.5');
+      expect(withPort?.port, 9090);
+    });
+
+    test('非法地址或越界端口返回 null', () {
+      expect(parseManualLanHost(''), isNull);
+      expect(parseManualLanHost('not-an-ip'), isNull);
+      expect(parseManualLanHost('192.168.1.8:80'), isNull);
+      expect(parseManualLanHost('192.168.1.8:70000'), isNull);
     });
   });
 

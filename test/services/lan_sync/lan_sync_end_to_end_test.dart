@@ -15,6 +15,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_export.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
@@ -86,7 +87,7 @@ void main() {
       deviceName: '主机的名字',
       address: '127.0.0.1',
       port: host.baseUri.port,
-      protocolVersion: 1,
+      protocolVersion: lanSyncProtocolVersion,
     );
   });
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 允许局域网同步（http:// / ws://）与内网自建 WebDAV 明文连接；
+     对外公网服务（词典、AI、TTS）一律走 HTTPS。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

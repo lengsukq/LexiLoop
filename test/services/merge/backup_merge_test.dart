@@ -522,12 +522,53 @@ void main() {
 
       expect(outcome.tables['study_sessions'], hasLength(1));
       expect(outcome.tables['study_session_items'], hasLength(1));
-      // 会话已存在 → 它的题目没有进入映射表 → 日志里的题目引用写成 null。
+      // 同一场会话按 position 对齐题目，日志里的题目引用能保留映射到本机题目 id。
       expect(outcome.tables['review_logs']!.single['study_session_id'], 3);
-      expect(
-        outcome.tables['review_logs']!.single['study_session_item_id'],
-        isNull,
-      );
+      expect(outcome.tables['review_logs']!.single['study_session_item_id'], 4);
+    });
+
+    test('进行中的本地会话在远端完成后，合并会推进会话与题目状态', () {
+      final local = emptyTables()
+        ..['words'] = <Map<String, Object?>>[wordRow(id: 7, term: 'apple')]
+        ..['study_sessions'] = <Map<String, Object?>>[
+          <String, Object?>{
+            ...sessionRow(id: 3, startedAt: now),
+            'completed_at': null,
+            'completed_count': 0,
+          },
+        ]
+        ..['study_session_items'] = <Map<String, Object?>>[
+          <String, Object?>{
+            ...itemRow(id: 4, sessionId: 3, wordId: 7, position: 0),
+            'status': StudyItemStatus.pending.wire,
+            'answered_at': null,
+          },
+        ];
+      final remote = emptyTables()
+        ..['words'] = <Map<String, Object?>>[wordRow(id: 1, term: 'apple')]
+        ..['study_sessions'] = <Map<String, Object?>>[
+          <String, Object?>{
+            ...sessionRow(id: 1, startedAt: now),
+            'completed_at': now + 60000,
+            'completed_count': 1,
+          },
+        ]
+        ..['study_session_items'] = <Map<String, Object?>>[
+          <String, Object?>{
+            ...itemRow(id: 1, sessionId: 1, wordId: 1, position: 0),
+            'status': StudyItemStatus.answered.wire,
+            'answered_at': now + 30000,
+          },
+        ];
+
+      final outcome = merge(local, remote);
+
+      final mergedSession = outcome.tables['study_sessions']!.single;
+      final mergedItem = outcome.tables['study_session_items']!.single;
+      expect(mergedSession['completed_at'], now + 60000);
+      expect(mergedSession['completed_count'], 1);
+      expect(mergedItem['status'], StudyItemStatus.answered.wire);
+      expect(mergedItem['answered_at'], now + 30000);
     });
   });
 

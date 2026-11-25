@@ -298,24 +298,7 @@ class BackupImporter {
     String table,
     List<Map<String, Object?>> rows,
     List<String> usable,
-  ) {
-    final enumColumns = _enumColumns[table];
-    if (enumColumns == null) return;
-
-    for (final entry in enumColumns.entries) {
-      if (!usable.contains(entry.key)) continue;
-      for (final row in rows) {
-        final value = row[entry.key];
-        if (value == null) continue;
-        if (value is! String || wireLookup(entry.value, value) == null) {
-          throw ValidationError(
-            AppErrorCode.backupInvalidFormat,
-            details: '表 $table 的 ${entry.key} 含未知取值：$value',
-          );
-        }
-      }
-    }
-  }
+  ) => assertBackupEnumValues(table, rows, usable);
 
   /// 读取目标表的实际列名。
   Future<List<String>> _actualColumns(String table) async {
@@ -336,5 +319,29 @@ class BackupImporter {
       since14,
       now,
     ]);
+  }
+}
+
+/// 校验备份或增量载荷里 [table] 的枚举列取值合法（SSOT，供全量导入与增量合用）。
+void assertBackupEnumValues(
+  String table,
+  List<Map<String, Object?>> rows,
+  List<String> usable,
+) {
+  final enumColumns = _enumColumns[table];
+  if (enumColumns == null) return;
+
+  for (final entry in enumColumns.entries) {
+    if (!usable.contains(entry.key)) continue;
+    for (final row in rows) {
+      final value = row[entry.key];
+      if (value == null) continue;
+      if (value is! String || wireLookup(entry.value, value) == null) {
+        throw ValidationError(
+          AppErrorCode.backupInvalidFormat,
+          details: '表 $table 的 ${entry.key} 含未知取值：$value',
+        );
+      }
+    }
   }
 }

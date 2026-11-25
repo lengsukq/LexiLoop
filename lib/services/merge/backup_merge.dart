@@ -293,30 +293,27 @@ class _MergeRun {
     }
   }
 
-  /// 会话与题目：整场会话作为一个单位合并。
-  ///
-  /// **不逐题合并**：一场会话只会在**一台**设备上进行，两台设备出现同一个
-  /// 身份键只可能是「同一场会话的副本」。此时题集必然相同，逐题比对除了
-  /// 制造 `(session, position)` 冲突以外没有收益。
+  /// 会话与题目：按身份合并会话，并推进已有会话的新进度（如已完成或新作答题目）。
   void _mergeSessions() {
     final sessions = _rows(_sessionsTable);
     final byIdentity = <String, Map<String, Object?>>{
       for (final row in sessions) sessionIdentityOf(row): row,
     };
-    final itemsBySession = <int, List<Map<String, Object?>>>{};
-    for (final item in _incoming(_itemsTable)) {
-      final sessionId = _intOf(item['study_session_id']);
-      if (sessionId == null) continue;
-      itemsBySession
-          .putIfAbsent(sessionId, () => <Map<String, Object?>>[])
-          .add(item);
-    }
+    final itemsBySession = _groupItemsBySession(_incoming(_itemsTable));
+    final localItemsByPos = _indexLocalItemsByPosition(_rows(_itemsTable));
 
     for (final incoming in _incoming(_sessionsTable)) {
       final remoteId = _intOf(incoming['id']);
       final existing = byIdentity[sessionIdentityOf(incoming)];
       if (existing != null) {
-        if (remoteId != null) _sessionIdMap[remoteId] = _intOf(existing['id'])!;
+        final localSessionId = _intOf(existing['id'])!;
+        if (remoteId != null) _sessionIdMap[remoteId] = localSessionId;
+        _advanceExistingSession(existing, incoming);
+        _mergeSessionItems(
+          localSessionId,
+          itemsBySession[remoteId],
+          localItemsByPos,
+        );
         continue;
       }
       final row = <String, Object?>{...incoming, 'id': _nextSessionId};
@@ -326,6 +323,82 @@ class _MergeRun {
       if (remoteId != null) _sessionIdMap[remoteId] = _intOf(row['id'])!;
       _addedSessions += 1;
       _appendSessionItems(row, itemsBySession[remoteId]);
+    }
+  }
+
+  /// 按 `study_session_id` 分组远端题目项。
+  Map<int, List<Map<String, Object?>>> _groupItemsBySession(
+    List<Map<String, Object?>> items,
+  ) {
+    final grouped = <int, List<Map<String, Object?>>>{};
+    for (final item in items) {
+      final sessionId = _intOf(item['study_session_id']);
+      if (sessionId == null) continue;
+      grouped.putIfAbsent(sessionId, () => <Map<String, Object?>>[]).add(item);
+    }
+    return grouped;
+  }
+
+  /// 以 `(study_session_id, position)` 建立本机题目索引，供已有会话合入新进度。
+  Map<String, Map<String, Object?>> _indexLocalItemsByPosition(
+    List<Map<String, Object?>> items,
+  ) => <String, Map<String, Object?>>{
+    for (final item in items)
+      _sessionItemKey(_intOf(item['study_session_id']) ?? 0, item['position']):
+          item,
+  };
+
+  /// 若远端同一场会话推进到了更晚状态（如已完成或答完更多题），同步汇总列。
+  void _advanceExistingSession(
+    Map<String, Object?> existing,
+    Map<String, Object?> incoming,
+  ) {
+    final incomingDone = _intOf(incoming['completed_at']);
+    final existingDone = _intOf(existing['completed_at']);
+    final incomingProgress = _sessionProgressCount(incoming);
+    final existingProgress = _sessionProgressCount(existing);
+    final shouldAdvance =
+        (incomingDone != null && existingDone == null) ||
+        incomingProgress > existingProgress;
+    if (!shouldAdvance) return;
+    for (final column in _sessionProgressColumns) {
+      if (incoming.containsKey(column)) existing[column] = incoming[column];
+    }
+  }
+
+  /// 对已存在会话合并题目项：建立 id 映射，并用远端已作答/跳过状态推进本机 PENDING 项。
+  void _mergeSessionItems(
+    int localSessionId,
+    List<Map<String, Object?>>? incoming,
+    Map<String, Map<String, Object?>> localByPos,
+  ) {
+    if (incoming == null) return;
+    for (final item in incoming) {
+      final remoteId = _intOf(item['id']);
+      final key = _sessionItemKey(localSessionId, item['position']);
+      final existing = localByPos[key];
+      if (existing != null) {
+        if (remoteId != null) _itemIdMap[remoteId] = _intOf(existing['id'])!;
+        if (_stringOf(existing['status']) == StudyItemStatus.pending.wire &&
+            _stringOf(item['status']) != StudyItemStatus.pending.wire) {
+          existing['status'] = item['status'];
+          existing['answered_at'] = item['answered_at'];
+          existing['skip_reason'] = item['skip_reason'];
+        }
+        continue;
+      }
+      final wordId = _wordIdMap[_intOf(item['word_id'])];
+      if (wordId == null) continue;
+      final row = <String, Object?>{
+        ...item,
+        'id': _nextItemId,
+        'study_session_id': localSessionId,
+        'word_id': wordId,
+      };
+      _nextItemId += 1;
+      _rows(_itemsTable).add(row);
+      localByPos[key] = row;
+      if (remoteId != null) _itemIdMap[remoteId] = _intOf(row['id'])!;
     }
   }
 
@@ -398,7 +471,11 @@ class _MergeRun {
       );
       mastery[entry.key] = replayed;
       cards.add(_cardRow(entry.key, replayed.card, existingCards[entry.key]));
-      final wrong = _wrongRow(entry.key, replayed.wrong);
+      final wrong = _wrongRow(
+        entry.key,
+        replayed.wrong,
+        fallbackUpdatedAt: replayed.card.lastReviewAt ?? now,
+      );
       if (wrong != null) wrongs.add(wrong);
     }
 
@@ -549,8 +626,11 @@ Map<String, Object?> _cardRow(
 };
 
 /// 一条错词状态的新行；重放认为没有错词记录时返回 `null`。
-Map<String, Object?>? _wrongRow(int wordId, WrongStateTransition? transition) =>
-    transition == null
+Map<String, Object?>? _wrongRow(
+  int wordId,
+  WrongStateTransition? transition, {
+  required int fallbackUpdatedAt,
+}) => transition == null
     ? null
     : <String, Object?>{
         'word_id': wordId,
@@ -561,7 +641,10 @@ Map<String, Object?>? _wrongRow(int wordId, WrongStateTransition? transition) =>
         'last_wrong_at': transition.lastWrongAt,
         'last_correct_at': transition.lastCorrectAt,
         'resolved_at': transition.resolvedAt,
-        'updated_at': transition.lastCorrectAt ?? transition.lastWrongAt,
+        'updated_at':
+            transition.lastCorrectAt ??
+            transition.lastWrongAt ??
+            fallbackUpdatedAt,
       };
 
 /// 日志的稳定排序：先按时间，再按幂等键。
@@ -611,6 +694,23 @@ bool _isPersonalTruthy(Object? value) {
   if (value is num) return value != 0;
   return true;
 }
+
+/// 会话可推进的进度汇总列。
+const List<String> _sessionProgressColumns = <String>[
+  'completed_at',
+  'planned_count',
+  'completed_count',
+  'correct_count',
+  'wrong_count',
+  'skipped_count',
+  'duration_ms',
+];
+
+int _sessionProgressCount(Map<String, Object?> row) =>
+    (_intOf(row['completed_count']) ?? 0) + (_intOf(row['skipped_count']) ?? 0);
+
+String _sessionItemKey(int sessionId, Object? position) =>
+    '$sessionId\u0000${position is num ? position.toDouble() : position}';
 
 /// 远端瞬态任务状态无法在本机恢复，新增词将其回退到可重新初始化的状态。
 Object? _localInitializationStatus(Object? value) =>

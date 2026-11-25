@@ -1,7 +1,7 @@
 /// 数据管理设置分组。
 ///
-/// 备份导出 / 导入（复用 `backupServiceProvider`）、CSV 导入入口、
-/// WebDAV 远程备份、局域网同步与危险区。
+/// 采用清晰的分组卡片层次：本地备份与词库导入（分组操作行）、局域网直连增量同步、
+/// WebDAV 远程云备份与克制的危险区。
 library;
 
 import 'package:flutter/material.dart';
@@ -22,13 +22,30 @@ import 'package:lexiloop/services/backup/backup_export_providers.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
 import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
 import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
-import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 清空全部数据确认按钮的稳定 Key。
 const Key clearAllDataConfirmButtonKey = Key('clearAllDataConfirmButton');
+
+/// 分组操作行图标底块边长。
+const double _actionIconBoxSize = 36;
+
+/// 分组操作行之间的缩进分隔线起点。
+const double _actionDividerIndent = 60;
+
+/// 危险区切换横/竖布局的宽度阈值。
+const double _dangerWideThreshold = 460;
+
+/// 危险按钮紧凑高度。
+const double _dangerButtonHeight = 38;
 
 /// 数据管理分组。
 class DataManagementSection extends ConsumerStatefulWidget {
@@ -45,78 +62,69 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
   bool _exporting = false;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        LexiSpace.s4,
-        LexiSpace.s12,
-        LexiSpace.s4,
-        LexiSpace.s24,
-      ),
-      children: <Widget>[
-        SettingsSectionCard(
-          title: '备份与导入',
-          subtitle:
-              '备份是包含全部词条与学习记录的 JSON 文件； '
-              'CSV 是 EasyDict 导出的词库文件。',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              FilledButton.icon(
-                key: const Key('exportBackup'),
-                onPressed: _exporting ? null : _exportBackup,
-                icon: const Icon(LucideIcons.download, size: 16),
-                label: Text(_exporting ? '导出中…' : '导出 JSON 备份'),
-              ),
-              const SizedBox(height: LexiSpace.s8),
-              OutlinedButton.icon(
-                onPressed: _importing ? null : _importBackup,
-                icon: const Icon(LucideIcons.fileUp, size: 16),
-                label: Text(_importing ? '导入中…' : '导入旧版 JSON 备份'),
-              ),
-              const SizedBox(height: LexiSpace.s8),
-              OutlinedButton.icon(
-                key: const Key('openCsvImport'),
-                onPressed: () => context.go('/import'),
-                icon: const Icon(LucideIcons.table2, size: 16),
-                label: const Text('导入 EasyDict CSV 词库'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: LexiSpace.s12),
-        const RemoteBackupSection(),
-        const SizedBox(height: LexiSpace.s12),
-        const LanSyncSection(),
-        const SizedBox(height: LexiSpace.s12),
-        SettingsSectionCard(
-          title: '危险区',
-          subtitle: '以下操作不可撤销，建议先导出备份。',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text(
-                '清空全部数据会删除所有词条、学习记录、导入历史与设置，'
-                '应用回到首次启动的状态。',
-                style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-              ),
-              const SizedBox(height: LexiSpace.s10),
-              FilledButton.icon(
-                key: const Key('clearAllData'),
-                style: FilledButton.styleFrom(backgroundColor: colors.danger),
-                onPressed: _clearAll,
-                icon: const Icon(LucideIcons.trash2, size: 16),
-                label: const Text('清空全部数据'),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(
+      LexiSpace.s4,
+      LexiSpace.s12,
+      LexiSpace.s4,
+      LexiSpace.s24,
+    ),
+    children: <Widget>[
+      _localBackupCard(),
+      const SizedBox(height: LexiSpace.s16),
+      const LanSyncSection(),
+      const SizedBox(height: LexiSpace.s16),
+      const RemoteBackupSection(),
+      const SizedBox(height: LexiSpace.s16),
+      _DangerZoneCard(onClearAll: _clearAll),
+    ],
+  );
 
-  /// 导出备份：非破坏性只读动作，一键拉起系统分享/保存面板。
+  Widget _localBackupCard() => SectionCard(
+    title: '备份与导入',
+    icon: LucideIcons.hardDrive,
+    tone: LexiTone.sky,
+    subtitle: '导出离线 JSON 留底，或导入旧版备份与 EasyDict CSV 词库。',
+    child: Surface(
+      variant: SurfaceVariant.inset,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _GroupedActionRow(
+            rowKey: const Key('exportBackup'),
+            icon: LucideIcons.download,
+            tone: LexiTone.mint,
+            title: '导出 JSON 备份',
+            subtitle: _exporting ? '正在打包词条与学习记录…' : '包含全部词条、释义与 FSRS 复习历史',
+            trailing: LexiBadge(
+              label: _exporting ? '导出中…' : '导出',
+              tone: LexiBadgeTone.accent,
+            ),
+            onTap: _exporting ? null : _exportBackup,
+          ),
+          const Divider(height: 1, indent: _actionDividerIndent),
+          _GroupedActionRow(
+            icon: LucideIcons.fileUp,
+            tone: LexiTone.sky,
+            title: '导入旧版 JSON 备份',
+            subtitle: _importing ? '正在校验并恢复…' : '从备份文件整体替换恢复当前词库',
+            onTap: _importing ? null : _importBackup,
+          ),
+          const Divider(height: 1, indent: _actionDividerIndent),
+          _GroupedActionRow(
+            rowKey: const Key('openCsvImport'),
+            icon: LucideIcons.table2,
+            tone: LexiTone.peach,
+            title: '导入 EasyDict CSV 词库',
+            subtitle: '批量导入生词本、音标、释义与个人笔记',
+            onTap: () => context.go('/import'),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Future<void> _exportBackup() async {
     LexiHaptics.light();
     final messenger = ScaffoldMessenger.of(context);
@@ -184,4 +192,181 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
     invalidateLocalData(ref);
     messenger.showSnackBar(const SnackBar(content: Text('本地数据与语音缓存已清空。')));
   }
+}
+
+class _GroupedActionRow extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.tone,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.rowKey,
+    this.trailing,
+  });
+
+  final Key? rowKey;
+  final IconData icon;
+  final LexiTone tone;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final style = context.lexiTones.styleOf(tone);
+    return LexiPressable(
+      key: rowKey,
+      borderRadius: BorderRadius.circular(LexiRadius.md),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s12,
+          vertical: LexiSpace.s12,
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: _actionIconBoxSize,
+              height: _actionIconBoxSize,
+              decoration: BoxDecoration(
+                color: style.background,
+                borderRadius: BorderRadius.circular(LexiRadius.sm),
+              ),
+              child: Icon(icon, size: 17, color: style.foreground),
+            ),
+            const SizedBox(width: LexiSpace.s12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: LexiType.body.copyWith(
+                      color: colors.label,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: LexiSpace.s2),
+                  Text(
+                    subtitle,
+                    style: LexiType.caption.copyWith(
+                      color: colors.secondaryLabel,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: LexiSpace.s8),
+            trailing ??
+                Icon(
+                  LucideIcons.chevronRight,
+                  size: 16,
+                  color: colors.tertiaryLabel,
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DangerZoneCard extends StatelessWidget {
+  const new({required this.onClearAll});
+
+  final VoidCallback onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Container(
+      padding: const EdgeInsets.all(LexiSpace.s16),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(LexiRadius.lg),
+        border: Border.all(
+          color: colors.danger.withValues(alpha: LexiTint.border),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final info = _dangerInfo(colors);
+          final button = _dangerButton(colors);
+          if (constraints.maxWidth >= _dangerWideThreshold) {
+            return Row(
+              children: <Widget>[
+                Expanded(child: info),
+                const SizedBox(width: LexiSpace.s16),
+                button,
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              info,
+              const SizedBox(height: LexiSpace.s12),
+              Align(alignment: Alignment.centerRight, child: button),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _dangerInfo(LexiColors colors) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Container(
+        width: _actionIconBoxSize,
+        height: _actionIconBoxSize,
+        decoration: BoxDecoration(
+          color: colors.danger.withValues(alpha: LexiTint.tint),
+          borderRadius: BorderRadius.circular(LexiRadius.sm),
+        ),
+        child: Icon(
+          LucideIcons.triangleAlert,
+          size: 17,
+          color: colors.dangerText,
+        ),
+      ),
+      const SizedBox(width: LexiSpace.s12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '危险区',
+              style: LexiType.callout.copyWith(
+                color: colors.label,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: LexiSpace.s2),
+            Text(
+              '清空全部词条、学习记录、导入历史与设置并回到初始状态，不可撤销。',
+              style: LexiType.caption.copyWith(color: colors.secondaryLabel),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _dangerButton(LexiColors colors) => OutlinedButton.icon(
+    key: const Key('clearAllData'),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: colors.dangerText,
+      backgroundColor: colors.danger.withValues(alpha: LexiTint.tint),
+      side: BorderSide(color: colors.danger.withValues(alpha: LexiTint.border)),
+      minimumSize: const Size(0, _dangerButtonHeight),
+      padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s14),
+      textStyle: LexiType.footnote.copyWith(fontWeight: FontWeight.w600),
+    ),
+    onPressed: onClearAll,
+    icon: const Icon(LucideIcons.trash2, size: 15),
+    label: const Text('清空全部数据'),
+  );
 }

@@ -242,6 +242,21 @@ enum AppErrorCode {
     '两台设备的版本不兼容，请把两台设备都升级到同一版本。',
   ),
 
+  /// 主机当前处于只读模式或拒绝了双向写入请求。
+  lanSyncPeerRejected(
+    'LAN_SYNC_PEER_REJECTED',
+    '对方当前仅开启了只读共享，不支持双向同步。请切到「仅拉取合并」，或在主机端开启双向同步。',
+  ),
+
+  /// 用户主动取消了局域网同步。
+  lanSyncCancelled('LAN_SYNC_CANCELLED', '已取消本次同步。'),
+
+  /// 手动输入的局域网地址或端口格式无效。
+  lanSyncInvalidAddress(
+    'LAN_SYNC_INVALID_ADDRESS',
+    '请输入有效的 IPv4 地址与端口（如 192.168.1.8:8765）。',
+  ),
+
   // ── AI 与外部服务 ──
 
   /// 设置中未启用 AI。

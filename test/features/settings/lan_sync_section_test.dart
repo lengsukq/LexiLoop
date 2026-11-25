@@ -54,6 +54,7 @@ void main() {
           lanSyncHostStarterProvider.overrideWithValue(starter.call),
           lanSyncClientFactoryProvider.overrideWithValue(factory.call),
           lanSyncDiscoveryProvider.overrideWithValue(discovery),
+          lanSyncSessionRunnerProvider.overrideWithValue(null),
         ],
         child: MaterialApp(
           theme: LexiTheme.light,
@@ -453,6 +454,55 @@ void main() {
       final backup = await starter.calls.single.backupSource();
       expect(backup.fileName, startsWith('lexiloop-backup-'));
       expect(backup.bytes, isA<Uint8List>());
+    });
+  });
+
+  group('v2 增强交互（共享策略 / 双端动画 / 状态行 / 手动直连）', () {
+    testWidgets('开启共享后展示词环共振桥等待态与 6 位分格配对码', (tester) async {
+      await pumpSection(tester);
+      await startSharing(tester);
+
+      expect(find.byKey(const Key('lanSyncTheater')), findsOneWidget);
+      expect(find.text('双向共享在线'), findsOneWidget);
+      expect(find.byKey(const Key('lanSyncSharePolicy')), findsOneWidget);
+      expect(find.byKey(const Key('lanSyncStatus-0')), findsOneWidget);
+    });
+
+    testWidgets('共享策略切到只读后会传入服务端选项', (tester) async {
+      await pumpSection(tester);
+      await tester.tap(find.text('仅发送（只读）'));
+      await tester.pumpAndSettle();
+      await startSharing(tester);
+
+      expect(starter.calls.single.allowsBidirectional, isFalse);
+      expect(find.text('只读共享在线'), findsOneWidget);
+    });
+
+    testWidgets('可切换双向同步模式并弹出双向确认说明', (tester) async {
+      await pumpSection(tester);
+      await tester.tap(find.text('双向'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('一次配对互相增量合并'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('lanSyncManualConnect')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('lanSyncManualAddressField')),
+        '192.168.1.20:8765',
+      );
+      await tester.tap(find.byKey(const Key('lanSyncManualAddressConfirm')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('lanSyncCodeField')),
+        '135790',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('lanSyncCodeConfirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('开始双向同步'), findsOneWidget);
     });
   });
 }

@@ -176,11 +176,13 @@ void main() {
       await start();
       final backup = await starter.calls.single.backupSource();
 
-      expect(backup.totalRows, isZero);
+      // 开启共享会自动落盘本机持久化 deviceId / datasetEpoch（settings 表 1 行）。
+      expect(backup.totalRows, 1);
       expect(backup.fileName, startsWith(backupFilePrefixForTest));
       final decoded = jsonDecode(utf8.decode(backup.bytes));
       expect(decoded, isA<Map<String, Object?>>());
       expect((decoded as Map<String, Object?>)['format'], backupFormat);
+      expect(decoded['words'], isEmpty);
     });
   });
 }

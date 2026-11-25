@@ -19,8 +19,11 @@ import 'dart:typed_data';
 
 import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_codec_native.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_host_port.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_protocol.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_ws_host_native.dart';
+import 'package:lexiloop/domain/models/lan_sync_progress.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
 
 /// 启动共享服务端。
@@ -155,6 +158,7 @@ class _HttpLanSyncHost implements LanSyncHost {
       return switch (request.uri.path) {
         lanSyncHandshakePath => await _handshake(request),
         lanSyncBackupPath => await _backup(request),
+        lanSyncSessionPath => await _session(request),
         _ => await _reject(
           request,
           HttpStatus.notFound,
@@ -183,12 +187,78 @@ class _HttpLanSyncHost implements LanSyncHost {
     final handshake = LanSyncHandshake(
       deviceName: _options.deviceName,
       protocolVersion: lanSyncProtocolVersion,
+      deviceId: _options.deviceId,
+      deviceKind: _options.deviceKind,
+      allowsBidirectional: _options.allowsBidirectional,
+      datasetEpoch: _options.datasetEpoch,
     );
     request.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
       ..write(handshake.toJsonBody());
     await request.response.close();
+  }
+
+  /// v2 WebSocket 双向增量与双端实时进度会话。
+  Future<void> _session(HttpRequest request) async {
+    if (!_isAuthorized(request)) {
+      return await _reject(
+        request,
+        HttpStatus.unauthorized,
+        AppErrorCode.lanSyncCodeInvalid,
+      );
+    }
+    final delegate = _options.sessionDelegate;
+    if (delegate == null) {
+      return await _reject(
+        request,
+        HttpStatus.notFound,
+        AppErrorCode.lanSyncNotSharing,
+      );
+    }
+    if (_busy) {
+      return await _reject(
+        request,
+        HttpStatus.conflict,
+        AppErrorCode.lanSyncBusy,
+      );
+    }
+    await _runUpgradedSession(request, delegate);
+  }
+
+  Future<void> _runUpgradedSession(
+    HttpRequest request,
+    LanSyncSessionDelegate delegate,
+  ) async {
+    _busy = true;
+    try {
+      // 载荷本身已在后台 Isolate 做过 GZip 压缩，关闭 WebSocket 层 permessage-deflate
+      // 避免二次压缩开销与大二进制分片状态异常。
+      final socket = await WebSocketTransformer.upgrade(
+        request,
+        compression: CompressionOptions.compressionOff,
+      );
+      socket.pingInterval = const Duration(
+        milliseconds: lanSyncWsPingIntervalMs,
+      );
+      final peerIp = request.connectionInfo?.remoteAddress.address ?? '';
+      await runLanSyncHostSession(
+        socket: socket,
+        delegate: delegate,
+        localEndpoint: LanSyncEndpoint(
+          name: _options.deviceName,
+          deviceKind: _options.deviceKind,
+          address: baseUri.authority,
+        ),
+        peerAddress: peerIp,
+      );
+      _served += 1;
+      _options.onServed(_served);
+    } on Object {
+      // 会话内错误已通过 WebSocket 帧与 onSessionProgress 通知双方，主机继续保活。
+    } finally {
+      _busy = false;
+    }
   }
 
   /// 拉取一份备份。
@@ -220,7 +290,7 @@ class _HttpLanSyncHost implements LanSyncHost {
     }
   }
 
-  /// 导出并写出响应体。
+  /// 导出并写出响应体（客户端声明 `Accept-Encoding: gzip` 时走后台 GZip 压缩）。
   Future<void> _writeBackup(HttpRequest request) async {
     final backup = await _options.backupSource();
     if (backup.bytes.length > maxBackupBytes) {
@@ -229,21 +299,30 @@ class _HttpLanSyncHost implements LanSyncHost {
         details: '待共享的备份 ${backup.bytes.length} 字节，上限 $maxBackupBytes',
       );
     }
+    final acceptGzip = _acceptsGzip(request);
+    final wireBytes = acceptGzip
+        ? await compressLanSyncBytes(backup.bytes)
+        : backup.bytes;
     final response = request.response
       ..statusCode = HttpStatus.ok
       ..headers.contentType = ContentType.json
       ..headers.set(lanSyncBackupNameHeader, backup.fileName)
-      ..headers.set(lanSyncBackupRowsHeader, '${backup.totalRows}')
-      ..headers.contentLength = backup.bytes.length
-      ..add(backup.bytes);
-    // 导出阶段到此结束：字节已经交给 socket，下一份导出不会与它争 I/O。
-    // **在 `close()` 之前释放忙碌标记**：`close()` 会等对端把连接收干净，
-    // 对端读完后立即断开时它可能迟迟不返回；把「正在服务」一直挂在那里，
-    // 用户连续点两次「拉取」的第二次就会莫名其妙得到 409。
+      ..headers.set(lanSyncBackupRowsHeader, '${backup.totalRows}');
+    if (acceptGzip) {
+      response.headers.set(HttpHeaders.contentEncodingHeader, 'gzip');
+    }
+    response
+      ..contentLength = wireBytes.length
+      ..add(wireBytes);
     _served += 1;
     _options.onServed(_served);
     _busy = false;
     await response.close();
+  }
+
+  bool _acceptsGzip(HttpRequest request) {
+    final header = request.headers.value(HttpHeaders.acceptEncodingHeader);
+    return header != null && header.toLowerCase().contains('gzip');
   }
 
   /// 配对码是否正确；连续错码到达上限时停掉共享。
@@ -318,6 +397,8 @@ class _HttpLanSyncHost implements LanSyncHost {
       address: datagram.address.address,
       port: _port,
       protocolVersion: lanSyncProtocolVersion,
+      deviceKind: _options.deviceKind,
+      allowsBidirectional: _options.allowsBidirectional,
     ).toWire();
     _discovery.send(
       utf8.encode(jsonEncode(reply)),

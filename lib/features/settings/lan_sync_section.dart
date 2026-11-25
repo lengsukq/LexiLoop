@@ -1,15 +1,10 @@
 /// 局域网同步设置分组。
 ///
-/// **两块内容、一张卡片**：上面是「本机共享（发送）」，下面是「从局域网设备
-/// 拉取（接收）」。它们共用同一份设置（设备名、端口），拆成两张卡片会让
-/// 「端口填了但没开共享」这种状态看起来像两件互不相关的事。
-///
-/// **为什么与远程备份（WebDAV）并列而不是合并**：两者是同一件事的两种交付
-/// 方式——一个经服务器中转、换机可用，一个在局域网直连、不依赖任何第三方。
-/// 用户的取舍（要不要为了换机而配一台 WebDAV）需要它们各自可读。
-///
-/// **共享的说明为什么占了一整段**：这是全应用唯一一个「别的设备可以读走你
-/// 全部数据」的功能，用户必须在按下按钮之前就知道它做什么、不做什么。
+/// 整合「本机共享（服务端）」与「连接设备同步（客户端）」，内置：
+/// - v2 WebSocket 双向增量同步 + GZip 压缩 + 双端实时「词环共振桥」动画；
+/// - 主机端共享策略切换（双向增量合并 / 仅发送只读）；
+/// - 拉取端三档模式（双向 / 合并 / 覆盖）、自动搜索 + 手动输入 IP 直连；
+/// - 上次同步状态行（时间、对端、失败原因）。
 library;
 
 import 'dart:async';
@@ -22,30 +17,44 @@ import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/core/platform.dart';
 import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/lan_sync/lan_sync_discovery_port.dart';
+import 'package:lexiloop/data/lan_sync/lan_sync_session_client.dart';
+import 'package:lexiloop/domain/models/lan_sync_progress.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
+import 'package:lexiloop/features/settings/backup_size_label.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
+import 'package:lexiloop/features/settings/lan_sync/lan_sync_dialogs.dart';
+import 'package:lexiloop/features/settings/lan_sync/lan_sync_theater.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_providers.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_pull_service.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_share_service.dart';
 import 'package:lexiloop/services/lan_sync/lan_sync_state_store.dart';
 import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_haptics.dart';
 import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tones.dart';
 import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/inline_notice.dart';
 import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
-import 'package:lexiloop/ui/widgets/lexi_form_rows.dart';
+import 'package:lexiloop/ui/widgets/lexi_pressable.dart';
+import 'package:lexiloop/ui/widgets/section_card.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// 局域网覆盖拉取确认按钮的稳定 Key。
 const Key lanSyncPullConfirmButtonKey = Key('lanSyncPullConfirmButton');
 
-/// 设备发现对话框的宽度（固定尺寸，不是间距——不参与 LexiSpace 音阶）。
-const double lanSyncHostPickerWidth = 420;
-
 /// 配对码的展示字距。
-///
-/// 6 位数字要能被一眼分组读出来，靠拉开字距比插入分隔符更稳
-/// （对方照抄时不会把分隔符也抄进去）。
 const double lanSyncCodeLetterSpacing = 6;
+
+/// 分区内紧凑按钮高度。
+const double _compactButtonHeight = 38;
+
+/// 分区切分两列表单的宽度阈值。
+const double _twoColBreakpoint = 420;
+
+/// 设备卡片左侧图标块尺寸。
+const double _hostIconBoxSize = 36;
 
 /// 局域网同步分组。
 class LanSyncSection extends ConsumerStatefulWidget {
@@ -62,21 +71,19 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
 
   bool _seeded = false;
   bool _busy = false;
-
-  /// 当前选中的拉取模式。
-  ///
-  /// **同时存在状态里与设置表里**：设置表是持久化的真相，但这个字段让
-  /// 「刚点完『覆盖』就点设备」不会读到还没落盘的旧值（`setPullMode` 是异步的）。
-  /// 首帧与每次重灌设置时都从设置表同步回来。
   LanSyncPullMode _mode = LanSyncPullMode.merge;
+  LanSyncSharePolicy _sharePolicy = LanSyncSharePolicy.bidirectional;
   LanSyncDiscoveryResult? _found;
   String? _note;
+  LanSyncTransferProgress? _clientProgress;
+  LanSyncCancelSignal? _cancelSignal;
+  DiscoveredLanHost? _lastTarget;
+  String? _lastCode;
+  int _observedHostRevision = 0;
 
   @override
   void initState() {
     super.initState();
-    // 与远程备份同一套初始化：先建空控制器，等异步设置到了再灌初值，
-    // 否则「打开设置页直接点搜索」会用上一份空设备名。
     _deviceName = TextEditingController();
     _port = TextEditingController();
     ref.listenManual(appSettingsProvider, (previous, next) {
@@ -84,9 +91,15 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
       if (loaded == null || _seeded) return;
       _seed(loaded.raw[lanSyncSettingsKey]);
     }, fireImmediately: true);
+    ref.listenManual(lanSyncShareProvider, (previous, next) {
+      final revision = next.value?.dataRevision ?? 0;
+      if (revision <= _observedHostRevision) return;
+      _observedHostRevision = revision;
+      invalidateLocalData(ref);
+      ref.invalidate(appSettingsProvider);
+    });
   }
 
-  /// 把库里已有的配置灌进输入框。
   void _seed(Object? raw) {
     _seeded = true;
     final settings = lanSyncSettingsFromRaw(
@@ -98,10 +111,12 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     _deviceName.text = settings.deviceName;
     _port.text = '${settings.port}';
     _mode = settings.pullMode;
+    _sharePolicy = settings.sharePolicy;
   }
 
   @override
   void dispose() {
+    _cancelSignal?.cancel();
     _deviceName.dispose();
     _port.dispose();
     super.dispose();
@@ -111,12 +126,23 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
     final share = ref.watch(lanSyncShareProvider);
+    final rawSettings = ref
+        .watch(appSettingsProvider)
+        .value
+        ?.raw[lanSyncSettingsKey];
+    final lanSettings = lanSyncSettingsFromRaw(
+      rawSettings,
+      fallbackDeviceName: defaultLanSyncDeviceName(
+        isDesktop: PlatformCaps.isDesktop,
+      ),
+    );
+    final sharing = share.value?.isSharing ?? false;
 
-    return SettingsSectionCard(
+    return SectionCard(
       title: '局域网同步',
-      subtitle:
-          '在同一局域网的两台设备之间直接搬运数据，不经过任何服务器。'
-          '一台开启共享（只读），另一台输配对码把数据拉过来。',
+      icon: LucideIcons.wifi,
+      tone: LexiTone.mint,
+      subtitle: '同一局域网设备直连增量同步，不经过任何服务器，自动压缩且只传变更。',
       child: PlatformCaps.isWeb
           ? Text(
               AppErrorCode.lanSyncUnsupported.defaultMessage,
@@ -126,51 +152,50 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                ..._shareBlock(share),
-                const SizedBox(height: LexiSpace.s16),
-                const Divider(),
-                const SizedBox(height: LexiSpace.s16),
-                ..._pullBlock(),
+                _sharePanel(share, sharing: sharing),
+                const SizedBox(height: LexiSpace.s12),
+                _pullPanel(lanSettings),
               ],
             ),
     );
   }
 
-  /// 本机共享（发送）那一块。
-  List<Widget> _shareBlock(AsyncValue<LanSyncShareSession?> share) {
+  Widget _sharePanel(
+    AsyncValue<LanSyncShareSession?> share, {
+    required bool sharing,
+  }) {
     final session = share.value;
-    return <Widget>[
-      ..._shareIntro(),
-      ..._shareFields(enabled: session == null),
-      const SizedBox(height: LexiSpace.s12),
-      ..._shareStatus(share),
-    ];
+    final editable = session == null || !session.isSharing;
+    return Surface(
+      variant: SurfaceVariant.inset,
+      padding: const EdgeInsets.all(LexiSpace.s14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _SubPanelHeader(
+            icon: LucideIcons.radio,
+            tone: LexiTone.mint,
+            title: '本机共享',
+            trailing: LexiBadge(
+              label: sharing ? '共享在线' : '等待开启',
+              tone: sharing ? LexiBadgeTone.success : LexiBadgeTone.neutral,
+            ),
+          ),
+          const SizedBox(height: LexiSpace.s12),
+          _shareFields(enabled: editable),
+          const SizedBox(height: LexiSpace.s12),
+          _sharePolicyAndStart(share, editable: editable),
+          ..._shareBody(share),
+        ],
+      ),
+    );
   }
 
-  /// 共享那块的标题与说明。
-  List<Widget> _shareIntro() => <Widget>[
-    const _BlockTitle(title: '本机共享（发送）'),
-    const SizedBox(height: LexiSpace.s6),
-    Text(
-      '开启后，同网段的设备可以读到本机的一份完整备份。'
-      '共享期间本机数据只会被读取，不会被修改；'
-      '共享只在应用保持打开时有效。',
-      style: LexiType.footnote.copyWith(
-        color: context.lexiColors.secondaryLabel,
-      ),
-    ),
-    const SizedBox(height: LexiSpace.s12),
-  ];
-
-  /// 设备名与端口两行输入。
-  ///
-  /// 共享进行中一律禁用：改端口不会对已经监听的套接字生效，
-  /// 「改了没反应」比「不能改」更难理解。
-  List<Widget> _shareFields({required bool enabled}) => <Widget>[
-    _LanSyncTextField(
+  Widget _shareFields({required bool enabled}) {
+    final nameField = _LanSyncTextField(
       fieldKey: const Key('lanSyncDeviceNameField'),
       label: '设备名',
-      hint: '对方在搜索结果里看到的名字',
+      hint: '对方搜索时看到的名字',
       controller: _deviceName,
       enabled: enabled,
       onChanged: (value) => unawaited(
@@ -178,9 +203,8 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
             .read<LanSyncStateStore>(lanSyncStateStoreProvider)
             .setDeviceName(value),
       ),
-    ),
-    const SizedBox(height: LexiSpace.s8),
-    _LanSyncTextField(
+    );
+    final portField = _LanSyncTextField(
       fieldKey: const Key('lanSyncPortField'),
       label: '端口',
       hint: '$lanSyncDefaultPort',
@@ -192,178 +216,250 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
             .read<LanSyncStateStore>(lanSyncStateStoreProvider)
             .setPort(parseLanSyncPort(int.tryParse(value.trim()))),
       ),
-    ),
-  ];
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= _twoColBreakpoint) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(flex: 3, child: nameField),
+              const SizedBox(width: LexiSpace.s8),
+              Expanded(flex: 2, child: portField),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            nameField,
+            const SizedBox(height: LexiSpace.s8),
+            portField,
+          ],
+        );
+      },
+    );
+  }
 
-  /// 共享按钮与当前会话的展示。
-  List<Widget> _shareStatus(AsyncValue<LanSyncShareSession?> share) {
-    final session = share.value;
-    if (share.isLoading) {
-      return <Widget>[const LinearProgressIndicator(minHeight: LexiSpace.s2)];
-    }
-    final error = share.error;
-    if (error != null) {
-      return <Widget>[
-        Text(
-          error is AppError ? error.message : '开启共享失败：$error',
-          key: const Key('lanSyncShareError'),
-          style: LexiType.footnote.copyWith(
-            color: context.lexiColors.dangerText,
+  Widget _sharePolicyAndStart(
+    AsyncValue<LanSyncShareSession?> share, {
+    required bool editable,
+  }) {
+    final showStart = !share.isLoading && editable;
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: LexiSpace.s8,
+      runSpacing: LexiSpace.s8,
+      children: <Widget>[
+        _sharePolicySelector(enabled: editable),
+        if (showStart) _startButton(),
+      ],
+    );
+  }
+
+  Widget _sharePolicySelector({required bool enabled}) =>
+      SegmentedButton<LanSyncSharePolicy>(
+        key: const Key('lanSyncSharePolicy'),
+        style: _compactSegmentStyle(),
+        segments: const <ButtonSegment<LanSyncSharePolicy>>[
+          ButtonSegment<LanSyncSharePolicy>(
+            value: LanSyncSharePolicy.bidirectional,
+            label: Text('允许双向合并'),
+            icon: Icon(LucideIcons.arrowLeftRight, size: 14),
           ),
-        ),
-        const SizedBox(height: LexiSpace.s8),
-        _startButton(),
+          ButtonSegment<LanSyncSharePolicy>(
+            value: LanSyncSharePolicy.readOnly,
+            label: Text('仅发送（只读）'),
+            icon: Icon(LucideIcons.shieldCheck, size: 14),
+          ),
+        ],
+        selected: <LanSyncSharePolicy>{_sharePolicy},
+        onSelectionChanged: enabled ? _selectSharePolicy : null,
+      );
+
+  List<Widget> _shareBody(AsyncValue<LanSyncShareSession?> share) {
+    if (share.isLoading) {
+      return const <Widget>[
+        SizedBox(height: LexiSpace.s10),
+        LinearProgressIndicator(minHeight: LexiSpace.s2),
       ];
     }
-    if (session == null) return <Widget>[_startButton()];
-    if (!session.isSharing) return _lockedOutBlock();
-    return <Widget>[..._codeBlock(session), ..._sessionActions(session)];
-  }
-
-  /// 因配对码连续错误而自动停止共享时的提示。
-  List<Widget> _lockedOutBlock() => <Widget>[
-    Text(
-      AppErrorCode.lanSyncCodeLockedOut.defaultMessage,
-      key: const Key('lanSyncLockedOut'),
-      style: LexiType.footnote.copyWith(color: context.lexiColors.dangerText),
-    ),
-    const SizedBox(height: LexiSpace.s8),
-    _startButton(),
-  ];
-
-  /// 配对码与地址。
-  List<Widget> _codeBlock(LanSyncShareSession session) {
-    final colors = context.lexiColors;
-    return <Widget>[
-      Text(
-        '配对码',
-        style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-      ),
-      const SizedBox(height: LexiSpace.s4),
-      Text(
-        session.pairingCode,
-        key: const Key('lanSyncPairingCode'),
-        style: LexiType.title2.copyWith(
-          color: colors.accentText,
-          letterSpacing: lanSyncCodeLetterSpacing,
+    if (share.error case final error?) {
+      return <Widget>[
+        const SizedBox(height: LexiSpace.s10),
+        InlineNotice(
+          key: const Key('lanSyncShareError'),
+          message: error is AppError ? error.message : '开启共享失败：$error',
         ),
-      ),
-      const SizedBox(height: LexiSpace.s6),
-      Text(
-        '在另一台设备上输入这 6 位数字即可拉取。地址：${session.baseUri}',
-        key: const Key('lanSyncShareAddress'),
-        style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-      ),
-      const SizedBox(height: LexiSpace.s2),
-      Text(
-        '已服务 ${session.servedCount} 次',
-        key: const Key('lanSyncServedCount'),
-        style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-      ),
-      const SizedBox(height: LexiSpace.s12),
-    ];
+      ];
+    }
+    final session = share.value;
+    if (session == null) return const <Widget>[];
+    if (!session.isSharing) return _lockedOutNotice();
+    return _activeShareBody(session);
   }
 
-  /// 会话进行中的两个动作。
-  List<Widget> _sessionActions(LanSyncShareSession session) => <Widget>[
-    OutlinedButton.icon(
-      key: const Key('lanSyncCopyCode'),
-      onPressed: () => _copyCode(session.pairingCode),
-      icon: const Icon(LucideIcons.copy, size: 16),
-      label: const Text('复制配对码'),
-    ),
-    const SizedBox(height: LexiSpace.s8),
-    OutlinedButton.icon(
-      key: const Key('lanSyncStopShare'),
-      onPressed: _busy ? null : _stopSharing,
-      icon: const Icon(LucideIcons.circleStop, size: 16),
-      label: const Text('停止共享'),
+  List<Widget> _lockedOutNotice() => <Widget>[
+    const SizedBox(height: LexiSpace.s10),
+    InlineNotice(
+      key: const Key('lanSyncLockedOut'),
+      message: AppErrorCode.lanSyncCodeLockedOut.defaultMessage,
     ),
   ];
+
+  List<Widget> _activeShareBody(LanSyncShareSession session) => <Widget>[
+    const SizedBox(height: LexiSpace.s12),
+    _hostTheater(session),
+    const SizedBox(height: LexiSpace.s10),
+    LanSyncPairingCodeCard(
+      code: session.pairingCode,
+      meta: (
+        address: session.baseUri.toString(),
+        servedCount: session.servedCount,
+      ),
+      onCopy: () => _copyCode(session.pairingCode),
+      onStop: _busy ? null : _stopSharing,
+    ),
+  ];
+
+  Widget _hostTheater(LanSyncShareSession session) {
+    final progress =
+        session.liveProgress ??
+        LanSyncTransferProgress(
+          phase: LanSyncPhase.waiting,
+          direction: session.sharePolicy == LanSyncSharePolicy.bidirectional
+              ? LanSyncDirection.bidirectional
+              : LanSyncDirection.pushOnly,
+          local: LanSyncEndpoint(
+            name: session.deviceName,
+            deviceKind: session.deviceKind,
+            address: session.baseUri.authority,
+          ),
+        );
+    return LanSyncTheater(
+      progress: progress,
+      onDismiss: session.liveProgress?.isTerminal ?? false
+          ? () => ref.read(lanSyncShareProvider.notifier).dismissLiveProgress()
+          : null,
+    );
+  }
 
   Widget _startButton() => FilledButton.icon(
     key: const Key('lanSyncStartShare'),
+    style: _compactFilledStyle(),
     onPressed: _busy ? null : _startSharing,
-    icon: const Icon(LucideIcons.wifi, size: 16),
+    icon: const Icon(LucideIcons.wifi, size: 15),
     label: const Text('开启共享'),
   );
 
-  /// 从局域网设备拉取（接收）那一块。
-  List<Widget> _pullBlock() => <Widget>[
-    ..._pullIntro(),
-    const SizedBox(height: LexiSpace.s12),
-    ..._modeBlock(),
-    const SizedBox(height: LexiSpace.s12),
-    OutlinedButton.icon(
-      key: const Key('lanSyncDiscover'),
-      onPressed: _busy ? null : _discover,
-      icon: const Icon(LucideIcons.search, size: 16),
-      label: Text(_busy ? '搜索中…' : '搜索设备'),
+  Widget _pullPanel(LanSyncSettings settings) => Surface(
+    variant: SurfaceVariant.inset,
+    padding: const EdgeInsets.all(LexiSpace.s14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const _SubPanelHeader(
+          icon: LucideIcons.arrowLeftRight,
+          tone: LexiTone.sky,
+          title: '连接局域网设备',
+          caption: '推荐双向模式，一次配对两边一致',
+        ),
+        const SizedBox(height: LexiSpace.s8),
+        LanSyncStatusLine(settings: settings),
+        const SizedBox(height: LexiSpace.s10),
+        ..._modeBlock(),
+        if (_clientProgress case final live?) ...<Widget>[
+          const SizedBox(height: LexiSpace.s12),
+          LanSyncTheater(
+            progress: live,
+            onCancel: live.isActive ? _cancelSync : null,
+            onDismiss: live.isTerminal
+                ? () => setState(() => _clientProgress = null)
+                : null,
+            onRetry:
+                live.phase == LanSyncPhase.failed &&
+                    _lastTarget != null &&
+                    _lastCode != null
+                ? () => unawaited(_executeSync(_lastTarget!, _lastCode!, _mode))
+                : null,
+          ),
+        ],
+        const SizedBox(height: LexiSpace.s12),
+        _pullActionRow(),
+        ..._discoveryResult(),
+      ],
     ),
-    ..._discoveryResult(),
-  ];
+  );
 
-  /// 拉取那块的标题与说明。
-  List<Widget> _pullIntro() => <Widget>[
-    const _BlockTitle(title: '从局域网设备拉取（接收）'),
-    const SizedBox(height: LexiSpace.s6),
-    Text(
-      '搜索同网段正在共享的设备，把它的数据搬到本机。两种方式的差别见下。',
-      style: LexiType.footnote.copyWith(
-        color: context.lexiColors.secondaryLabel,
+  Widget _pullActionRow() => Wrap(
+    spacing: LexiSpace.s8,
+    runSpacing: LexiSpace.s8,
+    children: <Widget>[
+      FilledButton.icon(
+        key: const Key('lanSyncDiscover'),
+        style: _compactFilledStyle(),
+        onPressed: _busy ? null : _discover,
+        icon: const Icon(LucideIcons.search, size: 15),
+        label: Text(_busy ? '搜索中…' : '搜索设备'),
       ),
-    ),
-  ];
+      OutlinedButton.icon(
+        key: const Key('lanSyncManualConnect'),
+        style: _compactOutlinedStyle(),
+        onPressed: _busy ? null : _manualConnect,
+        icon: const Icon(LucideIcons.globe, size: 15),
+        label: const Text('手动输入地址'),
+      ),
+    ],
+  );
 
-  /// 「同步方式」两选一。
-  ///
-  /// **选择落盘**：用户的意图通常在几次同步里不变，记住它能少一次误选；
-  /// 两种方式各自的确认门仍然保留，误选不会跨过那道门。
   List<Widget> _modeBlock() => <Widget>[
     SegmentedButton<LanSyncPullMode>(
       key: const Key('lanSyncPullMode'),
+      style: _compactSegmentStyle(),
       segments: _modeSegments,
       selected: <LanSyncPullMode>{_mode},
       onSelectionChanged: _selectMode,
     ),
     const SizedBox(height: LexiSpace.s6),
     Text(
-      _mode == LanSyncPullMode.merge ? _mergeHint : _replaceHint,
+      _modeHint(_mode),
       key: const Key('lanSyncPullModeHint'),
-      style: LexiType.footnote.copyWith(
-        color: _mode == LanSyncPullMode.merge
-            ? context.lexiColors.secondaryLabel
-            : context.lexiColors.dangerText,
+      style: LexiType.caption.copyWith(
+        color: _mode == LanSyncPullMode.replace
+            ? context.lexiColors.dangerText
+            : context.lexiColors.secondaryLabel,
       ),
     ),
   ];
 
-  /// 两个选项的文案。
   static const List<ButtonSegment<LanSyncPullMode>> _modeSegments =
       <ButtonSegment<LanSyncPullMode>>[
         ButtonSegment<LanSyncPullMode>(
+          value: LanSyncPullMode.bidirectional,
+          label: Text('双向'),
+          icon: Icon(LucideIcons.arrowLeftRight, size: 14),
+        ),
+        ButtonSegment<LanSyncPullMode>(
           value: LanSyncPullMode.merge,
           label: Text('合并'),
-          icon: Icon(LucideIcons.merge, size: 16),
+          icon: Icon(LucideIcons.merge, size: 14),
         ),
         ButtonSegment<LanSyncPullMode>(
           value: LanSyncPullMode.replace,
           label: Text('覆盖'),
-          icon: Icon(LucideIcons.arrowLeftRight, size: 16),
+          icon: Icon(LucideIcons.replace, size: 14),
         ),
       ];
 
-  /// 合并的说明。
-  static const String _mergeHint = '合并：把对方的词条与作答并进来，本机现有数据全部保留。';
+  String _modeHint(LanSyncPullMode mode) => switch (mode) {
+    LanSyncPullMode.bidirectional => '双向：一次配对互相增量合并，两边都拿到最新词条与复习记录，一条不删。',
+    LanSyncPullMode.merge => '合并：把对方的词条与作答并进来，本机现有数据全部保留。',
+    LanSyncPullMode.replace => '覆盖：用对方的数据整体替换本机，本机数据不保留、无法撤销。',
+  };
 
-  /// 覆盖的说明。
-  static const String _replaceHint = '覆盖：用对方的数据整体替换本机，本机数据不保留、无法撤销。';
-
-  /// 记住选择并落盘。
-  ///
-  /// **先改状态再写库**：`setPullMode` 是异步的，而用户可能紧接着就点设备。
-  /// 状态是这一次交互的真相，设置表只是持久化。
   void _selectMode(Set<LanSyncPullMode> selection) {
+    LexiHaptics.selection();
     setState(() => _mode = selection.first);
     unawaited(
       ref
@@ -372,48 +468,82 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     );
   }
 
-  /// 搜索的提示、空态与结果列表。
+  void _selectSharePolicy(Set<LanSyncSharePolicy> selection) {
+    LexiHaptics.selection();
+    setState(() => _sharePolicy = selection.first);
+    unawaited(
+      ref
+          .read<LanSyncStateStore>(lanSyncStateStoreProvider)
+          .setSharePolicy(selection.first),
+    );
+  }
+
   List<Widget> _discoveryResult() {
     final colors = context.lexiColors;
     final found = _found;
     final note = _note;
     return <Widget>[
       if (note != null) ...<Widget>[
-        const SizedBox(height: LexiSpace.s8),
-        Text(
-          note,
+        const SizedBox(height: LexiSpace.s10),
+        InlineNotice(
           key: const Key('lanSyncDiscoveryNote'),
-          style: LexiType.footnote.copyWith(color: colors.dangerText),
+          message: note,
+          tone: InlineNoticeTone.warning,
         ),
       ],
       if (found != null && found.hosts.isEmpty) ...<Widget>[
-        const SizedBox(height: LexiSpace.s8),
+        const SizedBox(height: LexiSpace.s10),
         Text(
           AppErrorCode.lanSyncHostNotFound.defaultMessage,
           key: const Key('lanSyncEmptyHosts'),
-          style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          style: LexiType.caption.copyWith(color: colors.secondaryLabel),
         ),
       ],
-      if (found != null)
-        for (final host in found.hosts) _hostTile(host, colors),
+      if (found != null && found.hosts.isNotEmpty) ...<Widget>[
+        const SizedBox(height: LexiSpace.s10),
+        for (var i = 0; i < found.hosts.length; i += 1) ...<Widget>[
+          if (i > 0) const SizedBox(height: LexiSpace.s6),
+          _hostTile(found.hosts[i], colors),
+        ],
+      ],
     ];
   }
 
-  /// 一台可拉取的设备。
-  Widget _hostTile(DiscoveredLanHost host, LexiColors colors) => ListTile(
-    key: Key('lanSyncHost-${host.address}'),
-    contentPadding: EdgeInsets.zero,
-    leading: const Icon(LucideIcons.monitorSmartphone),
-    title: Text(_hostLabel(host)),
-    subtitle: Text(
-      '${host.address}:${host.port}',
-      style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-    ),
-    onTap: _busy ? null : () => _pullFrom(host),
+  Widget _hostTile(DiscoveredLanHost host, LexiColors colors) =>
+      _DiscoveredHostTile(
+        key: Key('lanSyncHost-${host.address}'),
+        host: host,
+        onTap: _busy ? null : () => _pullFrom(host),
+      );
+
+  ButtonStyle _compactFilledStyle() => FilledButton.styleFrom(
+    elevation: 0,
+    minimumSize: const Size(0, _compactButtonHeight),
+    padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s14),
+    textStyle: LexiType.footnote.copyWith(fontWeight: FontWeight.w600),
   );
 
-  /// 开启共享。
+  ButtonStyle _compactOutlinedStyle() {
+    final colors = context.lexiColors;
+    return OutlinedButton.styleFrom(
+      foregroundColor: colors.label,
+      side: BorderSide(color: colors.borderDefault),
+      minimumSize: const Size(0, _compactButtonHeight),
+      padding: const EdgeInsets.symmetric(horizontal: LexiSpace.s14),
+      textStyle: LexiType.footnote.copyWith(fontWeight: FontWeight.w600),
+    );
+  }
+
+  ButtonStyle _compactSegmentStyle() => const ButtonStyle(
+    minimumSize: WidgetStatePropertyAll<Size>(Size(0, _compactButtonHeight)),
+    padding: WidgetStatePropertyAll<EdgeInsetsGeometry>(
+      EdgeInsets.symmetric(horizontal: LexiSpace.s12),
+    ),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
+
   Future<void> _startSharing() async {
+    LexiHaptics.light();
     setState(() => _busy = true);
     try {
       await ref.read(lanSyncShareProvider.notifier).start();
@@ -422,7 +552,6 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     }
   }
 
-  /// 停止共享。
   Future<void> _stopSharing() async {
     setState(() => _busy = true);
     try {
@@ -432,14 +561,13 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     }
   }
 
-  /// 复制配对码。
   Future<void> _copyCode(String code) async {
+    LexiHaptics.light();
     final messenger = ScaffoldMessenger.of(context);
     await Clipboard.setData(ClipboardData(text: code));
     messenger.showSnackBar(const SnackBar(content: Text('配对码已复制。')));
   }
 
-  /// 搜索同网段的共享设备。
   Future<void> _discover() async {
     setState(() {
       _busy = true;
@@ -447,7 +575,6 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
       _found = null;
     });
     try {
-      // 排除本机自己的共享会话：同一台设备既开着共享又点搜索时会收到自己。
       final result = await ref
           .read(lanSyncPullServiceProvider)
           .discover(
@@ -468,44 +595,88 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
     }
   }
 
-  /// 选一台设备：输配对码 → 按当前模式确认 → 拉取。
+  Future<void> _manualConnect() async {
+    final host = await showDialog<DiscoveredLanHost>(
+      context: context,
+      builder: (_) => const LanSyncManualAddressDialog(),
+    );
+    if (host == null || !mounted) return;
+    await _pullFrom(host);
+  }
+
   Future<void> _pullFrom(DiscoveredLanHost host) async {
     final mode = _mode;
-    final code = await _askForCode(host);
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => LanSyncPairingCodeDialog(host: host),
+    );
     if (code == null || !mounted) return;
     if (await _confirmPull(host, mode) != true || !mounted) return;
+    await _executeSync(host, code, mode);
+  }
 
+  Future<void> _executeSync(
+    DiscoveredLanHost host,
+    String code,
+    LanSyncPullMode mode,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
-    setState(() => _busy = true);
+    final cancel = LanSyncCancelSignal();
+    setState(() {
+      _busy = true;
+      _cancelSignal = cancel;
+      _lastTarget = host;
+      _lastCode = code;
+    });
     try {
       final result = await ref
           .read(lanSyncPullServiceProvider)
-          .pull(host: host, pairingCode: code, mode: mode);
+          .pull(
+            host: host,
+            pairingCode: code,
+            mode: mode,
+            cancelSignal: cancel,
+            onProgress: (progress) {
+              if (mounted) setState(() => _clientProgress = progress);
+            },
+          );
       if (!mounted) return;
-      // 与本地导入、远端恢复同一条约定：整库被写之后必须显式失效缓存。
       invalidateLocalData(ref);
       messenger.showSnackBar(
         SnackBar(content: Text(_pullSummary(host, result))),
       );
-      // 恢复会整体替换设置表，输入框要按恢复后的内容重新灌一次。
       _seeded = false;
       ref.invalidate(appSettingsProvider);
       setState(() => _found = null);
     } on AppError catch (error) {
+      if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(error.message)));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _cancelSignal = null;
+        });
+      }
     }
   }
 
-  /// 输入配对码。
-  Future<String?> _askForCode(DiscoveredLanHost host) => showDialog<String>(
-    context: context,
-    builder: (dialogContext) => _PairingCodeDialog(host: host),
-  );
+  void _cancelSync() => _cancelSignal?.cancel();
 
-  /// 拉取前的确认；门槛按模式区分。
   Future<bool?> _confirmPull(DiscoveredLanHost host, LanSyncPullMode mode) {
+    if (mode == LanSyncPullMode.bidirectional) {
+      return showLexiConfirmSheet(
+        context,
+        title: '与 ${_hostLabel(host)} 双向增量同步？',
+        body:
+            '一次配对即可交换双方的词条、词典内容、作答记录与会话历史，'
+            '只传输上次同步以来的变更部分并自动压缩。\n\n'
+            '双方现有数据全部保留，交错复习过的词会按完整历史重新排期；'
+            '凭据与设备名不会被覆盖。',
+        confirmLabel: '开始双向同步',
+        confirmButtonKey: const Key('lanSyncMergeConfirm'),
+      );
+    }
     if (mode == LanSyncPullMode.merge) {
       return showLexiConfirmSheet(
         context,
@@ -526,49 +697,166 @@ class _LanSyncSectionState extends ConsumerState<LanSyncSection> {
           '将下载对方的完整备份，并整体替换本机全部词条、学习记录、'
           '导入历史与设置。本机当前的数据不会保留，也无法撤销。\n\n'
           '建议先在「备份与导入」里导出本机备份留个底。\n\n'
-          '如果只是想汇总两台设备的进度，请改用「合并」。',
+          '如果只是想汇总两台设备的进度，请改用「双向」或「合并」。',
       confirmLabel: '覆盖恢复',
       destructive: true,
       confirmButtonKey: lanSyncPullConfirmButtonKey,
     );
   }
 
-  /// 成功后的汇报文案。
-  ///
-  /// 两条模式的措辞刻意不同：合并说「新增」，覆盖说「覆盖」——
-  /// 用户需要一眼分辨刚才那次到底是哪一种。
   String _pullSummary(DiscoveredLanHost host, LanSyncPullResult result) {
     final label = _hostLabel(host);
+    final wire = result.transferredWireBytes > 0
+        ? '（传输 ${formatBackupBytes(result.transferredWireBytes)}）'
+        : '';
+    if (result.mode == LanSyncPullMode.bidirectional) {
+      return '已与 $label 双向同步：本机 +${result.addedWords} 词/+${result.addedLogs} '
+          '作答，对端 +${result.peerAddedWords} 词/+${result.peerAddedLogs} '
+          '作答$wire';
+    }
     if (result.mode == LanSyncPullMode.merge) {
       return '已从 $label 合并：新增 ${result.addedWords} 个词条、'
-          '${result.addedLogs} 条作答（本机共 ${result.wordCount} 个词条）';
+          '${result.addedLogs} 条作答（本机共 ${result.wordCount} 个词条）$wire';
     }
     return '已从 $label 覆盖：${result.wordCount} 个词条、'
-        '${result.writtenRows} 行';
+        '${result.writtenRows} 行$wire';
   }
 }
 
-/// 展示用的设备名；没命名时退到地址。
 String _hostLabel(DiscoveredLanHost host) =>
     host.deviceName.isEmpty ? host.address : host.deviceName;
 
-/// 小标题。
-class _BlockTitle extends StatelessWidget {
-  const new({required this.title});
+class _SubPanelHeader extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.tone,
+    required this.title,
+    this.caption,
+    this.trailing,
+  });
 
+  final IconData icon;
+  final LexiTone tone;
   final String title;
+  final String? caption;
+  final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Text(
-    title,
-    style: LexiType.callout.copyWith(
-      color: context.lexiColors.label,
-      fontWeight: FontWeight.w600,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final style = context.lexiTones.styleOf(tone);
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 15, color: style.foreground),
+        const SizedBox(width: LexiSpace.s6),
+        Text(
+          title,
+          style: LexiType.body.copyWith(
+            color: colors.label,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: LexiSpace.s8),
+        if (trailing != null) ...<Widget>[
+          const Spacer(),
+          trailing!,
+        ] else if (caption != null)
+          Expanded(
+            child: Text(
+              caption!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
-/// 普通文本输入行。
+class _DiscoveredHostTile extends StatelessWidget {
+  const new({required this.host, required this.onTap, super.key});
+
+  final DiscoveredLanHost host;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final tone = context.lexiTones.styleOf(LexiTone.sky);
+    final icon = host.deviceKind == lanSyncDeviceKindDesktop
+        ? LucideIcons.laptop
+        : host.deviceKind == lanSyncDeviceKindMobile
+        ? LucideIcons.smartphone
+        : LucideIcons.monitorSmartphone;
+    return LexiPressable(
+      borderRadius: BorderRadius.circular(LexiRadius.md),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: LexiSpace.s12,
+          vertical: LexiSpace.s10,
+        ),
+        decoration: BoxDecoration(
+          color: colors.card,
+          borderRadius: BorderRadius.circular(LexiRadius.md),
+          border: Border.all(color: colors.borderSubtle),
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: _hostIconBoxSize,
+              height: _hostIconBoxSize,
+              decoration: BoxDecoration(
+                color: tone.background,
+                borderRadius: BorderRadius.circular(LexiRadius.sm),
+              ),
+              child: Icon(icon, size: 17, color: tone.foreground),
+            ),
+            const SizedBox(width: LexiSpace.s10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    _hostLabel(host),
+                    style: LexiType.body.copyWith(
+                      color: colors.label,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${host.address}:${host.port}',
+                    style: LexiType.caption.copyWith(
+                      color: colors.secondaryLabel,
+                      fontFeatures: const <FontFeature>[
+                        FontFeature.tabularFigures(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            LexiBadge(
+              label: host.allowsBidirectional ? '双向' : '只读',
+              tone: host.allowsBidirectional
+                  ? LexiBadgeTone.accent
+                  : LexiBadgeTone.neutral,
+            ),
+            const SizedBox(width: LexiSpace.s6),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: colors.tertiaryLabel,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LanSyncTextField extends StatelessWidget {
   const new({
     required this.fieldKey,
@@ -591,84 +879,35 @@ class _LanSyncTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.lexiColors;
-    return TextField(
-      key: fieldKey,
-      controller: controller,
-      enabled: enabled,
-      autocorrect: false,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        hintStyle: LexiType.body.copyWith(color: colors.tertiaryLabel),
-        // 共享进行中改端口不会生效，禁用比「改了没反应」诚实。
-        helperText: enabled ? null : '共享进行中不可修改',
-        helperStyle: LexiType.footnote.copyWith(color: colors.secondaryLabel),
-      ),
-    );
-  }
-}
-
-/// 输入配对码的对话框。
-class _PairingCodeDialog extends StatefulWidget {
-  const new({required this.host});
-
-  final DiscoveredLanHost host;
-
-  @override
-  State<_PairingCodeDialog> createState() => _PairingCodeDialogState();
-}
-
-class _PairingCodeDialogState extends State<_PairingCodeDialog> {
-  final TextEditingController _code = TextEditingController();
-  bool _matched = false;
-
-  @override
-  void dispose() {
-    _code.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.lexiColors;
-    return AlertDialog(
-      title: const Text('输入配对码'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            '对方设备「${_hostLabel(widget.host)}」的共享页面上显示着一个 '
-            '6 位配对码。',
-            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: LexiType.caption.copyWith(
+            color: colors.secondaryLabel,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: LexiSpace.s12),
-          TextField(
-            key: const Key('lanSyncCodeField'),
-            controller: _code,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            maxLength: lanSyncPairingCodeLength,
-            decoration: const InputDecoration(hintText: '6 位数字'),
-            onChanged: (value) => setState(
-              () => _matched = value.trim().length == lanSyncPairingCodeLength,
-            ),
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
         ),
-        FilledButton(
-          key: const Key('lanSyncCodeConfirm'),
-          onPressed: _matched
-              ? () => Navigator.of(context).pop(_code.text.trim())
-              : null,
-          child: const Text('下一步'),
+        const SizedBox(height: LexiSpace.s4),
+        TextField(
+          key: fieldKey,
+          controller: controller,
+          enabled: enabled,
+          autocorrect: false,
+          keyboardType: keyboardType,
+          style: LexiType.body.copyWith(color: colors.label),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            isDense: true,
+            fillColor: enabled ? colors.card : colors.fill,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s10,
+            ),
+            hintText: hint,
+            hintStyle: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
+          ),
         ),
       ],
     );

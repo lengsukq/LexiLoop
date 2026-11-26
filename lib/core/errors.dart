@@ -257,6 +257,44 @@ enum AppErrorCode {
     '请输入有效的 IPv4 地址与端口（如 192.168.1.8:8765）。',
   ),
 
+  // ── Next.js 云端同步 ──
+
+  /// 云端同步地址尚未配置。
+  cloudSyncNotConfigured('CLOUD_SYNC_NOT_CONFIGURED', '请先填写 Next.js 服务器地址。'),
+
+  /// 云端同步地址格式无效（非 http/https）。
+  cloudSyncInvalidUrl(
+    'CLOUD_SYNC_INVALID_URL',
+    '服务器地址格式无效，请以 http:// 或 https:// 开头。',
+  ),
+
+  /// Next.js 服务端拒绝鉴权（HTTP 401 / 403）。
+  cloudSyncAuthFailed(
+    'CLOUD_SYNC_AUTH_FAILED',
+    '服务器密码不正确，请核对 LEXILOOP_PASSWORD。',
+  ),
+
+  /// 无法连接到 Next.js 服务器（网络不可达、域名错误、超时）。
+  cloudSyncUnreachable('CLOUD_SYNC_UNREACHABLE', '无法连接 Next.js 服务器，请检查地址与网络。'),
+
+  /// Next.js 云端同步返回非预期状态码或服务端错误。
+  cloudSyncRequestFailed('CLOUD_SYNC_REQUEST_FAILED', '云端同步请求失败，请稍后重试。'),
+
+  /// 两端云端同步协议版本不兼容。
+  cloudSyncProtocolMismatch(
+    'CLOUD_SYNC_PROTOCOL_MISMATCH',
+    '云端同步协议版本不兼容，请将两端更新至最新版本。',
+  ),
+
+  /// 单次同步分片体积超过服务端上限（HTTP 413）。
+  cloudSyncPayloadTooLarge(
+    'CLOUD_SYNC_PAYLOAD_TOO_LARGE',
+    '单个词条内容超过服务端请求体上限，无法同步。',
+  ),
+
+  /// 用户主动取消了云端同步。
+  cloudSyncCancelled('CLOUD_SYNC_CANCELLED', '已取消本次云端同步。'),
+
   // ── AI 与外部服务 ──
 
   /// 设置中未启用 AI。

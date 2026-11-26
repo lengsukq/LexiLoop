@@ -16,10 +16,12 @@ import 'package:lexiloop/data/db/database.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
 
-/// 默认不参与局域网合并同步外发的设置键（与 `mergeExcludedSettingKeys` 对齐）。
+/// 默认不参与局域网/云端合并同步外发的设置键（与 `mergeExcludedSettingKeys` 对齐）。
 const Set<String> defaultSyncExcludedSettingKeys = <String>{
   lanSyncSettingsKey,
   webdavSettingsKey,
+  cloudSyncSettingsKey,
+  cloudSyncServerSettingsKey,
   'llmConfig',
   'merriamWebsterDictionaryKey',
   'merriamWebsterThesaurusKey',

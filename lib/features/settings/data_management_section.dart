@@ -12,6 +12,7 @@ import 'package:lexiloop/data/db/dao_providers.dart';
 import 'package:lexiloop/data/db/database_provider.dart';
 import 'package:lexiloop/features/settings/audio_cache_providers.dart';
 import 'package:lexiloop/features/settings/backup_size_label.dart';
+import 'package:lexiloop/features/settings/cloud_sync_section.dart';
 import 'package:lexiloop/features/settings/data_invalidation.dart';
 import 'package:lexiloop/features/settings/import_backup_confirm.dart';
 import 'package:lexiloop/features/settings/lan_sync_section.dart';
@@ -73,6 +74,8 @@ class _DataManagementSectionState extends ConsumerState<DataManagementSection> {
       _localBackupCard(),
       const SizedBox(height: LexiSpace.s16),
       const LanSyncSection(),
+      const SizedBox(height: LexiSpace.s16),
+      const CloudSyncSection(),
       const SizedBox(height: LexiSpace.s16),
       const RemoteBackupSection(),
       const SizedBox(height: LexiSpace.s16),

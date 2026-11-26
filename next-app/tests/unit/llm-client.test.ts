@@ -31,7 +31,7 @@ describe("callLlm structured output", () => {
   });
 
   it("三档全空时抛 AI_EMPTY_RESPONSE 且可重试", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonBody("")));
+    vi.stubGlobal("fetch", vi.fn(async () => jsonBody("")));
     const error = await callLlm(primary, "hi", { systemPrompt: "sys", jsonSchema: { type: "object" } }).catch((e) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).code).toBe("AI_EMPTY_RESPONSE");

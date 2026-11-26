@@ -3,6 +3,7 @@ import type { NextRequest, NextResponse } from "next/server";
 
 export const AUTH_COOKIE_NAME = "lexiloop_auth";
 export const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+export const SYNC_PASSWORD_HEADER = "x-lexiloop-sync-password";
 
 function configuredPassword(): string | null {
   const password = process.env.LEXILOOP_PASSWORD;
@@ -52,6 +53,27 @@ export function isAuthCookieValid(request: NextRequest, now = Date.now()): boole
   const expiresAtSeconds = Number(expiresAt);
   if (!Number.isSafeInteger(expiresAtSeconds) || expiresAtSeconds <= Math.floor(now / 1000)) return false;
   return secureCompare(suppliedSignature, signature(expiresAt, password));
+}
+
+function extractSyncPassword(request: NextRequest): string | null {
+  const direct = request.headers.get(SYNC_PASSWORD_HEADER);
+  if (direct && direct.length > 0) return direct;
+  const auth = request.headers.get("authorization");
+  if (!auth) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(auth.trim());
+  return match?.[1] ?? null;
+}
+
+/**
+ * Authorizes cross-device cloud sync API calls (`/api/sync/*`).
+ * Accepts either the standard browser auth cookie or a stateless password header
+ * (`X-LexiLoop-Sync-Password` / `Authorization: Bearer <password>`).
+ */
+export function isSyncRequestAuthorized(request: NextRequest, now = Date.now()): boolean {
+  if (!isPasswordEnabled()) return true;
+  if (isAuthCookieValid(request, now)) return true;
+  const supplied = extractSyncPassword(request);
+  return supplied !== null && isPasswordCorrect(supplied);
 }
 
 function requestIsSecure(request: NextRequest): boolean {

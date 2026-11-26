@@ -2241,3 +2241,43 @@ const int wordPackLatencyTimeoutMs = 9999;
 
 /// 词书包来源数据标识：ECDICT MIT 基础预填充。
 const String ecdictDictionarySource = 'ecdict';
+
+// ═══════════════════════════════════════════════════════════════
+// Next.js 云端跨端同步（HTTP + GZip + 分片，兼容 Vercel 4.5 MB 上限）
+// ═══════════════════════════════════════════════════════════════
+
+/// 云端同步设置在 `settings` 表里的键名。
+const String cloudSyncSettingsKey = 'cloudSync';
+
+/// Next.js 服务端云同步元信息在 `settings` 表里的键名（绝不合入客户端）。
+const String cloudSyncServerSettingsKey = 'cloudSyncServer';
+
+/// 云端同步服务标识。
+const String cloudSyncServiceName = 'lexiloop-cloud-sync';
+
+/// 云端同步协议版本。
+const int cloudSyncProtocolVersion = 1;
+
+/// 云端同步鉴权请求头（携带 `LEXILOOP_PASSWORD`）。
+const String cloudSyncPasswordHeader = 'X-LexiLoop-Sync-Password';
+
+/// 推送批次的原始 JSON 字节上限（1.5 MB；GZip 后约 300–450 KB，远低于 Vercel 4.5 MB 上限）。
+const int cloudSyncMaxBatchRawBytes = 1500 * 1024;
+
+/// 单次云端拉取分页请求的原始字节预算上限（与服务端 `MAX_PULL_PAGE_BYTES` 对齐）。
+const int cloudSyncMaxPullPageBytes = 1500 * 1024;
+
+/// 云端同步最多允许连续拉取的分页数（防止异常服务端无限分页）。
+const int cloudSyncMaxPullPages = 200;
+
+/// 云端同步握手 / 轻量请求超时（毫秒）。
+const int cloudSyncRequestTimeoutMs = 30 * secondMs;
+
+/// 云端同步单次分页/分批传输超时（毫秒；对齐 Vercel 60s 函数上限）。
+const int cloudSyncTransferTimeoutMs = 90 * secondMs;
+
+/// 云端同步 HTTP 状态码：鉴权拒绝（403）。
+const int cloudSyncStatusForbidden = 403;
+
+/// 云端同步单行 JSON 估算的逗号与空白冗余字节数。
+const int cloudSyncRowOverheadBytes = 2;

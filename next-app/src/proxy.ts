@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authRequired } from "@/lib/api";
-import { isAuthCookieValid, isPasswordEnabled } from "@/lib/security";
+import { isAuthCookieValid, isPasswordEnabled, isSyncRequestAuthorized } from "@/lib/security";
 
 const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/health"]);
 
@@ -26,6 +26,11 @@ export function proxy(request: NextRequest): NextResponse {
       return NextResponse.redirect(new URL(destination, request.url));
     }
     return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/api/sync/")) {
+    if (isSyncRequestAuthorized(request)) return NextResponse.next();
+    return authRequired();
   }
 
   if (isAuthCookieValid(request)) return NextResponse.next();

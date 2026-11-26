@@ -21,6 +21,7 @@ import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/core/errors.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/data/db/database.dart';
+import 'package:lexiloop/domain/models/cloud_sync_settings.dart';
 import 'package:lexiloop/domain/models/webdav_settings.dart';
 
 /// 备份格式的版本号。
@@ -172,6 +173,15 @@ class BackupExporter {
             });
             canonicalRow['value_json'] = jsonEncode(stableValue);
           }
+        } else if (table == 'settings' &&
+            canonicalRow['key'] == cloudSyncSettingsKey) {
+          canonicalRow.remove('updated_at');
+          final value = _decodeSettingValue(canonicalRow['value_json']);
+          if (value is Map) {
+            canonicalRow['value_json'] = jsonEncode(
+              _canonicalize(cloudSyncValueForFingerprint(value)),
+            );
+          }
         }
         return _canonicalize(canonicalRow);
       }).toList()..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
@@ -200,10 +210,17 @@ class BackupExporter {
     final rows = tables['settings'];
     if (rows == null) return;
     for (final row in rows) {
-      if (row['key'] != webdavSettingsKey) continue;
-      final decoded = _decodeSettingValue(row['value_json']);
-      if (decoded != null) {
-        row['value_json'] = jsonEncode(webdavValueForExport(decoded));
+      final key = row['key'];
+      if (key == webdavSettingsKey) {
+        final decoded = _decodeSettingValue(row['value_json']);
+        if (decoded != null) {
+          row['value_json'] = jsonEncode(webdavValueForExport(decoded));
+        }
+      } else if (key == cloudSyncSettingsKey) {
+        final decoded = _decodeSettingValue(row['value_json']);
+        if (decoded != null) {
+          row['value_json'] = jsonEncode(cloudSyncValueForExport(decoded));
+        }
       }
     }
   }

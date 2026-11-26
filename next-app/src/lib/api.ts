@@ -45,6 +45,10 @@ const ERROR_MESSAGES: Record<string, { message: string; status: number }> = {
   AI_RESPONSE_INVALID: { message: "AI 返回的内容格式无效，请重试或更换模型。", status: 422 },
   AI_MNEMONIC_LANGUAGE_INVALID: { message: "AI 生成的助记词不是中文。", status: 400 },
   AI_REQUEST_FAILED: { message: "AI 服务请求失败。", status: 502 },
+  // 跨端云同步
+  SYNC_PROTOCOL_MISMATCH: { message: "同步协议版本不兼容，请升级两端到最新版本。", status: 409 },
+  SYNC_PAYLOAD_TOO_LARGE: { message: "同步分片体积超过限制。", status: 413 },
+  SYNC_INVALID_PAYLOAD: { message: "同步载荷格式无效。", status: 400 },
 };
 
 /**

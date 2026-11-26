@@ -42,6 +42,8 @@ const ALL_TABLES = [
   "study_sessions",
   "wrong_word_states",
   "review_cards",
+  "word_pack_items",
+  "word_packs",
   "word_review_stats",
   "word_contents",
   "words",

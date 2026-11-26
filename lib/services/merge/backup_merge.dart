@@ -18,6 +18,7 @@
 ///    原样带走（导入事务会先清表，漏掉哪张就等于把那批数据删了）。
 library;
 
+import 'package:lexiloop/core/constants.dart';
 import 'package:lexiloop/data/backup/backup_import.dart';
 import 'package:lexiloop/domain/enums.dart';
 import 'package:lexiloop/domain/models/lan_sync_settings.dart';
@@ -42,6 +43,8 @@ import 'package:lexiloop/services/merge/learning_replay.dart';
 const Set<String> mergeExcludedSettingKeys = <String>{
   lanSyncSettingsKey,
   webdavSettingsKey,
+  cloudSyncSettingsKey,
+  cloudSyncServerSettingsKey,
   llmConfigSettingsKey,
   'merriamWebsterDictionaryKey',
   'merriamWebsterThesaurusKey',

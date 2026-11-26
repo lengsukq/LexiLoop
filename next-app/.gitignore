@@ -1,0 +1,40 @@
+node_modules/
+.next/
+out/
+coverage/
+test-results/
+playwright-report/
+.env
+.env.local
+*.log
+*.tsbuildinfo
+
+# Database & personal data
+data/*.sqlite
+data/*.sqlite-*
+data/*.db
+data/backups/*
+data/reference/*
+!data/.gitkeep
+!data/backups/.gitkeep
+!data/reference/.gitkeep
+*.sqlite
+*.sqlite-*
+
+# Test artifacts
+test-screenshots/
+
+# Local coding-agent artifacts
+.zcode/
+
+# Private deploy to Queen (personal server, never commit)
+scripts/deploy-queen.sh
+
+.DS_Store
+.vercel
+.env*
+# Private self-hosted deploy (keep Queen infra local)
+Dockerfile
+docker-compose.yml
+.dockerignore
+.idea/

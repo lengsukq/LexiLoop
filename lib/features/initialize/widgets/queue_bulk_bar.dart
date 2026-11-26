@@ -1,0 +1,152 @@
+/// 多选后浮在底部的批量操作条。
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/core/errors.dart';
+import 'package:lexiloop/features/initialize/configurator/configurator_state.dart';
+import 'package:lexiloop/features/initialize/configurator/initialization_configurator.dart';
+import 'package:lexiloop/features/initialize/initialize_providers.dart';
+import 'package:lexiloop/ui/feedback/confirm_dialog.dart';
+import 'package:lexiloop/ui/glass.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+
+/// 「已选 N 个词条」浮条。
+///
+/// 做成浮条而不是列表上方的一行：多选是为了在长列表里挑词条，
+/// 挑完之后视线已经移到了列表底部，操作入口必须跟着出现在那里。
+class QueueBulkBar extends ConsumerWidget {
+  /// 以键构造。
+  const new({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(queueSelectionProvider);
+    if (selected.isEmpty) return const SizedBox.shrink();
+    final notifier = ref.read(queueSelectionProvider.notifier);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: barInset),
+      child: LiquidGlass(
+        level: GlassLevel.elevated,
+        borderRadius: BorderRadius.circular(LexiRadius.xl),
+        padding: const EdgeInsets.symmetric(
+          horizontal: barPadding,
+          vertical: LexiSpace.s10,
+        ),
+        child: Row(
+          children: <Widget>[
+            _SelectionCount(count: selected.length),
+            const SizedBox(width: countGap),
+            Text(
+              '已选 ${selected.length} 个词条',
+              style: LexiType.body.copyWith(
+                color: context.lexiColors.label,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: barPadding),
+            Expanded(
+              child: Wrap(
+                spacing: barPadding,
+                alignment: WrapAlignment.end,
+                children: <Widget>[
+                  FilledButton(
+                    onPressed: () => unawaited(
+                      showInitializationConfigurator(
+                        context,
+                        initialScope: ConfiguratorScope.selection,
+                      ),
+                    ),
+                    child: const Text('配置内容补全'),
+                  ),
+                  FilledButton(
+                    onPressed: () => _retry(context, ref),
+                    child: const Text('重试这些词条的全部任务'),
+                  ),
+                  TextButton(
+                    onPressed: notifier.clear,
+                    child: const Text('取消选择'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _retry(BuildContext context, WidgetRef ref) async {
+    final selection = ref.read(queueSelectionProvider);
+    // **批量重试是花真金白银的动作**：每个重新排队的任务都会再去打一次
+    // 词典与 AI。同一页里「创建初始化任务」要先过一遍带预览的配置器，
+    // 这里却是一点就跑——谨慎度不一致，用户学到的规则就是「这里不用想」。
+    final confirmed = await confirmAction(
+      context,
+      title: '重试这些词条的全部任务？',
+      body:
+          '将为选中的 ${selection.length} 个词条重新排队，'
+          ' 每个任务都会再查一次词典；需要 AI 补全的会再次消耗额度。',
+      confirmLabel: '重试',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final retried = await ref
+          .read(queueActionsProvider)
+          .retryWords(selection.toList());
+      messenger.showSnackBar(
+        SnackBar(content: Text(retried == 0 ? '没有可重试的任务' : '已重试 $retried 个任务')),
+      );
+    } on AppError catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+}
+
+/// 选中数量的气泡计数。
+class _SelectionCount extends StatelessWidget {
+  const new({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Container(
+      constraints: const BoxConstraints.tightFor(
+        width: _countBubbleSize,
+        height: _countBubbleSize,
+      ),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.accent,
+        borderRadius: BorderRadius.circular(LexiRadius.sm),
+      ),
+      child: Text(
+        '$count',
+        style: LexiType.footnote.copyWith(
+          color: colors.surface,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// 浮条离屏幕左右的距离。
+const double barInset = 16;
+
+/// 浮条内边距与元素间距。
+const double barPadding = 12;
+
+/// 计数气泡与文案之间的间距。
+const double countGap = 6;
+
+/// 选中数量气泡的边长（正方形）。
+const double _countBubbleSize = 26;

@@ -1,0 +1,100 @@
+# LexiLoop 静态分析配置
+#
+# 设计原则：把 docs/CLEAN_CODE_BASELINE.md 记录的教训变成编译期约束，
+# 而不是依赖人工评审。旧版最严重的问题是「重复逻辑」与「巨型函数/组件」，
+# 这些问题在严格 lint 下会在写出来的当下就暴露。
+#
+# 门禁（提交前与 CI 必须全绿）：
+#   dart format --set-exit-if-changed .
+#   dart analyze --fatal-infos --fatal-warnings
+#   dart test
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/*.mocks.dart"
+    - "build/**"
+    - android/**
+    - macos/**
+    - web/**
+
+  errors:
+    # ── 死代码与未使用：一律 error，不允许留下 ──
+    # 对应基线：恒 null 死分支、formatTs 两分支相同、markMistake 直通包装
+    dead_code: error
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+    unused_result: error
+
+    # ── 类型安全：禁止绕过类型系统 ──
+    avoid_dynamic_calls: error
+    always_declare_return_types: error
+    missing_return: error
+
+    # ── 错误处理：禁止静默吞异常与字符串判错 ──
+    # 对应基线：大量 `catch { return [] }`、15 处 `error.message === "CODE"`
+    avoid_catches_without_on_clauses: error
+    avoid_empty_else: error
+    only_throw_errors: error
+
+    # ── 不可变性：默认 final，减少隐式可变状态 ──
+    # 对应基线：模块级可变 distractorPool 全局缓存
+    prefer_final_locals: error
+    prefer_const_constructors: error
+    prefer_const_declarations: error
+
+    # ── 文档：公共 API 必须说明「为什么」而非复述签名 ──
+    public_member_api_docs: error
+
+    # TODO 允许存在，但必须显式标注（不阻断构建）
+    todo: ignore
+
+linter:
+  rules:
+    # 依赖按「数据层 / 状态 / 网络 / UI / 平台」分组并注释用途，
+    # 比严格字母序更能说明「为什么需要这个依赖」，故关闭排序规则。
+    sort_pub_dependencies: false
+
+    # 该规则会把 `const Foo({super.key})` 改写为 Dart 3.10 的声明式构造
+    # `const new({super.key})`。这是语言的演进方向，采纳 lint 的立场。
+    unnecessary_type_name_in_constructor: true
+
+    # ── 导入规范：统一 package 导入，便于架构守卫按路径断言 ──
+    always_use_package_imports: true
+    directives_ordering: true
+    depend_on_referenced_packages: true
+
+    # ── 输出：禁止 print ──
+    avoid_print: true
+
+    # ── 格式一致性 ──
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    sort_constructors_first: true
+    sort_unnamed_constructors_first: true
+    always_put_required_named_parameters_first: true
+
+    # ── 可读性：禁止嵌套三元与布尔字面量三元 ──
+    # 对应基线：selection.ts 长 if 链 + 嵌套三元
+    avoid_bool_literals_in_conditional_expressions: true
+    no_adjacent_strings_in_list: true
+    unnecessary_lambdas: true
+    unnecessary_parenthesis: true
+
+    # ── API 设计：限制参数膨胀 ──
+    # 对应基线：设置页传 13+8 个回调 props、详情页 11+6+7
+    avoid_positional_boolean_parameters: true
+
+    # ── 集合与空安全 ──
+    prefer_collection_literals: true
+    prefer_spread_collections: true
+    avoid_function_literals_in_foreach_calls: true
+
+    # ── 异步：避免未处理的 Future ──
+    # 对应基线：updateHeartbeat fire-and-forget 导致 unhandled rejection
+    unawaited_futures: true
+    avoid_void_async: true

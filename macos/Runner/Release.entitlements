@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- 出站网络：AI 初始化与在线词典。缺此项会报
+	     SocketException: Operation not permitted, errno = 1，且为静默失败 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- 入站网络：局域网同步开着共享时要监听 TCP 端口并应答 UDP 发现查询。
+	     ⚠️ DebugProfile.entitlements 里原本就有这一项（那是 Flutter 热重载
+	     需要的），因此**只在 debug 构建下测试会在 release 包上失败**：
+	     表现为「开启共享」直接报无法启动共享，而代码里没有任何东西看起来
+	     是错的。release 必须显式声明。 -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- 文件选择器读写用户选中的 CSV 与备份文件 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+</dict>
+</plist>

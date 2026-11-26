@@ -1,0 +1,392 @@
+/// LLM 配置的解析与归一化。
+///
+/// 对应旧版 `src/lib/types/settings.ts` 的 `LlmConfig` 与
+/// `modules/settings/service.ts` 的 zod 校验。
+///
+/// **为什么留在 `settings.raw` 里**：`AppSettings` 只建模了学习计划、
+/// 播放与数据源开关；LLM 配置结构深、字段多且只在设置页被读写。
+/// 把它原样保留在 `raw` 中，既避免设置页每改一次学习设置就清空 AI 配置，
+/// 也让本模块可以独立演进。
+library;
+
+import 'package:lexiloop/core/constants.dart';
+
+/// LLM 配置在 `settings.raw` 中的键名。
+const String llmConfigSettingsKey = 'llmConfig';
+
+/// AI 重试遍数在 `settings.raw` 中的键名。
+///
+/// **注意它不在 `llmConfig` 里面**：旧版 `modules/settings/service.ts:77`
+/// 把它和 `backgroundConcurrency` 一样定义在设置对象顶层。
+/// 本版曾从 `llmConfig.ai` 下读它，结果永远拿到默认值——用户改了设置也不生效。
+const String aiRetryCountSettingsKey = 'aiRetryCount';
+
+/// LLM 接口协议。
+enum LlmApiType {
+  /// OpenAI 兼容（`POST {baseUrl}/chat/completions`）。
+  openai('openai'),
+
+  /// Anthropic（`POST {baseUrl}/messages`）。
+  anthropic('anthropic');
+
+  new(this.wire);
+
+  /// 存储标识。
+  final String wire;
+
+  /// 按存储标识反查；未知值回退到 [LlmApiType.openai]。
+  static LlmApiType fromWire(Object? wire) => wire == LlmApiType.anthropic.wire
+      ? LlmApiType.anthropic
+      : LlmApiType.openai;
+}
+
+/// 单个 LLM 提供方。
+class LlmProviderConfig {
+  /// 以各字段构造。
+  const new({
+    required this.id,
+    required this.name,
+    required this.apiType,
+    required this.baseUrl,
+    required this.apiKey,
+    this.models = const <String>[],
+    this.defaultModel = '',
+  });
+
+  /// 稳定标识。
+  final String id;
+
+  /// 展示名。
+  final String name;
+
+  /// 接口协议。
+  final LlmApiType apiType;
+
+  /// 接口基址（已去掉尾部斜杠）。
+  final String baseUrl;
+
+  /// API Key。
+  final String apiKey;
+
+  /// 可选模型列表（「拉取模型列表」的结果）。
+  final List<String> models;
+
+  /// 默认模型。
+  final String defaultModel;
+
+  /// 配置是否可用于发起请求。
+  bool get isUsable => baseUrl.isNotEmpty && apiKey.isNotEmpty;
+}
+
+/// AI 各用途的独立开关。
+///
+/// 默认仅开启「文章智能分词」与「每日学习建议」：
+/// 词典查词、例句与发音默认由有道等词典数据源完成，避免配置好 AI 后
+/// 在后台静默消耗额度生成助记、补翻译或兜底查词。
+class LlmFeatureToggles {
+  /// 以各用途开关构造。
+  const new({
+    this.articleTokenize = true,
+    this.autoMnemonic = false,
+    this.autoTranslate = false,
+    this.dictionaryFallback = false,
+    this.dailySuggestion = true,
+  });
+
+  /// 文章智能分词与难度筛选（默认开启）。
+  final bool articleTokenize;
+
+  /// 有道查词完成后，后台自动调用 AI 生成助记（默认关闭）。
+  final bool autoMnemonic;
+
+  /// 句子词条缺目标语言翻译时，后台自动调用 AI 补翻译（默认关闭）。
+  final bool autoTranslate;
+
+  /// 词典无结果或显式选源时，允许使用 AI 兜底查词（默认关闭）。
+  final bool dictionaryFallback;
+
+  /// 首页每日学习建议允许由 AI 润色（默认开启）。
+  final bool dailySuggestion;
+
+  /// 默认用途开关。
+  static const LlmFeatureToggles defaults = LlmFeatureToggles();
+
+  /// 序列化为可落库的键值映射。
+  Map<String, Object?> toJson() => <String, Object?>{
+    'articleTokenize': articleTokenize,
+    'autoMnemonic': autoMnemonic,
+    'autoTranslate': autoTranslate,
+    'dictionaryFallback': dictionaryFallback,
+    'dailySuggestion': dailySuggestion,
+  };
+}
+
+/// 词条初始化 / 分词 / 建议等用途共用的 AI 配置。
+class LlmAiConfig {
+  /// 以各字段构造。
+  const new({
+    required this.enabled,
+    required this.providerId,
+    required this.model,
+    this.retryProviderId = '',
+    this.retryModel = '',
+    this.temperature = defaultLlmTemperature,
+    this.maxOutputTokens = defaultLlmMaxOutputTokens,
+    this.timeoutMs = defaultLlmTimeoutMs,
+    this.thinkingEnabled = false,
+    this.thinkingBudgetTokens = defaultThinkingBudgetTokens,
+    this.reasoningEffort = '',
+    this.retryCount = defaultAiRetryCount,
+    this.features = LlmFeatureToggles.defaults,
+  });
+
+  /// 是否启用。
+  final bool enabled;
+
+  /// 主提供方 ID。
+  final String providerId;
+
+  /// 主模型。
+  final String model;
+
+  /// 备用提供方 ID。
+  final String retryProviderId;
+
+  /// 备用模型。
+  final String retryModel;
+
+  /// 采样温度。
+  final double temperature;
+
+  /// 最大输出 token。
+  final int maxOutputTokens;
+
+  /// 请求超时（毫秒）。
+  final int timeoutMs;
+
+  /// 是否开启思考。
+  final bool thinkingEnabled;
+
+  /// 思考预算（token）。
+  final int thinkingBudgetTokens;
+
+  /// 推理强度（`minimal` / `low` / `medium` / `high`）。
+  final String reasoningEffort;
+
+  /// 重试遍数。
+  final int retryCount;
+
+  /// 各用途的独立开关。
+  final LlmFeatureToggles features;
+}
+
+/// LLM 配置。
+class LlmConfig {
+  /// 以各字段构造。
+  const new({required this.providers, required this.ai});
+
+  /// 全部提供方。
+  final List<LlmProviderConfig> providers;
+
+  /// 用途配置。
+  final LlmAiConfig ai;
+
+  /// 未配置任何 LLM 时的默认值。
+  static const LlmConfig disabled = LlmConfig(
+    providers: <LlmProviderConfig>[],
+    ai: LlmAiConfig(enabled: false, providerId: '', model: ''),
+  );
+
+  /// 按 ID 查找提供方；找不到返回 `null`。
+  LlmProviderConfig? providerById(String id) {
+    for (final provider in providers) {
+      if (provider.id == id) return provider;
+    }
+    return null;
+  }
+
+  /// 主提供方；未配置或不可用时返回 `null`。
+  LlmProviderConfig? get primaryProvider => providerById(ai.providerId);
+
+  /// 配置是否足以发起请求。
+  bool get isUsable {
+    final primary = primaryProvider;
+    return ai.enabled &&
+        primary != null &&
+        primary.isUsable &&
+        ai.model.trim().isNotEmpty;
+  }
+
+  /// 是否允许用于文章智能分词。
+  bool get canArticleTokenize => isUsable && ai.features.articleTokenize;
+
+  /// 是否允许在查词后自动入队助记生成。
+  bool get canAutoMnemonic => isUsable && ai.features.autoMnemonic;
+
+  /// 是否允许在查词后自动入队句子翻译。
+  bool get canAutoTranslate => isUsable && ai.features.autoTranslate;
+
+  /// 是否允许作为词典兜底或手动 AI 查词数据源。
+  bool get canDictionaryFallback => isUsable && ai.features.dictionaryFallback;
+
+  /// 是否允许用于首页每日学习建议。
+  bool get canDailySuggestion => isUsable && ai.features.dailySuggestion;
+}
+
+/// 从整份 `settings.raw` 解析 LLM 配置。
+///
+/// **为什么不是直接用 [llmConfigFromRaw]**：`aiRetryCount` 存在设置顶层而不在
+/// `llmConfig` 子对象里，只把子对象传进来就会丢掉它。所有调用方手上拿的都是
+/// 整份 `raw`，走这一个入口才不会有人再读错层级。
+LlmConfig llmConfigFromSettings(Map<Object?, Object?> settingsRaw) {
+  final config = llmConfigFromRaw(settingsRaw[llmConfigSettingsKey]);
+  final override = settingsRaw[aiRetryCountSettingsKey];
+  if (override is! num) return config;
+  return LlmConfig(
+    providers: config.providers,
+    ai: LlmAiConfig(
+      enabled: config.ai.enabled,
+      providerId: config.ai.providerId,
+      model: config.ai.model,
+      retryProviderId: config.ai.retryProviderId,
+      retryModel: config.ai.retryModel,
+      thinkingEnabled: config.ai.thinkingEnabled,
+      reasoningEffort: config.ai.reasoningEffort,
+      temperature: config.ai.temperature,
+      maxOutputTokens: config.ai.maxOutputTokens,
+      timeoutMs: config.ai.timeoutMs,
+      thinkingBudgetTokens: config.ai.thinkingBudgetTokens,
+      retryCount: override.round().clamp(1, maxAiRetryCount),
+      features: config.ai.features,
+    ),
+  );
+}
+
+/// 从 `settings.raw['llmConfig']` 解析 LLM 配置。
+///
+/// 任何一层结构不符都退化为 [LlmConfig.disabled]，而不是抛错——
+/// 设置页的脏数据不应该让初始化队列整体不可用。
+///
+/// **调用方应改用 [llmConfigFromSettings]**：本函数看不到顶层设置，
+/// 因此读不到 `aiRetryCount`。
+LlmConfig llmConfigFromRaw(Object? raw) {
+  if (raw is! Map) return LlmConfig.disabled;
+  final providers = _providers(raw['providers']);
+  final ai = _ai(raw['ai']);
+  return LlmConfig(providers: providers, ai: ai);
+}
+
+List<LlmProviderConfig> _providers(Object? raw) {
+  if (raw is! List) return const <LlmProviderConfig>[];
+  final result = <LlmProviderConfig>[];
+  for (final item in raw) {
+    if (item is! Map) continue;
+    final id = _text(item['id']);
+    if (id.isEmpty) continue;
+    final models = <String>[];
+    final rawModels = item['models'];
+    if (rawModels is List) {
+      for (final model in rawModels) {
+        final value = _text(model);
+        if (value.isNotEmpty) models.add(value);
+      }
+    }
+    result.add(
+      LlmProviderConfig(
+        id: id,
+        name: _text(item['name']),
+        apiType: LlmApiType.fromWire(item['apiType']),
+        baseUrl: normalizeBaseUrl(_text(item['baseUrl'])),
+        apiKey: _text(item['apiKey']),
+        models: models,
+        defaultModel: _text(item['defaultModel']),
+      ),
+    );
+  }
+  return result;
+}
+
+LlmAiConfig _ai(Object? raw) {
+  if (raw is! Map) {
+    return const LlmAiConfig(enabled: false, providerId: '', model: '');
+  }
+  final limits = _aiLimits(raw);
+  return LlmAiConfig(
+    enabled: raw['enabled'] == true,
+    providerId: _text(raw['providerId']),
+    model: _text(raw['model']),
+    retryProviderId: _text(raw['retryProviderId']),
+    retryModel: _text(raw['retryModel']),
+    thinkingEnabled: raw['thinkingEnabled'] == true,
+    reasoningEffort: _text(raw['reasoningEffort']),
+    temperature: limits.$1,
+    maxOutputTokens: limits.$2,
+    timeoutMs: limits.$3,
+    thinkingBudgetTokens: limits.$4,
+    features: _features(raw['features']),
+  );
+}
+
+LlmFeatureToggles _features(Object? raw) {
+  if (raw is! Map) return LlmFeatureToggles.defaults;
+  return LlmFeatureToggles(
+    articleTokenize: _boolOr(raw['articleTokenize'], fallback: true),
+    autoMnemonic: _boolOr(raw['autoMnemonic'], fallback: false),
+    autoTranslate: _boolOr(raw['autoTranslate'], fallback: false),
+    dictionaryFallback: _boolOr(raw['dictionaryFallback'], fallback: false),
+    dailySuggestion: _boolOr(raw['dailySuggestion'], fallback: true),
+  );
+}
+
+bool _boolOr(Object? value, {required bool fallback}) =>
+    value is bool ? value : fallback;
+
+/// 数值字段的取值夹取。
+///
+/// 单独成函数是因为这里集中了 4 组「区间 + 默认值」，
+/// 混在结构解析里会让 `_ai` 越过 40 行上限。
+///
+/// **`aiRetryCount` 不在这里**：它在设置顶层，由 [llmConfigFromSettings] 覆盖。
+(double, int, int, int) _aiLimits(Map<dynamic, dynamic> raw) => (
+  _clampDouble(
+    raw['temperature'],
+    defaultLlmTemperature,
+    minLlmTemperature,
+    maxLlmTemperature,
+  ),
+  _clampInt(
+    raw['maxOutputTokens'],
+    defaultLlmMaxOutputTokens,
+    minLlmMaxOutputTokens,
+    maxLlmMaxOutputTokens,
+  ),
+  _clampInt(
+    raw['timeoutMs'],
+    defaultLlmTimeoutMs,
+    minLlmTimeoutMs,
+    maxLlmTimeoutMs,
+  ),
+  _clampInt(
+    raw['thinkingBudgetTokens'],
+    defaultThinkingBudgetTokens,
+    minThinkingBudgetTokens,
+    maxThinkingBudgetTokens,
+  ),
+);
+
+/// 去掉基址的尾部斜杠，避免拼出 `//chat/completions`。
+String normalizeBaseUrl(String value) {
+  var result = value.trim();
+  while (result.endsWith('/')) {
+    result = result.substring(0, result.length - 1);
+  }
+  return result;
+}
+
+String _text(Object? value) => value is String ? value.trim() : '';
+
+int _clampInt(Object? value, int fallback, int min, int max) =>
+    value is num ? value.round().clamp(min, max) : fallback;
+
+double _clampDouble(Object? value, double fallback, double min, double max) =>
+    value is num ? value.toDouble().clamp(min, max) : fallback;

@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "archive_revision": "sha256:2543f967b0b80947fd59c712f6f231ebb608b02a5153f1242e0f9dccb886614e",
+  "entries": [
+    {
+      "number": 1,
+      "path": "docs/history-session/1.md",
+      "title": "开发会话",
+      "created_at": "unix:1794786682",
+      "updated_at": "unix:1794786682",
+      "bytes": 343,
+      "sha256": "e9c871a7a8a00bf3ad86499d0b92c58fc5e31da08a47e96185879200d1c6981f",
+      "keywords": [
+        "开发会话"
+      ]
+    }
+  ]
+}

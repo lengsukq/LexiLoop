@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "latest_number": 1,
+  "sessions": {
+    "v1/3m6Ci9sjBQrmcS0CGDh442aPhMtGwvbFy6S56liRsSeNCSeh7BbGSNCwXFpHG4gCGhwxGhdKVqJ5": {
+      "number": 1,
+      "path": "docs/history-session/1.md",
+      "created_at": "unix:1794786682",
+      "updated_at": "unix:1794786682"
+    }
+  }
+}

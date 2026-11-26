@@ -1,0 +1,629 @@
+/// 词条详情页头部卡片。
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lexiloop/data/db/daos/word_detail_dao.dart';
+import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/features/word_detail/dialogs/edit_word_dialog.dart';
+import 'package:lexiloop/features/word_detail/dialogs/youdao_preview_dialog.dart';
+import 'package:lexiloop/features/word_detail/word_detail_audio.dart';
+import 'package:lexiloop/features/word_detail/word_detail_format.dart';
+import 'package:lexiloop/features/word_detail/word_detail_providers.dart';
+import 'package:lexiloop/features/word_detail/word_detail_widgets.dart';
+import 'package:lexiloop/ui/navigation/route_paths.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_tint.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/disclosure_section.dart';
+import 'package:lexiloop/ui/widgets/lexi_confirm_sheet.dart';
+import 'package:lexiloop/ui/widgets/page_header.dart';
+import 'package:lexiloop/ui/widgets/status_badges.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+/// 词条头部：操作栏 + 文本、状态徽章、口音切换与学习开关。
+///
+/// 只接收数据，写操作通过 [wordDetailActionsProvider] 发起——
+/// 旧版这一块收了 11 个 props 与 6 个回调，这里一个参数都不用传。
+class WordDetailHeaderCard extends ConsumerWidget {
+  /// 以词条详情构造。
+  const new({required this.detail, super.key});
+
+  /// 词条详情。
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _HeaderActionBar(detail: detail),
+        const SizedBox(height: LexiSpace.s10),
+        Surface(
+          variant: SurfaceVariant.hero,
+          borderRadius: BorderRadius.circular(LexiRadius.xl),
+          padding: const EdgeInsets.fromLTRB(
+            LexiSpace.s20,
+            LexiSpace.s16,
+            LexiSpace.s14,
+            LexiSpace.s14,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _TermBlock(detail: detail),
+              _TranslationHint(detail: detail),
+              const SizedBox(height: LexiSpace.s10),
+              _PronunciationBar(detail: detail),
+              const SizedBox(height: LexiSpace.s10),
+              _HeaderActions(detail: detail),
+              DisclosureSection(
+                title: '词条信息',
+                child: _SourceMeta(detail: detail),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 顶部操作栏：补全内容、有道词典、编辑、重新生成、删除。
+///
+/// **为什么独立于卡片之外**：这些是「对这个词条做什么」，而卡片展示的是
+/// 「这个词条是什么」。混在一张玻璃卡片里会让用户以为按钮只作用于卡片
+/// 内部的某个分区。
+class _HeaderActionBar extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    // **两个一等动作 + 一个「⋯」**。
+    //
+    // 收敛前这里是五个平铺的文字按钮：「补全缺失内容 / 有道词典 / 编辑 /
+    // 重新生成 / 删除」。删除与重新生成之间只隔约 40 像素，而前者不可逆、
+    // 后者会覆盖手动编辑的内容——把最危险的两个放在最容易被误点的位置，
+    // 是布局问题，也是安全问题。
+    //
+    // 现在：查词典与编辑留在台面上（高频、无害），
+    // 重新生成与删除收进菜单，删除仍排最后且用危险色。
+    return Wrap(
+      spacing: LexiSpace.s8,
+      runSpacing: LexiSpace.s8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        backButton(context, fallbackLocation: wordsPath, tooltip: '返回单词本'),
+        OutlinedButton.icon(
+          onPressed: () =>
+              unawaited(YoudaoPreviewDialog.show(context, wordId: detail.id)),
+          icon: const Icon(LucideIcons.bookOpen, size: 16),
+          label: const Text('有道词典'),
+        ),
+        const SizedBox(width: LexiSpace.s8),
+        OutlinedButton.icon(
+          onPressed: () => unawaited(
+            EditWordDialog.show(
+              context,
+              target: EditWordTarget(
+                wordId: detail.id,
+                term: detail.term,
+                sourceLanguage: detail.sourceLanguage,
+                targetLanguage: detail.targetLanguage,
+                contentType: detail.contentType,
+              ),
+            ),
+          ),
+          icon: const Icon(LucideIcons.pencil, size: 16),
+          label: const Text('编辑'),
+        ),
+        PopupMenuButton<_HeaderAction>(
+          tooltip: '更多操作',
+          icon: Icon(LucideIcons.ellipsis, color: colors.secondaryLabel),
+          onSelected: (action) => switch (action) {
+            _HeaderAction.complete => unawaited(
+              _initialize(context, ref, InitializationMode.fillMissingFields),
+            ),
+            _HeaderAction.regenerate => unawaited(
+              _confirmRegenerate(context, ref),
+            ),
+            _HeaderAction.delete => unawaited(_confirmDelete(context, ref)),
+          },
+          itemBuilder: (context) => <PopupMenuEntry<_HeaderAction>>[
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.complete,
+              child: _MenuRow(icon: LucideIcons.sparkles, label: '补全缺失内容'),
+            ),
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.regenerate,
+              child: _MenuRow(
+                icon: LucideIcons.refreshCw,
+                label: 'AI 重新生成',
+                // 「会覆盖手动编辑」放在第二行：一是必须说清楚，
+                // 二是塞进一行会把弹层撑出边界（弹层有宽度上限）。
+                hint: '会覆盖手动编辑的释义与例句',
+              ),
+            ),
+            const PopupMenuItem<_HeaderAction>(
+              value: _HeaderAction.delete,
+              child: _MenuRow(
+                icon: LucideIcons.trash2,
+                label: '删除词条',
+                danger: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 排一个初始化任务并提示。
+  Future<void> _initialize(
+    BuildContext context,
+    WidgetRef ref,
+    InitializationMode mode,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref
+        .read(wordDetailActionsProvider)
+        .requestInitialization(detail.id, mode);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          mode == InitializationMode.forceOverwrite ? '已排入重新生成队列' : '已排入补全队列',
+        ),
+      ),
+    );
+  }
+
+  /// 「重新生成」的二次确认。
+  ///
+  /// 必须确认：它会覆盖现有内容，误点一次就要等一次完整的重新抓取。
+  Future<void> _confirmRegenerate(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showLexiConfirmSheet(
+      context,
+      title: '重新生成',
+      body:
+          '重新生成会再次调用 AI，并用返回结果覆盖这个词条的内容，'
+          ' 包括你手动改过的释义与例句。这一步不可撤销，确定继续吗？',
+      confirmLabel: '继续',
+    );
+    if (!confirmed || !context.mounted) return;
+    await _initialize(context, ref, InitializationMode.forceOverwrite);
+  }
+
+  /// 二次确认后删除词条，并退出详情页。
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showLexiConfirmSheet(
+      context,
+      title: '删除词条',
+      body:
+          '确定删除「${detail.term}」吗？'
+          '该词条的释义、例句、复习记录与错词状态都会一并删除，且无法恢复。',
+      confirmLabel: '删除',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    await ref.read(wordDetailActionsProvider).delete(detail.id);
+    if (context.mounted) await Navigator.of(context).maybePop();
+  }
+}
+
+/// 朗读词条，失败或降级时提示原因。
+///
+/// 统一走 [speakWithWordSpeaker]（真人录音优先、系统朗读兜底）：
+/// Android 缺语音包时系统 TTS 会静默无声，不提示的话用户只会觉得
+/// 「按钮坏了」。
+Future<void> _speakWord(
+  BuildContext context,
+  WidgetRef ref,
+  WordDetail detail, {
+  Accent? accent,
+}) {
+  final fromSelection = ref.read(selectedAccentProvider)[detail.id];
+  return _speakWith(
+    context,
+    ref,
+    detail,
+    _resolveAccent(ref, fromSelection, accent),
+  );
+}
+
+/// 决定这次朗读用哪个口音。
+///
+/// 优先级：显式指定的口音（点了某个口音的喇叭）> 该词条上次选中的口音 >
+/// 设置里的默认口音。写成显式分支而不是 `??` 链：`??` 链在
+/// `ref.read` 的泛型推断下会把整体类型推成可空，编译器无法替我们确认
+/// 「一定拿得到一个口音」。
+Accent _resolveAccent(WidgetRef ref, Accent? selected, Accent? override) {
+  if (override != null) return override;
+  if (selected != null) return selected;
+  return ref.read(preferredAccentProvider);
+}
+
+/// 用指定口音朗读。
+Future<void> _speakWith(
+  BuildContext context,
+  WidgetRef ref,
+  WordDetail detail,
+  Accent accent,
+) {
+  return speakWithWordSpeaker(
+    context: context,
+    ref: ref,
+    term: detail.term,
+    accent: accent,
+    contentType: detail.contentType,
+    pronunciations: detail.pronunciations,
+  );
+}
+
+class _TermBlock extends StatelessWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          detail.term,
+          style: LexiType.display.copyWith(
+            color: colors.label,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: LexiSpace.s10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: <Widget>[
+            MasteryBadge(
+              level: detail.masteryLevel,
+              score: detail.masteryScore,
+            ),
+            if (detail.initializationStatus != InitializationStatus.ready)
+              InitializationBadge(status: detail.initializationStatus),
+            if (detail.isSuspended)
+              const DetailChip(text: '已暂停', tone: LexiBadgeTone.danger),
+            if (detail.isPersonal && detail.packNames.isNotEmpty)
+              const DetailChip(text: '个人词库', tone: LexiBadgeTone.accent),
+            for (final packName in detail.packNames) DetailChip(text: packName),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 「暂无中文释义 → AI 翻译释义」提示。
+///
+/// 只在**有英文释义而缺中文译文**时出现：什么内容都没有的词条该走
+/// 「补全缺失内容」，那是另一条路径。
+///
+/// **与旧版的差异**：旧版把 busy 与结果文案放在页面上（`translationBusy` /
+/// `translationMessage`）；这里改成入队后弹一条 SnackBar——翻译由后台
+/// worker 执行，页面上留一个永远停在「翻译中」的状态没有意义。
+class _TranslationHint extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final short = detail.summary.shortDefinition?.trim() ?? '';
+    final translation = detail.summary.translation?.trim() ?? '';
+    if (short.isEmpty || translation.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+    final colors = context.lexiColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: LexiSpace.s8),
+      child: Row(
+        children: <Widget>[
+          Text(
+            '暂无中文释义',
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+          const SizedBox(width: LexiSpace.s8),
+          TextButton.icon(
+            onPressed: () => unawaited(_request(context, ref)),
+            icon: const Icon(LucideIcons.languages, size: 15),
+            label: const Text('AI 翻译释义'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _request(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(wordDetailActionsProvider).requestTranslation(detail.id);
+    messenger.showSnackBar(const SnackBar(content: Text('已加入翻译队列')));
+  }
+}
+
+/// 口音切换栏：把 US / UK 两个音标并排展示，各自可点选、各自可朗读。
+///
+/// 旧版只显示一个口音，另一个音标要切全局设置才看得到——用户根本不知道
+/// 这个词还有英音，于是记不住的那个读音就永远不会被复习到。
+class _PronunciationBar extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preferred = ref.watch(preferredAccentProvider);
+    final selection = ref.watch(selectedAccentProvider);
+    final accent = selection[detail.id] ?? preferred;
+    final available = <Accent>[
+      for (final item in Accent.values)
+        if (detail.pronunciations.any((one) => one.accent == item)) item,
+    ];
+    if (available.isEmpty) return _PlainPlayButton(detail: detail);
+    return Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      children: <Widget>[
+        for (final item in available)
+          _AccentToggle(detail: detail, accent: item, selected: item == accent),
+      ],
+    );
+  }
+}
+
+/// 一个口音：点胶囊选它，点喇叭只朗读、不改选择。
+///
+/// 选中与朗读分成两个控件是因为它们回答的是不同问题：「我该学哪个读音」
+/// 与「这个读音怎么念」。合成一个按钮的话，想只听不改就没法只听不改。
+class _AccentToggle extends ConsumerWidget {
+  const new({
+    required this.detail,
+    required this.accent,
+    required this.selected,
+  });
+
+  final WordDetail detail;
+  final Accent accent;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    final phonetic =
+        preferredPronunciation(detail.pronunciations, accent)?.phonetic ?? '';
+    final label = accentLabel(accent);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        GestureDetector(
+          onTap: () => ref
+              .read(selectedAccentProvider.notifier)
+              .select(detail.id, accent),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: LexiSpace.s12,
+              vertical: LexiSpace.s8,
+            ),
+            decoration: BoxDecoration(
+              color: selected
+                  ? colors.accent.withValues(alpha: LexiTint.tint)
+                  : Colors.transparent,
+              border: Border.all(
+                color: selected ? colors.accent : colors.separator,
+              ),
+              borderRadius: BorderRadius.circular(LexiRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: LexiType.body.copyWith(
+                    color: selected ? colors.accent : colors.secondaryLabel,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (phonetic.isNotEmpty) ...<Widget>[
+                  const SizedBox(width: LexiSpace.s6),
+                  Text(
+                    '/$phonetic/',
+                    style: LexiType.footnote.copyWith(
+                      color: colors.secondaryLabel,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: '朗读$label式发音',
+          visualDensity: VisualDensity.compact,
+          onPressed: () =>
+              unawaited(_speakWord(context, ref, detail, accent: accent)),
+          icon: Icon(LucideIcons.volume2, size: 18, color: colors.accent),
+        ),
+      ],
+    );
+  }
+}
+
+/// 没有任何音标时的兜底朗读按钮。
+class _PlainPlayButton extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Tooltip(
+        message: '朗读',
+        child: TextButton.icon(
+          onPressed: () => unawaited(_speakWord(context, ref, detail)),
+          icon: const Icon(LucideIcons.volume2, size: 18),
+          label: const Text('播放发音'),
+        ),
+      ),
+    );
+  }
+}
+
+/// 「创建 / 更新 / 源内容时间」一行。
+///
+/// 三个时间回答三个不同的问题：词条是何时进库的、内容最后一次是何时被我
+/// 改的、词典条目本身是何时写的。只显示第一个的话，用户会把自己手动改过的
+/// 词条误当成「当初就这样导入的」。
+class _SourceMeta extends StatelessWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _metaLine(
+          colors,
+          '${languageLabel(detail.sourceLanguage)} → '
+          '${languageLabel(detail.targetLanguage)}',
+        ),
+        _metaLine(colors, contentTypeLabel(detail.contentType)),
+        _metaLine(colors, contentSourceLabel(detail.contentSource)),
+        _metaLine(colors, '创建于 ${formatTimestamp(detail.createdAt)}'),
+        if (detail.updatedAt != null && detail.updatedAt != detail.createdAt)
+          _metaLine(colors, '更新于 ${formatTimestamp(detail.updatedAt!)}'),
+        if (detail.sourceCreatedAt != null)
+          _metaLine(
+            colors,
+            '源内容时间 ${formatTimestamp(detail.sourceCreatedAt!)}',
+          ),
+      ],
+    );
+  }
+
+  Widget _metaLine(LexiColors colors, String text) => Padding(
+    padding: const EdgeInsets.only(bottom: LexiSpace.s2),
+    child: Text(
+      text,
+      style: LexiType.caption.copyWith(color: colors.tertiaryLabel),
+    ),
+  );
+}
+
+/// 卡片底部：朗读、学习状态与暂停开关。
+class _HeaderActions extends ConsumerWidget {
+  const new({required this.detail});
+
+  final WordDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.lexiColors;
+    return Row(
+      children: <Widget>[
+        if (!detail.isPersonal)
+          OutlinedButton.icon(
+            onPressed: () => unawaited(_promoteToPersonal(context, ref)),
+            icon: const Icon(LucideIcons.bookmarkPlus, size: 15),
+            label: const Text('收入个人词库'),
+          ),
+        const Spacer(),
+        Text(
+          detail.isSuspended ? '已暂停' : '学习中',
+          style: LexiType.body.copyWith(color: colors.secondaryLabel),
+        ),
+        Switch(
+          value: detail.isSuspended,
+          onChanged: (value) => ref
+              .read(wordDetailActionsProvider)
+              .setSuspended(detail.id, suspended: value),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _promoteToPersonal(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await ref.read(wordDetailActionsProvider).promoteToPersonal(detail.id);
+    messenger.showSnackBar(const SnackBar(content: Text('已收入个人词库')));
+  }
+}
+
+/// 词条详情页「⋯」菜单里的动作。
+enum _HeaderAction { complete, regenerate, delete }
+
+/// 菜单行：图标 + 文案（危险动作用危险色）。
+class _MenuRow extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.label,
+    this.hint,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+
+  /// 第二行的补充说明；弹层宽度有限，长句子放这里而不是标题里。
+  final String? hint;
+
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final foreground = danger ? colors.dangerText : colors.label;
+    final hint = this.hint;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 16, color: foreground),
+        ),
+        const SizedBox(width: LexiSpace.s10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: LexiType.callout.copyWith(color: foreground),
+              ),
+              if (hint != null)
+                Text(
+                  hint,
+                  maxLines: 2,
+                  style: LexiType.footnote.copyWith(
+                    color: colors.secondaryLabel,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

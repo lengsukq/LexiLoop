@@ -1,0 +1,194 @@
+/// 导入预览表格。
+///
+/// 一次最多渲染 `importPreviewDisplayLimit` 行：预览可能有上万行，
+/// 全量塞进 `ListView` 会让首帧直接卡住，而用户真正关心的是
+/// 「前几十行长什么样」与「有多少行有问题」。
+library;
+
+import 'package:flutter/material.dart';
+import 'package:lexiloop/core/constants.dart';
+import 'package:lexiloop/data/import/csv_parser.dart';
+import 'package:lexiloop/data/import/import_models.dart';
+import 'package:lexiloop/domain/enums.dart';
+import 'package:lexiloop/ui/theme/lexi_colors.dart';
+import 'package:lexiloop/ui/theme/lexi_space.dart';
+import 'package:lexiloop/ui/theme/lexi_type.dart';
+import 'package:lexiloop/ui/widgets/badge.dart';
+import 'package:lexiloop/ui/widgets/surface.dart';
+
+/// 预览表格。
+class ImportPreviewTable extends StatelessWidget {
+  /// 以预览与「只看问题行」开关构造。
+  const new({required this.preview, required this.onlyProblems, super.key});
+
+  /// 预览结果。
+  final ImportPreview preview;
+
+  /// 是否只展示非法 / 重复 / 已存在的行。
+  final bool onlyProblems;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final rows = _visibleRows();
+    final hidden = preview.totalRows - rows.length;
+    final summary = StringBuffer()
+      ..write('预览（共 ${preview.totalRows} 行，')
+      ..write('新增 ${preview.newRows} / 已存在 ${preview.existingRows} / ')
+      ..write('重复 ${preview.duplicateRows} / 无效 ${preview.invalidRows}）');
+
+    return Surface(
+      borderRadius: BorderRadius.circular(LexiRadius.lg),
+      padding: const EdgeInsets.all(LexiSpace.s14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            summary.toString(),
+            style: LexiType.footnote.copyWith(color: colors.secondaryLabel),
+          ),
+          if (preview.skippedCount > 0) ...<Widget>[
+            const SizedBox(height: LexiSpace.s4),
+            Text(
+              '已跳过 ${preview.skippedCount} 个空行',
+              style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
+            ),
+          ],
+          const SizedBox(height: LexiSpace.s10),
+          const _TableHeader(),
+          const Divider(height: 12),
+          for (final row in rows) _PreviewRow(row: row),
+          if (hidden > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: LexiSpace.s8),
+              child: Text(
+                '另有 $hidden 行未展示（可导入，只是不在此处渲染）',
+                style: LexiType.footnote.copyWith(color: colors.tertiaryLabel),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<ParsedCsvRow> _visibleRows() {
+    final filtered = onlyProblems
+        ? preview.rows.where((row) => row.needsAttention).toList()
+        : preview.rows;
+    if (filtered.length <= importPreviewDisplayLimit) return filtered;
+    return filtered.sublist(0, importPreviewDisplayLimit);
+  }
+}
+
+class _TableHeader extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final style = LexiType.caption.copyWith(
+      color: colors.tertiaryLabel,
+      fontWeight: FontWeight.w600,
+    );
+    return Row(
+      children: <Widget>[
+        SizedBox(
+          width: _rowNumberColumnWidth,
+          child: Text('行号', style: style),
+        ),
+        Expanded(flex: 3, child: Text('词条', style: style)),
+        Expanded(flex: 2, child: Text('类型', style: style)),
+        SizedBox(
+          width: _statusColumnWidth,
+          child: Text('状态', style: style),
+        ),
+        Expanded(flex: 3, child: Text('问题', style: style)),
+      ],
+    );
+  }
+}
+
+class _PreviewRow extends StatelessWidget {
+  const new({required this.row});
+
+  final ParsedCsvRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.lexiColors;
+    final label = LexiType.footnote.copyWith(color: colors.label);
+    final muted = LexiType.footnote.copyWith(color: colors.secondaryLabel);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: LexiSpace.s4),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            width: _rowNumberColumnWidth,
+            child: Text('${row.rowNumber}', style: muted),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              row.term.isEmpty ? '（空）' : row.term,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: label,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(_contentTypeLabel(row.contentType), style: muted),
+          ),
+          SizedBox(
+            width: _statusColumnWidth,
+            child: ImportRowStatusBadge(status: row.status),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              row.errorMessage ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: LexiType.footnote.copyWith(color: colors.dangerText),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 导入行状态徽章。
+class ImportRowStatusBadge extends StatelessWidget {
+  /// 以状态构造。
+  const new({required this.status, super.key});
+
+  /// 行状态。
+  final ImportRowStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (String label, LexiBadgeTone tone) = switch (status) {
+      ImportRowStatus.newWord => ('新增', LexiBadgeTone.success),
+      ImportRowStatus.existing => ('已存在', LexiBadgeTone.accent),
+      ImportRowStatus.duplicate => ('重复', LexiBadgeTone.warning),
+      ImportRowStatus.invalid => ('无效', LexiBadgeTone.danger),
+      ImportRowStatus.imported => ('已导入', LexiBadgeTone.success),
+      ImportRowStatus.error => ('失败', LexiBadgeTone.danger),
+    };
+    return LexiBadge(label: label, tone: tone);
+  }
+}
+
+/// 内容类型的中文标签。
+String _contentTypeLabel(LexicalContentType type) => switch (type) {
+  LexicalContentType.word => '单词',
+  LexicalContentType.phrase => '短语',
+  LexicalContentType.sentence => '句子',
+};
+
+/// 「行号」列宽——行号最多五位数，固定宽度让表头与数据行对齐。
+const double _rowNumberColumnWidth = 44;
+
+/// 「状态」列宽——要放得下最长的状态徽章。
+const double _statusColumnWidth = 68;

@@ -1,0 +1,35 @@
+{
+    "name": "LexiLoop 词环",
+    "short_name": "LexiLoop",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#f7f8fa",
+    "theme_color": "#f7f8fa",
+    "description": "LexiLoop 词环 —— 纯本地、跨端的词汇复习应用。",
+    "orientation": "any",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

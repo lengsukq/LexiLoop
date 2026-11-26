@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, RefreshCw, Save } from "lucide-react";
 import { Button, PageHeader } from "@/components/ui";
 import { AiSettingsTab } from "./components/ai-settings-tab";
@@ -14,6 +14,13 @@ import { useSettingsData } from "./use-settings-data";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("study");
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab !== "study" && tab !== "ai" && tab !== "data") return;
+    const timer = window.setTimeout(() => setActiveTab(tab), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const data = useSettingsData();
   const llm = useLlmSettings(data.settings, data.setSettings);
   const pickerProvider = llm.modelPicker && data.settings

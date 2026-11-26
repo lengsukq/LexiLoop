@@ -37,6 +37,48 @@ export interface CallLlmOptions {
 export const DEFAULT_LLM_MAX_OUTPUT_TOKENS = 2000;
 export const DEFAULT_LLM_TEMPERATURE = 0.2;
 
+async function postLlmEndpoint(
+  provider: LlmProviderRequest,
+  baseUrl: string,
+  payload: Record<string, unknown>,
+): Promise<Response> {
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    return fetch("/api/local-proxy/llm", {
+      method: "POST",
+      signal: AbortSignal.timeout(provider.timeoutMs + 2_000),
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        apiType: provider.apiType,
+        baseUrl,
+        apiKey: provider.apiKey,
+        timeoutMs: provider.timeoutMs,
+        payload,
+      }),
+    });
+  }
+
+  const endpoint = provider.apiType === "anthropic"
+    ? `${baseUrl}/messages`
+    : `${baseUrl}/chat/completions`;
+  const headers: Record<string, string> = provider.apiType === "anthropic"
+    ? {
+        "content-type": "application/json",
+        "x-api-key": provider.apiKey,
+        "anthropic-version": "2023-06-01",
+      }
+    : {
+        "content-type": "application/json",
+        authorization: `Bearer ${provider.apiKey}`,
+      };
+
+  return fetch(endpoint, {
+    method: "POST",
+    signal: AbortSignal.timeout(provider.timeoutMs),
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
 function clampBudget(value: unknown): number {
   const num = Number(value);
   if (!Number.isFinite(num)) return 4000;
@@ -282,12 +324,7 @@ export async function callLlm(
 
     const attempt = async (withThinking: boolean): Promise<Response> => {
       try {
-        return await fetch(`${baseUrl}/messages`, {
-          method: "POST",
-          signal: AbortSignal.timeout(provider.timeoutMs),
-          headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify(buildAnthropicBody(withThinking, finalPrompt)),
-        });
+        return await postLlmEndpoint(provider, baseUrl, buildAnthropicBody(withThinking, finalPrompt));
       } catch (error) {
         if (isTimeoutError(error)) {
           const apiErr = new ApiError("AI_REQUEST_FAILED", "AI 请求超时", 502);
@@ -348,12 +385,7 @@ export async function callLlm(
     for (const { format, prompt } of formats) {
       const attempt = async (withThinking: boolean): Promise<Response> => {
         try {
-          return await fetch(`${baseUrl}/chat/completions`, {
-            method: "POST",
-            signal: AbortSignal.timeout(provider.timeoutMs),
-            headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
-            body: JSON.stringify(buildOpenAiBody(withThinking, format, prompt)),
-          });
+          return await postLlmEndpoint(provider, baseUrl, buildOpenAiBody(withThinking, format, prompt));
         } catch (error) {
           if (isTimeoutError(error)) {
             const apiErr = new ApiError("AI_REQUEST_FAILED", "AI 请求超时", 502);
@@ -449,12 +481,7 @@ export async function callLlm(
   {
     const attempt = async (withThinking: boolean): Promise<Response> => {
       try {
-        return await fetch(`${baseUrl}/chat/completions`, {
-          method: "POST",
-          signal: AbortSignal.timeout(provider.timeoutMs),
-          headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
-          body: JSON.stringify(buildOpenAiBody(withThinking, null, userPrompt)),
-        });
+        return await postLlmEndpoint(provider, baseUrl, buildOpenAiBody(withThinking, null, userPrompt));
       } catch (error) {
         if (isTimeoutError(error)) {
           const apiErr = new ApiError("AI_REQUEST_FAILED", "AI 请求超时", 502);

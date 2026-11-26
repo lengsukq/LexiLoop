@@ -1,4 +1,5 @@
 import { sqlite } from "@/db/client";
+import { utf8ByteLength } from "@/lib/iso-crypto";
 import {
   CLOUD_SYNC_DELTA_FORMAT,
   CLOUD_SYNC_DELTA_VERSION,
@@ -46,7 +47,7 @@ function asString(value: unknown): string {
 }
 
 function estimateRowBytes(row: SyncRow): number {
-  return Buffer.byteLength(JSON.stringify(row), "utf8") + 2;
+  return utf8ByteLength(JSON.stringify(row)) + 2;
 }
 
 function sessionChangedWhere(alias: string): string {

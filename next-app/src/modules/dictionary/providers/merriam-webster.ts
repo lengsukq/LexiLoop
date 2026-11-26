@@ -1,5 +1,6 @@
 import type { AppSettings, DictionaryContent, LookupInput, RelatedWordItem } from "@/lib/types";
 import type { DictionaryProvider } from "../provider";
+import { fetchDictionaryUpstream } from "../proxy-fetch";
 
 type MwEntry = {
   meta?: { id?: string; syns?: string[][]; ants?: string[][] };
@@ -46,9 +47,12 @@ function examples(entries: MwEntry[]): DictionaryContent["examples"] {
 }
 
 async function request(reference: "collegiate" | "thesaurus", term: string, key: string): Promise<MwEntry[] | null> {
-  const response = await fetch(`https://www.dictionaryapi.com/api/v3/references/${reference}/json/${encodeURIComponent(term)}?key=${encodeURIComponent(key)}`, {
-    signal: AbortSignal.timeout(10_000), headers: { accept: "application/json", "user-agent": "LexiLoop/1.0" },
-  });
+  const response = await fetchDictionaryUpstream(
+    { target: "merriam-webster", term, reference, apiKey: key, timeoutMs: 10_000 },
+    () => fetch(`https://www.dictionaryapi.com/api/v3/references/${reference}/json/${encodeURIComponent(term)}?key=${encodeURIComponent(key)}`, {
+      signal: AbortSignal.timeout(10_000), headers: { accept: "application/json", "user-agent": "LexiLoop/1.0" },
+    }),
+  );
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`HTTP_${response.status}`);
   const raw = await response.text();

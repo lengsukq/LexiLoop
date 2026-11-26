@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/client-api";
+
 const DB_NAME = "lexiloop-client-cache";
 const DB_VERSION = 1;
 const STORE_NAME = "tts-audio";
@@ -45,17 +47,14 @@ async function ensureSpeedConfig(): Promise<void> {
   if (!speedFetchPromise) {
     speedFetchPromise = (async () => {
       try {
-        const response = await fetch("/api/settings", { headers: { accept: "application/json" }, cache: "no-store" });
-        if (!response.ok) return;
-        const payload = await response.json().catch(() => null) as { success?: boolean; data?: { wordSpeed?: number; phraseSpeed?: number; sentenceSpeed?: number } } | null;
-        const data = payload?.success ? payload.data : null;
+        const data = await apiFetch<{ wordSpeed?: number; phraseSpeed?: number; sentenceSpeed?: number }>("/api/settings");
         speedConfig = {
           word: typeof data?.wordSpeed === "number" ? data.wordSpeed : 1,
           phrase: typeof data?.phraseSpeed === "number" ? data.phraseSpeed : 1,
           sentence: typeof data?.sentenceSpeed === "number" ? data.sentenceSpeed : 1,
         };
       } catch {
-        // Network failures fall back to normal speed.
+        // Network or auth failures fall back to normal speed.
       }
     })();
   }

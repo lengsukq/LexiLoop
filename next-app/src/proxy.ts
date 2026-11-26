@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authRequired } from "@/lib/api";
-import { isAuthCookieValid, isPasswordEnabled, isSyncRequestAuthorized } from "@/lib/security";
+import {
+  hasLocalModeCookie,
+  isAuthCookieValid,
+  isPasswordEnabled,
+  isSameSiteStatelessRelayAllowed,
+  isSyncRequestAuthorized,
+} from "@/lib/security";
 
-const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/health"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/api/auth/login",
+  "/api/auth/local-mode",
+  "/api/auth/logout",
+  "/api/health",
+]);
+
+const LOCAL_STATELESS_API_PATHS = new Set([
+  "/api/tts",
+  "/api/tts/youdao",
+  "/api/local-proxy/dictionary",
+  "/api/local-proxy/tencent-translate",
+  "/api/local-proxy/llm",
+  "/api/settings/models",
+  "/api/settings/test-provider",
+  "/api/settings/test-tencent-translate",
+]);
 
 function isSafeNextPath(value: string | null): value is string {
   return Boolean(value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/login"));
@@ -34,6 +57,17 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   if (isAuthCookieValid(request)) return NextResponse.next();
+
+  // Browser Local Mode: permit page shells and strictly stateless external proxies,
+  // while keeping all cloud database `/api/*` endpoints behind password auth.
+  if (hasLocalModeCookie(request)) {
+    if (LOCAL_STATELESS_API_PATHS.has(pathname) && isSameSiteStatelessRelayAllowed(request)) {
+      return NextResponse.next();
+    }
+    if (pathname.startsWith("/api/")) return authRequired();
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/api/")) return authRequired();
   return redirectToLogin(request);
 }

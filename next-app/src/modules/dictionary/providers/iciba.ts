@@ -1,5 +1,6 @@
 import type { DictionaryContent, LookupInput } from "@/lib/types";
 import type { DictionaryProvider } from "../provider";
+import { fetchDictionaryUpstream } from "../proxy-fetch";
 import { hasAnyIcibaContent, parseIcibaHtml } from "./iciba-parser";
 
 const SUPPORTED_FIELDS = new Set([
@@ -17,16 +18,19 @@ export class IcibaProvider implements DictionaryProvider {
     if (!SUPPORTED_FIELDS.size) return { content: null, errorCode: "NOT_SUPPORTED", errorMessage: "iciba provider不提供任何字段" };
     try {
       const url = `https://www.iciba.com/word?w=${encodeURIComponent(input.term.trim())}`;
-      const response = await fetch(url, {
-        redirect: "follow",
-        signal: AbortSignal.timeout(10_000),
-        headers: {
-          accept: "text/html,application/xhtml+xml",
-          "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-          "cache-control": "no-cache",
-          "user-agent": "Mozilla/5.0 LexiLoop",
-        },
-      });
+      const response = await fetchDictionaryUpstream(
+        { target: "iciba", term: input.term.trim(), timeoutMs: 10_000 },
+        () => fetch(url, {
+          redirect: "follow",
+          signal: AbortSignal.timeout(10_000),
+          headers: {
+            accept: "text/html,application/xhtml+xml",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "cache-control": "no-cache",
+            "user-agent": "Mozilla/5.0 LexiLoop",
+          },
+        }),
+      );
       if (!response.ok) {
         const transient = response.status >= 500;
         return { content: null, errorCode: `HTTP_${response.status}`, errorMessage: `金山词霸页面返回 ${response.status}`, transient };

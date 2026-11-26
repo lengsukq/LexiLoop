@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
 import { sqlite } from "@/db/client";
 import { ApiError } from "@/lib/api";
+import { randomUuid, sha256Hex } from "@/lib/iso-crypto";
 import {
   ARTICLE_AI_CANDIDATE_LIMIT,
   ARTICLE_MAX_SEGMENTS,
@@ -209,9 +209,10 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
     sentenceCount,
   };
 
-  const token = crypto.randomUUID();
+  const token = randomUuid();
   const expiresAt = new Date(now + IMPORT_PREVIEW_TTL_MS);
-  const filename = `article:${crypto.createHash("sha256").update(rawText).digest("hex").slice(0, 8)}`;
+  const rawHash = await sha256Hex(rawText);
+  const filename = `article:${rawHash.slice(0, 8)}`;
 
   const rowsForImport = candidates.map((c, index) => ({
     rowNumber: index + 1,
@@ -249,7 +250,7 @@ export async function createArticlePreview(input: CreateArticlePreviewInput): Pr
   ).run(
     token,
     filename,
-    crypto.createHash("sha256").update(rawText).digest("hex"),
+    rawHash,
     JSON.stringify(rowsForImport),
     expiresAt.getTime(),
     now,
@@ -374,9 +375,10 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
     phraseCount,
     sentenceCount,
   };
-  const token = crypto.randomUUID();
+  const token = randomUuid();
   const expiresAt = new Date(now + IMPORT_PREVIEW_TTL_MS);
-  const filename = `article-merge:${crypto.createHash("sha256").update(fileHashBase + tokens.join("|")).digest("hex").slice(0, 8)}`;
+  const mergeHash = await sha256Hex(fileHashBase + tokens.join("|"));
+  const filename = `article-merge:${mergeHash.slice(0, 8)}`;
   const rowsForImport = merged.map((c, index) => ({
     rowNumber: index + 1,
     term: c.term,
@@ -402,7 +404,8 @@ export async function mergeArticlePreviews(tokens: string[]): Promise<ArticleImp
       charCount: totalCharCount,
     };
   }
-  await sqlite.prepare("INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(token, filename, crypto.createHash("sha256").update(rowsForImport.map((r) => r.normalizedTerm).join("|")).digest("hex"), JSON.stringify(rowsForImport), expiresAt.getTime(), now);
+  const rowsHash = await sha256Hex(rowsForImport.map((r) => r.normalizedTerm).join("|"));
+  await sqlite.prepare("INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(token, filename, rowsHash, JSON.stringify(rowsForImport), expiresAt.getTime(), now);
   return {
     previewToken: token,
     filename,

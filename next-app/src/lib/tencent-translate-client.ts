@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "crypto";
+import { hmacSha256Hex, hmacSha256Raw, sha256Hex } from "@/lib/iso-crypto";
 
 export interface TencentTranslateConfig {
   secretId: string;
@@ -31,14 +31,6 @@ function mapLanguage(lang: string): string {
   return lower;
 }
 
-function sha256Hex(data: string | Buffer): string {
-  return createHash("sha256").update(data).digest("hex");
-}
-
-function hmacSha256(key: string | Buffer, data: string): Buffer {
-  return createHmac("sha256", key).update(data).digest();
-}
-
 export class TencentTranslateError extends Error {
   constructor(
     public readonly code: string,
@@ -49,9 +41,48 @@ export class TencentTranslateError extends Error {
   }
 }
 
+async function callViaBrowserProxy(
+  text: string,
+  source: string,
+  target: string,
+  config: TencentTranslateConfig,
+): Promise<string> {
+  const response = await fetch("/api/local-proxy/tencent-translate", {
+    method: "POST",
+    signal: AbortSignal.timeout(TIMEOUT_MS + 2_000),
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      text,
+      source,
+      target,
+      secretId: config.secretId,
+      secretKey: config.secretKey,
+      projectId: config.projectId,
+    }),
+  });
+  const body = await response.json().catch(() => null) as {
+    success?: boolean;
+    data?: { translation?: string };
+    error?: { code?: string; message?: string };
+  } | null;
+
+  if (!response.ok || !body?.success) {
+    throw new TencentTranslateError(
+      body?.error?.code ?? `HTTP_${response.status}`,
+      body?.error?.message ?? `HTTP ${response.status}`,
+      response.status,
+    );
+  }
+  const translation = body.data?.translation;
+  if (typeof translation !== "string" || !translation.trim()) {
+    throw new TencentTranslateError("EMPTY_RESULT", "腾讯翻译未返回翻译结果。", 422);
+  }
+  return translation;
+}
+
 /**
  * Call Tencent Cloud TMT TextTranslate API with TC3-HMAC-SHA256 signing.
- * Returns the translated text.
+ * In browser Local Mode, delegates to the stateless `/api/local-proxy/tencent-translate` relay.
  */
 export async function tencentTranslateText(
   text: string,
@@ -59,6 +90,10 @@ export async function tencentTranslateText(
   target: string,
   config: TencentTranslateConfig,
 ): Promise<string> {
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    return callViaBrowserProxy(text, source, target, config);
+  }
+
   const payload = JSON.stringify({
     SourceText: text,
     Source: mapLanguage(source),
@@ -75,7 +110,7 @@ export async function tencentTranslateText(
   const canonicalQueryString = "";
   const canonicalHeaders = `content-type:application/json\nhost:${ENDPOINT}\n`;
   const signedHeaders = "content-type;host";
-  const hashedPayload = sha256Hex(payload);
+  const hashedPayload = await sha256Hex(payload);
   const canonicalRequest = [
     httpRequestMethod,
     canonicalUri,
@@ -92,14 +127,14 @@ export async function tencentTranslateText(
     algorithm,
     String(timestamp),
     credentialScope,
-    sha256Hex(canonicalRequest),
+    await sha256Hex(canonicalRequest),
   ].join("\n");
 
   // Step 3: Signing key chain
-  const secretDate = hmacSha256(`TC3${config.secretKey}`, date);
-  const secretService = hmacSha256(secretDate, SERVICE);
-  const secretSigning = hmacSha256(secretService, "tc3_request");
-  const signature = createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
+  const secretDate = await hmacSha256Raw(`TC3${config.secretKey}`, date);
+  const secretService = await hmacSha256Raw(secretDate, SERVICE);
+  const secretSigning = await hmacSha256Raw(secretService, "tc3_request");
+  const signature = await hmacSha256Hex(secretSigning, stringToSign);
 
   // Step 4: Authorization header
   const authorization = `${algorithm} Credential=${config.secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
@@ -170,7 +205,6 @@ export async function tencentTranslateBatch(
       if (error instanceof TencentTranslateError && error.status === 429) {
         throw error; // propagate rate limit
       }
-      // Skip individual failures for non-critical errors
     }
   }
   return results;

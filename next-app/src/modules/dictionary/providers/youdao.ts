@@ -1,5 +1,6 @@
 import type { DictionaryContent, LookupInput } from "@/lib/types";
 import type { DictionaryProvider } from "../provider";
+import { fetchDictionaryUpstream } from "../proxy-fetch";
 import { mergeDictionaryContent } from "../content";
 import { hasAnyContent, parseYoudaoHtml } from "./youdao-parser";
 
@@ -100,7 +101,16 @@ async function lookupEndpointWithRetry(
 
 async function lookupEndpoint(endpoint: YoudaoEndpoint, input: LookupInput): Promise<{ content: Partial<DictionaryContent> | null; attempt: YoudaoAttempt }> {
   try {
-    const response = await fetch(endpoint.buildUrl(input.term), { redirect: "follow", signal: AbortSignal.timeout(timeoutFor(input.entryType)), headers: { accept: "text/html,application/xhtml+xml", "accept-language": "zh-CN,zh;q=0.9,en;q=0.8", "cache-control": "no-cache", "user-agent": "Mozilla/5.0 LexiLoop" } });
+    const timeoutMs = timeoutFor(input.entryType);
+    const target = endpoint.id === "dict.youdao.com" ? "youdao-dict" : "youdao-result";
+    const response = await fetchDictionaryUpstream(
+      { target, term: input.term, timeoutMs },
+      () => fetch(endpoint.buildUrl(input.term), {
+        redirect: "follow",
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: { accept: "text/html,application/xhtml+xml", "accept-language": "zh-CN,zh;q=0.9,en;q=0.8", "cache-control": "no-cache", "user-agent": "Mozilla/5.0 LexiLoop" },
+      }),
+    );
     if (!response.ok) return { content: null, attempt: { endpoint: endpoint.id, status: "FAILED", statusCode: response.status, errorCode: `HTTP_${response.status}`, errorMessage: `页面返回 ${response.status}` } };
     const html = await response.text(); const content = parseYoudaoHtml(html, { term: input.term, entryType: input.entryType, targetLanguage: input.targetLanguage });
     if (!content || !hasAnyContent(content)) return { content: null, attempt: { endpoint: endpoint.id, status: "EMPTY", statusCode: response.status, errorCode: html.trim() ? "UNPARSABLE_RESPONSE" : "EMPTY_RESPONSE", errorMessage: html.trim() ? "页面存在内容，但未解析出词典字段" : "页面内容为空" } };

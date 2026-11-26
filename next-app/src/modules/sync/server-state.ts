@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
 import { sqlite } from "@/db/client";
+import { randomHexToken } from "@/lib/iso-crypto";
 import {
   CLOUD_SYNC_SERVER_SETTINGS_KEY,
   MAX_TRACKED_PEERS,
@@ -8,7 +8,7 @@ import {
 } from "./types";
 
 function generateHexToken(length = 16): string {
-  return randomBytes(Math.ceil(length / 2)).toString("hex").slice(0, length);
+  return randomHexToken(length);
 }
 
 function asNonNegativeInt(value: unknown): number {

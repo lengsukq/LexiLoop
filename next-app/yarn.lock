@@ -221,6 +221,11 @@
   resolved "https://registry.npmmirror.com/@csstools/css-tokenizer/-/css-tokenizer-4.0.0.tgz#798a33950d11226a0ebb6acafa60f5594424967f"
   integrity sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==
 
+"@electric-sql/pglite@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.npmmirror.com/@electric-sql/pglite/-/pglite-0.6.0.tgz#0014372188ed1fd654001214039fb10935239066"
+  integrity sha512-g3tAPFjRLEdN1g5FvawTl4ETo9LtmVwBRUJYnH6Erl6mhlKFRGB2mYhPABffIuXMYxki64mX0Al8U4UFUhuYDQ==
+
 "@emnapi/core@1.10.0":
   version "1.10.0"
   resolved "https://registry.npmmirror.com/@emnapi/core/-/core-1.10.0.tgz#380ccc8f2412ea22d1d972df7f8ee23a3b9c7467"

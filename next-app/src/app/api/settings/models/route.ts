@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { errorMessage } from "@/lib/format";
-import { fail, internalError, ok } from "@/lib/api";
+import { ApiError, fail, internalError, ok } from "@/lib/api";
+import { requiresSsrfGuard } from "@/lib/security";
+import { assertPublicSafeUrl } from "@/lib/ssrf-guard";
 import { formatAiProviderError } from "@/modules/ai-tasks/provider-error";
 import { SECOND_MS } from "@/lib/time";
 import { z } from "zod";
@@ -37,7 +39,12 @@ function modelsFromPayload(payload: unknown): string[] {
 export async function POST(request: NextRequest) {
   try {
     const input = inputSchema.parse(await request.json());
-    const response = await fetch(`${normalizeBaseUrl(input.baseUrl)}/models`, {
+    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    if (requiresSsrfGuard(request)) {
+      await assertPublicSafeUrl(baseUrl);
+    }
+    const response = await fetch(`${baseUrl}/models`, {
+      redirect: "error",
       signal: AbortSignal.timeout(15 * SECOND_MS),
       headers: input.apiType === "anthropic"
         ? { "x-api-key": input.apiKey, "anthropic-version": "2023-06-01" }
@@ -59,6 +66,7 @@ export async function POST(request: NextRequest) {
     if (!models.length) return fail("MODELS_EMPTY", "Models 接口没有返回可识别的模型列表。", 422);
     return ok({ models });
   } catch (error) {
+    if (error instanceof ApiError) return fail(error.code, error.message, error.status);
     if (error instanceof z.ZodError) return fail("VALIDATION_ERROR", "Provider 配置不完整，无法读取模型。", 400, error.issues);
     const timeout = error instanceof DOMException && error.name === "TimeoutError";
     if (timeout) return fail("TIMEOUT", "Models 接口连接超时（15秒）。", 504);

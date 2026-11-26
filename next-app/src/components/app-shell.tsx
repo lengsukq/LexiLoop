@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AudioLines, BarChart3, BookMarked, Home, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, Sparkles, X } from "lucide-react";
+import { AudioLines, BarChart3, BookMarked, Database, Home, MoreHorizontal, PlayCircle, PlusCircle, RefreshCw, Settings, Sparkles, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { APP_MODE_CHANGE_EVENT, syncAppModeStorage, type AppMode } from "@/lib/app-mode";
 import { cn } from "@/lib/cn";
 import { Logo } from "./logo";
 import { BackgroundKeepalive } from "@/components/background-keepalive";
@@ -32,7 +33,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [appMode, setAppMode] = useState<AppMode>("cloud");
   const isStudyScreen = pathname.startsWith("/study") || pathname.startsWith("/match") || pathname.startsWith("/games") || pathname.startsWith("/phonetics");
+
+  useEffect(() => {
+    const sync = () => setAppMode(syncAppModeStorage());
+    const timer = window.setTimeout(sync, 0);
+    const onModeChange = (event: Event) => {
+      const nextMode = (event as CustomEvent<AppMode>).detail;
+      if (nextMode === "local" || nextMode === "cloud") setAppMode(nextMode);
+      else sync();
+    };
+    window.addEventListener(APP_MODE_CHANGE_EVENT, onModeChange);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(APP_MODE_CHANGE_EVENT, onModeChange);
+    };
+  }, []);
 
   const primaryNav = navigation.filter((item) => mobilePrimary.includes(item.href));
   const secondaryNav = navigation.filter((item) => !mobilePrimary.includes(item.href));
@@ -110,18 +127,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* 侧边栏底部 mini 状态卡片 */}
         <div className="relative z-10 mt-auto space-y-2.5 pt-3">
-          <div className="liquid-glass-subtle rounded-[14px] p-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-success" />
+          <div className="liquid-glass-subtle rounded-[14px] p-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex size-2 shrink-0">
+                <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75", appMode === "local" ? "bg-accent" : "bg-success")} />
+                <span className={cn("relative inline-flex size-2 rounded-full", appMode === "local" ? "bg-accent" : "bg-success")} />
               </span>
-              <span className="text-[11.5px] font-medium text-secondary-label">自托管运行中</span>
+              <span className="truncate text-[11.5px] font-medium text-secondary-label" title={appMode === "local" ? "数据库存于浏览器 IndexedDB" : "已连接云端 PostgreSQL"}>
+                {appMode === "local" ? "浏览器本地模式" : "云端运行中"}
+              </span>
             </div>
-            <span className="inline-flex items-center gap-1 text-[10.5px] text-tertiary-label">
-              <Sparkles className="size-3 text-accent" />
-              FSRS
-            </span>
+            {appMode === "local" ? (
+              <Link
+                href="/settings?tab=data"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[10.5px] font-semibold text-accent transition hover:bg-accent/15"
+              >
+                <Database className="size-3" />
+                数据管理
+              </Link>
+            ) : (
+              <span className="inline-flex shrink-0 items-center gap-1 text-[10.5px] text-tertiary-label">
+                <Sparkles className="size-3 text-accent" />
+                FSRS
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between px-2 text-[11px] text-tertiary-label dark:text-[#545458]">
             <span>LexiLoop v1.0</span>
@@ -151,7 +180,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="relative mx-3.5 mb-[calc(4.75rem+env(safe-area-inset-bottom))] max-h-[60vh] overflow-y-auto">
             <div className="liquid-glass-elevated liquid-glass-specular animate-scale-in rounded-[24px] p-4 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]">
               <div className="mb-3 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-secondary-label uppercase tracking-wider">更多导航</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-secondary-label uppercase tracking-wider">更多导航</span>
+                  {appMode === "local" && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/12 px-2 py-0.5 text-[10.5px] font-semibold text-accent">
+                      <Database className="size-3" />
+                      本地模式
+                    </span>
+                  )}
+                </div>
                 <button className="ios-press grid size-7 place-items-center rounded-full bg-black/[0.05] text-secondary-label dark:bg-white/[0.08] dark:text-secondary-label" onClick={() => setMoreOpen(false)}>
                   <X className="size-3.5" />
                 </button>

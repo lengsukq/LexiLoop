@@ -1,6 +1,6 @@
 import { DAY_MS } from "@/lib/time";
 
-const TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
+const TIMEZONE = (typeof process !== "undefined" ? process.env?.APP_TIMEZONE : undefined) ?? "Asia/Shanghai";
 const dateKeyFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIMEZONE,
   year: "numeric",

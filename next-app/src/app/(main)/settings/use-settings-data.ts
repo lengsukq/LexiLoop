@@ -74,6 +74,7 @@ export function useSettingsData() {
       const form = new FormData();
       form.append("file", file);
       const result = await apiFetch<{ message: string }>("/api/backups/restore", { method: "POST", body: form });
+      await load();
       setMessage(result.message);
       toast.success(result.message, "备份恢复成功");
     } catch (reason) {

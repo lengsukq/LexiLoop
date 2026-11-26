@@ -1,6 +1,6 @@
 import { sqlite } from "@/db/client";
-import crypto from "node:crypto";
 import { IMPORT_PREVIEW_TTL_MS } from "@/lib/config";
+import { randomUuid } from "@/lib/iso-crypto";
 import { mapLanguage } from "@/lib/language";
 import { ENTRY_TYPES, type EntryType, type ManualContentPreview, type ProviderAttempt } from "@/lib/types";
 import { contentStatus, dictionaryContentFromRow, mergeDictionaryContent, normalizeDictionaryContent } from "@/modules/dictionary/content";
@@ -70,7 +70,7 @@ export async function createManualPreview(input: unknown): Promise<ManualContent
     ...attempt,
     fieldsReturned: attempt.fieldsReturned.length ? attempt.fieldsReturned : fieldsReturned(content),
   }));
-  const token = crypto.randomUUID();
+  const token = randomUuid();
   const now = Date.now();
   const expiresAt = now + IMPORT_PREVIEW_TTL_MS;
   await sqlite.transaction(async () => {

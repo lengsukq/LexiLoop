@@ -1,4 +1,5 @@
 import type { DictionaryProvider } from "../provider";
+import { fetchDictionaryUpstream } from "../proxy-fetch";
 import type { LookupInput } from "@/lib/types";
 
 interface MyMemoryResponse {
@@ -19,7 +20,16 @@ export class MyMemoryProvider implements DictionaryProvider {
       const url = new URL("https://api.mymemory.translated.net/get");
       url.searchParams.set("q", input.term);
       url.searchParams.set("langpair", `${input.sourceLanguage}|${input.targetLanguage}`);
-      const response = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { "user-agent": "LexiLoop/1.0" } });
+      const response = await fetchDictionaryUpstream(
+        {
+          target: "mymemory",
+          term: input.term,
+          sourceLanguage: input.sourceLanguage,
+          targetLanguage: input.targetLanguage,
+          timeoutMs: 8_000,
+        },
+        () => fetch(url, { signal: AbortSignal.timeout(8_000), headers: { "user-agent": "LexiLoop/1.0" } }),
+      );
       if (response.status === 429) return { content: null, errorCode: "RATE_LIMITED", errorMessage: "翻译服务限流", transient: true };
       if (!response.ok) return { content: null, errorCode: `HTTP_${response.status}`, errorMessage: `翻译服务返回 ${response.status}`, transient: response.status >= 500 };
       const data = await response.json() as MyMemoryResponse;

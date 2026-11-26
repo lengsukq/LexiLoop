@@ -1,4 +1,5 @@
 import type { DictionaryProvider } from "../provider";
+import { fetchDictionaryUpstream } from "../proxy-fetch";
 import type { DictionaryContent, LookupInput } from "@/lib/types";
 
 interface ApiEntry {
@@ -18,10 +19,13 @@ export class DictionaryApiProvider implements DictionaryProvider {
 
   async lookup(input: LookupInput) {
     try {
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(input.term)}`, {
-        signal: AbortSignal.timeout(10_000),
-        headers: { accept: "application/json", "user-agent": "LexiLoop/1.0" },
-      });
+      const response = await fetchDictionaryUpstream(
+        { target: "dictionaryapi", term: input.term, timeoutMs: 10_000 },
+        () => fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(input.term)}`, {
+          signal: AbortSignal.timeout(10_000),
+          headers: { accept: "application/json", "user-agent": "LexiLoop/1.0" },
+        }),
+      );
       if (response.status === 404) return { content: null, errorCode: "NOT_FOUND", errorMessage: "词典中没有该词条" };
       if (response.status === 429) return { content: null, errorCode: "RATE_LIMITED", errorMessage: "词典 API 限流", transient: true };
       if (!response.ok) return { content: null, errorCode: `HTTP_${response.status}`, errorMessage: `词典 API 返回 ${response.status}`, transient: response.status >= 500 };

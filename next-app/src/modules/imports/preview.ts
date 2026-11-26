@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
 import { sqlite } from "@/db/client";
 import { IMPORT_PREVIEW_TTL_MS } from "@/lib/config";
+import { randomUuid, sha256Hex } from "@/lib/iso-crypto";
 import { mapLanguage } from "@/lib/language";
 import type { ImportPreview, ImportPreviewRow } from "@/lib/types";
 import { parseEasyDictCsv } from "./parser";
@@ -36,11 +36,11 @@ export async function createImportPreview(content: string, filename: string): Pr
       errors: duplicate ? ["CSV 内重复词条，提交时仅处理第一次出现的记录。"] : [],
     };
   });
-  const token = crypto.randomUUID();
+  const token = randomUuid();
   const expiresAt = new Date(now + IMPORT_PREVIEW_TTL_MS);
   await sqlite.prepare(
     "INSERT INTO import_previews(token, filename, file_hash, rows_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-  ).run(token, filename, crypto.createHash("sha256").update(content).digest("hex"), JSON.stringify(rows), expiresAt.getTime(), now);
+  ).run(token, filename, await sha256Hex(content), JSON.stringify(rows), expiresAt.getTime(), now);
   const valid = rows.filter((row) => row.status !== "INVALID" && row.status !== "DUPLICATE");
   const languages: Record<string, number> = {};
   const entryTypes: Record<string, number> = {};

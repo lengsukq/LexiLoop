@@ -7,8 +7,16 @@ const MAINTENANCE_INTERVAL_MS = 10 * MINUTE_MS; // 10 minutes
 const SUGGESTION_CHECK_INTERVAL_MS = MINUTE_MS; // 1 minute
 const SUGGESTION_GENERATION_HOUR = 0;
 const SUGGESTION_GENERATION_MINUTE = 5;
-const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "Asia/Shanghai";
+const APP_TIMEZONE = (typeof process !== "undefined" ? process.env?.APP_TIMEZONE : undefined) ?? "Asia/Shanghai";
 const DEFAULT_MAX_JOBS = 3;
+
+function isBrowserRuntime(): boolean {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+function currentProcessId(): number {
+  return typeof process !== "undefined" && typeof process.pid === "number" ? process.pid : 0;
+}
 
 /**
  * 固定 workerId 用于 serverless 触发路径。worker_heartbeats 按 worker_id upsert，
@@ -113,29 +121,48 @@ export async function runBackgroundTick(
   let totalClaimed = 0;
 
   await maybeRunMaintenance();
-  maybeGenerateDailySuggestion();
+  const sequential = isBrowserRuntime();
+  if (sequential) {
+    // In single-connection Browser PGlite, avoid overlapping fire-and-forget DB writes.
+    maybeGenerateDailySuggestion();
+    if (state().suggestionPromise) await state().suggestionPromise;
+  } else {
+    maybeGenerateDailySuggestion();
+  }
 
   for (;;) {
-    const jobs = await claimJobs(workerId, maxJobs);
+    const jobs = await claimJobs(workerId, sequential ? 1 : maxJobs);
     if (jobs.length === 0) break;
-    await Promise.allSettled(jobs.map(async (job) => {
-      updateHeartbeat(workerId, "WORKING", job.id, {
-        pid: process.pid,
-        wordId: job.wordId,
-        mode: "tick",
-      });
-      await processJob(job);
-    }));
+    if (sequential) {
+      for (const job of jobs) {
+        await updateHeartbeat(workerId, "WORKING", job.id, {
+          pid: currentProcessId(),
+          wordId: job.wordId,
+          mode: "tick",
+        });
+        await processJob(job);
+      }
+    } else {
+      await Promise.allSettled(jobs.map(async (job) => {
+        updateHeartbeat(workerId, "WORKING", job.id, {
+          pid: currentProcessId(),
+          wordId: job.wordId,
+          mode: "tick",
+        });
+        await processJob(job);
+      }));
+    }
     totalClaimed += jobs.length;
     if (timeBudgetMs <= 0) break;
     if (Date.now() - startedAt >= timeBudgetMs) break;
   }
 
-  updateHeartbeat(workerId, "IDLE", undefined, {
-    pid: process.pid,
+  const idleHeartbeat = updateHeartbeat(workerId, "IDLE", undefined, {
+    pid: currentProcessId(),
     claimed: totalClaimed,
     mode: "tick",
   });
+  if (sequential) await idleHeartbeat;
 
   return {
     workerId,

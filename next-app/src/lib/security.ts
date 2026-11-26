@@ -1,9 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NextRequest, NextResponse } from "next/server";
+import { SYNC_PASSWORD_HEADER } from "@/lib/sync-constants";
 
 export const AUTH_COOKIE_NAME = "lexiloop_auth";
 export const AUTH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
-export const SYNC_PASSWORD_HEADER = "x-lexiloop-sync-password";
+export const LOCAL_MODE_COOKIE_NAME = "lexiloop_mode";
+export const LOCAL_MODE_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+export { SYNC_PASSWORD_HEADER };
 
 function configuredPassword(): string | null {
   const password = process.env.LEXILOOP_PASSWORD;
@@ -81,7 +84,12 @@ function requestIsSecure(request: NextRequest): boolean {
   return (forwardedProtocol ?? new URL(request.url).protocol.replace(":", "")) === "https";
 }
 
+export function hasLocalModeCookie(request: NextRequest): boolean {
+  return request.cookies.get(LOCAL_MODE_COOKIE_NAME)?.value === "local";
+}
+
 export function setAuthCookie(response: NextResponse, request: NextRequest): void {
+  const secure = requestIsSecure(request);
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
     value: createAuthCookieValue(),
@@ -89,6 +97,62 @@ export function setAuthCookie(response: NextResponse, request: NextRequest): voi
     maxAge: AUTH_COOKIE_MAX_AGE_SECONDS,
     path: "/",
     sameSite: "lax",
-    secure: requestIsSecure(request),
+    secure,
   });
+  // Signing into cloud mode clears any previous browser-local cookie so visits return to cloud DB.
+  response.cookies.set({
+    name: LOCAL_MODE_COOKIE_NAME,
+    value: "",
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+}
+
+export function setLocalModeCookie(response: NextResponse, request: NextRequest, enabled: boolean): void {
+  const secure = requestIsSecure(request);
+  response.cookies.set({
+    name: LOCAL_MODE_COOKIE_NAME,
+    value: enabled ? "local" : "",
+    httpOnly: false,
+    maxAge: enabled ? LOCAL_MODE_COOKIE_MAX_AGE_SECONDS : 0,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+}
+
+export function clearAuthCookies(response: NextResponse, request: NextRequest): void {
+  const secure = requestIsSecure(request);
+  response.cookies.set({
+    name: AUTH_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+  response.cookies.set({
+    name: LOCAL_MODE_COOKIE_NAME,
+    value: "",
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+}
+
+/** Requires SSRF validation for AI/provider relays whenever the caller is not explicitly password-authenticated. */
+export function requiresSsrfGuard(request: NextRequest): boolean {
+  return !(isPasswordEnabled() && isAuthCookieValid(request));
+}
+
+export function isSameSiteStatelessRelayAllowed(request: NextRequest): boolean {
+  const secFetchSite = request.headers.get("sec-fetch-site");
+  if (secFetchSite && secFetchSite !== "same-origin" && secFetchSite !== "same-site" && secFetchSite !== "none") {
+    return false;
+  }
+  return isAuthCookieValid(request) || hasLocalModeCookie(request);
 }

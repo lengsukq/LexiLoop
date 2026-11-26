@@ -33,6 +33,7 @@ scripts/deploy-queen.sh
 .DS_Store
 .vercel
 .env*
+!.env.example
 # Private self-hosted deploy (keep Queen infra local)
 Dockerfile
 docker-compose.yml

@@ -74,18 +74,17 @@ workflow 文件在**默认分支 `main`**：
 .github/workflows/release.yml
 ```
 
-原因：GitHub 的「Run workflow」按钮只认默认分支上的 `workflow_dispatch`
-workflow。Flutter 应用在 `flutter` 分支，所以 workflow 放在 `main`，构建时
-`actions/checkout` 到 `source_ref`（默认 `flutter`）解析出的**具体 commit SHA**；
-构建、签名和 Release tag 都指向同一个 SHA。
+原因：GitHub 的「Run workflow」按钮读取默认分支（`main`）上的 `workflow_dispatch`
+workflow。Flutter 应用已合入 `main` 根目录，构建时 `actions/checkout` 到 `source_ref`
+（默认 `main`）解析出的**具体 commit SHA**；构建、签名和 Release tag 都指向同一个 SHA。
 
 ### 网页
 
 1. 打开 Actions → **Build Release (Android / macOS)**。
-2. 点 **Run workflow**，分支保持 **main**（不要切到 flutter，workflow 文件不在那里）。
+2. 点 **Run workflow**，分支保持 **main**。
 3. 选择：
    - `platform`: `all` / `android` / `macos`
-   - `source_ref`: 默认 `flutter`
+   - `source_ref`: 默认 `main`（也可按需指定历史分支或 tag）
 4. Run。
 
 ### 命令行
@@ -94,7 +93,7 @@ workflow。Flutter 应用在 `flutter` 分支，所以 workflow 放在 `main`，
 gh workflow run release.yml \
   --ref main \
   -f platform=all \
-  -f source_ref=flutter
+  -f source_ref=main
 
 gh run list --workflow release.yml --limit 3
 gh run watch <run-id> --exit-status

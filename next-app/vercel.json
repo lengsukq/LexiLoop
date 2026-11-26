@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "crons": [
     { "path": "/api/background/tick", "schedule": "0 0 * * *" }
   ]

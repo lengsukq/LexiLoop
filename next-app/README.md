@@ -67,7 +67,13 @@ npx tsx scripts/migrate-sqlite-to-pg.ts /path/to/backup.sqlite
 
 ## Vercel 部署（Serverless）
 
+> **子目录部署**：本 Next.js 工程位于仓库的 `next-app/` 子目录。请在 Vercel 项目 **Settings → General → Root Directory** 中设置为 `next-app`；`vercel.json` 已配置 `ignoreCommand`（`scripts/vercel-ignore.sh`），仅在 `next-app/` 目录变动时才触发线上构建。
+
 LexiLoop 采用 **tick 驱动模式**：没有常驻 Worker 进程，初始化任务由定时 Cron 与请求内按需触发推进，兼容 Vercel serverless 与本地自托管。
+
+### 与 Flutter 跨端云同步
+
+Next.js 暴露了一组兼容 Vercel 4.5 MB 请求体上限的 HTTP + GZip + 分片增量同步端点（`/api/sync/handshake`、`/api/sync/pull`、`/api/sync/push`、`/api/sync/status`），复用 `LEXILOOP_PASSWORD`（通过 `X-LexiLoop-Sync-Password` 或 `Authorization: Bearer` 鉴权）。在 Flutter 应用「设置 → 数据管理 → Next.js 云端同步」填入本站点地址与登录密码即可双向增量互传。
 
 ### 环境变量
 

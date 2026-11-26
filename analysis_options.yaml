@@ -19,6 +19,7 @@ analyzer:
     - android/**
     - macos/**
     - web/**
+    - next-app/**
 
   errors:
     # ── 死代码与未使用：一律 error，不允许留下 ──

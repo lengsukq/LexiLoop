@@ -5,9 +5,11 @@
 
 - 双端目标：**macOS**（桌面）与 **Android**（移动）；另有 **Web** 构建用于在
   浏览器里自测（见下文「Web 构建的已知限制」）。
-- 迁移来源：本项目由一套 Next.js + PostgreSQL 的实现迁移而来。旧版在
-  `main` 分支（`src/`），新版在 `flutter` 分支（`lib/`），两者不共存。
-  功能对照见 [`docs/FLUTTER_PARITY.md`](docs/FLUTTER_PARITY.md)。
+- 仓库结构：`main` 根目录为 Flutter 主工程（`lib/`、`android/`、`macos/`、`web/`），
+  原 Next.js + PostgreSQL 网页与云同步服务端位于 [`next-app/`](next-app/README.md)
+  （Vercel `Root Directory = next-app`）。功能对照见 [`docs/FLUTTER_PARITY.md`](docs/FLUTTER_PARITY.md)。
+- 跨端互传：支持 Flutter 客户端在「设置 → 数据管理 → Next.js 云端同步」直连部署好的
+  Next.js 实例（Vercel 或自托管），通过 HTTP + GZip + 分片完成双向增量合并、单向拉取与覆盖恢复。
 - 外观：设置 › 外观可切换跟随系统/浅色/深色，并从 12 个预设或自定义色相/饱和度里
   选择主色与次色；颜色按明暗自动校准，所有文字保持 ≥4.5:1。见
   [`docs/THEMING.md`](docs/THEMING.md)。

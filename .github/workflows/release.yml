@@ -1,6 +1,6 @@
-# 仓库默认分支是 main（旧 Next.js 版），Flutter 应用在 flutter 分支。
-# GitHub 的「Run workflow」按钮只读取默认分支上的 workflow，
-# 所以本文件放在 main；构建时 checkout 到 inputs.source_ref（默认 flutter）。
+# 仓库默认分支 main 根目录为 Flutter 主工程，Next.js Web/云同步服务位于 next-app/。
+# GitHub 的「Run workflow」按钮读取默认分支（main）上的 workflow，
+# 构建时 checkout 到 inputs.source_ref（默认 main）。
 #
 # 版本策略：
 #   - pubspec.yaml 只保留 0.x 基础版本（当前 0.1.0+1）
@@ -22,9 +22,9 @@ on:
           - android
           - macos
       source_ref:
-        description: "Flutter 代码 ref（默认 flutter）"
+        description: "Flutter 代码 ref（默认 main）"
         required: true
-        default: flutter
+        default: main
         type: string
 
 permissions:

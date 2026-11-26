@@ -4,9 +4,8 @@ import type { NextConfig } from "next";
 const isVercel = process.env.VERCEL === "1";
 
 const nextConfig: NextConfig = {
-  ...(isVercel ? {} : { output: "standalone" as const }),
+  ...(isVercel ? {} : { output: "standalone" as const, outputFileTracingRoot: __dirname }),
   serverExternalPackages: ["ws"],
-  outputFileTracingRoot: __dirname,
   allowedDevOrigins: ["127.0.0.1"],
   turbopack: {
     root: __dirname,
